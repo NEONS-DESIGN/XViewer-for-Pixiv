@@ -71,4 +71,24 @@ export const KEYS = Object.freeze({
 	PREV_WORK: 'ArrowUp',
 	NEXT_WORK: 'ArrowDown',
 	CLOSE: 'Escape',
+	FOCUS_NEXT: 'Tab',
 });
+
+/**
+ * モーダルの中で Tab を巡回させる対象。
+ * role="dialog" を名乗る以上、フォーカスは中に閉じ込める (UI_DESIGN_KIT §6)。
+ */
+export const FOCUSABLE_SELECTOR = [
+	'a[href]',
+	'button:not([disabled])',
+	'input:not([disabled])',
+	'select:not([disabled])',
+	'textarea:not([disabled])',
+	'[tabindex]:not([tabindex="-1"])',
+].join(',');
+
+/** 隠れている要素。フォーカスの巡回から外すために使う。 */
+export const HIDDEN_SELECTOR = '[hidden]';
+
+/** モーダルの背後を Tab と読み上げから外すための属性。 */
+export const INERT_ATTRIBUTE = 'inert';

@@ -207,6 +207,9 @@ export function createImagePane(deps) {
 			// 新しく描いた画面にエラーを出すのを防ぐ
 			if (image && onImageError) image.removeEventListener('error', onImageError);
 			if (image) image.src = '';
+			// 自分が作った DOM は自分で片付ける。
+			// これを外すと、読み込み中に前の作品の矢印とカウンタが残る
+			frame?.remove();
 			prefetched = [];
 			image = null;
 			onImageError = null;
