@@ -1,7 +1,6 @@
 {
 	"manifest_version": 3,
 	"name": "PixivMaster",
-	"version": "0.1.0",
 	"description": "pixiv のユーザーページに X 風の画像ビュワーを追加します",
 	"content_scripts": [
 		{
