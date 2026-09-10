@@ -45,7 +45,6 @@ export function prefetchTargets(index, total, count) {
  * @property {Document} doc
  * @property {HTMLElement} container 描画先 (.stage)
  * @property {object} settings 設定
- * @property {(message: string) => void} onError 失敗を伝える
  */
 
 /**
@@ -70,6 +69,10 @@ export function createImagePane(deps) {
 	let prevButton = null;
 	/** @type {HTMLButtonElement|null} */
 	let nextButton = null;
+	/** @type {HTMLElement|null} 自分が作った枠。エラー行の置き場 */
+	let frame = null;
+	/** 画像の読み込み失敗ハンドラ。dispose で外すため参照を持つ */
+	let onImageError = null;
 
 	/**
 	 * 矢印ボタンを作る。
@@ -90,11 +93,29 @@ export function createImagePane(deps) {
 	}
 
 	/**
+	 * ペインの中にエラー行を出す。
+	 * 共有の状態表示を使うと既に見えている画像まで消えてしまうため、自分の枠の中に出す。
+	 * @param {string} message 文言
+	 * @returns {void}
+	 */
+	function showPaneError(message) {
+		if (!frame) return;
+		frame.querySelector('.pane-error')?.remove();
+		const line = doc.createElement('p');
+		line.className = 'pane-error';
+		line.setAttribute('role', 'alert');
+		line.textContent = message;
+		frame.appendChild(line);
+	}
+
+	/**
 	 * 今のページを描く。
 	 * @returns {void}
 	 */
 	function paint() {
 		if (!image) return;
+		// ページを切り替えたら前のページのエラーは残さない
+		frame?.querySelector('.pane-error')?.remove();
 		image.src = urls[index] ?? '';
 		if (counter) counter.textContent = `${index + 1}/${urls.length}`;
 		const single = urls.length <= 1;
@@ -143,12 +164,13 @@ export function createImagePane(deps) {
 		async render(detail) {
 			container.querySelectorAll('.status, .frame').forEach((node) => node.remove());
 
-			const frame = doc.createElement('div');
+			frame = doc.createElement('div');
 			frame.className = 'frame';
 
 			image = doc.createElement('img');
 			image.alt = detail.title;
-			image.addEventListener('error', () => deps.onError('画像を読み込めませんでした'));
+			onImageError = () => showPaneError('画像を読み込めませんでした');
+			image.addEventListener('error', onImageError);
 
 			counter = doc.createElement('p');
 			counter.className = 'counter';
@@ -172,7 +194,7 @@ export function createImagePane(deps) {
 				paint();
 			} catch (error) {
 				// 1 枚目は出ているので、複数枚が開けないことだけを伝える
-				deps.onError('2 枚目以降を読み込めませんでした');
+				showPaneError('2 枚目以降を読み込めませんでした');
 				console.warn('[PixivMaster] failed to load pages', detail.id, error);
 			}
 		},
@@ -181,11 +203,17 @@ export function createImagePane(deps) {
 		prev() { move(-1); },
 
 		dispose() {
+			// 破棄したあとに古い画像の error が発火して、
+			// 新しく描いた画面にエラーを出すのを防ぐ
+			if (image && onImageError) image.removeEventListener('error', onImageError);
+			if (image) image.src = '';
 			prefetched = [];
 			image = null;
+			onImageError = null;
 			counter = null;
 			prevButton = null;
 			nextButton = null;
+			frame = null;
 		},
 	};
 }
