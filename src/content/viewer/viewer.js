@@ -16,7 +16,7 @@ import { createIcon } from '../../common/icons.js';
 import { getJson } from '../../pixiv/client.js';
 import { illustUrl } from '../../pixiv/endpoints.js';
 import { normalizeDetail, ILLUST_TYPES } from '../../pixiv/normalize.js';
-import { readSession } from '../../pixiv/session.js';
+import { readSession } from '../session.js';
 import { createImagePane } from './image-pane.js';
 import { createUgoiraPlayer } from './ugoira.js';
 import { createSidebar } from './sidebar.js';

@@ -6,7 +6,7 @@
  * ブックマーク削除は反映が数秒遅れるため、画面は先に更新して再取得で確認しない。
  */
 import { createIcon } from '../../common/icons.js';
-import { readSession } from '../../pixiv/session.js';
+import { readSession } from '../session.js';
 import { likeIllust, addBookmark, deleteBookmark, followUser, unfollowUser } from '../../pixiv/actions.js';
 
 /**

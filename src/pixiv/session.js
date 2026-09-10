@@ -1,11 +1,10 @@
 /**
- * ページに埋め込まれた #__NEXT_DATA__ からセッション情報を読む。
+ * #__NEXT_DATA__ の中身からセッション情報を組み立てる。
  * pixiv は Next.js の Pages Router で動いており、ログイン状態・表示設定・CSRF トークンが
  * ここに入っている (SITE_SPEC §0)。
+ *
+ * ここは文字列を受け取る純粋関数だけを置く。DOM から読み出す役は content/session.js。
  */
-
-/** __NEXT_DATA__ を持つ script 要素の id。 */
-const NEXT_DATA_ID = '__NEXT_DATA__';
 
 /** 読めなかったときに返す値。未ログインと同じ扱いにする。 */
 const EMPTY_SESSION = Object.freeze({ isLoggedIn: false, self: null, csrfToken: null });
@@ -27,6 +26,9 @@ const EMPTY_SESSION = Object.freeze({ isLoggedIn: false, self: null, csrfToken: 
  * __NEXT_DATA__ の中身を解析する。
  * 壊れていても例外を投げない。セッションが読めないことは画面を落とす理由にならず、
  * 未ログインとして扱えば全年齢作品は見られるため。
+ *
+ * __NEXT_DATA__ は SPA 遷移では更新されないので、同じページでは何度読んでも同じ値になる。
+ * トークンの失効は 401 を見て別に扱う (この関数の担当ではない)。
  * @param {string|null} text script 要素の中身
  * @returns {Session} セッション情報
  */
@@ -63,15 +65,4 @@ export function parseNextData(text) {
 	}
 
 	return session;
-}
-
-/**
- * ドキュメントからセッション情報を読む。
- * トークンはセッション更新で変わりうるのでキャッシュせず、必要なたびに呼ぶ。
- * @param {Document} doc 対象のドキュメント
- * @returns {Session} セッション情報
- */
-export function readSession(doc) {
-	const script = doc.getElementById(NEXT_DATA_ID);
-	return parseNextData(script?.textContent ?? null);
 }
