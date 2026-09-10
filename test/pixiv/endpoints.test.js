@@ -8,6 +8,7 @@ import {
 	userProfileAllUrl,
 	userProfileIllustsUrl,
 	userUrl,
+	safeCdnUrl,
 } from '../../src/pixiv/endpoints.js';
 
 test('作品まわりの URL を組み立てる', () => {
@@ -40,4 +41,25 @@ test('profile/illusts は ids[] を URL エンコードして並べる', () => {
 test('profile/illusts は is_first_page が false なら 0 を入れる', () => {
 	const url = userProfileIllustsUrl('54734418', ['1'], false);
 	assert.ok(url.includes('is_first_page=0'));
+});
+
+test('safeCdnUrl は pixiv の CDN の URL だけを通す', () => {
+	const url = 'https://i.pximg.net/user-profile/img/2026/01/01/00/00/00/1_50.jpg';
+	assert.equal(safeCdnUrl(url), url);
+	assert.equal(safeCdnUrl('https://s.pximg.net/common/images/x.png'), 'https://s.pximg.net/common/images/x.png');
+});
+
+test('safeCdnUrl は別のホストと http を弾く', () => {
+	// API の応答をそのまま外部オリジンへのリクエストにしないための関門
+	assert.equal(safeCdnUrl('https://example.com/a.jpg'), null);
+	assert.equal(safeCdnUrl('https://evil.i.pximg.net/a.jpg'), null);
+	assert.equal(safeCdnUrl('http://i.pximg.net/a.jpg'), null);
+});
+
+test('safeCdnUrl は URL でない値と空を弾く', () => {
+	assert.equal(safeCdnUrl('javascript:alert(1)'), null);
+	assert.equal(safeCdnUrl('/img/a.jpg'), null);
+	assert.equal(safeCdnUrl(''), null);
+	assert.equal(safeCdnUrl(null), null);
+	assert.equal(safeCdnUrl(undefined), null);
 });

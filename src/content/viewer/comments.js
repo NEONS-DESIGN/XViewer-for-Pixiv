@@ -3,7 +3,7 @@
  * コメントの取得に失敗しても画像は見られるので、失敗はこの区画の中だけで伝える。
  */
 import { getJson } from '../../pixiv/client.js';
-import { commentRootsUrl } from '../../pixiv/endpoints.js';
+import { commentRootsUrl, safeCdnUrl } from '../../pixiv/endpoints.js';
 import { COMMENT_PAGE_SIZE } from '../../common/constants.js';
 
 /** 退会したユーザーの表示名。 */
@@ -76,8 +76,12 @@ export function createComments(deps) {
 
 		const avatar = doc.createElement('img');
 		avatar.className = 'comment-avatar';
-		avatar.src = comment.avatarUrl;
 		avatar.alt = '';
+		// API が返した値をそのまま外部オリジンへのリクエストにしない。
+		// pixiv の CDN 以外を指していたら読み込まず、読み込み失敗と同じ見え方にする
+		const avatarUrl = safeCdnUrl(comment.avatarUrl);
+		if (avatarUrl) avatar.src = avatarUrl;
+		else avatar.style.visibility = 'hidden';
 		// 読み込めなくても本文は読めるので、枠だけ残して黙って続ける
 		avatar.addEventListener('error', () => { avatar.style.visibility = 'hidden'; });
 
