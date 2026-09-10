@@ -1,7 +1,113 @@
-/* 配色トークンは Task 21 で UI_DESIGN_KIT §2 から入れる。ここでは幅だけ決めておく */
+/* 配色はすべてここの変数で決める。個々の規則に色を直書きしないこと。
+   ダークが既定。ライトは :root[data-theme='light'] で変数だけを差し替える。 */
+:root {
+	/* ブラウザ標準の部品も配色に追従させる。これが無いとチェックボックスだけ暗いままになる */
+	color-scheme: dark;
+	--bg: #14161c;
+	--surface: #1d212b;
+	--fg: #eff0f4;
+	--muted: #9aa0b4;
+	--border: #262b38;
+	--divider: rgba(255, 255, 255, 0.12);
+	--control-bg: #1d212b;
+	--control-border: #333846;
+	--control-hover: #262b38;
+	--hover: rgba(255, 255, 255, 0.08);
+	--accent: #4ea3d6;
+	--on-accent: #04121a;
+	--danger: #e5737a;
+}
+
+:root[data-theme='light'] {
+	color-scheme: light;
+	--bg: #f5f6f8;
+	--surface: #ffffff;
+	--fg: #1c1e26;
+	--muted: #5c6275;
+	--border: #d6d9e0;
+	--divider: rgba(0, 0, 0, 0.12);
+	--control-bg: #ffffff;
+	--control-border: #c5c9d3;
+	--control-hover: #e9ebf0;
+	--hover: rgba(0, 0, 0, 0.05);
+	--accent: #1f7fb8;
+	--on-accent: #ffffff;
+	--danger: #c0392b;
+}
+
 body {
+	/* Chrome 拡張の popup は幅を固定する (UI_DESIGN_KIT §10) */
 	width: 320px;
 	margin: 0;
 	padding: 12px;
-	font-family: system-ui, sans-serif;
+	background: var(--bg);
+	color: var(--fg);
+	font-family: system-ui, -apple-system, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+	font-size: 14px;
+	line-height: 1.6;
+}
+
+h1 {
+	margin: 0 0 12px;
+	font-size: 15px;
+}
+
+.field {
+	padding: 8px 0;
+	border-bottom: 1px solid var(--divider);
+}
+
+.field:last-of-type { border-bottom: none; }
+
+.row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	cursor: pointer;
+}
+
+.label { flex: 1 1 auto; }
+
+/* 操作部品の高さを揃える (UI_DESIGN_KIT §3) */
+select {
+	width: 100%;
+	height: 30px;
+	margin-top: 4px;
+	padding: 0 8px;
+	border: 1px solid var(--control-border);
+	border-radius: 6px;
+	background: var(--control-bg);
+	color: var(--fg);
+	font: inherit;
+}
+
+select:hover { background: var(--control-hover); }
+
+input[type='checkbox'] {
+	width: 16px;
+	height: 16px;
+	margin: 0;
+	accent-color: var(--accent);
+}
+
+/* すべての操作部品に輪郭を出す (UI_DESIGN_KIT §6) */
+select:focus-visible,
+input[type='checkbox']:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+/* 説明文。設定項目には必ず 1 行付ける (UI_DESIGN_KIT §1 原則 6) */
+.hint {
+	margin: 2px 0 0;
+	color: var(--muted);
+	font-size: 12px;
+	line-height: 1.4;
+}
+
+.status {
+	min-height: 1.4em;
+	margin: 8px 0 0;
+	color: var(--muted);
+	font-size: 12px;
 }
