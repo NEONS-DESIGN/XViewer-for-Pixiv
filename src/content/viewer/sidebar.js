@@ -239,6 +239,9 @@ export function createSidebar(deps) {
 		commentsSlot() { return comments; },
 
 		dispose() {
+			// 自分が描いた中身は自分で消す。
+			// これを外すと、次の作品を読み込んでいる間に前の作品の情報が残る
+			container.textContent = '';
 			actions = null;
 			comments = null;
 		},
