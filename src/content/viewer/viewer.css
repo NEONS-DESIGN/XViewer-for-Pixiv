@@ -35,8 +35,6 @@
 	--sidebar-width: 384px;
 	/* 操作部品の高さ。UI_DESIGN_KIT §3 に合わせる */
 	--control-height: 30px;
-	/* 作品情報がサイドバーの縦を占めてよい上限。残りは必ずコメント一覧に回す */
-	--sidebar-info-max-height: 60%;
 
 	/* Shadow DOM はフォントを継承しない。ホストページの書体に引きずられないよう明示する */
 	font-family: system-ui, -apple-system, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
@@ -92,30 +90,34 @@
 	cursor: default;
 }
 
-/* サイドバー自身はスクロールしない。縦に伸びるのはコメント一覧だけにしたいので、
+/* 縦に伸び縮みするのはコメント一覧だけにしたいので、
    中を 2 つ (.sidebar-info / .comments) に分けて領域を分け合う。
-   余白は中の 2 つが持つ。ここに padding を置くとスクロールバーが内側に寄る */
+   余白は中の 2 つが持つ。ここに padding を置くとスクロールバーが内側に寄る。
+
+   overflow-y は最後の逃げ道。作品情報だけでサイドバーの高さを超える作品では
+   コメント側を 0 まで潰しても収まらないので、そのときだけここがスクロールする。
+   ふだんは中身が必ず収まるので、このスクロールバーは出ない */
 .sidebar {
 	flex: 0 0 var(--sidebar-width);
 	max-width: 100%;
 	display: flex;
 	flex-direction: column;
-	overflow: hidden;
+	overflow-y: auto;
 	background: var(--surface);
 	border-left: 1px solid var(--border);
 	padding: 0;
 }
 
-/* 作品情報。ふだんはスクロールしない。
-   投稿文が極端に長いときだけ上限で頭打ちになり、自分でスクロールする (中身を切り落とさないため)。
+/* 作品情報。**大きさに関わらずスクロールさせない。** 中身の高さをそのまま使う。
 
-   flex-shrink は 0 にすること。1 にするとコメントが多い作品で
-   「縮む量を基準サイズで按分」され、作品情報まで一緒に潰れる (実機で踏んだ)。
-   縮んでよいのはコメント側だけで、こちらの上限は max-height が決める */
+   flex は 0 0 auto で固定すること。
+   - shrink を 1 にすると、コメントが多い作品で「縮む量を基準サイズで按分」され、
+     作品情報まで一緒に潰れる (実機で踏んだ)
+   - max-height で頭打ちにすると、コメントが多い作品で作品情報側に
+     スクロールバーが出る (実機で踏んだ)
+   縮むのはコメント側だけ。足りなければコメント一覧が 0 まで潰れる */
 .sidebar-info {
 	flex: 0 0 auto;
-	max-height: var(--sidebar-info-max-height);
-	overflow-y: auto;
 	padding: 16px 16px 0;
 }
 
@@ -352,8 +354,7 @@
 }
 
 /* コメント区画。見出しと「もっと見る」は動かさず、一覧だけを縦に伸ばしてスクロールさせる。
-   縮んでよいのはここだけ。作品情報は max-height で頭打ちにしてあるので、
-   残りは必ず 100% - var(--sidebar-info-max-height) 以上ある */
+   縮んでよいのはここだけ。作品情報が長い作品ではここが圧縮される */
 .comments {
 	flex: 1 1 auto;
 	min-height: 0;
