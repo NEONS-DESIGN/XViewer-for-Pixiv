@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createImagePane } from '../../src/content/viewer/image-pane.js';
 import { createSidebar } from '../../src/content/viewer/sidebar.js';
+import { renderWork, disposeAll } from '../../src/content/viewer/panes.js';
 
 /**
  * class セレクタだけを解する最小の要素の代わり。
@@ -73,6 +74,8 @@ function findByClass(root, selector) {
  */
 function fakeDoc() {
 	return {
+		// actions-bar が readSession で __NEXT_DATA__ を引く。未ログイン扱いで十分
+		getElementById: () => null,
 		createElement: (tag) => fakeElement(tag),
 		createElementNS: (_ns, tag) => fakeElement(tag),
 		createDocumentFragment: () => fakeElement('#fragment'),
@@ -83,6 +86,9 @@ function fakeDoc() {
 		},
 	};
 }
+
+/** 未ログインのセッション。全年齢作品はこれでも見られる。 */
+const ANONYMOUS = Object.freeze({ isLoggedIn: false, self: null });
 
 /** サイドバーへ渡す作品詳細の代わり。 */
 const DETAIL = Object.freeze({
@@ -99,7 +105,24 @@ const DETAIL = Object.freeze({
 	createDate: '2026-09-08T17:45:00+09:00',
 	pageCount: 1,
 	urls: { regular: 'https://i.pximg.net/img-master/x_p0_master1200.jpg' },
+	illustType: 0,
+	xRestrict: 0,
+	aiType: 0,
+	commentOff: false,
+	// 0 件にしておくとコメントの取得へ行かない。ここで見たいのは区画を作るかどうかだけ
+	commentCount: 0,
 });
+
+/** renderWork へ渡す設定の代わり。 */
+const SETTINGS = Object.freeze({ showSidebar: true, imageQuality: 'regular', prefetch: 0 });
+
+/**
+ * renderWork の描画先をひとそろい作る。
+ * @returns {{stage: object, sidebar: object}} ステージとサイドバー
+ */
+function fakeTargets() {
+	return { stage: fakeElement('div'), sidebar: fakeElement('div') };
+}
 
 test('画像ペインは dispose で自分の枠を DOM から外す', async () => {
 	const container = fakeElement('div');
@@ -126,4 +149,39 @@ test('サイドバーは dispose で中身を空にする', () => {
 
 	pane.dispose();
 	assert.equal(container.children.length, 0);
+});
+
+test('renderWork はサイドバーにコメント区画とアクションを作る', async () => {
+	const { stage, sidebar } = fakeTargets();
+	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc: fakeDoc(), stage, sidebar, onError: () => {} });
+
+	assert.equal(sidebar.hidden, false);
+	assert.ok(sidebar.querySelectorAll('.comments')[0].children.length > 0);
+	assert.ok(sidebar.querySelectorAll('.actions')[0].children.length > 0);
+	disposeAll();
+});
+
+test('主役の描画を待つ間に古くなったらコメントとアクションを作らない', async () => {
+	// 古い renderWork が再開して、新しい作品のサイドバーへ
+	// 古い作品のコメントとアクションを差し込むのを防ぐ。
+	// いいねは取り消せないので、対象を間違えると実害が出る
+	const { stage, sidebar } = fakeTargets();
+	let stale = false;
+	const rendering = renderWork(DETAIL, ANONYMOUS, SETTINGS, {
+		doc: fakeDoc(),
+		stage,
+		sidebar,
+		onError: () => {},
+		isStale: () => stale,
+	});
+	// 主役 (画像ペイン) の await の途中で別の作品へ移った
+	stale = true;
+	await rendering;
+
+	// サイドバー自体と主役は描かれている。増えないのはコメントとアクションだけ
+	assert.ok(sidebar.querySelectorAll('.title').length > 0);
+	assert.equal(stage.querySelectorAll('.frame').length, 1);
+	assert.equal(sidebar.querySelectorAll('.comments')[0].children.length, 0);
+	assert.equal(sidebar.querySelectorAll('.actions')[0].children.length, 0);
+	disposeAll();
 });

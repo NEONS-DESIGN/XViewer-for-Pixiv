@@ -239,6 +239,8 @@ export function createViewer(deps) {
 				stage,
 				sidebar,
 				onError: (message) => showStatus(message, 'error'),
+				// renderWork の内側の await をまたぐ間に別の作品へ移ったかを見せる
+				isStale: () => token !== requestToken,
 			});
 		} catch (error) {
 			if (token !== requestToken) return;
