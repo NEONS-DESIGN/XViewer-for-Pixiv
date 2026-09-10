@@ -13,6 +13,7 @@ import { normalizeDetail, canView } from '../../pixiv/normalize.js';
 import { readSession } from '../../pixiv/session.js';
 import { createImagePane } from './image-pane.js';
 import { createSidebar } from './sidebar.js';
+import { createComments } from './comments.js';
 
 /** ホストページのスクロールを止めるために body へ付ける style。 */
 const BODY_LOCK_STYLE = 'overflow:hidden';
@@ -53,6 +54,8 @@ export function createViewer(deps) {
 	let imagePane = null;
 	/** @type {ReturnType<typeof createSidebar>|null} */
 	let sidebarPane = null;
+	/** @type {ReturnType<typeof createComments>|null} */
+	let commentsPane = null;
 	/** 今開いている作品の並び。上下キーでの移動に使う */
 	let sequence = null;
 	/** 端で全作品の並びへ広げている最中かどうか。二重に広げないためのガード */
@@ -226,10 +229,15 @@ export function createViewer(deps) {
 			// 設定を戻したときに hidden が立ったままになって出てこなくなる
 			sidebarPane?.dispose();
 			sidebarPane = null;
+			commentsPane?.dispose();
 			sidebar.hidden = !settings.showSidebar;
 			if (settings.showSidebar) {
 				sidebarPane = createSidebar({ doc, container: sidebar });
 				sidebarPane.render(detail);
+			}
+			if (sidebarPane) {
+				commentsPane = createComments({ doc, container: sidebarPane.commentsSlot() });
+				void commentsPane.load(detail);
 			}
 			await imagePane.render(detail);
 		} catch (error) {
@@ -265,6 +273,8 @@ export function createViewer(deps) {
 			imagePane = null;
 			sidebarPane?.dispose();
 			sidebarPane = null;
+			commentsPane?.dispose();
+			commentsPane = null;
 			host?.remove();
 			host = null;
 			shadow = null;
