@@ -21,6 +21,14 @@ export const PAGE_KEY_SEPARATOR = '|';
 /** ユーザーページのうち、タグで絞り込んでいる状態のパス。 */
 export const USER_TAG_PATH_PATTERN = /^\/users\/\d+\/(?:artworks|illustrations|manga)\/.+/;
 
+/**
+ * ユーザーページのうち、その人自身の作品グリッドを出すパス。
+ * ブックマーク (/users/{id}/bookmarks/artworks) やフォロー中 (/users/{id}/following) にも
+ * 作品リンクは並ぶが、そこに出ているのは他人の作品なので、
+ * 「この作者の全作品」へ並びを広げてはいけない (SITE_SPEC §3)。
+ */
+export const USER_WORKS_PATH_PATTERN = /^\/users\/\d+(?:\/(?:artworks|illustrations|manga)(?:\/.*)?)?\/?$/;
+
 /** モーダルを載せるホスト要素の id。 */
 export const HOST_ELEMENT_ID = 'pixivmaster-root';
 
