@@ -6,9 +6,24 @@
  * ホストページが Trusted Types を強制していると innerHTML が例外になる事情もある。
  */
 import { createIcon } from '../../common/icons.js';
+import { PIXIV_ORIGIN } from '../../pixiv/endpoints.js';
 
 /** リンクとして扱ってよいスキーム。 */
 const SAFE_SCHEMES = ['http:', 'https:'];
+
+/** 日時の表示に使うタイムゾーン。閲覧地に依らず pixiv 本体と同じ表示にするため固定する。 */
+const DISPLAY_TIME_ZONE = 'Asia/Tokyo';
+
+/** 日時の書式。年月日は数値、時刻は 24 時間の 2 桁。 */
+const DATE_TIME_FORMAT = new Intl.DateTimeFormat('ja-JP', {
+	timeZone: DISPLAY_TIME_ZONE,
+	year: 'numeric',
+	month: 'numeric',
+	day: 'numeric',
+	hour: '2-digit',
+	minute: '2-digit',
+	hourCycle: 'h23',
+});
 
 /** 実体参照の戻し表。pixiv が返すのはこの範囲。 */
 const ENTITIES = Object.freeze({
@@ -31,6 +46,7 @@ export function formatCount(value) {
 
 /**
  * ISO 8601 の日時を日本語表記にする。
+ * ローカル時刻のゲッタを使うと閲覧地によって pixiv 本体と違う日時が出るため、JST に固定する。
  * @param {string} iso createDate など
  * @returns {string} 日本語の日時。読めなければ空文字
  */
@@ -38,9 +54,9 @@ export function formatDate(iso) {
 	if (!iso) return '';
 	const date = new Date(iso);
 	if (Number.isNaN(date.getTime())) return '';
-	const pad = (n) => String(n).padStart(2, '0');
-	return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 `
-		+ `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+	const parts = {};
+	for (const { type, value } of DATE_TIME_FORMAT.formatToParts(date)) parts[type] = value;
+	return `${parts.year}年${parts.month}月${parts.day}日 ${parts.hour}:${parts.minute}`;
 }
 
 /**
@@ -53,15 +69,19 @@ function decodeEntities(text) {
 }
 
 /**
- * href がリンクとして安全か。
- * @param {string} href URL
- * @returns {boolean} 安全なら true
+ * href がリンクとして安全かを確かめ、絶対 URL にして返す。
+ * 投稿文には /users/123 のような相対リンクが入るので、base を渡して解決する
+ * (渡さないと相対リンクが全て弾かれ、本文テキストに落ちてしまう)。
+ * 返すのは絶対 URL。Shadow DOM の中では相対 URL の解決基準が分かりにくいため正規化する。
+ * @param {string} href 投稿文の中の href
+ * @returns {string|null} 使ってよい絶対 URL。安全でなければ null
  */
-function isSafeHref(href) {
+function resolveSafeHref(href) {
 	try {
-		return SAFE_SCHEMES.includes(new URL(href).protocol);
+		const url = new URL(href, PIXIV_ORIGIN);
+		return SAFE_SCHEMES.includes(url.protocol) ? url.href : null;
 	} catch {
-		return false;
+		return null;
 	}
 }
 
@@ -87,10 +107,10 @@ export function splitComment(html) {
 			while ((matched = pattern.exec(line)) !== null) {
 				const before = line.slice(cursor, matched.index);
 				if (before) parts.push({ type: 'text', value: decodeEntities(before.replace(/<[^>]*>/g, '')) });
-				const href = decodeEntities(matched[1]);
 				const label = decodeEntities(matched[2].replace(/<[^>]*>/g, ''));
+				const href = resolveSafeHref(decodeEntities(matched[1]));
 				// 危険なスキームはリンクにせず本文として出す
-				parts.push(isSafeHref(href) ? { type: 'link', value: label, href } : { type: 'text', value: label });
+				parts.push(href ? { type: 'link', value: label, href } : { type: 'text', value: label });
 				cursor = matched.index + matched[0].length;
 			}
 			const rest = line.slice(cursor);

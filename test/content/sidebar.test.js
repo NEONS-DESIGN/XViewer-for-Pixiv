@@ -18,6 +18,12 @@ test('formatDate は日本語の日時にする', () => {
 	assert.equal(formatDate('2026-09-08T17:45:00+09:00'), '2026年9月8日 17:45');
 });
 
+test('formatDate は実行環境のタイムゾーンに依らず JST で出す', () => {
+	// UTC の深夜は JST では翌日。ここがローカル時刻だと閲覧地で表示が変わる
+	assert.equal(formatDate('2026-09-09T15:30:00Z'), '2026年9月10日 00:30');
+	assert.equal(formatDate('2026-01-01T00:05:00Z'), '2026年1月1日 09:05');
+});
+
 test('formatDate は読めない値で空文字を返す', () => {
 	assert.equal(formatDate('よくわからない'), '');
 	assert.equal(formatDate(''), '');
@@ -39,10 +45,27 @@ test('splitComment は a タグをリンクとして取り出す', () => {
 	]]);
 });
 
-test('splitComment は javascript: のリンクを本文として扱う', () => {
+test('splitComment は javascript: と data: のリンクを本文として扱う', () => {
 	// 外部由来の HTML なので、危険なスキームはリンクにしない
-	const lines = splitComment('<a href="javascript:alert(1)">押して</a>');
-	assert.deepEqual(lines, [[{ type: 'text', value: '押して' }]]);
+	assert.deepEqual(
+		splitComment('<a href="javascript:alert(1)">押して</a>'),
+		[[{ type: 'text', value: '押して' }]],
+	);
+	assert.deepEqual(
+		splitComment('<a href="data:text/html,x">押して</a>'),
+		[[{ type: 'text', value: '押して' }]],
+	);
+});
+
+test('splitComment は相対リンクを pixiv の絶対 URL にして残す', () => {
+	// 投稿文の中の /users/123 のような内部リンクを本文へ落とさない
+	assert.deepEqual(
+		splitComment('作者は<a href="/users/123">この人</a>'),
+		[[
+			{ type: 'text', value: '作者は' },
+			{ type: 'link', value: 'この人', href: 'https://www.pixiv.net/users/123' },
+		]],
+	);
 });
 
 test('splitComment は実体参照を戻す', () => {
