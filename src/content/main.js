@@ -96,8 +96,11 @@ async function apply() {
 		onRequestClose: () => router.close(),
 		// 作品を切り替えたら URL だけ差し替える。履歴は積まない
 		onNavigate: (workId) => router.replace(workId),
-		// タグ絞り込み中は profile/all と並びが一致しないので広げない
-		canExtendSequence: () => Boolean(page) && !page.isTagFiltered,
+		// その人自身の作品グリッドでだけ広げる。
+		// ブックマークやフォロー中に並んでいるのは他人の作品なので、
+		// 「この作者の全作品」へ広げると画面と無関係な作品へ飛んでしまう。
+		// タグ絞り込み中も profile/all と並びが一致しないので広げない
+		canExtendSequence: () => Boolean(page) && page.isWorksGrid && !page.isTagFiltered,
 		extendSequence: (current) => extendWithAllWorks(current, page.userId),
 	});
 	gridListener = attachGridListener(document, handleOpen);
@@ -191,6 +194,11 @@ function stopNavigationWatch() {
 
 /**
  * 設定を読んでから監視を始める。
+ *
+ * startNavigationWatch() を apply() より先に呼ぶ順序には意味がある。
+ * popstate は登録順に配られるので、こちらの購読が router.js の購読より先になる。
+ * そのおかげで、対象外のページへ戻ったときに stop() が router を捨ててから
+ * handlePopState が走ることはない。逆順にすると、捨てたはずの viewer を触りにいく。
  * @returns {Promise<void>}
  */
 async function boot() {

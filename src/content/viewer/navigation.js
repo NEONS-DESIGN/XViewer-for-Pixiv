@@ -75,6 +75,7 @@ export function createNavigation(deps) {
 		if (event.key === KEYS.CLOSE) {
 			event.preventDefault();
 			deps.onRequestClose();
+			return;
 		}
 		if (event.key === KEYS.FOCUS_NEXT) {
 			deps.focusNext(event);
