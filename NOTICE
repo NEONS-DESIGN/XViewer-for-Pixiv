@@ -1,0 +1,12 @@
+PixivMaster
+
+このソフトウェアには以下の成果物が含まれます。
+
+---
+
+Material Symbols
+https://github.com/google/material-design-icons
+Copyright Google LLC
+Licensed under the Apache License, Version 2.0
+
+src/common/icon-shapes.js に含まれる図形データは Material Symbols から生成したものです。

@@ -1,0 +1,166 @@
+/**
+ * どのペインを出すかの判断と、その組み立て。
+ *
+ * 「表示形式・サイドバー・コメント・アクションのどれを出すか」は条件の掛け算になり、
+ * ここが壊れると読み込み中に前の作品が残る・設定を戻すと出てこない等の不具合になる。
+ * 判断だけを純粋関数 planPanes() に切り出し、DOM を触らない形でテストで固定する。
+ * DOM を作るのは renderWork()、片付けるのは disposeAll()。
+ */
+import { ILLUST_TYPES } from '../../pixiv/normalize.js';
+import { createImagePane } from './image-pane.js';
+import { createUgoiraPlayer } from './ugoira.js';
+import { createSidebar } from './sidebar.js';
+import { createComments } from './comments.js';
+import { createActionsBar } from './actions-bar.js';
+import { createBlocked, blockReason } from './blocked.js';
+
+/** ステージに出す主役の種別。 */
+export const MAIN_PANE = Object.freeze({
+	IMAGE: 'image',
+	UGOIRA: 'ugoira',
+	BLOCKED: 'blocked',
+});
+
+/** @type {ReturnType<typeof createImagePane>|null} */
+let imagePane = null;
+/** @type {ReturnType<typeof createUgoiraPlayer>|null} */
+let ugoiraPane = null;
+/** @type {ReturnType<typeof createSidebar>|null} */
+let sidebarPane = null;
+/** @type {ReturnType<typeof createComments>|null} */
+let commentsPane = null;
+/** @type {ReturnType<typeof createActionsBar>|null} */
+let actionsPane = null;
+/** @type {ReturnType<typeof createBlocked>|null} */
+let blockedPane = null;
+
+/**
+ * @typedef {object} PanePlan
+ * @property {'image'|'ugoira'|'blocked'} main ステージに出す主役
+ * @property {boolean} sidebar サイドバーを出すか
+ * @property {boolean} comments コメント区画を作るか (中の「受け付けていません」の出し分けは comments.js)
+ * @property {boolean} actions いいね等のアクションを出すか
+ * @property {{kind: string, message: string}|null} reason 見られない理由。見られるなら null
+ */
+
+/**
+ * 何を出すかを決める。DOM は触らない。
+ *
+ * 見られない作品でもサイドバーは出す。タイトル・タグ・カウンタは pixiv 本体でも見える情報で、
+ * 隠す理由が無い。逆に本文の画像だけは出さない。
+ * ブロックの判定はうごイラより先。見られない作品を再生してはいけない。
+ * @param {object} detail 正規化した作品詳細
+ * @param {{isLoggedIn: boolean, self: object|null}} session セッション
+ * @param {object} settings 設定
+ * @returns {PanePlan} 何を出すか
+ */
+export function planPanes(detail, session, settings) {
+	const reason = blockReason(detail, session);
+	const sidebar = settings.showSidebar === true;
+	if (reason) {
+		// 見られない作品には更新系もコメントも出さない
+		return { main: MAIN_PANE.BLOCKED, sidebar, comments: false, actions: false, reason };
+	}
+	const main = detail.illustType === ILLUST_TYPES.UGOIRA ? MAIN_PANE.UGOIRA : MAIN_PANE.IMAGE;
+	// コメントとアクションはサイドバーの中に入るので、サイドバーが無ければ出せない
+	return { main, sidebar, comments: sidebar, actions: sidebar, reason: null };
+}
+
+/**
+ * @typedef {object} RenderTargets
+ * @property {Document} doc 対象のドキュメント
+ * @property {HTMLElement} stage 主役の描画先 (.stage)
+ * @property {HTMLElement} sidebar サイドバーの描画先 (.sidebar)
+ * @property {(message: string) => void} onError 再生できない等を伝える
+ * @property {() => boolean} [isStale] この描画がもう古いか。省略時は常に false
+ */
+
+/**
+ * 判断に従ってペインを組み立てる。
+ * 呼ぶ前に disposeAll() を済ませておくこと (取得を待つ前に解体するのが決まり)。
+ * 主役の描画は await するので、その間に別の作品へ移ることがある。
+ * targets.isStale で世代を確かめ、古くなっていたら残りを作らない。
+ * @param {object} detail 正規化した作品詳細
+ * @param {{isLoggedIn: boolean, self: object|null}} session セッション
+ * @param {object} settings 設定
+ * @param {RenderTargets} targets 描画先
+ * @returns {Promise<void>}
+ */
+export async function renderWork(detail, session, settings, targets) {
+	const { doc, stage, sidebar, onError } = targets;
+	// 渡されなければ「古くなっていない」とみなす
+	const isStale = targets.isStale ?? (() => false);
+	const plan = planPanes(detail, session, settings);
+
+	// hidden は毎回明示的に設定する。片方でしか触らないと、
+	// 設定を戻したときに hidden が立ったままになって出てこなくなる
+	sidebar.hidden = !plan.sidebar;
+
+	// サイドバーを先に出す。文章とカウンタは画像の読み込みを待つ理由が無い
+	if (plan.sidebar) {
+		sidebarPane = createSidebar({ doc, container: sidebar });
+		sidebarPane.render(detail);
+	}
+
+	if (plan.main === MAIN_PANE.BLOCKED) {
+		blockedPane = createBlocked({ doc, container: stage });
+		blockedPane.render(detail, plan.reason);
+		return;
+	}
+
+	if (plan.main === MAIN_PANE.UGOIRA) {
+		ugoiraPane = createUgoiraPlayer({ doc, container: stage, settings, onError });
+		await ugoiraPane.render(detail);
+	} else {
+		imagePane = createImagePane({ doc, container: stage, settings });
+		await imagePane.render(detail);
+	}
+
+	// 主役を待っている間に別の作品へ移っていたら、ここで降りる。
+	// ペインの参照はモジュール変数なので、続けると新しい作品のサイドバーへ
+	// 古い作品のコメントとアクションを差し込むことになる。
+	// いいねは取り消せないので、対象を間違えると実害が出る (CLAUDE.md 制約 7)。
+	// 資源は漏れない。新しい openWork の disposeAll() が古いペインを既に捨てている
+	if (isStale()) return;
+
+	if (plan.comments && sidebarPane) {
+		commentsPane = createComments({ doc, container: sidebarPane.commentsSlot() });
+		void commentsPane.load(detail);
+	}
+	if (plan.actions && sidebarPane) {
+		actionsPane = createActionsBar({ doc, container: sidebarPane.actionsSlot() });
+		actionsPane.render(detail);
+	}
+}
+
+/**
+ * ペインをすべて捨てる。
+ * DOM の片付けは各ペインが dispose の中でやるので、ここは呼ぶだけ。
+ * 必ず取得を待つ前に呼ぶこと。await の後ろに置くと読み込み中に前の作品の
+ * 矢印とカウンタが残り、左右キーが古い img を触ってしまう。
+ * @returns {void}
+ */
+export function disposeAll() {
+	imagePane?.dispose();
+	imagePane = null;
+	ugoiraPane?.dispose();
+	ugoiraPane = null;
+	sidebarPane?.dispose();
+	sidebarPane = null;
+	commentsPane?.dispose();
+	commentsPane = null;
+	actionsPane?.dispose();
+	actionsPane = null;
+	blockedPane?.dispose();
+	blockedPane = null;
+}
+
+/**
+ * 画像のページを送る。うごイラとブロック表示ではページの概念が無いので何もしない。
+ * @param {number} direction 1 なら次、-1 なら前
+ * @returns {void}
+ */
+export function movePage(direction) {
+	if (direction > 0) imagePane?.next();
+	else imagePane?.prev();
+}
