@@ -8,10 +8,16 @@
  * アイコンの対応は pixiv 本体に合わせる。いいねは顔 (like)、ブックマークはハート (favorite)。
  * 逆にすると意味が入れ替わって見える。
  *
- * いいねとブックマークはサイドバーのカウンタの上に並べ、フォローだけは作者行の右端へ描く。
- * 描画先が 2 つに分かれるので container と followContainer を別々に受け取る。
+ * **いいねとブックマークは独立したボタンを持たない。** サイドバーのカウンタ
+ * (.count-like / .count-bookmark) をボタンへ差し替え、数字そのものを押させる (X.com と同じ形)。
+ * 押す対象と結果が同じ場所にあるので、押した後に数字が動くのが分かる。
+ * 差し替えないままなら押せない表示として残るので、未ログインでも件数は読める。
+ *
+ * フォローだけは作者行の右端に独立したボタンとして描く。
+ * 描画先が 2 つに分かれるので container (カウンタの行) と followContainer を別々に受け取る。
  */
 import { createIcon } from '../../common/icons.js';
+import { formatCount } from './sidebar.js';
 import { readSession } from '../session.js';
 import { getJson } from '../../pixiv/client.js';
 import { userUrl } from '../../pixiv/endpoints.js';
@@ -64,11 +70,23 @@ export function followLabel(following) {
 }
 
 /**
+ * 押せるカウンタの読み上げ用の文言。
+ * 見えているのはアイコンと数字だけなので、操作の説明と件数を両方入れる。
+ * @param {string} label 操作の説明 (いいね済み など)
+ * @param {number} count 件数
+ * @returns {string} 文言
+ */
+export function countLabel(label, count) {
+	return `${label} ${formatCount(count)} 件`;
+}
+
+/**
  * @typedef {object} ActionsDeps
  * @property {Document} doc
- * @property {HTMLElement} container いいね・ブックマークの描画先 (.actions)
+ * @property {HTMLElement} container カウンタの行 (.counts)。中の .count-like / .count-bookmark を差し替える
  * @property {HTMLElement} [followContainer] フォローの描画先 (.follow-slot)。無ければフォローを出さない
  * @property {(userId: string) => Promise<object>} [fetchUser] ユーザー情報の取得。既定は /ajax/user/{id}?full=1
+ * @property {object} [actions] 更新系の差し替え。テストから通信させないために使う
  */
 
 /**
@@ -79,6 +97,9 @@ export function followLabel(following) {
 export function createActionsBar(deps) {
 	const { doc, container, followContainer } = deps;
 	const fetchUser = deps.fetchUser ?? ((userId) => getJson(userUrl(userId)));
+	// 更新系はまとめて差し替えられるようにしておく。
+	// テストで本物の pixiv を叩かないためと、いいねが取り消せないため
+	const api = { likeIllust, addBookmark, deleteBookmark, followUser, unfollowUser, ...deps.actions };
 	/** 押した結果を読み上げさせるための領域 */
 	let statusLine = null;
 	/** 破棄済みか。await の後に自分がまだ生きているか確かめるために使う */
@@ -146,6 +167,43 @@ export function createActionsBar(deps) {
 	}
 
 	/**
+	 * カウンタ 1 つを押せるボタンへ差し替える。
+	 * 中身 (アイコンと数字) は describeCount() が入れる。
+	 * @param {string} marker 差し替える .count に付いている印 (count-like など)
+	 * @param {string} iconName アイコン名
+	 * @param {(event: MouseEvent) => void} onClick 押されたとき
+	 * @returns {HTMLButtonElement|null} 差し替えたボタン。印が見つからなければ null
+	 */
+	function upgradeCount(marker, iconName, onClick) {
+		const item = container.querySelector(`.${marker}`);
+		if (!item) return null;
+		const button = doc.createElement('button');
+		button.type = 'button';
+		button.className = `count count-action ${marker}`;
+		button.appendChild(createIcon(doc, iconName));
+		button.appendChild(doc.createElement('span'));
+		button.addEventListener('click', onClick);
+		container.replaceChild(button, item);
+		return button;
+	}
+
+	/**
+	 * 押せるカウンタの数字と説明を書き直す。
+	 * 見えているのはアイコンと数字だけなので、何のボタンかは aria-label と title が持つ。
+	 * @param {HTMLButtonElement|null} button 対象。null なら何もしない
+	 * @param {string} label 操作の説明 (いいね済み など)
+	 * @param {number} count 件数
+	 * @returns {void}
+	 */
+	function describeCount(button, label, count) {
+		if (!button) return;
+		const text = countLabel(label, count);
+		button.setAttribute('aria-label', text);
+		button.title = text;
+		button.querySelector('span').textContent = formatCount(count);
+	}
+
+	/**
 	 * フォローボタンの見た目を状態に合わせる。
 	 * フォロー中は「押すと解除」になるので、塗りつぶしを外して目立たせない。
 	 * @param {HTMLButtonElement} button 対象
@@ -184,8 +242,8 @@ export function createActionsBar(deps) {
 			button.disabled = true;
 			const token = readSession(doc).csrfToken;
 			try {
-				if (following) await unfollowUser(detail.userId, token);
-				else await followUser(detail.userId, token);
+				if (following) await api.unfollowUser(detail.userId, token);
+				else await api.followUser(detail.userId, token);
 				if (disposed) return;
 				following = !following;
 				followCache.set(detail.userId, following);
@@ -225,7 +283,7 @@ export function createActionsBar(deps) {
 		 * @returns {void}
 		 */
 		render(detail) {
-			container.textContent = '';
+			// カウンタの行はサイドバーが描いた中身をそのまま使う。ここで消さないこと
 			if (followContainer) followContainer.textContent = '';
 			const session = readSession(doc);
 
@@ -234,7 +292,7 @@ export function createActionsBar(deps) {
 			// 押した結果を読み上げさせる。alert ではないので操作を邪魔しない
 			statusLine.setAttribute('role', 'status');
 
-			// 未ログインでは更新系が使えない
+			// 未ログインでは更新系が使えない。カウンタは押せない表示のまま残すので件数は読める
 			if (!session.isLoggedIn || !session.csrfToken) {
 				const notice = doc.createElement('p');
 				notice.className = 'status';
@@ -245,16 +303,21 @@ export function createActionsBar(deps) {
 
 			let liked = detail.likedByMe;
 			let bookmarkId = detail.bookmarkId;
+			// 押した結果を数字にも出す。再取得はせず手元で足し引きする
+			// (pixiv 側の集計は遅れて反映されるので、取り直しても押した直後は変わらない)
+			let likeCount = detail.likeCount;
+			let bookmarkCount = detail.bookmarkCount;
 
-			const likeButton = createButton('like', likeLabel(liked), async () => {
+			const likeButton = upgradeCount('count-like', 'like', async () => {
 				if (liked) return;
 				likeButton.disabled = true;
 				try {
-					await likeIllust(detail.id, readSession(doc).csrfToken);
+					await api.likeIllust(detail.id, readSession(doc).csrfToken);
 					if (disposed) return;
 					liked = true;
-					relabel(likeButton, likeLabel(true));
+					likeCount += 1;
 					likeButton.classList.add('is-on');
+					describeCount(likeButton, likeLabel(true), likeCount);
 					announce('いいねしました');
 				} catch (error) {
 					if (disposed) return;
@@ -263,29 +326,36 @@ export function createActionsBar(deps) {
 					console.warn('[PixivMaster] like failed', error);
 				}
 			});
-			likeButton.disabled = liked;
-			if (liked) likeButton.classList.add('is-on');
+			describeCount(likeButton, likeLabel(liked), likeCount);
+			if (likeButton) {
+				// いいねは取り消せない。済みなら押させない
+				likeButton.disabled = liked;
+				if (liked) likeButton.classList.add('is-on');
+			}
 
-			const bookmarkButton = createButton('favorite', bookmarkLabel(bookmarkId), async (event) => {
+			const bookmarkButton = upgradeCount('count-bookmark', 'favorite', async (event) => {
 				bookmarkButton.disabled = true;
 				const wasBookmarked = Boolean(bookmarkId);
 				// 反映が遅れるので画面を先に変える
 				const token = readSession(doc).csrfToken;
 				try {
 					if (wasBookmarked) {
-						await deleteBookmark(bookmarkId, token);
+						await api.deleteBookmark(bookmarkId, token);
 						bookmarkId = null;
+						// 表示が負の数になるのを防ぐ。pixiv 側の集計とずれていても画面は壊さない
+						bookmarkCount = Math.max(0, bookmarkCount - 1);
 						bookmarkButton.classList.remove('is-on');
 						announce('ブックマークを外しました');
 					} else {
 						// 非公開で入れたいときは Shift を押しながら
 						const isPrivate = event.shiftKey;
-						bookmarkId = await addBookmark(detail.id, isPrivate, token);
+						bookmarkId = await api.addBookmark(detail.id, isPrivate, token);
+						bookmarkCount += 1;
 						bookmarkButton.classList.add('is-on');
 						announce(isPrivate ? '非公開でブックマークしました' : 'ブックマークしました');
 					}
 					if (disposed) return;
-					relabel(bookmarkButton, bookmarkLabel(bookmarkId));
+					describeCount(bookmarkButton, bookmarkLabel(bookmarkId), bookmarkCount);
 				} catch (error) {
 					if (disposed) return;
 					announce('ブックマークを変更できませんでした', 'error');
@@ -294,9 +364,10 @@ export function createActionsBar(deps) {
 					bookmarkButton.disabled = false;
 				}
 			});
-			if (bookmarkId) bookmarkButton.classList.add('is-on');
+			describeCount(bookmarkButton, bookmarkLabel(bookmarkId), bookmarkCount);
+			if (bookmarkId) bookmarkButton?.classList.add('is-on');
 
-			container.append(likeButton, bookmarkButton, statusLine);
+			container.appendChild(statusLine);
 
 			// フォローの描画先はサイドバーの作者行。無い構成では出さない
 			if (followContainer) renderFollow(detail);

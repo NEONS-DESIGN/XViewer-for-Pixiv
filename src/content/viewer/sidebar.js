@@ -155,27 +155,32 @@ export function commentToNodes(doc, html) {
 /**
  * サイドバーを作る。
  * @param {SidebarDeps} deps 依存
- * @returns {{render: (detail: object) => void, followSlot: () => HTMLElement, actionsSlot: () => HTMLElement, commentsSlot: () => HTMLElement, dispose: () => void}}
+ * @returns {{render: (detail: object) => void, followSlot: () => HTMLElement, countsSlot: () => HTMLElement, commentsSlot: () => HTMLElement, dispose: () => void}}
  */
 export function createSidebar(deps) {
 	const { doc, container } = deps;
 	/** @type {HTMLElement|null} フォローボタンを後から差し込む場所 (作者行の右端) */
 	let follow = null;
-	/** @type {HTMLElement|null} アクション (いいね・ブックマーク) を後から差し込む場所 */
-	let actions = null;
+	/** @type {HTMLElement|null} カウンタの行。いいねとブックマークはここが押せるボタンに変わる */
+	let counts = null;
 	/** @type {HTMLElement|null} コメントを後から差し込む場所 */
 	let comments = null;
 
 	/**
 	 * カウンタ 1 つを作る。
+	 *
+	 * いいねとブックマークは actions-bar が押せるボタンへ差し替える。
+	 * 差し替え先を探せるように印 (marker) を付ける。差し替えられなかったとき
+	 * (未ログイン・見られない作品) はこのまま押せない表示として残る。
 	 * @param {string} iconName アイコン名
 	 * @param {string} label 読み上げ用のラベル
 	 * @param {number} value 値
+	 * @param {string} [marker] 差し替え先を示す追加のクラス
 	 * @returns {HTMLElement} 要素
 	 */
-	function createCount(iconName, label, value) {
+	function createCount(iconName, label, value, marker) {
 		const item = doc.createElement('span');
-		item.className = 'count';
+		item.className = marker ? `count ${marker}` : 'count';
 		item.appendChild(createIcon(doc, iconName));
 		const text = doc.createElement('span');
 		text.textContent = formatCount(value);
@@ -240,17 +245,12 @@ export function createSidebar(deps) {
 				info.appendChild(tagList);
 			}
 
-			// 操作はカウンタのすぐ上。タイトルと投稿文の間に挟むと読む流れが切れる
-			actions = doc.createElement('div');
-			actions.className = 'actions';
-			info.appendChild(actions);
-
-			const counts = doc.createElement('div');
+			counts = doc.createElement('div');
 			counts.className = 'counts';
 			// アイコンの対応は pixiv 本体に合わせる。いいねは顔、ブックマークはハート
 			counts.append(
-				createCount('like', 'いいね', detail.likeCount),
-				createCount('favorite', 'ブックマーク', detail.bookmarkCount),
+				createCount('like', 'いいね', detail.likeCount, 'count-like'),
+				createCount('favorite', 'ブックマーク', detail.bookmarkCount, 'count-bookmark'),
 				createCount('visibility', '閲覧数', detail.viewCount),
 				createCount('comment', 'コメント', detail.commentCount),
 			);
@@ -276,7 +276,7 @@ export function createSidebar(deps) {
 		},
 
 		followSlot() { return follow; },
-		actionsSlot() { return actions; },
+		countsSlot() { return counts; },
 		commentsSlot() { return comments; },
 
 		dispose() {
@@ -284,7 +284,7 @@ export function createSidebar(deps) {
 			// これを外すと、次の作品を読み込んでいる間に前の作品の情報が残る
 			container.textContent = '';
 			follow = null;
-			actions = null;
+			counts = null;
 			comments = null;
 		},
 	};
