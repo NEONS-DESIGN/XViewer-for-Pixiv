@@ -117,9 +117,14 @@ export function createComments(deps) {
 	 * @returns {Promise<void>}
 	 */
 	async function loadMore() {
+		// 読み込み中に別の作品へ移ることがある。応答が返ったときに
+		// まだ同じ作品を見ているかを確かめてから描く
+		const requestedWorkId = workId;
 		if (moreButton) moreButton.disabled = true;
 		try {
-			const body = await getJson(commentRootsUrl(workId, offset, COMMENT_PAGE_SIZE));
+			const body = await getJson(commentRootsUrl(requestedWorkId, offset, COMMENT_PAGE_SIZE));
+			// 待っている間に破棄されたか、別の作品へ移っていたら捨てる
+			if (workId !== requestedWorkId || !list) return;
 			const comments = (body?.comments ?? []).map(normalizeComment);
 			for (const comment of comments) {
 				list.appendChild(createItem(comment));
@@ -130,6 +135,9 @@ export function createComments(deps) {
 				moreButton.disabled = false;
 			}
 		} catch (error) {
+			// 破棄後・別の作品へ移った後の失敗は伝えない。
+			// これを入れないと、正常な切り替えが読み込み失敗として表示される
+			if (workId !== requestedWorkId) return;
 			const failure = doc.createElement('p');
 			failure.className = 'status';
 			failure.dataset.kind = 'error';
@@ -137,7 +145,7 @@ export function createComments(deps) {
 			failure.textContent = 'コメントを読み込めませんでした';
 			container.appendChild(failure);
 			if (moreButton) moreButton.hidden = true;
-			console.warn('[PixivMaster] failed to load comments', workId, error);
+			console.warn('[PixivMaster] failed to load comments', requestedWorkId, error);
 		}
 	}
 
