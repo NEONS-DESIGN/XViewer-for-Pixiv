@@ -4,32 +4,35 @@
  */
 import { isViewerTarget, parseArtworkPath } from './page.js';
 import { createRouter } from './router.js';
-import { attachGridListener, collectWorkIds } from './grid.js';
+import { attachGridListener } from './grid.js';
+import { createViewer } from './viewer/viewer.js';
 import { loadSettings, watchSettings } from '../common/storage.js';
 
 /** 今の購読。ページから離れるときに解除する。 */
 let gridListener = null;
 let router = null;
 let settings = null;
+let viewer = null;
 
 /**
- * 作品が開かれたときの処理。Task 15 でモーダルに差し替える。
+ * 作品が開かれたときの処理。
  * @param {string} workId 作品 ID
  * @returns {void}
  */
 function handleOpen(workId) {
-	const ids = collectWorkIds(document, location.origin);
-	console.log('[PixivMaster] open', workId, 'ids in grid:', ids.length);
 	router.open(workId);
+	void viewer.open(workId);
 }
 
 /**
  * 戻る/進むで URL が変わったときの処理。
+ * 作品を指していなければモーダルを閉じる。
  * @param {string|null} workId 今の URL が指す作品 ID
  * @returns {void}
  */
 function handlePopState(workId) {
-	console.log('[PixivMaster] popstate ->', workId);
+	if (workId) void viewer.open(workId);
+	else viewer.close();
 }
 
 /**
@@ -43,6 +46,12 @@ async function start() {
 	if (gridListener) return;
 
 	router = createRouter(handlePopState);
+	viewer = createViewer({
+		doc: document,
+		settings,
+		// 閉じたい合図は履歴を戻すことに集約する。実際に閉じるのは popstate 側
+		onRequestClose: () => router.close(),
+	});
 	gridListener = attachGridListener(document, handleOpen);
 	console.log('[PixivMaster] ready on', location.pathname);
 }
@@ -56,6 +65,8 @@ function stop() {
 	gridListener = null;
 	router?.dispose();
 	router = null;
+	viewer?.dispose();
+	viewer = null;
 }
 
 /**
@@ -91,6 +102,7 @@ function watchNavigation() {
 watchNavigation();
 watchSettings((next) => {
 	settings = next;
+	viewer?.setSettings(next);
 	if (!next.enabled) stop();
 	else void start();
 });
