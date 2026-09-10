@@ -44,6 +44,10 @@ export function parseArtworkPath(pathname) {
  * /users/1 と /users/1/artworks は同じ作者・同じ絞り込みなので同じキーになる。
  * 生のパスで比べると、pixiv 本体のタブ操作で行き来するたびに
  * viewer と router と gridListener の解体と再構築が走ってしまう。
+ *
+ * タグ名を含めないのは、絞り込み中は並びを広げないから (canExtendSequence が false)。
+ * タグ違い同士では組み直しても同じものを作り直すだけになる。
+ * 絞り込み中も並びを広げるようにしたら、タグ名がページの一部になるのでここも変えること。
  * @param {string} pathname location.pathname
  * @returns {string} 作者と絞り込みの有無を表すキー
  */
