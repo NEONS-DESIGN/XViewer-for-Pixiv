@@ -99,31 +99,36 @@
 	padding: 16px;
 }
 
+/* 主役のペイン (.frame / .ugoira / .blocked) は position: relative でステージ一杯に
+   広がり、DOM 順でも後ろにある。重ね順を上げないとペインが上に乗り、
+   押せるのはペインの外へはみ出た数 px だけになる (左上に当たり判定がずれて見える) */
 .close {
 	position: absolute;
 	top: 12px;
 	left: 12px;
+	z-index: 1;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: var(--control-height);
-	height: var(--control-height);
+	width: 40px;
+	height: 40px;
 	padding: 0;
-	border: 1px solid transparent;
-	border-radius: 6px;
-	background: transparent;
+	/* 画像の上に重なるので、背景と枠でボタンだと分かるようにする。左右の矢印と同じ形 */
+	border: 1px solid var(--control-border);
+	border-radius: 50%;
+	background: var(--control-bg);
 	color: var(--fg);
 	cursor: pointer;
 }
 
 .close:hover {
-	background: var(--hover);
+	background: var(--control-hover);
 }
 
 /* createIcon が返す svg は寸法を持たない。受け皿で必ず大きさを決める */
 .close svg {
-	width: 20px;
-	height: 20px;
+	width: 24px;
+	height: 24px;
 }
 
 :host(:focus-visible) .close:focus-visible,
@@ -229,17 +234,33 @@
 	font-size: 12px;
 }
 
+/* 作者名とフォローを同じ行に。名前が長くても畳んでフォローを右端に残す */
+.author-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+
 .author {
-	display: inline-block;
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
 	color: var(--fg);
 	font-weight: 600;
 	text-decoration: none;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .author:hover { text-decoration: underline; }
 
+.follow-slot {
+	flex: 0 0 auto;
+}
+
 .title {
-	margin: 8px 0 12px;
+	margin: 0 0 12px;
 	font-size: 16px;
 	line-height: 1.4;
 }
@@ -377,11 +398,12 @@
 .more:disabled { opacity: 0.5; cursor: default; }
 .more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+/* いいね・ブックマークはカウンタのすぐ上に置く */
 .actions {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 6px;
-	margin-bottom: 12px;
+	margin-bottom: 8px;
 }
 
 .action {
@@ -412,6 +434,27 @@
 
 /* 有効になっている操作。塗りつぶしではなく色だけで示す */
 .action.is-on { color: var(--accent); border-color: var(--accent); }
+
+/* フォローだけは pixiv 本体と同じく塗りつぶす。作者行で最初に目に入る操作にする */
+.action-follow {
+	border-color: transparent;
+	background: var(--accent);
+	color: var(--on-accent);
+	font-weight: 600;
+}
+
+.action-follow:hover:not(:disabled) { background: var(--accent); filter: brightness(1.12); }
+
+/* フォロー中に押すと解除になる。塗りを外して誤って押しにくくする */
+.action-follow.is-on {
+	border-color: var(--control-border);
+	background: var(--control-bg);
+	color: var(--fg);
+	font-weight: 400;
+	filter: none;
+}
+
+.action-follow.is-on:hover:not(:disabled) { background: var(--control-hover); filter: none; }
 
 .action-status {
 	width: 100%;

@@ -26,6 +26,16 @@ const BODY_LOCK_STYLE = 'overflow:hidden';
 const THEME = Object.freeze({ LIGHT: 'light', DARK: 'dark' });
 
 /**
+ * ステージの中で押しても閉じない要素。
+ *
+ * ステージの余白を押すと閉じるが、主役のペイン (.frame / .ugoira / .blocked) は
+ * ステージ一杯に広がっているので「押された要素がステージ自身か」では判定できない。
+ * 代わりに「画像そのものと操作部品の上でなければ余白」とみなす。
+ * `.blocked-backdrop` は見られない作品の背後に敷くぼかしで、画像本体ではないので除く。
+ */
+const KEEP_OPEN_SELECTOR = 'img:not(.blocked-backdrop), canvas, video, button, a, .blocked-panel';
+
+/**
  * @typedef {object} ViewerDeps
  * @property {Document} doc 対象のドキュメント
  * @property {object} settings 設定
@@ -119,7 +129,10 @@ export function createViewer(deps) {
 		// 背景 (画像とサイドバーの間の余白) を押すと閉じる。画像そのものでは閉じない
 		stage.addEventListener('click', (event) => {
 			if (!settings.closeOnBackdrop) return;
-			if (event.target === stage) deps.onRequestClose();
+			// テキストノードや Shadow DOM の境界で closest を持たない相手が来ることがある
+			const target = event.target;
+			if (typeof target?.closest === 'function' && target.closest(KEEP_OPEN_SELECTOR)) return;
+			deps.onRequestClose();
 		});
 
 		doc.body.appendChild(host);

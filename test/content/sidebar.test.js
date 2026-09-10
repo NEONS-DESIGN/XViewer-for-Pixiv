@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatCount, formatDate, splitComment } from '../../src/content/viewer/sidebar.js';
+import { formatCount, formatDate, splitComment, createSidebar } from '../../src/content/viewer/sidebar.js';
+import { ICON_SHAPES } from '../../src/common/icon-shapes.js';
 
 test('formatCount は 3 桁区切りにする', () => {
 	assert.equal(formatCount(2740), '2,740');
@@ -75,4 +76,115 @@ test('splitComment は実体参照を戻す', () => {
 test('splitComment は空文字で空配列を返す', () => {
 	assert.deepEqual(splitComment(''), []);
 	assert.deepEqual(splitComment(null), []);
+});
+
+/**
+ * class 名と親子関係だけを持つ最小の要素の代わり。
+ * ここで確かめたいのは「どの順で何を積んだか」だけなので、これで足りる。
+ * @param {string} tag タグ名
+ * @returns {object} 要素の代わり
+ */
+function fakeElement(tag) {
+	let text = '';
+	const element = {
+		tag,
+		children: [],
+		className: '',
+		attributes: {},
+		innerHTML: '',
+		appendChild(child) { element.children.push(child); return child; },
+		append(...nodes) { for (const node of nodes) element.appendChild(node); },
+		setAttribute(name, value) { element.attributes[name] = value; },
+		addEventListener() {},
+	};
+	Object.defineProperty(element, 'textContent', {
+		get() { return text; },
+		set(value) { text = value; element.children = []; },
+	});
+	return element;
+}
+
+/**
+ * document の代わり。要素を作る役だけを持つ。
+ * @returns {object} doc の代わり
+ */
+function fakeDoc() {
+	return {
+		createElement: (tag) => fakeElement(tag),
+		createElementNS: (_ns, tag) => fakeElement(tag),
+		createDocumentFragment: () => fakeElement('#fragment'),
+		createTextNode: (value) => {
+			const node = fakeElement('#text');
+			node.textContent = value;
+			return node;
+		},
+	};
+}
+
+/** サイドバーへ渡す作品詳細の代わり。 */
+const DETAIL = Object.freeze({
+	id: '149425016',
+	userId: '54734418',
+	userName: '作者',
+	title: 'タイトル',
+	comment: '本文',
+	tags: ['オリジナル'],
+	likeCount: 1,
+	bookmarkCount: 2,
+	viewCount: 3,
+	commentCount: 4,
+	createDate: '2026-09-08T17:45:00+09:00',
+});
+
+test('サイドバーは作者行・タイトル・投稿文・タグ・操作・カウンタの順に積む', () => {
+	// いいね等のボタンがタイトルと投稿文の間に挟まると読む流れが切れる。
+	// 操作はカウンタのすぐ上に置く
+	const container = fakeElement('div');
+	createSidebar({ doc: fakeDoc(), container }).render(DETAIL);
+	assert.deepEqual(
+		container.children.map((child) => child.className),
+		['author-row', 'title', 'comment', 'tags', 'actions', 'counts', 'date', 'original-link', 'comments'],
+	);
+});
+
+test('作者行はユーザー名とフォロー用の枠を同じ行に持つ', () => {
+	const container = fakeElement('div');
+	const sidebar = createSidebar({ doc: fakeDoc(), container });
+	sidebar.render(DETAIL);
+	const row = container.children[0];
+	assert.deepEqual(row.children.map((child) => child.className), ['author', 'follow-slot']);
+	assert.equal(row.children[0].textContent, '作者');
+	// フォローボタンは actions ではなくこの枠へ差し込む
+	assert.equal(sidebar.followSlot(), row.children[1]);
+});
+
+/**
+ * createIcon が描いた svg から図形の名前を割り出す。
+ * 偽の要素は innerHTML を覚えるだけなので、図形データと突き合わせて名前へ戻す。
+ * @param {object} icon svg の代わり
+ * @returns {string|undefined} ICON_SHAPES のキー
+ */
+function iconName(icon) {
+	return Object.keys(ICON_SHAPES).find((name) => ICON_SHAPES[name].markup === icon.innerHTML);
+}
+
+test('カウンタはいいねを顔、ブックマークをハートで示す', () => {
+	// pixiv 本体と同じ対応にする。逆にすると意味が入れ替わって見える
+	const container = fakeElement('div');
+	createSidebar({ doc: fakeDoc(), container }).render(DETAIL);
+	const counts = container.children.find((child) => child.className === 'counts');
+	assert.deepEqual(
+		counts.children.map((count) => iconName(count.children[0])),
+		['like', 'favorite', 'visibility', 'comment'],
+	);
+});
+
+test('dispose はスロットの参照も手放す', () => {
+	const container = fakeElement('div');
+	const sidebar = createSidebar({ doc: fakeDoc(), container });
+	sidebar.render(DETAIL);
+	sidebar.dispose();
+	assert.equal(sidebar.followSlot(), null);
+	assert.equal(sidebar.actionsSlot(), null);
+	assert.equal(sidebar.commentsSlot(), null);
 });

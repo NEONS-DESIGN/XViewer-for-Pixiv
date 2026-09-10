@@ -54,3 +54,16 @@ test('createIcon は innerHTML が投げても落ちない', () => {
 	};
 	assert.doesNotThrow(() => createIcon(doc, 'close'));
 });
+
+test('ICON_SHAPES に自前の like (pixiv 式の顔) が入っている', () => {
+	// pixiv の「いいね」はハートではなく顔。ハートはブックマークを指す (SITE_SPEC §8)
+	assert.equal(ICON_SHAPES.like.viewBox, '0 0 24 24');
+	assert.equal(ICON_SHAPES.like.markup.match(/<circle/g).length, 2);
+	assert.ok(ICON_SHAPES.like.markup.includes('stroke-linecap="round"'));
+});
+
+test('ICON_SHAPES からリボン型の bookmark は外してある', () => {
+	// ブックマークはハート (favorite) で表す。取り違えの元になるので図形ごと持たない
+	assert.equal(ICON_SHAPES.bookmark, undefined);
+	assert.ok(ICON_SHAPES.favorite.markup.includes('<path'));
+});
