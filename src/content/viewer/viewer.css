@@ -26,6 +26,10 @@
 	/* 塗りつぶしボタンの文字色。背景 var(--accent) との組み合わせで決める値なので、
 	   テーマごとに必ず対で見直すこと。ダークは明るい水色の上の濃紺で約 6.8:1 */
 	--on-accent: #04121a;
+	/* フォローボタンだけは pixiv 本体と同じ「青地に白文字」にする。
+	   --accent との比は約 2.8:1 で AA には届かないが、
+	   本体の見え方に揃える判断 (docs/DECISIONS.md)。他の塗りつぶしは --on-accent のまま */
+	--follow-fg: #ffffff;
 	/* 取り返しの付かない操作の枠と文字 */
 	--danger: #e5737a;
 
@@ -451,6 +455,24 @@
 	word-break: break-word;
 }
 
+/* 本文に混ざる絵文字。実体は 56x56 の png。
+   大きさと沈み込みは pixiv 本体のコメント欄の実測値に合わせてある (24px / -6px)。
+   本文と同じ 14px / line-height 1.6 の行に載る前提 */
+.comment-emoji {
+	width: 24px;
+	height: 24px;
+	vertical-align: -6px;
+}
+
+/* スタンプはコメント 1 件がまるごとこれになる。
+   原寸は 160x160 だが、pixiv 本体は 96x96 で出しているので合わせる */
+.comment-stamp {
+	display: block;
+	width: 96px;
+	height: 96px;
+	max-width: 100%;
+}
+
 .comment-date {
 	color: var(--muted);
 	font-size: 11px;
@@ -512,7 +534,7 @@
 .action-follow {
 	border-color: transparent;
 	background: var(--accent);
-	color: var(--on-accent);
+	color: var(--follow-fg);
 	font-weight: 600;
 }
 

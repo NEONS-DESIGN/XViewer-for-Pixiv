@@ -42,6 +42,36 @@ export function safeCdnUrl(url) {
 }
 
 /**
+ * pixiv が絵文字・スタンプの画像を置いている場所。
+ * どちらも s.pximg.net の静的ファイルで、年齢制限も認証も掛かっていない (SITE_SPEC 実測)。
+ */
+const COMMON_IMAGES = 'https://s.pximg.net/common/images/';
+
+/** スタンプ ID として通る形。API の値をそのままパスに埋めないための関門 */
+const STAMP_ID_PATTERN = /^\d+$/;
+
+/**
+ * 絵文字の画像 URL。ID は PIXIV_EMOJI の値なので検証しない。
+ * @param {number} id 絵文字 ID
+ * @returns {string} URL
+ */
+export function emojiUrl(id) {
+	return `${COMMON_IMAGES}emoji/${id}.png`;
+}
+
+/**
+ * スタンプの画像 URL。160x160 の jpg が返る。
+ * @param {string|number|null|undefined} stampId API が返した stampId
+ * @returns {string|null} URL。数字でなければ null
+ */
+export function stampUrl(stampId) {
+	if (stampId === null || stampId === undefined) return null;
+	const id = String(stampId);
+	if (!STAMP_ID_PATTERN.test(id)) return null;
+	return `${COMMON_IMAGES}stamp/generated-stamps/${id}_s.jpg`;
+}
+
+/**
  * 作品詳細。
  * @param {string} illustId 作品 ID
  * @returns {string} URL
