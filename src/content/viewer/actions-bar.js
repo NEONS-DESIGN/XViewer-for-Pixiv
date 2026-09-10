@@ -86,11 +86,19 @@ export function createActionsBar(deps) {
 
 	/**
 	 * 操作の結果を伝える。
+	 *
+	 * 成功は画面に出さない。押した結果はボタン自身の見た目 (ラベル・disabled・is-on) が
+	 * 既に伝えているので、下に文言が出るとカウンタの位置が動くだけで邪魔になる。
+	 * 読み上げには渡したいので要素は残し、CSS で見えなくしている (viewer.css の .action-status)。
+	 * 失敗だけはボタンの見た目に出ないので、目にも見えるようにする。
 	 * @param {string} message 文言
+	 * @param {'info'|'error'} [kind] 種別。error だけ画面に出す
 	 * @returns {void}
 	 */
-	function announce(message) {
-		if (statusLine) statusLine.textContent = message;
+	function announce(message, kind = 'info') {
+		if (!statusLine) return;
+		statusLine.textContent = message;
+		statusLine.setAttribute('data-kind', kind);
 	}
 
 	/**
@@ -185,7 +193,7 @@ export function createActionsBar(deps) {
 				announce(following ? 'フォローしました' : 'フォローを解除しました');
 			} catch (error) {
 				if (disposed) return;
-				announce('フォローを変更できませんでした');
+				announce('フォローを変更できませんでした', 'error');
 				console.warn('[PixivMaster] follow failed', error);
 			} finally {
 				button.disabled = false;
@@ -251,7 +259,7 @@ export function createActionsBar(deps) {
 				} catch (error) {
 					if (disposed) return;
 					likeButton.disabled = false;
-					announce('いいねできませんでした');
+					announce('いいねできませんでした', 'error');
 					console.warn('[PixivMaster] like failed', error);
 				}
 			});
@@ -280,7 +288,7 @@ export function createActionsBar(deps) {
 					relabel(bookmarkButton, bookmarkLabel(bookmarkId));
 				} catch (error) {
 					if (disposed) return;
-					announce('ブックマークを変更できませんでした');
+					announce('ブックマークを変更できませんでした', 'error');
 					console.warn('[PixivMaster] bookmark failed', error);
 				} finally {
 					bookmarkButton.disabled = false;
