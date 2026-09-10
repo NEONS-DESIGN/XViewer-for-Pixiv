@@ -1,0 +1,24 @@
+{
+	"manifest_version": 3,
+	"name": "PixivMaster",
+	"version": "0.1.0",
+	"description": "pixiv のユーザーページに X 風の画像ビュワーを追加します",
+	"content_scripts": [
+		{
+			"matches": ["https://www.pixiv.net/*"],
+			"js": ["inject.js"],
+			"run_at": "document_start",
+			"world": "MAIN"
+		},
+		{
+			"matches": ["https://www.pixiv.net/*"],
+			"js": ["content.js"],
+			"run_at": "document_idle"
+		}
+	],
+	"action": {
+		"default_popup": "popup/popup.html",
+		"default_title": "PixivMaster"
+	},
+	"permissions": ["storage"]
+}

@@ -1,0 +1,17 @@
+{
+	"name": "pixivmaster",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "pixiv のユーザーページに独自の画像ビュワーを追加する Chrome 拡張機能",
+	"scripts": {
+		"build": "node scripts/build.mjs",
+		"watch": "node scripts/build.mjs --watch",
+		"build:symbols": "node scripts/build-symbols.mjs",
+		"test": "node --test"
+	},
+	"devDependencies": {
+		"@material-symbols/svg-400": "^0.47.2",
+		"esbuild": "^0.28.2"
+	}
+}
