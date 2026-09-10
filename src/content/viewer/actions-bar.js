@@ -42,6 +42,8 @@ export function createActionsBar(deps) {
 	const { doc, container } = deps;
 	/** 押した結果を読み上げさせるための領域 */
 	let statusLine = null;
+	/** 破棄済みか。await の後に自分がまだ生きているか確かめるために使う */
+	let disposed = false;
 
 	/**
 	 * 操作の結果を伝える。
@@ -118,11 +120,13 @@ export function createActionsBar(deps) {
 				likeButton.disabled = true;
 				try {
 					await likeIllust(detail.id, readSession(doc).csrfToken);
+					if (disposed) return;
 					liked = true;
 					relabel(likeButton, likeLabel(true));
 					likeButton.classList.add('is-on');
 					announce('いいねしました');
 				} catch (error) {
+					if (disposed) return;
 					likeButton.disabled = false;
 					announce('いいねできませんでした');
 					console.warn('[PixivMaster] like failed', error);
@@ -149,8 +153,10 @@ export function createActionsBar(deps) {
 						bookmarkButton.classList.add('is-on');
 						announce(isPrivate ? '非公開でブックマークしました' : 'ブックマークしました');
 					}
+					if (disposed) return;
 					relabel(bookmarkButton, bookmarkLabel(bookmarkId));
 				} catch (error) {
+					if (disposed) return;
 					announce('ブックマークを変更できませんでした');
 					console.warn('[PixivMaster] bookmark failed', error);
 				} finally {
@@ -165,18 +171,21 @@ export function createActionsBar(deps) {
 				try {
 					if (following) {
 						await unfollowUser(detail.userId, token);
+						if (disposed) return;
 						following = false;
 						relabel(followButton, 'この作者をフォロー');
 						followButton.classList.remove('is-on');
 						announce('フォローを解除しました');
 					} else {
 						await followUser(detail.userId, token);
+						if (disposed) return;
 						following = true;
 						relabel(followButton, 'フォロー中');
 						followButton.classList.add('is-on');
 						announce('フォローしました');
 					}
 				} catch (error) {
+					if (disposed) return;
 					announce('フォローを変更できませんでした');
 					console.warn('[PixivMaster] follow failed', error);
 				} finally {
@@ -188,6 +197,7 @@ export function createActionsBar(deps) {
 		},
 
 		dispose() {
+			disposed = true;
 			statusLine = null;
 		},
 	};
