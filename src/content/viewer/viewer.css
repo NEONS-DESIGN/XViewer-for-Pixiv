@@ -367,3 +367,46 @@
 .more:hover:not(:disabled) { background: var(--control-hover); }
 .more:disabled { opacity: 0.5; cursor: default; }
 .more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-bottom: 12px;
+}
+
+.action {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	height: var(--control-height);
+	padding: 0 10px;
+	border: 1px solid var(--control-border);
+	border-radius: 6px;
+	background: var(--control-bg);
+	color: var(--fg);
+	font-size: 13px;
+	cursor: pointer;
+}
+
+.action:hover:not(:disabled) { background: var(--control-hover); }
+
+/* 押せない状態を形で示す。いいね済みはここに入る */
+.action:disabled { opacity: 0.5; cursor: default; }
+
+.action:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.action svg {
+	width: 16px;
+	height: 16px;
+}
+
+/* 有効になっている操作。塗りつぶしではなく色だけで示す */
+.action.is-on { color: var(--accent); border-color: var(--accent); }
+
+.action-status {
+	width: 100%;
+	margin: 4px 0 0;
+	color: var(--muted);
+	font-size: 12px;
+}

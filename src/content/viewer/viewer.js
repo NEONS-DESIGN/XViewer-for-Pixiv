@@ -14,6 +14,7 @@ import { readSession } from '../../pixiv/session.js';
 import { createImagePane } from './image-pane.js';
 import { createSidebar } from './sidebar.js';
 import { createComments } from './comments.js';
+import { createActionsBar } from './actions-bar.js';
 
 /** ホストページのスクロールを止めるために body へ付ける style。 */
 const BODY_LOCK_STYLE = 'overflow:hidden';
@@ -56,6 +57,8 @@ export function createViewer(deps) {
 	let sidebarPane = null;
 	/** @type {ReturnType<typeof createComments>|null} */
 	let commentsPane = null;
+	/** @type {ReturnType<typeof createActionsBar>|null} */
+	let actionsPane = null;
 	/** 今開いている作品の並び。上下キーでの移動に使う */
 	let sequence = null;
 	/** 端で全作品の並びへ広げている最中かどうか。二重に広げないためのガード */
@@ -239,6 +242,11 @@ export function createViewer(deps) {
 				commentsPane = createComments({ doc, container: sidebarPane.commentsSlot() });
 				void commentsPane.load(detail);
 			}
+			if (sidebarPane) {
+				actionsPane?.dispose();
+				actionsPane = createActionsBar({ doc, container: sidebarPane.actionsSlot() });
+				actionsPane.render(detail);
+			}
 			await imagePane.render(detail);
 		} catch (error) {
 			if (currentWorkId !== workId) return;
@@ -275,6 +283,8 @@ export function createViewer(deps) {
 			sidebarPane = null;
 			commentsPane?.dispose();
 			commentsPane = null;
+			actionsPane?.dispose();
+			actionsPane = null;
 			host?.remove();
 			host = null;
 			shadow = null;
