@@ -55,6 +55,18 @@
 			<p class="hint">画像の外側を押したときに閉じます。誤って閉じてしまう場合はオフに</p>
 		</div>
 
+		<div class="field">
+			<label class="row" for="gridTabSkip">
+				<span class="label">グリッドの Tab 移動</span>
+			</label>
+			<select id="gridTabSkip">
+				<option value="both">ブックマークとタイトルを飛ばす</option>
+				<option value="title">タイトルだけ飛ばす</option>
+				<option value="none">飛ばさない</option>
+			</select>
+			<p class="hint">Tab キーを 1 回押すだけで次の作品へ移れます。飛ばした操作はビュワーの中で行えます</p>
+		</div>
+
 		<p class="status" id="status" role="status"></p>
 
 		<script src="popup.js"></script>

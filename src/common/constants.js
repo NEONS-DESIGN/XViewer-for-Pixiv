@@ -66,6 +66,23 @@ export const PREFETCH_CHOICES = Object.freeze([0, 1, 3]);
 /** コメントを 1 回に読む件数。 */
 export const COMMENT_PAGE_SIZE = 30;
 
+/** グリッドのフォーカス順を当て直す間隔 (ミリ秒)。再描画のたびに走らせないための間引き。 */
+export const TAB_SKIP_REFRESH_MS = 200;
+
+/**
+ * グリッドで Tab を送ったときに、何をフォーカス順から外すか。
+ * pixiv のカードは「サムネ → ブックマーク → タイトル」の 3 ステップで 1 作品なので、
+ * 外さないと次の作品まで 3 回押すことになる (SITE_SPEC 参照)。
+ */
+export const GRID_TAB_SKIP = Object.freeze({
+	/** ブックマークボタンとタイトルリンクの両方 */
+	BOTH: 'both',
+	/** タイトルリンクだけ */
+	TITLE: 'title',
+	/** 何も外さない (pixiv 標準のまま) */
+	NONE: 'none',
+});
+
 /** 設定の既定値。保存値が壊れていたらここへ倒す。 */
 export const SETTINGS_DEFAULTS = Object.freeze({
 	enabled: true,
@@ -73,6 +90,7 @@ export const SETTINGS_DEFAULTS = Object.freeze({
 	prefetch: 3,
 	showSidebar: true,
 	closeOnBackdrop: true,
+	gridTabSkip: GRID_TAB_SKIP.BOTH,
 });
 
 /** キー操作の割り当て。 */

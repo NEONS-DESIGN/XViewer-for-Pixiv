@@ -5,6 +5,7 @@
 import { isViewerTarget, parseArtworkPath, parseUserPage, pageKey } from './page.js';
 import { createRouter } from './router.js';
 import { attachGridListener, collectWorkIds } from './grid.js';
+import { attachTabSkip } from './tab-skip.js';
 import { createViewer } from './viewer/viewer.js';
 import { createDomSequence, extendWithAllWorks } from './sequence.js';
 import { loadSettings, watchSettings } from '../common/storage.js';
@@ -12,6 +13,8 @@ import { NAV_EVENTS, LOCATION_CHECK_DELAY_MS } from '../common/constants.js';
 
 /** 今の購読。ページから離れるときに解除する。 */
 let gridListener = null;
+/** @type {{setMode: (mode: string) => void, dispose: () => void}|null} グリッドのフォーカス順の組み替え */
+let tabSkip = null;
 let router = null;
 let settings = null;
 let viewer = null;
@@ -104,6 +107,8 @@ async function apply() {
 		extendSequence: (current) => extendWithAllWorks(current, page.userId),
 	});
 	gridListener = attachGridListener(document, handleOpen);
+	// カード 1 枚につき 3 回 Tab を押さずに済むよう、作品を開く導線以外をフォーカス順から外す
+	tabSkip = attachTabSkip(document, settings.gridTabSkip);
 	console.log('[PixivMaster] ready on', path);
 }
 
@@ -115,6 +120,9 @@ function stop() {
 	activeKey = null;
 	gridListener?.dispose();
 	gridListener = null;
+	// 外したフォーカス順は必ず戻す。戻さないと pixiv 標準の Tab が壊れたままになる
+	tabSkip?.dispose();
+	tabSkip = null;
 	router?.dispose();
 	router = null;
 	viewer?.dispose();
@@ -211,6 +219,7 @@ async function boot() {
 watchSettings((next) => {
 	settings = next;
 	viewer?.setSettings(next);
+	tabSkip?.setMode(next.gridTabSkip);
 	if (next.enabled) {
 		startNavigationWatch();
 		void apply();
