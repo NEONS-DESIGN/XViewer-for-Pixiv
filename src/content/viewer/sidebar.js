@@ -194,6 +194,13 @@ export function createSidebar(deps) {
 		render(detail) {
 			container.textContent = '';
 
+			// 作品情報とコメントを別の入れ物に分ける。
+			// スクロールするのはコメント一覧だけにしたいので、
+			// サイドバー自身ではなく中の 2 つで縦の領域を分け合う (viewer.css の .sidebar)
+			const info = doc.createElement('div');
+			info.className = 'sidebar-info';
+			container.appendChild(info);
+
 			// 作者名とフォローを同じ行に置く。pixiv 本体と同じで、誰の作品かが最初に目に入る
 			const authorRow = doc.createElement('div');
 			authorRow.className = 'author-row';
@@ -207,17 +214,17 @@ export function createSidebar(deps) {
 			follow = doc.createElement('div');
 			follow.className = 'follow-slot';
 			authorRow.appendChild(follow);
-			container.appendChild(authorRow);
+			info.appendChild(authorRow);
 
 			const title = doc.createElement('h2');
 			title.className = 'title';
 			title.textContent = detail.title;
-			container.appendChild(title);
+			info.appendChild(title);
 
 			const comment = doc.createElement('p');
 			comment.className = 'comment';
 			comment.appendChild(commentToNodes(doc, detail.comment));
-			container.appendChild(comment);
+			info.appendChild(comment);
 
 			if (detail.tags.length > 0) {
 				const tagList = doc.createElement('ul');
@@ -230,13 +237,13 @@ export function createSidebar(deps) {
 					item.appendChild(link);
 					tagList.appendChild(item);
 				}
-				container.appendChild(tagList);
+				info.appendChild(tagList);
 			}
 
 			// 操作はカウンタのすぐ上。タイトルと投稿文の間に挟むと読む流れが切れる
 			actions = doc.createElement('div');
 			actions.className = 'actions';
-			container.appendChild(actions);
+			info.appendChild(actions);
 
 			const counts = doc.createElement('div');
 			counts.className = 'counts';
@@ -247,12 +254,12 @@ export function createSidebar(deps) {
 				createCount('visibility', '閲覧数', detail.viewCount),
 				createCount('comment', 'コメント', detail.commentCount),
 			);
-			container.appendChild(counts);
+			info.appendChild(counts);
 
 			const date = doc.createElement('p');
 			date.className = 'date';
 			date.textContent = formatDate(detail.createDate);
-			container.appendChild(date);
+			info.appendChild(date);
 
 			const original = doc.createElement('a');
 			original.className = 'original-link';
@@ -261,7 +268,7 @@ export function createSidebar(deps) {
 			original.rel = 'noopener noreferrer';
 			original.textContent = 'pixiv で開く';
 			original.appendChild(createIcon(doc, 'openInNew'));
-			container.appendChild(original);
+			info.appendChild(original);
 
 			comments = doc.createElement('div');
 			comments.className = 'comments';

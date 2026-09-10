@@ -136,14 +136,21 @@ const DETAIL = Object.freeze({
 	createDate: '2026-09-08T17:45:00+09:00',
 });
 
-test('サイドバーは作者行・タイトル・投稿文・タグ・操作・カウンタの順に積む', () => {
+test('サイドバーは作品情報とコメントを別の入れ物に分ける', () => {
+	// スクロールするのはコメント一覧だけにしたいので、縦の領域をこの 2 つで分け合う
+	const container = fakeElement('div');
+	createSidebar({ doc: fakeDoc(), container }).render(DETAIL);
+	assert.deepEqual(container.children.map((child) => child.className), ['sidebar-info', 'comments']);
+});
+
+test('作品情報は作者行・タイトル・投稿文・タグ・操作・カウンタの順に積む', () => {
 	// いいね等のボタンがタイトルと投稿文の間に挟まると読む流れが切れる。
 	// 操作はカウンタのすぐ上に置く
 	const container = fakeElement('div');
 	createSidebar({ doc: fakeDoc(), container }).render(DETAIL);
 	assert.deepEqual(
-		container.children.map((child) => child.className),
-		['author-row', 'title', 'comment', 'tags', 'actions', 'counts', 'date', 'original-link', 'comments'],
+		container.children[0].children.map((child) => child.className),
+		['author-row', 'title', 'comment', 'tags', 'actions', 'counts', 'date', 'original-link'],
 	);
 });
 
@@ -151,7 +158,7 @@ test('作者行はユーザー名とフォロー用の枠を同じ行に持つ',
 	const container = fakeElement('div');
 	const sidebar = createSidebar({ doc: fakeDoc(), container });
 	sidebar.render(DETAIL);
-	const row = container.children[0];
+	const row = container.children[0].children[0];
 	assert.deepEqual(row.children.map((child) => child.className), ['author', 'follow-slot']);
 	assert.equal(row.children[0].textContent, '作者');
 	// フォローボタンは actions ではなくこの枠へ差し込む
@@ -172,7 +179,7 @@ test('カウンタはいいねを顔、ブックマークをハートで示す',
 	// pixiv 本体と同じ対応にする。逆にすると意味が入れ替わって見える
 	const container = fakeElement('div');
 	createSidebar({ doc: fakeDoc(), container }).render(DETAIL);
-	const counts = container.children.find((child) => child.className === 'counts');
+	const counts = container.children[0].children.find((child) => child.className === 'counts');
 	assert.deepEqual(
 		counts.children.map((count) => iconName(count.children[0])),
 		['like', 'favorite', 'visibility', 'comment'],
