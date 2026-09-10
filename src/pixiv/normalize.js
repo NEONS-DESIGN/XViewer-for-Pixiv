@@ -4,6 +4,8 @@
  * 上位の層が異常系を意識しなくて済むようにする。
  */
 
+import { safeCdnUrl } from './endpoints.js';
+
 /** 作品の種別。SITE_SPEC の実測値。 */
 export const ILLUST_TYPES = Object.freeze({
 	ILLUST: 0,
@@ -13,6 +15,23 @@ export const ILLUST_TYPES = Object.freeze({
 
 /** 未ログインのときに使う表示上限。全年齢のみ。 */
 const DEFAULT_X_RESTRICT = 0;
+
+/**
+ * urls の各値を CDN のものだけに絞る。
+ * 応答の値はそのまま img の src になる (= 外部オリジンへのリクエストになる) ので、
+ * 表示に使う前にここで一度だけ関門を通す。弾いた項目は落とし、
+ * 呼び出し側は「URL が無い作品」と同じ扱いにできる。
+ * @param {object|null|undefined} urls raw.urls
+ * @returns {object} CDN を指す値だけを残した urls
+ */
+function sanitizeUrls(urls) {
+	const safe = {};
+	for (const [key, value] of Object.entries(urls ?? {})) {
+		const url = safeCdnUrl(value);
+		if (url) safe[key] = url;
+	}
+	return safe;
+}
 
 /**
  * @typedef {object} WorkDetail 作品詳細
@@ -58,6 +77,7 @@ export function canView(work, self) {
  * @returns {WorkDetail} 正規化した詳細
  */
 export function normalizeDetail(raw) {
+	const urls = sanitizeUrls(raw.urls);
 	return {
 		id: raw.illustId,
 		title: raw.illustTitle,
@@ -65,7 +85,7 @@ export function normalizeDetail(raw) {
 		pageCount: raw.pageCount,
 		xRestrict: raw.xRestrict,
 		aiType: raw.aiType,
-		thumbUrl: raw.urls?.thumb ?? null,
+		thumbUrl: urls.thumb ?? null,
 		userId: raw.userId,
 		userName: raw.userName,
 		createDate: raw.createDate,
@@ -78,6 +98,6 @@ export function normalizeDetail(raw) {
 		commentOff: raw.commentOff === 1,
 		likedByMe: raw.likeData === true,
 		bookmarkId: raw.bookmarkData?.id ?? null,
-		urls: raw.urls ?? {},
+		urls,
 	};
 }

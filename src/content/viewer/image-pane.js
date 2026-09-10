@@ -5,20 +5,21 @@
  * 呼び出し側が可視判定で先に弾いている前提 (SITE_SPEC §6)。
  */
 import { getJson } from '../../pixiv/client.js';
-import { illustPagesUrl } from '../../pixiv/endpoints.js';
+import { illustPagesUrl, safeCdnUrl } from '../../pixiv/endpoints.js';
 import { createIcon } from '../../common/icons.js';
 import { IMAGE_QUALITY } from '../../common/constants.js';
 
 /**
  * ページ配列から表示に使う URL を並べる。
  * 指定した解像度が無い作品もあるので regular へ落とす。
+ * 応答の値はそのまま img の src になるので、CDN を指すものだけを通す。
  * @param {Array<{urls: object}>|null} pages /pages の body
  * @param {string} quality IMAGE_QUALITY のいずれか
  * @returns {string[]} ページ順の URL
  */
 export function pickPageUrls(pages, quality) {
 	if (!Array.isArray(pages)) return [];
-	return pages.map((page) => page.urls?.[quality] ?? page.urls?.[IMAGE_QUALITY.REGULAR] ?? '');
+	return pages.map((page) => safeCdnUrl(page.urls?.[quality] ?? page.urls?.[IMAGE_QUALITY.REGULAR]) ?? '');
 }
 
 /**
