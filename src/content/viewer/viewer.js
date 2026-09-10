@@ -149,10 +149,16 @@ export function createViewer(deps) {
 		 */
 		async open(workId) {
 			currentWorkId = workId;
+			// 既に開いている状態で body を再ロックすると、ロック済みの style を
+			// 「元の値」として保存してしまい、閉じたあとスクロールが戻らなくなる。
+			// 作品間を移動するときは open() が close() を挟まずに呼ばれる
+			const wasOpen = host !== null;
 			ensureHost();
-			savedBodyStyle = doc.body.getAttribute('style') ?? '';
-			doc.body.setAttribute('style', `${savedBodyStyle};${BODY_LOCK_STYLE}`);
-			doc.addEventListener('keydown', onKeyDown, true);
+			if (!wasOpen) {
+				savedBodyStyle = doc.body.getAttribute('style') ?? '';
+				doc.body.setAttribute('style', `${savedBodyStyle};${BODY_LOCK_STYLE}`);
+				doc.addEventListener('keydown', onKeyDown, true);
+			}
 			showStatus('読み込み中...', 'info');
 
 			try {
