@@ -15,14 +15,9 @@ import {
 import { createIcon } from '../../common/icons.js';
 import { getJson } from '../../pixiv/client.js';
 import { illustUrl } from '../../pixiv/endpoints.js';
-import { normalizeDetail, ILLUST_TYPES } from '../../pixiv/normalize.js';
+import { normalizeDetail } from '../../pixiv/normalize.js';
 import { readSession } from '../session.js';
-import { createImagePane } from './image-pane.js';
-import { createUgoiraPlayer } from './ugoira.js';
-import { createSidebar } from './sidebar.js';
-import { createComments } from './comments.js';
-import { createActionsBar } from './actions-bar.js';
-import { createBlocked, blockReason } from './blocked.js';
+import { renderWork, disposeAll, movePage } from './panes.js';
 
 /** ホストページのスクロールを止めるために body へ付ける style。 */
 const BODY_LOCK_STYLE = 'overflow:hidden';
@@ -70,18 +65,6 @@ export function createViewer(deps) {
 	let inertTargets = [];
 	/** 閉じたときに戻す body の style */
 	let savedBodyStyle = '';
-	/** @type {ReturnType<typeof createImagePane>|null} */
-	let imagePane = null;
-	/** @type {ReturnType<typeof createUgoiraPlayer>|null} */
-	let ugoiraPane = null;
-	/** @type {ReturnType<typeof createSidebar>|null} */
-	let sidebarPane = null;
-	/** @type {ReturnType<typeof createComments>|null} */
-	let commentsPane = null;
-	/** @type {ReturnType<typeof createActionsBar>|null} */
-	let actionsPane = null;
-	/** @type {ReturnType<typeof createBlocked>|null} */
-	let blockedPane = null;
 	/** 今開いている作品の並び。上下キーでの移動に使う */
 	let sequence = null;
 	/** 端で全作品の並びへ広げている最中かどうか。二重に広げないためのガード */
@@ -144,28 +127,6 @@ export function createViewer(deps) {
 	function applyTheme() {
 		if (!host) return;
 		host.dataset.theme = doc.documentElement.dataset.theme === THEME.LIGHT ? THEME.LIGHT : THEME.DARK;
-	}
-
-	/**
-	 * ペインをすべて捨てる。
-	 * DOM の片付けは各ペインが dispose の中でやるので、ここは呼ぶだけ。
-	 * 必ず取得を待つ前に呼ぶこと。await の後ろに置くと読み込み中に前の作品の
-	 * 矢印とカウンタが残り、左右キーが古い img を触ってしまう。
-	 * @returns {void}
-	 */
-	function disposePanes() {
-		imagePane?.dispose();
-		imagePane = null;
-		ugoiraPane?.dispose();
-		ugoiraPane = null;
-		sidebarPane?.dispose();
-		sidebarPane = null;
-		commentsPane?.dispose();
-		commentsPane = null;
-		actionsPane?.dispose();
-		actionsPane = null;
-		blockedPane?.dispose();
-		blockedPane = null;
 	}
 
 	/**
@@ -246,12 +207,12 @@ export function createViewer(deps) {
 		}
 		if (event.key === KEYS.NEXT_PAGE) {
 			event.preventDefault();
-			imagePane?.next();
+			movePage(1);
 			return;
 		}
 		if (event.key === KEYS.PREV_PAGE) {
 			event.preventDefault();
-			imagePane?.prev();
+			movePage(-1);
 			return;
 		}
 		if (event.key === KEYS.NEXT_WORK) {
@@ -325,9 +286,8 @@ export function createViewer(deps) {
 		}
 
 		// 古いペインは取得を待つ前に必ず捨てる。
-		// hidden は毎回明示的に設定する。片方でしか触らないと、
-		// 設定を戻したときに hidden が立ったままになって出てこなくなる
-		disposePanes();
+		// 読み込み中のサイドバーの見え方も設定どおりにしておく (renderWork でも改めて設定する)
+		disposeAll();
 		sidebar.hidden = !settings.showSidebar;
 		showStatus('読み込み中...', 'info');
 
@@ -338,47 +298,12 @@ export function createViewer(deps) {
 			if (token !== requestToken) return;
 			const detail = normalizeDetail(raw);
 			const session = readSession(doc);
-
-			const reason = blockReason(detail, session);
-			if (reason) {
-				// サイドバーは出す。タイトル・タグ・カウンタは pixiv 本体でも見える情報
-				if (settings.showSidebar) {
-					sidebarPane = createSidebar({ doc, container: sidebar });
-					sidebarPane.render(detail);
-				}
-				blockedPane = createBlocked({ doc, container: stage });
-				blockedPane.render(detail, reason);
-				return;
-			}
-
-			if (detail.illustType === ILLUST_TYPES.UGOIRA) {
-				ugoiraPane = createUgoiraPlayer({
-					doc,
-					container: stage,
-					settings,
-					onError: (message) => showStatus(message, 'error'),
-				});
-				await ugoiraPane.render(detail);
-			} else {
-				imagePane = createImagePane({
-					doc,
-					container: stage,
-					settings,
-				});
-				await imagePane.render(detail);
-			}
-			if (settings.showSidebar) {
-				sidebarPane = createSidebar({ doc, container: sidebar });
-				sidebarPane.render(detail);
-			}
-			if (sidebarPane) {
-				commentsPane = createComments({ doc, container: sidebarPane.commentsSlot() });
-				void commentsPane.load(detail);
-			}
-			if (sidebarPane) {
-				actionsPane = createActionsBar({ doc, container: sidebarPane.actionsSlot() });
-				actionsPane.render(detail);
-			}
+			await renderWork(detail, session, settings, {
+				doc,
+				stage,
+				sidebar,
+				onError: (message) => showStatus(message, 'error'),
+			});
 		} catch (error) {
 			if (token !== requestToken) return;
 			showStatus('作品を読み込めませんでした', 'error');
@@ -416,7 +341,7 @@ export function createViewer(deps) {
 			// 次に開くときへ持ち越さない。持ち越すと 2 回目に古い値を書き戻す
 			savedBodyStyle = '';
 			unlockBackground();
-			disposePanes();
+			disposeAll();
 			host.remove();
 			host = null;
 			shadow = null;
