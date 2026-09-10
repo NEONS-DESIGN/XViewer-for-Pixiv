@@ -3,7 +3,7 @@
  * 保存ボタンは作らず変更のたびに書くので、書き込みは 1 項目ずつ。
  * 保存値が壊れていても既定へ倒して必ず描けるようにする (UI_DESIGN_KIT §9)。
  */
-import { SETTINGS_DEFAULTS, IMAGE_QUALITY, PREFETCH_CHOICES } from './constants.js';
+import { SETTINGS_DEFAULTS, IMAGE_QUALITY, PREFETCH_CHOICES, GRID_TAB_SKIP } from './constants.js';
 
 /**
  * 既定の保存領域。テストでは deps.area で差し替える。
@@ -41,6 +41,9 @@ export function normalizeSettings(raw) {
 			: SETTINGS_DEFAULTS.prefetch,
 		showSidebar: asBoolean(source.showSidebar, SETTINGS_DEFAULTS.showSidebar),
 		closeOnBackdrop: asBoolean(source.closeOnBackdrop, SETTINGS_DEFAULTS.closeOnBackdrop),
+		gridTabSkip: Object.values(GRID_TAB_SKIP).includes(source.gridTabSkip)
+			? source.gridTabSkip
+			: SETTINGS_DEFAULTS.gridTabSkip,
 	};
 }
 

@@ -4,7 +4,7 @@
  * 見た目の反映は保存の完了を待たない。待つと押した手応えが遅れるため。
  */
 import { loadSettings, saveSetting } from '../common/storage.js';
-import { IMAGE_QUALITY, PREFETCH_CHOICES, SETTINGS_DEFAULTS } from '../common/constants.js';
+import { IMAGE_QUALITY, PREFETCH_CHOICES, SETTINGS_DEFAULTS, GRID_TAB_SKIP } from '../common/constants.js';
 
 /** 保存したことを伝える表示を消すまでの時間 (ミリ秒)。 */
 const STATUS_CLEAR_MS = 1500;
@@ -54,6 +54,15 @@ async function main() {
 			? quality.value
 			: SETTINGS_DEFAULTS.imageQuality;
 		void saveSetting('imageQuality', value).then((saved) => announceSaved(status, saved));
+	});
+
+	const tabSkip = document.getElementById('gridTabSkip');
+	tabSkip.value = settings.gridTabSkip;
+	tabSkip.addEventListener('change', () => {
+		const value = Object.values(GRID_TAB_SKIP).includes(tabSkip.value)
+			? tabSkip.value
+			: SETTINGS_DEFAULTS.gridTabSkip;
+		void saveSetting('gridTabSkip', value).then((saved) => announceSaved(status, saved));
 	});
 
 	const prefetch = document.getElementById('prefetch');

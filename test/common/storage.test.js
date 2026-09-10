@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeSettings, loadSettings, saveSetting } from '../../src/common/storage.js';
-import { SETTINGS_DEFAULTS } from '../../src/common/constants.js';
+import { SETTINGS_DEFAULTS, GRID_TAB_SKIP } from '../../src/common/constants.js';
 
 /**
  * chrome.storage.sync の偽物を作る。
@@ -23,7 +23,14 @@ test('normalizeSettings は空の入力を既定へ倒す', () => {
 });
 
 test('normalizeSettings は正しい値をそのまま通す', () => {
-	const input = { enabled: false, imageQuality: 'original', prefetch: 1, showSidebar: false, closeOnBackdrop: false };
+	const input = {
+		enabled: false,
+		imageQuality: 'original',
+		prefetch: 1,
+		showSidebar: false,
+		closeOnBackdrop: false,
+		gridTabSkip: GRID_TAB_SKIP.TITLE,
+	};
 	assert.deepEqual(normalizeSettings(input), input);
 });
 
@@ -34,6 +41,15 @@ test('normalizeSettings は知らない解像度を既定へ倒す', () => {
 test('normalizeSettings は選択肢に無い先読み数を既定へ倒す', () => {
 	assert.equal(normalizeSettings({ prefetch: 99 }).prefetch, 3);
 	assert.equal(normalizeSettings({ prefetch: '3' }).prefetch, 3);
+});
+
+test('normalizeSettings は選択肢に無い Tab スキップの指定を既定へ倒す', () => {
+	assert.equal(normalizeSettings({ gridTabSkip: 'everything' }).gridTabSkip, GRID_TAB_SKIP.BOTH);
+	assert.equal(normalizeSettings({ gridTabSkip: 3 }).gridTabSkip, GRID_TAB_SKIP.BOTH);
+});
+
+test('normalizeSettings は Tab スキップの選択肢をそのまま通す', () => {
+	assert.equal(normalizeSettings({ gridTabSkip: GRID_TAB_SKIP.NONE }).gridTabSkip, GRID_TAB_SKIP.NONE);
 });
 
 test('normalizeSettings は真偽値でない値を既定へ倒す', () => {
