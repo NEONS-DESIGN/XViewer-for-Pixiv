@@ -12,6 +12,7 @@ import { illustUrl } from '../../pixiv/endpoints.js';
 import { normalizeDetail, canView } from '../../pixiv/normalize.js';
 import { readSession } from '../../pixiv/session.js';
 import { createImagePane } from './image-pane.js';
+import { createSidebar } from './sidebar.js';
 
 /** ホストページのスクロールを止めるために body へ付ける style。 */
 const BODY_LOCK_STYLE = 'overflow:hidden';
@@ -47,6 +48,8 @@ export function createViewer(deps) {
 	let savedBodyStyle = '';
 	/** @type {ReturnType<typeof createImagePane>|null} */
 	let imagePane = null;
+	/** @type {ReturnType<typeof createSidebar>|null} */
+	let sidebarPane = null;
 
 	/**
 	 * ホストと Shadow DOM を用意する。
@@ -176,6 +179,12 @@ export function createViewer(deps) {
 					container: stage,
 					settings,
 				});
+				if (settings.showSidebar) {
+					sidebarPane = createSidebar({ doc, container: sidebar });
+					sidebarPane.render(detail);
+				} else {
+					sidebar.hidden = true;
+				}
 				await imagePane.render(detail);
 			} catch (error) {
 				if (currentWorkId !== workId) return;
@@ -195,6 +204,8 @@ export function createViewer(deps) {
 			else doc.body.removeAttribute('style');
 			imagePane?.dispose();
 			imagePane = null;
+			sidebarPane?.dispose();
+			sidebarPane = null;
 			host?.remove();
 			host = null;
 			shadow = null;
