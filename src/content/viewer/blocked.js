@@ -44,6 +44,8 @@ export function blockReason(work, session) {
  */
 export function createBlocked(deps) {
 	const { doc, container } = deps;
+	/** @type {HTMLElement|null} 自分が作った要素。dispose で外す */
+	let root = null;
 
 	return {
 		/**
@@ -57,6 +59,7 @@ export function createBlocked(deps) {
 
 			const blocked = doc.createElement('div');
 			blocked.className = 'blocked';
+			root = blocked;
 
 			// 48x48 を引き伸ばしてぼかす。元が極小なので拡大しても中身は読み取れない
 			const backdrop = doc.createElement('img');
@@ -88,6 +91,13 @@ export function createBlocked(deps) {
 			container.appendChild(blocked);
 		},
 
-		dispose() {},
+		dispose() {
+			// 自分が作った DOM は自分で片付ける。
+			// 他のペインの消去セレクタに .blocked を足す形にすると、
+			// 無関係なペイン同士が互いのクラス名を知ることになる。
+			// これを外さないと、次に開いた作品の画像と横に並んで両方潰れる
+			root?.remove();
+			root = null;
+		},
 	};
 }
