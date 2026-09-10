@@ -21,6 +21,28 @@ export const USER_TAG_PATH_PATTERN = /^\/users\/\d+\/(?:artworks|illustrations|m
 /** モーダルを載せるホスト要素の id。 */
 export const HOST_ELEMENT_ID = 'pixivmaster-root';
 
+/**
+ * page world の注入スクリプトと content script の間でやり取りするイベント名。
+ * world をまたげるのは DOM だけなので、遷移の通知も解除の指示も DOM イベントで送る。
+ */
+export const NAV_EVENTS = Object.freeze({
+	/** 注入側 -> content script。history が呼ばれた */
+	NAVIGATE: 'pixivmaster:navigate',
+	/** content script -> 注入側。history のフックを外して pixiv 標準に戻す */
+	UNHOOK: 'pixivmaster:unhook',
+	/** content script -> 注入側。外したフックを張り直す */
+	REHOOK: 'pixivmaster:rehook',
+});
+
+/** history をフック済みであることを示す window のプロパティ名。二重注入の防止に使う。 */
+export const NAV_HOOK_FLAG = '__pixivmasterNavHooked';
+
+/**
+ * MutationObserver から location を確かめるまでの待ち時間 (ミリ秒)。
+ * pixiv のグリッドは頻繁に再描画されるため、一連の変更を 1 回の確認にまとめる。
+ */
+export const LOCATION_CHECK_DELAY_MS = 200;
+
 /** 画像の解像度。urls のキー名と合わせてある。 */
 export const IMAGE_QUALITY = Object.freeze({
 	REGULAR: 'regular',
