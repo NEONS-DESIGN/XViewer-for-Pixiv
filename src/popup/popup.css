@@ -1,0 +1,7 @@
+/* 配色トークンは Task 21 で UI_DESIGN_KIT §2 から入れる。ここでは幅だけ決めておく */
+body {
+	width: 320px;
+	margin: 0;
+	padding: 12px;
+	font-family: system-ui, sans-serif;
+}
