@@ -219,3 +219,84 @@
 	color: var(--danger);
 	font-size: 12px;
 }
+
+.author {
+	display: inline-block;
+	color: var(--fg);
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.author:hover { text-decoration: underline; }
+
+.title {
+	margin: 8px 0 12px;
+	font-size: 16px;
+	line-height: 1.4;
+}
+
+.comment {
+	margin: 0 0 12px;
+	color: var(--fg);
+	word-break: break-word;
+}
+
+.comment a { color: var(--accent); }
+
+.tags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin: 0 0 12px;
+	padding: 0;
+	list-style: none;
+}
+
+.tags a {
+	color: var(--accent);
+	font-size: 13px;
+	text-decoration: none;
+}
+
+.tags a:hover { text-decoration: underline; }
+
+.counts {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	padding: 8px 0;
+	border-top: 1px solid var(--divider);
+	color: var(--muted);
+	font-size: 13px;
+}
+
+.count {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.count svg {
+	width: 16px;
+	height: 16px;
+}
+
+.date {
+	margin: 0 0 12px;
+	color: var(--muted);
+	font-size: 12px;
+}
+
+.original-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	color: var(--accent);
+	font-size: 13px;
+	text-decoration: none;
+}
+
+.original-link svg {
+	width: 14px;
+	height: 14px;
+}
