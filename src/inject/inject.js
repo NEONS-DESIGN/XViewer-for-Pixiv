@@ -16,6 +16,8 @@ const PATCHED_METHODS = ['pushState', 'replaceState'];
 
 /**
  * 遷移が起きたことを isolated world へ知らせる。
+ * detail にデータは載せない。world 境界を越えると期待どおり読めないことがあるため、
+ * これは信号としてだけ使い、URL は受け取った側が location から読む。
  * @returns {void}
  */
 function notify() {

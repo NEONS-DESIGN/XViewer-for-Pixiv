@@ -15,8 +15,8 @@ let gridListener = null;
 let router = null;
 let settings = null;
 let viewer = null;
-/** 今購読しているパス。未起動なら null */
-let activePath = null;
+/** 今購読しているページのキー。未起動なら null */
+let activeKey = null;
 /** apply() の世代。await をまたいで古い要求を捨てるために使う */
 let startToken = 0;
 /** @type {{dispose: () => void}|null} 遷移監視の購読。設定でオフにしたら外す */
@@ -55,6 +55,20 @@ function handlePopState(workId) {
 }
 
 /**
+ * 組み直しの要否を判断するキーを作る。
+ * /users/1 と /users/1/artworks は同じ作者・同じ絞り込みなので、
+ * 生のパスで比べると意味の無い解体と再構築が走る。
+ * @param {string} pathname location.pathname
+ * @returns {string} 作者と絞り込みの有無を表すキー
+ */
+function viewerKey(pathname) {
+	const page = parseUserPage(pathname);
+	// ユーザーページとして読めないパスは、フォールバックとしてパスそのものを使う
+	if (!page) return pathname;
+	return `${page.userId}|${page.isTagFiltered}`;
+}
+
+/**
  * 今の URL に合わせて購読を組み直す。
  *
  * 起動と停止とページ切り替えを 1 か所で扱う。ページが変わったら必ず作り直すのが要点で、
@@ -78,12 +92,13 @@ async function apply() {
 		stop();
 		return;
 	}
-	// 同じページで再入しただけ。作り直す必要はない
-	if (activePath === path) return;
+	// 同じ作者・同じ絞り込みのままなら作り直す必要はない
+	const key = viewerKey(path);
+	if (activeKey === key) return;
 
 	// 別のページへ移った。古い購読を捨ててから組み立て直す
 	stop();
-	activePath = path;
+	activeKey = key;
 
 	router = createRouter(handlePopState);
 	// page はこのパスから取り直す。下の 2 つのコールバックが掴むのは常に今のページ
@@ -108,7 +123,7 @@ async function apply() {
  * @returns {void}
  */
 function stop() {
-	activePath = null;
+	activeKey = null;
 	gridListener?.dispose();
 	gridListener = null;
 	router?.dispose();
@@ -150,7 +165,8 @@ function startNavigationWatch() {
 	window.addEventListener(NAV_EVENTS.NAVIGATE, onNavigate);
 	window.addEventListener('popstate', onNavigate);
 
-	// 保険の経路。ここは「パスが変わったか」を見るだけの安い処理に留める。
+	// 保険の経路。無限スクロールで数千回走るので、ここは pathname の比較だけに留める
+	// (グリッドの出現の検出には使わない)。
 	// タイマが動いている間は何もしないので、再描画が続いても確認は間隔ごとに 1 回で済む
 	const observer = new MutationObserver(() => {
 		if (checkTimer) return;
@@ -161,8 +177,10 @@ function startNavigationWatch() {
 			handleLocationChange();
 		}, LOCATION_CHECK_DELAY_MS);
 	});
-	observer.observe(document.documentElement, { childList: true, subtree: true });
+	observer.observe(document.body, { childList: true, subtree: true });
 
+	// この購読は stop() では外さない。外すと対象外のページへ出たあと戻ってこられない。
+	// 解除するのは設定が enabled: false になったときだけ
 	navigationWatch = {
 		dispose() {
 			window.removeEventListener(NAV_EVENTS.NAVIGATE, onNavigate);
