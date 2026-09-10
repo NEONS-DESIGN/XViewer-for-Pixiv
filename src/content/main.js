@@ -8,12 +8,19 @@ import { attachGridListener, collectWorkIds } from './grid.js';
 import { createViewer } from './viewer/viewer.js';
 import { createDomSequence, extendWithAllWorks } from './sequence.js';
 import { loadSettings, watchSettings } from '../common/storage.js';
+import { NAV_EVENTS, LOCATION_CHECK_DELAY_MS } from '../common/constants.js';
 
 /** 今の購読。ページから離れるときに解除する。 */
 let gridListener = null;
 let router = null;
 let settings = null;
 let viewer = null;
+/** @type {{dispose: () => void}|null} 遷移監視の購読。設定でオフにしたら外す */
+let navigationWatch = null;
+/** MutationObserver 経路で前回見たパス。変わっていなければ何もしない */
+let observedPath = null;
+/** パス確認の遅延タイマ ID。0 なら動いていない */
+let checkTimer = 0;
 
 /**
  * 作品が開かれたときの処理。
@@ -84,40 +91,97 @@ function stop() {
 }
 
 /**
- * SPA の遷移を監視する。
- * pixiv は History API でページを切り替えるため、pushState と replaceState を包んで
- * 自前のイベントに変換する。これをしないと最初の 1 ページでしか動かない。
+ * URL が変わったかもしれないときの入口。
+ * 注入側のイベント・popstate・MutationObserver の 3 経路をここに集約する。
  * @returns {void}
  */
-function watchNavigation() {
-	const EVENT_NAME = 'pixivmaster:navigate';
-	for (const method of ['pushState', 'replaceState']) {
-		const original = history[method];
-		history[method] = function patched(...args) {
-			const result = original.apply(this, args);
-			window.dispatchEvent(new Event(EVENT_NAME));
-			return result;
-		};
+function handleLocationChange() {
+	// 自分のルーターが作品ページへ書き換えた直後もここへ来る。
+	// 作品パスは「ビュワーで作品を開いている最中」なので、止めてはいけない
+	if (parseArtworkPath(location.pathname)) return;
+	if (isViewerTarget(location.pathname)) {
+		void start();
+	} else {
+		stop();
 	}
-	const onNavigate = () => {
-		// 自分のルーターが作品ページへ書き換えた直後もここへ来る。
-		// 作品パスは「ビュワーで作品を開いている最中」なので、止めてはいけない
-		if (parseArtworkPath(location.pathname)) return;
-		if (isViewerTarget(location.pathname)) {
-			void start();
-		} else {
-			stop();
-		}
-	};
-	window.addEventListener(EVENT_NAME, onNavigate);
-	window.addEventListener('popstate', onNavigate);
 }
 
-watchNavigation();
+/**
+ * SPA の遷移を監視し始める。
+ *
+ * pixiv は History API でページを切り替える。history のフックは page world の
+ * inject.js が持っており (isolated world で包んでもサイト本体の呼び出しは捕まらない)、
+ * ここはその通知を受ける側。取りこぼしの保険として MutationObserver も見張る。
+ * @returns {void}
+ */
+function startNavigationWatch() {
+	if (navigationWatch) return;
+	// 一度 unhook したあと張り直すため。初回は注入側の二重注入ガードで無害に終わる
+	window.dispatchEvent(new CustomEvent(NAV_EVENTS.REHOOK));
+
+	observedPath = location.pathname;
+	const onNavigate = () => {
+		observedPath = location.pathname;
+		handleLocationChange();
+	};
+	window.addEventListener(NAV_EVENTS.NAVIGATE, onNavigate);
+	window.addEventListener('popstate', onNavigate);
+
+	// 保険の経路。ここは「パスが変わったか」を見るだけの安い処理に留める。
+	// タイマが動いている間は何もしないので、再描画が続いても確認は間隔ごとに 1 回で済む
+	const observer = new MutationObserver(() => {
+		if (checkTimer) return;
+		checkTimer = setTimeout(() => {
+			checkTimer = 0;
+			if (location.pathname === observedPath) return;
+			observedPath = location.pathname;
+			handleLocationChange();
+		}, LOCATION_CHECK_DELAY_MS);
+	});
+	observer.observe(document.documentElement, { childList: true, subtree: true });
+
+	navigationWatch = {
+		dispose() {
+			window.removeEventListener(NAV_EVENTS.NAVIGATE, onNavigate);
+			window.removeEventListener('popstate', onNavigate);
+			observer.disconnect();
+			clearTimeout(checkTimer);
+			checkTimer = 0;
+		},
+	};
+}
+
+/**
+ * SPA の遷移の監視をやめる。注入側のフックも外して pixiv 標準の動作へ戻す。
+ * @returns {void}
+ */
+function stopNavigationWatch() {
+	if (!navigationWatch) return;
+	navigationWatch.dispose();
+	navigationWatch = null;
+	window.dispatchEvent(new CustomEvent(NAV_EVENTS.UNHOOK));
+}
+
+/**
+ * 設定を読んでから監視を始める。
+ * @returns {Promise<void>}
+ */
+async function boot() {
+	settings = await loadSettings();
+	if (!settings.enabled) return;
+	startNavigationWatch();
+	await start();
+}
+
 watchSettings((next) => {
 	settings = next;
 	viewer?.setSettings(next);
-	if (!next.enabled) stop();
-	else void start();
+	if (next.enabled) {
+		startNavigationWatch();
+		void start();
+	} else {
+		stop();
+		stopNavigationWatch();
+	}
 });
-void start();
+void boot();

@@ -1,6 +1,7 @@
 /**
  * 拡張機能をビルドする。
  * content script は MV3 で ESM を読めないため IIFE 1 本にまとめる。
+ * page world へ注入する inject.js は world が違うので別の束にする。
  * viewer.css は text loader で文字列として取り込み、Shadow DOM へ注入する。
  */
 import { context } from 'esbuild';
@@ -23,6 +24,8 @@ const STATIC_FILES = [
 const BUILD_OPTIONS = {
 	entryPoints: {
 		content: 'src/content/main.js',
+		// page world へ注入する分。content.js とは別 world なので束を分ける
+		inject: 'src/inject/inject.js',
 		'popup/popup': 'src/popup/popup.js',
 	},
 	outdir: OUT_DIR,
