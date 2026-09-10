@@ -8,9 +8,10 @@ import viewerCss from './viewer.css';
 import { HOST_ELEMENT_ID, KEYS } from '../../common/constants.js';
 import { createIcon } from '../../common/icons.js';
 import { getJson } from '../../pixiv/client.js';
-import { illustUrl, illustPagesUrl } from '../../pixiv/endpoints.js';
+import { illustUrl } from '../../pixiv/endpoints.js';
 import { normalizeDetail, canView } from '../../pixiv/normalize.js';
 import { readSession } from '../../pixiv/session.js';
+import { createImagePane } from './image-pane.js';
 
 /** ホストページのスクロールを止めるために body へ付ける style。 */
 const BODY_LOCK_STYLE = 'overflow:hidden';
@@ -44,6 +45,8 @@ export function createViewer(deps) {
 	let currentWorkId = null;
 	/** 閉じたときに戻す body の style */
 	let savedBodyStyle = '';
+	/** @type {ReturnType<typeof createImagePane>|null} */
+	let imagePane = null;
 
 	/**
 	 * ホストと Shadow DOM を用意する。
@@ -113,22 +116,6 @@ export function createViewer(deps) {
 	}
 
 	/**
-	 * 画像を 1 枚だけ表示する。ページ切替は Task 16 で足す。
-	 * @param {object} detail 正規化した作品詳細
-	 * @returns {void}
-	 */
-	function showFirstImage(detail) {
-		stage.querySelectorAll('.status, img').forEach((node) => node.remove());
-		const image = doc.createElement('img');
-		image.alt = detail.title;
-		image.src = detail.urls[settings.imageQuality] ?? detail.urls.regular ?? '';
-		image.addEventListener('error', () => {
-			showStatus('画像を読み込めませんでした', 'error');
-		});
-		stage.appendChild(image);
-	}
-
-	/**
 	 * キーボード操作。
 	 * @param {KeyboardEvent} event キー
 	 * @returns {void}
@@ -138,6 +125,16 @@ export function createViewer(deps) {
 		if (event.key === KEYS.CLOSE) {
 			event.preventDefault();
 			deps.onRequestClose();
+		}
+		if (event.key === KEYS.NEXT_PAGE) {
+			event.preventDefault();
+			imagePane?.next();
+			return;
+		}
+		if (event.key === KEYS.PREV_PAGE) {
+			event.preventDefault();
+			imagePane?.prev();
+			return;
 		}
 	}
 
@@ -172,7 +169,13 @@ export function createViewer(deps) {
 					showStatus('表示設定により非表示になっています', 'info');
 					return;
 				}
-				showFirstImage(detail);
+				imagePane = createImagePane({
+					doc,
+					container: stage,
+					settings,
+					onError: (message) => showStatus(message, 'error'),
+				});
+				await imagePane.render(detail);
 			} catch (error) {
 				if (currentWorkId !== workId) return;
 				showStatus('作品を読み込めませんでした', 'error');
@@ -189,6 +192,8 @@ export function createViewer(deps) {
 			doc.removeEventListener('keydown', onKeyDown, true);
 			if (savedBodyStyle) doc.body.setAttribute('style', savedBodyStyle);
 			else doc.body.removeAttribute('style');
+			imagePane?.dispose();
+			imagePane = null;
 			host?.remove();
 			host = null;
 			shadow = null;
