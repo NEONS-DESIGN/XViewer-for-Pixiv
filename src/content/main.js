@@ -6,6 +6,7 @@ import { isViewerTarget, parseArtworkPath, parseUserPage, pageKey } from './page
 import { createRouter } from './router.js';
 import { attachGridListener, collectWorkIds } from './grid.js';
 import { attachTabSkip } from './tab-skip.js';
+import { ensureFocusStyle } from './grid-focus.js';
 import { createViewer } from './viewer/viewer.js';
 import { createDomSequence, extendWithAllWorks } from './sequence.js';
 import { loadSettings, watchSettings } from '../common/storage.js';
@@ -15,6 +16,8 @@ import { NAV_EVENTS, LOCATION_CHECK_DELAY_MS } from '../common/constants.js';
 let gridListener = null;
 /** @type {{setMode: (mode: string) => void, dispose: () => void}|null} グリッドのフォーカス順の組み替え */
 let tabSkip = null;
+/** @type {{dispose: () => void}|null} グリッドのフォーカス枠の CSS */
+let focusStyle = null;
 let router = null;
 let settings = null;
 let viewer = null;
@@ -109,6 +112,8 @@ async function apply() {
 	gridListener = attachGridListener(document, handleOpen);
 	// カード 1 枚につき 3 回 Tab を押さずに済むよう、作品を開く導線以外をフォーカス順から外す
 	tabSkip = attachTabSkip(document, settings.gridTabSkip);
+	// どこにフォーカスがあるか分かるようにする。gridTabSkip の設定とは独立して常に出す
+	focusStyle = ensureFocusStyle(document);
 	console.log('[PixivMaster] ready on', path);
 }
 
@@ -123,6 +128,8 @@ function stop() {
 	// 外したフォーカス順は必ず戻す。戻さないと pixiv 標準の Tab が壊れたままになる
 	tabSkip?.dispose();
 	tabSkip = null;
+	focusStyle?.dispose();
+	focusStyle = null;
 	router?.dispose();
 	router = null;
 	viewer?.dispose();
