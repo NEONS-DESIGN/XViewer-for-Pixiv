@@ -155,11 +155,13 @@ export function commentToNodes(doc, html) {
 /**
  * サイドバーを作る。
  * @param {SidebarDeps} deps 依存
- * @returns {{render: (detail: object) => void, actionsSlot: () => HTMLElement, commentsSlot: () => HTMLElement, dispose: () => void}}
+ * @returns {{render: (detail: object) => void, followSlot: () => HTMLElement, actionsSlot: () => HTMLElement, commentsSlot: () => HTMLElement, dispose: () => void}}
  */
 export function createSidebar(deps) {
 	const { doc, container } = deps;
-	/** @type {HTMLElement|null} アクション (いいね等) を後から差し込む場所 */
+	/** @type {HTMLElement|null} フォローボタンを後から差し込む場所 (作者行の右端) */
+	let follow = null;
+	/** @type {HTMLElement|null} アクション (いいね・ブックマーク) を後から差し込む場所 */
 	let actions = null;
 	/** @type {HTMLElement|null} コメントを後から差し込む場所 */
 	let comments = null;
@@ -192,20 +194,25 @@ export function createSidebar(deps) {
 		render(detail) {
 			container.textContent = '';
 
+			// 作者名とフォローを同じ行に置く。pixiv 本体と同じで、誰の作品かが最初に目に入る
+			const authorRow = doc.createElement('div');
+			authorRow.className = 'author-row';
+
 			const author = doc.createElement('a');
 			author.className = 'author';
 			author.href = `/users/${detail.userId}`;
 			author.textContent = detail.userName;
-			container.appendChild(author);
+			authorRow.appendChild(author);
+
+			follow = doc.createElement('div');
+			follow.className = 'follow-slot';
+			authorRow.appendChild(follow);
+			container.appendChild(authorRow);
 
 			const title = doc.createElement('h2');
 			title.className = 'title';
 			title.textContent = detail.title;
 			container.appendChild(title);
-
-			actions = doc.createElement('div');
-			actions.className = 'actions';
-			container.appendChild(actions);
 
 			const comment = doc.createElement('p');
 			comment.className = 'comment';
@@ -226,11 +233,17 @@ export function createSidebar(deps) {
 				container.appendChild(tagList);
 			}
 
+			// 操作はカウンタのすぐ上。タイトルと投稿文の間に挟むと読む流れが切れる
+			actions = doc.createElement('div');
+			actions.className = 'actions';
+			container.appendChild(actions);
+
 			const counts = doc.createElement('div');
 			counts.className = 'counts';
+			// アイコンの対応は pixiv 本体に合わせる。いいねは顔、ブックマークはハート
 			counts.append(
-				createCount('favorite', 'いいね', detail.likeCount),
-				createCount('bookmark', 'ブックマーク', detail.bookmarkCount),
+				createCount('like', 'いいね', detail.likeCount),
+				createCount('favorite', 'ブックマーク', detail.bookmarkCount),
 				createCount('visibility', '閲覧数', detail.viewCount),
 				createCount('comment', 'コメント', detail.commentCount),
 			);
@@ -255,6 +268,7 @@ export function createSidebar(deps) {
 			container.appendChild(comments);
 		},
 
+		followSlot() { return follow; },
 		actionsSlot() { return actions; },
 		commentsSlot() { return comments; },
 
@@ -262,6 +276,7 @@ export function createSidebar(deps) {
 			// 自分が描いた中身は自分で消す。
 			// これを外すと、次の作品を読み込んでいる間に前の作品の情報が残る
 			container.textContent = '';
+			follow = null;
 			actions = null;
 			comments = null;
 		},

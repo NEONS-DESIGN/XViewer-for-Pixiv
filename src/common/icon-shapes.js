@@ -2,6 +2,7 @@
  * 生成物。手で編集しない。scripts/build-symbols.mjs で作り直す。
  * 図形の出典: Material Symbols (Rounded, weight 400, FILL 1) / Apache-2.0
  * https://github.com/google/material-design-icons
+ * ただし CUSTOM_SHAPES にある図形 (like) だけは自前で描いたもの。
  */
 export const ICON_SHAPES = Object.freeze({
 	"close": {
@@ -19,10 +20,6 @@ export const ICON_SHAPES = Object.freeze({
 	"favorite": {
 		"viewBox": "0 -960 960 960",
 		"markup": "<path d=\"M458-144q-11-4-19-12l-53-49Q262-320 171-424.5T80-643q0-90 60.5-150.5T290-854q51 0 101 24.5t89 80.5q44-56 91-80.5t99-24.5q89 0 149.5 60.5T880-643q0 114-91 218.5T574-205l-53 49q-8 8-19 12t-22 4q-11 0-22-4Z\"/>"
-	},
-	"bookmark": {
-		"viewBox": "0 -960 960 960",
-		"markup": "<path d=\"m480-240-196 84q-30 13-57-5t-27-50v-574q0-24 18-42t42-18h440q24 0 42 18t18 42v574q0 32-27 50t-57 5l-196-84Z\"/>"
 	},
 	"personAdd": {
 		"viewBox": "0 -960 960 960",
@@ -59,5 +56,9 @@ export const ICON_SHAPES = Object.freeze({
 	"refresh": {
 		"viewBox": "0 -960 960 960",
 		"markup": "<path d=\"M480-160q-133 0-226.5-93.5T160-480q0-133 93.5-226.5T480-800q85 0 149 34.5T740-671v-99q0-13 8.5-21.5T770-800q13 0 21.5 8.5T800-770v194q0 13-8.5 21.5T770-546H576q-13 0-21.5-8.5T546-576q0-13 8.5-21.5T576-606h138q-38-60-97-97t-137-37q-109 0-184.5 75.5T220-480q0 109 75.5 184.5T480-220q75 0 140-39.5T717-366q5-11 16.5-16.5t22.5-.5q12 5 16 16.5t-1 23.5q-39 84-117.5 133.5T480-160Z\"/>"
+	},
+	"like": {
+		"viewBox": "0 0 24 24",
+		"markup": "<circle cx=\"4\" cy=\"8\" r=\"4\"/><circle cx=\"20\" cy=\"8\" r=\"4\"/><path d=\"M7.05 14.95c2.73 2.73 7.17 2.73 9.9 0\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\"/>"
 	}
 });
