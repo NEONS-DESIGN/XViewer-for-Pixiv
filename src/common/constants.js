@@ -36,7 +36,7 @@ export const COMMENT_PAGE_SIZE = 30;
 /** 設定の既定値。保存値が壊れていたらここへ倒す。 */
 export const SETTINGS_DEFAULTS = Object.freeze({
 	enabled: true,
-	imageQuality: 'regular',
+	imageQuality: IMAGE_QUALITY.REGULAR,
 	prefetch: 3,
 	showSidebar: true,
 	closeOnBackdrop: true,
