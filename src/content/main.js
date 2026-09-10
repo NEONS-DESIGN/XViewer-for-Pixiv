@@ -2,10 +2,11 @@
  * content script のエントリ。
  * pixiv は SPA なので、URL が変わるたびに対象ページかどうかを判定し直す。
  */
-import { isViewerTarget, parseArtworkPath } from './page.js';
+import { isViewerTarget, parseArtworkPath, parseUserPage } from './page.js';
 import { createRouter } from './router.js';
-import { attachGridListener } from './grid.js';
+import { attachGridListener, collectWorkIds } from './grid.js';
 import { createViewer } from './viewer/viewer.js';
+import { createDomSequence, extendWithAllWorks } from './sequence.js';
 import { loadSettings, watchSettings } from '../common/storage.js';
 
 /** 今の購読。ページから離れるときに解除する。 */
@@ -20,8 +21,9 @@ let viewer = null;
  * @returns {void}
  */
 function handleOpen(workId) {
+	const ids = collectWorkIds(document, location.origin);
 	router.open(workId);
-	void viewer.open(workId);
+	void viewer.open(workId, createDomSequence(ids));
 }
 
 /**
@@ -31,8 +33,14 @@ function handleOpen(workId) {
  * @returns {void}
  */
 function handlePopState(workId) {
-	if (workId) void viewer.open(workId);
-	else viewer.close();
+	if (!workId) {
+		viewer.close();
+		return;
+	}
+	// 既に開いている作品なら描き直さない (作品移動で replaceState した直後など)
+	if (!viewer.isOpen()) {
+		void viewer.open(workId, createDomSequence(collectWorkIds(document, location.origin)));
+	}
 }
 
 /**
@@ -46,11 +54,17 @@ async function start() {
 	if (gridListener) return;
 
 	router = createRouter(handlePopState);
+	const page = parseUserPage(location.pathname);
 	viewer = createViewer({
 		doc: document,
 		settings,
 		// 閉じたい合図は履歴を戻すことに集約する。実際に閉じるのは popstate 側
 		onRequestClose: () => router.close(),
+		// 作品を切り替えたら URL だけ差し替える。履歴は積まない
+		onNavigate: (workId) => router.replace(workId),
+		// タグ絞り込み中は profile/all と並びが一致しないので広げない
+		canExtendSequence: () => Boolean(page) && !page.isTagFiltered,
+		extendSequence: (current) => extendWithAllWorks(current, page.userId),
 	});
 	gridListener = attachGridListener(document, handleOpen);
 	console.log('[PixivMaster] ready on', location.pathname);

@@ -22,13 +22,16 @@ const BODY_LOCK_STYLE = 'overflow:hidden';
  * @property {Document} doc 対象のドキュメント
  * @property {object} settings 設定
  * @property {() => void} onRequestClose 閉じたいときに呼ばれる (履歴を戻す役は呼び出し側)
+ * @property {(workId: string) => void} onNavigate 上下キーで作品が切り替わったときに呼ばれる (URL の差し替えは呼び出し側)
+ * @property {() => boolean} canExtendSequence グリッドの端で全作品の並びへ広げてよいか (タグ絞り込み中は false)
+ * @property {(current: import('../sequence.js').Sequence) => Promise<import('../sequence.js').Sequence>} extendSequence 端で全作品の並びへ広げる
  */
 
 /**
  * ビュワーを作る。
  * 生成した時点では画面に何も出さない。open() で初めて表示する。
  * @param {ViewerDeps} deps 依存
- * @returns {{open: (workId: string) => Promise<void>, close: () => void, isOpen: () => boolean, dispose: () => void, setSettings: (s: object) => void}}
+ * @returns {{open: (workId: string, nextSequence?: import('../sequence.js').Sequence) => Promise<void>, close: () => void, isOpen: () => boolean, dispose: () => void, setSettings: (s: object) => void}}
  */
 export function createViewer(deps) {
 	const { doc } = deps;
@@ -50,6 +53,10 @@ export function createViewer(deps) {
 	let imagePane = null;
 	/** @type {ReturnType<typeof createSidebar>|null} */
 	let sidebarPane = null;
+	/** 今開いている作品の並び。上下キーでの移動に使う */
+	let sequence = null;
+	/** 端で全作品の並びへ広げている最中かどうか。二重に広げないためのガード */
+	let extending = false;
 
 	/**
 	 * ホストと Shadow DOM を用意する。
@@ -139,62 +146,109 @@ export function createViewer(deps) {
 			imagePane?.prev();
 			return;
 		}
+		if (event.key === KEYS.NEXT_WORK) {
+			event.preventDefault();
+			void moveWork(1);
+			return;
+		}
+		if (event.key === KEYS.PREV_WORK) {
+			event.preventDefault();
+			void moveWork(-1);
+			return;
+		}
+	}
+
+	/**
+	 * 前後の作品へ移動する。
+	 * 端に達したら全作品の並びへ広げてもう一度試す。
+	 * @param {number} direction 1 なら次、-1 なら前
+	 * @returns {Promise<void>}
+	 */
+	async function moveWork(direction) {
+		if (!sequence || !currentWorkId) return;
+		let target = direction > 0 ? sequence.next(currentWorkId) : sequence.prev(currentWorkId);
+
+		// 端に来た。全作品の並びへ広げられるなら広げてもう一度
+		if (!target && deps.canExtendSequence() && !extending) {
+			extending = true;
+			try {
+				sequence = await deps.extendSequence(sequence);
+			} finally {
+				extending = false;
+			}
+			target = direction > 0 ? sequence.next(currentWorkId) : sequence.prev(currentWorkId);
+		}
+		if (!target) return;
+
+		deps.onNavigate(target);
+		await openWork(target);
+	}
+
+	/**
+	 * 作品を開く (内部)。
+	 * @param {string} workId 作品 ID
+	 * @returns {Promise<void>}
+	 */
+	async function openWork(workId) {
+		currentWorkId = workId;
+		// 既に開いている状態で body を再ロックすると、ロック済みの style を
+		// 「元の値」として保存してしまい、閉じたあとスクロールが戻らなくなる。
+		// 作品間を移動するときは open() が close() を挟まずに呼ばれる
+		const wasOpen = host !== null;
+		ensureHost();
+		if (!wasOpen) {
+			savedBodyStyle = doc.body.getAttribute('style') ?? '';
+			doc.body.setAttribute('style', `${savedBodyStyle};${BODY_LOCK_STYLE}`);
+			doc.addEventListener('keydown', onKeyDown, true);
+		}
+		showStatus('読み込み中...', 'info');
+
+		try {
+			const raw = await getJson(illustUrl(workId));
+			// 開こうとしている間に別の作品へ移っていたら捨てる
+			if (currentWorkId !== workId) return;
+			const detail = normalizeDetail(raw);
+			const session = readSession(doc);
+			if (!canView(detail, session.self)) {
+				// 詳しい表示は Task 21 で差し替える
+				showStatus('表示設定により非表示になっています', 'info');
+				return;
+			}
+			// 作品を続けて開くときに古いペインの資源を残さない
+			imagePane?.dispose();
+			imagePane = createImagePane({
+				doc,
+				container: stage,
+				settings,
+			});
+			// 作品を続けて開くときに古いサイドバーの資源を残さない。
+			// hidden は毎回明示的に設定する。片方でしか触らないと、
+			// 設定を戻したときに hidden が立ったままになって出てこなくなる
+			sidebarPane?.dispose();
+			sidebarPane = null;
+			sidebar.hidden = !settings.showSidebar;
+			if (settings.showSidebar) {
+				sidebarPane = createSidebar({ doc, container: sidebar });
+				sidebarPane.render(detail);
+			}
+			await imagePane.render(detail);
+		} catch (error) {
+			if (currentWorkId !== workId) return;
+			showStatus('作品を読み込めませんでした', 'error');
+			console.warn('[PixivMaster] failed to open', workId, error);
+		}
 	}
 
 	return {
 		/**
 		 * 作品を開く。
 		 * @param {string} workId 作品 ID
+		 * @param {import('../sequence.js').Sequence} [nextSequence] 新しい並び。渡されたときだけ差し替える
 		 * @returns {Promise<void>}
 		 */
-		async open(workId) {
-			currentWorkId = workId;
-			// 既に開いている状態で body を再ロックすると、ロック済みの style を
-			// 「元の値」として保存してしまい、閉じたあとスクロールが戻らなくなる。
-			// 作品間を移動するときは open() が close() を挟まずに呼ばれる
-			const wasOpen = host !== null;
-			ensureHost();
-			if (!wasOpen) {
-				savedBodyStyle = doc.body.getAttribute('style') ?? '';
-				doc.body.setAttribute('style', `${savedBodyStyle};${BODY_LOCK_STYLE}`);
-				doc.addEventListener('keydown', onKeyDown, true);
-			}
-			showStatus('読み込み中...', 'info');
-
-			try {
-				const raw = await getJson(illustUrl(workId));
-				// 開こうとしている間に別の作品へ移っていたら捨てる
-				if (currentWorkId !== workId) return;
-				const detail = normalizeDetail(raw);
-				const session = readSession(doc);
-				if (!canView(detail, session.self)) {
-					// 詳しい表示は Task 21 で差し替える
-					showStatus('表示設定により非表示になっています', 'info');
-					return;
-				}
-				// 作品を続けて開くときに古いペインの資源を残さない
-				imagePane?.dispose();
-				imagePane = createImagePane({
-					doc,
-					container: stage,
-					settings,
-				});
-				// 作品を続けて開くときに古いサイドバーの資源を残さない。
-				// hidden は毎回明示的に設定する。片方でしか触らないと、
-				// 設定を戻したときに hidden が立ったままになって出てこなくなる
-				sidebarPane?.dispose();
-				sidebarPane = null;
-				sidebar.hidden = !settings.showSidebar;
-				if (settings.showSidebar) {
-					sidebarPane = createSidebar({ doc, container: sidebar });
-					sidebarPane.render(detail);
-				}
-				await imagePane.render(detail);
-			} catch (error) {
-				if (currentWorkId !== workId) return;
-				showStatus('作品を読み込めませんでした', 'error');
-				console.warn('[PixivMaster] failed to open', workId, error);
-			}
+		async open(workId, nextSequence) {
+			if (nextSequence) sequence = nextSequence;
+			await openWork(workId);
 		},
 
 		/**
@@ -203,6 +257,7 @@ export function createViewer(deps) {
 		 */
 		close() {
 			currentWorkId = null;
+			sequence = null;
 			doc.removeEventListener('keydown', onKeyDown, true);
 			if (savedBodyStyle) doc.body.setAttribute('style', savedBodyStyle);
 			else doc.body.removeAttribute('style');
