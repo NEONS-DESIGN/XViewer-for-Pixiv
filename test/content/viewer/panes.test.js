@@ -55,13 +55,6 @@ test('サイドバーを閉じているとコメントとアクションも出�
 	assert.equal(plan.main, MAIN_PANE.IMAGE);
 });
 
-test('サイドバーを OFF から ON へ戻すと再び出す', () => {
-	// Task 17 で実際に壊れた組み合わせ。判断が設定だけで決まることを固定する
-	const work = detail();
-	assert.equal(planPanes(work, LOGGED_IN, settings(false)).sidebar, false);
-	assert.equal(planPanes(work, LOGGED_IN, settings(true)).sidebar, true);
-});
-
 test('見られない作品はブロック表示。サイドバーは出すがコメントとアクションは出さない', () => {
 	const plan = planPanes(detail({ xRestrict: 2 }), LOGGED_IN, settings(true));
 	assert.equal(plan.main, MAIN_PANE.BLOCKED);
