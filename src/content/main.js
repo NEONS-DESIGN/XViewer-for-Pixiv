@@ -15,6 +15,10 @@ let gridListener = null;
 let router = null;
 let settings = null;
 let viewer = null;
+/** 今購読しているパス。未起動なら null */
+let activePath = null;
+/** apply() の世代。await をまたいで古い要求を捨てるために使う */
+let startToken = 0;
 /** @type {{dispose: () => void}|null} 遷移監視の購読。設定でオフにしたら外す */
 let navigationWatch = null;
 /** MutationObserver 経路で前回見たパス。変わっていなければ何もしない */
@@ -51,17 +55,39 @@ function handlePopState(workId) {
 }
 
 /**
- * 起動する。
+ * 今の URL に合わせて購読を組み直す。
+ *
+ * 起動と停止とページ切り替えを 1 か所で扱う。ページが変わったら必ず作り直すのが要点で、
+ * 同じ購読を使い回すと page (userId やタグ絞り込みの有無) が初回の値で固定され、
+ * グリッドの端で別人の作品一覧へ飛んでしまう。
+ * 再入は単調増加のトークンで捌く。await の後に自分が最新でなければ何もしない。
  * @returns {Promise<void>}
  */
-async function start() {
-	settings = await loadSettings();
-	if (!settings.enabled) return;
-	if (!isViewerTarget(location.pathname)) return;
-	if (gridListener) return;
+async function apply() {
+	const token = ++startToken;
+	const path = location.pathname;
+
+	// 設定は watchSettings が更新し続けるので、まだ読んでいないときだけ読む
+	if (!settings) {
+		settings = await loadSettings();
+		// 待っている間に新しい要求が来ていたらこの回は捨てる
+		if (token !== startToken) return;
+	}
+
+	if (!settings.enabled || !isViewerTarget(path)) {
+		stop();
+		return;
+	}
+	// 同じページで再入しただけ。作り直す必要はない
+	if (activePath === path) return;
+
+	// 別のページへ移った。古い購読を捨ててから組み立て直す
+	stop();
+	activePath = path;
 
 	router = createRouter(handlePopState);
-	const page = parseUserPage(location.pathname);
+	// page はこのパスから取り直す。下の 2 つのコールバックが掴むのは常に今のページ
+	const page = parseUserPage(path);
 	viewer = createViewer({
 		doc: document,
 		settings,
@@ -74,7 +100,7 @@ async function start() {
 		extendSequence: (current) => extendWithAllWorks(current, page.userId),
 	});
 	gridListener = attachGridListener(document, handleOpen);
-	console.log('[PixivMaster] ready on', location.pathname);
+	console.log('[PixivMaster] ready on', path);
 }
 
 /**
@@ -82,6 +108,7 @@ async function start() {
  * @returns {void}
  */
 function stop() {
+	activePath = null;
 	gridListener?.dispose();
 	gridListener = null;
 	router?.dispose();
@@ -99,11 +126,7 @@ function handleLocationChange() {
 	// 自分のルーターが作品ページへ書き換えた直後もここへ来る。
 	// 作品パスは「ビュワーで作品を開いている最中」なので、止めてはいけない
 	if (parseArtworkPath(location.pathname)) return;
-	if (isViewerTarget(location.pathname)) {
-		void start();
-	} else {
-		stop();
-	}
+	void apply();
 }
 
 /**
@@ -170,7 +193,7 @@ async function boot() {
 	settings = await loadSettings();
 	if (!settings.enabled) return;
 	startNavigationWatch();
-	await start();
+	await apply();
 }
 
 watchSettings((next) => {
@@ -178,7 +201,7 @@ watchSettings((next) => {
 	viewer?.setSettings(next);
 	if (next.enabled) {
 		startNavigationWatch();
-		void start();
+		void apply();
 	} else {
 		stop();
 		stopNavigationWatch();
