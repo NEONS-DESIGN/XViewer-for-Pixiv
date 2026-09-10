@@ -161,6 +161,23 @@ test('renderWork はサイドバーにコメント区画とアクションを作
 	disposeAll();
 });
 
+test('サイドバーを OFF から ON へ戻すと hidden が下りる', async () => {
+	// Task 17 で実際に壊れた組み合わせ。hidden を立てる側しか書いていなかったため、
+	// 設定を戻して次の作品へ移ってもサイドバーが出てこなかった。
+	// 判断 (planPanes) ではなく、毎回明示的に代入する renderWork 側を見る必要がある
+	const { stage, sidebar } = fakeTargets();
+	const doc = fakeDoc();
+	const off = { ...SETTINGS, showSidebar: false };
+
+	await renderWork(DETAIL, ANONYMOUS, off, { doc, stage, sidebar, onError: () => {} });
+	assert.equal(sidebar.hidden, true);
+
+	disposeAll();
+	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc, stage, sidebar, onError: () => {} });
+	assert.equal(sidebar.hidden, false);
+	disposeAll();
+});
+
 test('主役の描画を待つ間に古くなったらコメントとアクションを作らない', async () => {
 	// 古い renderWork が再開して、新しい作品のサイドバーへ
 	// 古い作品のコメントとアクションを差し込むのを防ぐ。

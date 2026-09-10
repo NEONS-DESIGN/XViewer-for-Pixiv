@@ -6,6 +6,8 @@ import { NAV_EVENTS, NAV_HOOK_FLAG } from '../../src/common/constants.js';
  * 注入スクリプトが触る page world の最小の代役を用意する。
  * inject.js は window と history をグローバルとして参照するので、
  * 読み込む前に globalThis へ置いておく。
+ * 実ページでは window.history と history は同じオブジェクトなので、代役でも繋いでおく。
+ * 別物にすると「フラグは window、パッチ先は history」の対応が崩れても気づけない。
  * @returns {{window: EventTarget, calls: string[], originals: object}} 代役と観測用の記録
  */
 function installPageWorld() {
@@ -21,8 +23,10 @@ function installPageWorld() {
 		},
 	};
 	const win = new EventTarget();
+	const hist = { ...originals };
+	win.history = hist;
 	globalThis.window = win;
-	globalThis.history = { ...originals };
+	globalThis.history = hist;
 	return { window: win, calls, originals };
 }
 
@@ -38,6 +42,10 @@ await import('../../src/inject/inject.js');
 test('読み込んだ時点で history を包み、フラグを立てる', () => {
 	assert.notEqual(globalThis.history.pushState, page.originals.pushState);
 	assert.ok(page.window[NAV_HOOK_FLAG]);
+	// フラグを置く先とパッチする先を取り違えていないこと。
+	// サイト本体が呼ぶのは window.history なので、そちらから見て包まれている必要がある
+	assert.equal(page.window.history.pushState, globalThis.history.pushState);
+	assert.equal(page.window.history[NAV_HOOK_FLAG], undefined);
 });
 
 test('pushState は元の戻り値を返しつつ遷移を通知する', () => {
