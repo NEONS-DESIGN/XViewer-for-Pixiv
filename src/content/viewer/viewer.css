@@ -205,3 +205,17 @@
 	color: var(--muted);
 	font-size: 12px;
 }
+
+/* ペイン内のエラー行。画像を消さずに下へ重ねて出す */
+.pane-error {
+	position: absolute;
+	left: 50%;
+	bottom: 12px;
+	transform: translateX(-50%);
+	margin: 0;
+	padding: 4px 10px;
+	border-radius: 6px;
+	background: var(--surface);
+	color: var(--danger);
+	font-size: 12px;
+}

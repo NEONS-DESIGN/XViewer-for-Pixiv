@@ -169,11 +169,12 @@ export function createViewer(deps) {
 					showStatus('表示設定により非表示になっています', 'info');
 					return;
 				}
+				// 作品を続けて開くときに古いペインの資源を残さない
+				imagePane?.dispose();
 				imagePane = createImagePane({
 					doc,
 					container: stage,
 					settings,
-					onError: (message) => showStatus(message, 'error'),
 				});
 				await imagePane.render(detail);
 			} catch (error) {
