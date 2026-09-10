@@ -11,7 +11,7 @@
  * Blob URL は閉じるときに必ず revoke する。
  */
 import { getJson } from '../../pixiv/client.js';
-import { ugoiraMetaUrl } from '../../pixiv/endpoints.js';
+import { ugoiraMetaUrl, safeCdnUrl } from '../../pixiv/endpoints.js';
 import { parseStoredZip } from '../../pixiv/ugoira-zip.js';
 import { createIcon } from '../../common/icons.js';
 import { IMAGE_QUALITY } from '../../common/constants.js';
@@ -206,7 +206,9 @@ export function createUgoiraPlayer(deps) {
 				const meta = await getJson(ugoiraMetaUrl(detail.id));
 				if (disposed) return;
 
-				const zipUrl = pickZipUrl(meta, deps.settings.imageQuality);
+				// API が返した値をそのまま外部オリジンへ投げない
+				const zipUrl = safeCdnUrl(pickZipUrl(meta, deps.settings.imageQuality));
+				if (!zipUrl) throw new Error('zip の URL が pixiv の CDN ではありません');
 				const response = await fetch(zipUrl, { mode: 'cors' });
 				if (!response.ok) throw new Error(`zip の取得に失敗しました: ${response.status}`);
 				const buffer = await response.arrayBuffer();
@@ -218,8 +220,13 @@ export function createUgoiraPlayer(deps) {
 				await loadImages(frames, meta.mime_type ?? 'image/jpeg');
 				if (disposed) return;
 
-				canvas.width = images[0].naturalWidth;
-				canvas.height = images[0].naturalHeight;
+				// デコードに失敗すると 0 になる。0x0 の canvas に描いても無言で何も出ないので、
+				// 静止画のまま catch へ落として理由を出す
+				const width = images[0].naturalWidth;
+				const height = images[0].naturalHeight;
+				if (!width || !height) throw new Error('フレームの画像をデコードできませんでした');
+				canvas.width = width;
+				canvas.height = height;
 				context = canvas.getContext('2d');
 				canvas.hidden = false;
 				poster.hidden = true;

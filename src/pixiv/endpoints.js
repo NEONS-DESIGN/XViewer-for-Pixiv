@@ -10,6 +10,37 @@ const AJAX = '/ajax';
 /** 応答の言語。日本語固定。 */
 const LANG = 'lang=ja';
 
+/** pixiv 本体のオリジン。投稿文の相対リンクを解決する基準に使う。 */
+export const PIXIV_ORIGIN = 'https://www.pixiv.net';
+
+/**
+ * 画像と zip を読み込んでよいホスト。
+ * pixiv の CDN は画像・うごイラ zip の i.pximg.net と静的ファイルの s.pximg.net (SITE_SPEC §2)。
+ */
+const CDN_HOSTS = Object.freeze(['i.pximg.net', 's.pximg.net']);
+
+/** CDN で使うスキーム。 */
+const CDN_PROTOCOL = 'https:';
+
+/**
+ * API が返した URL が pixiv の CDN を指しているかを確かめる。
+ * 応答の値をそのまま外部オリジンへのリクエストにしないための関門。
+ * 相対 URL は CDN を指しえないので受け付けない。
+ * @param {string|null|undefined} url 検査する URL
+ * @returns {string|null} 使ってよい URL。そうでなければ null
+ */
+export function safeCdnUrl(url) {
+	if (!url) return null;
+	try {
+		const parsed = new URL(url);
+		if (parsed.protocol !== CDN_PROTOCOL) return null;
+		if (!CDN_HOSTS.includes(parsed.hostname)) return null;
+		return parsed.href;
+	} catch {
+		return null;
+	}
+}
+
 /**
  * 作品詳細。
  * @param {string} illustId 作品 ID
