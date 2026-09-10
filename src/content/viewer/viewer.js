@@ -9,12 +9,13 @@ import { HOST_ELEMENT_ID, KEYS } from '../../common/constants.js';
 import { createIcon } from '../../common/icons.js';
 import { getJson } from '../../pixiv/client.js';
 import { illustUrl } from '../../pixiv/endpoints.js';
-import { normalizeDetail, canView } from '../../pixiv/normalize.js';
+import { normalizeDetail } from '../../pixiv/normalize.js';
 import { readSession } from '../../pixiv/session.js';
 import { createImagePane } from './image-pane.js';
 import { createSidebar } from './sidebar.js';
 import { createComments } from './comments.js';
 import { createActionsBar } from './actions-bar.js';
+import { createBlocked, blockReason } from './blocked.js';
 
 /** ホストページのスクロールを止めるために body へ付ける style。 */
 const BODY_LOCK_STYLE = 'overflow:hidden';
@@ -59,6 +60,8 @@ export function createViewer(deps) {
 	let commentsPane = null;
 	/** @type {ReturnType<typeof createActionsBar>|null} */
 	let actionsPane = null;
+	/** @type {ReturnType<typeof createBlocked>|null} */
+	let blockedPane = null;
 	/** 今開いている作品の並び。上下キーでの移動に使う */
 	let sequence = null;
 	/** 端で全作品の並びへ広げている最中かどうか。二重に広げないためのガード */
@@ -215,27 +218,40 @@ export function createViewer(deps) {
 			if (currentWorkId !== workId) return;
 			const detail = normalizeDetail(raw);
 			const session = readSession(doc);
-			if (!canView(detail, session.self)) {
-				// 詳しい表示は Task 21 で差し替える
-				showStatus('表示設定により非表示になっています', 'info');
+
+			// 作品を続けて開くときに古いペインの資源を残さない。
+			// 表示できる経路・できない経路のどちらでも必ず通す。
+			// hidden は毎回明示的に設定する。片方でしか触らないと、
+			// 設定を戻したときに hidden が立ったままになって出てこなくなる
+			imagePane?.dispose();
+			imagePane = null;
+			sidebarPane?.dispose();
+			sidebarPane = null;
+			commentsPane?.dispose();
+			commentsPane = null;
+			actionsPane?.dispose();
+			actionsPane = null;
+			blockedPane?.dispose();
+			blockedPane = null;
+			sidebar.hidden = !settings.showSidebar;
+
+			const reason = blockReason(detail, session);
+			if (reason) {
+				// サイドバーは出す。タイトル・タグ・カウンタは pixiv 本体でも見える情報
+				if (settings.showSidebar) {
+					sidebarPane = createSidebar({ doc, container: sidebar });
+					sidebarPane.render(detail);
+				}
+				blockedPane = createBlocked({ doc, container: stage });
+				blockedPane.render(detail, reason);
 				return;
 			}
-			// 作品を続けて開くときに古いペインの資源を残さない
-			imagePane?.dispose();
+
 			imagePane = createImagePane({
 				doc,
 				container: stage,
 				settings,
 			});
-			// 作品を続けて開くときに古いサイドバーの資源を残さない。
-			// hidden は毎回明示的に設定する。片方でしか触らないと、
-			// 設定を戻したときに hidden が立ったままになって出てこなくなる
-			sidebarPane?.dispose();
-			sidebarPane = null;
-			commentsPane?.dispose();
-			actionsPane?.dispose();
-			actionsPane = null;
-			sidebar.hidden = !settings.showSidebar;
 			if (settings.showSidebar) {
 				sidebarPane = createSidebar({ doc, container: sidebar });
 				sidebarPane.render(detail);
@@ -286,6 +302,8 @@ export function createViewer(deps) {
 			commentsPane = null;
 			actionsPane?.dispose();
 			actionsPane = null;
+			blockedPane?.dispose();
+			blockedPane = null;
 			host?.remove();
 			host = null;
 			shadow = null;
