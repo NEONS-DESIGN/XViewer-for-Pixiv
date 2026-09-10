@@ -1,3 +1,12 @@
+/* hidden 属性を必ず効かせる。
+   この中の部品は display: flex / inline-flex を持つものが多く、
+   そのままだと利用者エージェント既定の [hidden] { display: none } に勝ってしまい、
+   hidden = true を立てても消えない (1 枚絵で左右の矢印が出たままになる)。
+   Shadow DOM の中なので、ホストページの reset は届かない。 */
+[hidden] {
+	display: none !important;
+}
+
 /* 配色はすべてここの変数で決める。個々の規則に色を直書きしないこと。
    ダークが既定。ライトは :host([data-theme='light']) で変数だけを差し替える。
    Shadow DOM の中なので :root ではなく :host に置く。 */

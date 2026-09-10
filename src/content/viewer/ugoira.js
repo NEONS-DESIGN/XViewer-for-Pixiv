@@ -144,10 +144,17 @@ export function createUgoiraPlayer(deps) {
 		const loaders = frames.map((frame) => {
 			const url = URL.createObjectURL(new Blob([frame.bytes], { type: mimeType }));
 			objectUrls.push(url);
-			const image = new Image();
-			image.src = url;
-			// decode() が失敗しても再生は続けたいので握りつぶす
-			return image.decode().catch(() => {}).then(() => image);
+			return new Promise((resolve) => {
+				const image = new Image();
+				// decode() は使わない。DOM に繋がっていない Image では
+				// 画像が読めていても解決しないことがあり (実機で確認)、
+				// そうなると Promise.all が永久に待って再生が始まらないまま静止画で止まる。
+				// load / error は繋がっていなくても必ず発火する。
+				// 失敗しても再生は続けたいので、error でも image を返して次の関門に任せる
+				image.addEventListener('load', () => resolve(image), { once: true });
+				image.addEventListener('error', () => resolve(image), { once: true });
+				image.src = url;
+			});
 		});
 		images = await Promise.all(loaders);
 		timings = frames.map((frame) => ({ delay: frame.delay }));
