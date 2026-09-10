@@ -63,6 +63,10 @@ h1 {
 	display: flex;
 	align-items: center;
 	gap: 8px;
+	/* クリック領域は 30px を下回らない (UI_DESIGN_KIT §6)。
+	   チェックボックス 16px とテキスト行だけでは 22px ほどにしかならず、
+	   セレクト (30px) とも揃わない */
+	min-height: 30px;
 	cursor: pointer;
 }
 

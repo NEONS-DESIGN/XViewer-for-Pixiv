@@ -62,18 +62,21 @@ export async function loadSettings(deps = {}) {
 
 /**
  * 設定を 1 項目書く。失敗しても投げない (見た目の反映は保存を待たない)。
+ * 呼び出し側が結果を伝えられるよう、成否は戻り値で返す。
  * @param {string} key 設定キー
  * @param {unknown} value 値
  * @param {{area?: object}} [deps] 保存領域の差し替え
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>} 保存できたら true
  */
 export async function saveSetting(key, value, deps = {}) {
 	const area = deps.area ?? defaultArea();
-	if (!area) return;
+	if (!area) return false;
 	try {
 		await area.set({ [key]: value });
+		return true;
 	} catch {
-		// 次に開いたとき元に戻るだけで、壊れた状態にはならない
+		// 呼び出し側が画面に出す。ここでは投げない
+		return false;
 	}
 }
 

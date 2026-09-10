@@ -57,3 +57,14 @@ test('saveSetting は 1 項目だけ書く', async () => {
 	await saveSetting('enabled', false, { area });
 	assert.deepEqual(written, { enabled: false });
 });
+
+test('saveSetting は保存できたら true を返す', async () => {
+	const { area } = fakeArea();
+	assert.equal(await saveSetting('enabled', false, { area }), true);
+});
+
+test('saveSetting は保存に失敗したら false を返す', async () => {
+	// 呼び出し側が画面に出せるよう、握りつぶさず成否を返すこと
+	const area = { set: async () => { throw new Error('no storage'); } };
+	assert.equal(await saveSetting('enabled', false, { area }), false);
+});
