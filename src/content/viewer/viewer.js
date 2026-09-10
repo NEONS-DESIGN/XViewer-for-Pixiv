@@ -179,11 +179,15 @@ export function createViewer(deps) {
 					container: stage,
 					settings,
 				});
+				// 作品を続けて開くときに古いサイドバーの資源を残さない。
+				// hidden は毎回明示的に設定する。片方でしか触らないと、
+				// 設定を戻したときに hidden が立ったままになって出てこなくなる
+				sidebarPane?.dispose();
+				sidebarPane = null;
+				sidebar.hidden = !settings.showSidebar;
 				if (settings.showSidebar) {
 					sidebarPane = createSidebar({ doc, container: sidebar });
 					sidebarPane.render(detail);
-				} else {
-					sidebar.hidden = true;
 				}
 				await imagePane.render(detail);
 			} catch (error) {
