@@ -2,7 +2,7 @@
  * content script のエントリ。
  * pixiv は SPA なので、URL が変わるたびに対象ページかどうかを判定し直す。
  */
-import { isViewerTarget } from './page.js';
+import { isViewerTarget, parseArtworkPath } from './page.js';
 import { createRouter } from './router.js';
 import { attachGridListener, collectWorkIds } from './grid.js';
 import { loadSettings, watchSettings } from '../common/storage.js';
@@ -75,6 +75,9 @@ function watchNavigation() {
 		};
 	}
 	const onNavigate = () => {
+		// 自分のルーターが作品ページへ書き換えた直後もここへ来る。
+		// 作品パスは「ビュワーで作品を開いている最中」なので、止めてはいけない
+		if (parseArtworkPath(location.pathname)) return;
 		if (isViewerTarget(location.pathname)) {
 			void start();
 		} else {
