@@ -2,7 +2,7 @@
  * content script のエントリ。
  * pixiv は SPA なので、URL が変わるたびに対象ページかどうかを判定し直す。
  */
-import { isViewerTarget, parseArtworkPath, parseUserPage } from './page.js';
+import { isViewerTarget, parseArtworkPath, parseUserPage, pageKey } from './page.js';
 import { createRouter } from './router.js';
 import { attachGridListener, collectWorkIds } from './grid.js';
 import { createViewer } from './viewer/viewer.js';
@@ -55,20 +55,6 @@ function handlePopState(workId) {
 }
 
 /**
- * 組み直しの要否を判断するキーを作る。
- * /users/1 と /users/1/artworks は同じ作者・同じ絞り込みなので、
- * 生のパスで比べると意味の無い解体と再構築が走る。
- * @param {string} pathname location.pathname
- * @returns {string} 作者と絞り込みの有無を表すキー
- */
-function viewerKey(pathname) {
-	const page = parseUserPage(pathname);
-	// ユーザーページとして読めないパスは、フォールバックとしてパスそのものを使う
-	if (!page) return pathname;
-	return `${page.userId}|${page.isTagFiltered}`;
-}
-
-/**
  * 今の URL に合わせて購読を組み直す。
  *
  * 起動と停止とページ切り替えを 1 か所で扱う。ページが変わったら必ず作り直すのが要点で、
@@ -93,7 +79,7 @@ async function apply() {
 		return;
 	}
 	// 同じ作者・同じ絞り込みのままなら作り直す必要はない
-	const key = viewerKey(path);
+	const key = pageKey(path);
 	if (activeKey === key) return;
 
 	// 別のページへ移った。古い購読を捨ててから組み立て直す

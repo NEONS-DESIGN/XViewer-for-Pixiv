@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseUserPage, parseArtworkPath, isViewerTarget } from '../../src/content/page.js';
+import { parseUserPage, parseArtworkPath, isViewerTarget, pageKey } from '../../src/content/page.js';
 
 test('ユーザーページの各タブを認識する', () => {
 	assert.deepEqual(parseUserPage('/users/54734418'), { userId: '54734418', isTagFiltered: false });
@@ -38,4 +38,31 @@ test('isViewerTarget はユーザーページでだけ true', () => {
 	assert.equal(isViewerTarget('/users/54734418/artworks'), true);
 	assert.equal(isViewerTarget('/artworks/149425016'), false);
 	assert.equal(isViewerTarget('/'), false);
+});
+
+test('pageKey は同じ作者・同じ絞り込みを同じキーにする', () => {
+	// pixiv 本体のタブ操作で行き来しても、購読を組み直す必要はない
+	assert.equal(pageKey('/users/1'), pageKey('/users/1/artworks'));
+	assert.equal(pageKey('/users/1'), pageKey('/users/1/illustrations'));
+	assert.equal(pageKey('/users/1'), pageKey('/users/1/bookmarks/artworks'));
+});
+
+test('pageKey は作者が違えば別のキーにする', () => {
+	assert.notEqual(pageKey('/users/1'), pageKey('/users/2'));
+});
+
+test('pageKey はタグ絞り込みを別のキーにする', () => {
+	// 絞り込み中は profile/all と並びが一致しないので、組み直さないといけない
+	assert.notEqual(pageKey('/users/1'), pageKey('/users/1/artworks/東方'));
+});
+
+test('pageKey はタグ違いを区別しない', () => {
+	// 絞り込みの有無しか見ない。タグが変わっても掴む値 (userId と絞り込み中か) は同じで、
+	// 並びはクリック時に collectWorkIds が取り直すため、組み直す必要が無い
+	assert.equal(pageKey('/users/1/artworks/東方'), pageKey('/users/1/artworks/オリジナル'));
+});
+
+test('pageKey はユーザーページでないパスをそのまま返す', () => {
+	assert.equal(pageKey('/'), '/');
+	assert.equal(pageKey('/artworks/149425016'), '/artworks/149425016');
 });

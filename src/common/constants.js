@@ -15,6 +15,9 @@ export const ARTWORK_PATH_PATTERN = /^\/artworks\/(\d+)$/;
 /** ユーザーページのパス。 */
 export const USER_PATH_PATTERN = /^\/users\/(\d+)(?:\/|$)/;
 
+/** ページのキーを組み立てるときの区切り。ID にもフラグにも現れない文字を使う。 */
+export const PAGE_KEY_SEPARATOR = '|';
+
 /** ユーザーページのうち、タグで絞り込んでいる状態のパス。 */
 export const USER_TAG_PATH_PATTERN = /^\/users\/\d+\/(?:artworks|illustrations|manga)\/.+/;
 
