@@ -233,6 +233,8 @@ export function createViewer(deps) {
 			sidebarPane?.dispose();
 			sidebarPane = null;
 			commentsPane?.dispose();
+			actionsPane?.dispose();
+			actionsPane = null;
 			sidebar.hidden = !settings.showSidebar;
 			if (settings.showSidebar) {
 				sidebarPane = createSidebar({ doc, container: sidebar });
@@ -243,7 +245,6 @@ export function createViewer(deps) {
 				void commentsPane.load(detail);
 			}
 			if (sidebarPane) {
-				actionsPane?.dispose();
 				actionsPane = createActionsBar({ doc, container: sidebarPane.actionsSlot() });
 				actionsPane.render(detail);
 			}
