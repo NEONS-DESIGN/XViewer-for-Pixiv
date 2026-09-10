@@ -7,7 +7,6 @@
 import viewerCss from './viewer.css';
 import {
 	HOST_ELEMENT_ID,
-	KEYS,
 	FOCUSABLE_SELECTOR,
 	HIDDEN_SELECTOR,
 	INERT_ATTRIBUTE,
@@ -18,6 +17,7 @@ import { illustUrl } from '../../pixiv/endpoints.js';
 import { normalizeDetail } from '../../pixiv/normalize.js';
 import { readSession } from '../session.js';
 import { renderWork, disposeAll, movePage } from './panes.js';
+import { createNavigation } from './navigation.js';
 
 /** ホストページのスクロールを止めるために body へ付ける style。 */
 const BODY_LOCK_STYLE = 'overflow:hidden';
@@ -55,8 +55,6 @@ export function createViewer(deps) {
 	let sidebar = null;
 	/** @type {HTMLButtonElement|null} 閉じるボタン。開いた直後のフォーカス先 */
 	let closeButton = null;
-	/** 開く処理が競合しないよう、最後に開こうとした作品を覚えておく */
-	let currentWorkId = null;
 	/** 開く要求の世代。await をまたいで古い応答を捨てるために使う */
 	let requestToken = 0;
 	/** @type {Element|null} 開く前にフォーカスがあった要素。閉じたら戻す */
@@ -65,10 +63,18 @@ export function createViewer(deps) {
 	let inertTargets = [];
 	/** 閉じたときに戻す body の style */
 	let savedBodyStyle = '';
-	/** 今開いている作品の並び。上下キーでの移動に使う */
-	let sequence = null;
-	/** 端で全作品の並びへ広げている最中かどうか。二重に広げないためのガード */
-	let extending = false;
+	// 作品間の移動とキー操作の割り振りは navigation.js が持つ。
+	// ここに残るのはホストの構築と描画の指揮だけ
+	const navigation = createNavigation({
+		openWork: (workId) => openWork(workId),
+		isOpen: () => host !== null,
+		onRequestClose: () => deps.onRequestClose(),
+		onNavigate: (workId) => deps.onNavigate(workId),
+		canExtendSequence: () => deps.canExtendSequence(),
+		extendSequence: (current) => deps.extendSequence(current),
+		movePage,
+		focusNext: (event) => trapFocus(event),
+	});
 
 	/**
 	 * ホストと Shadow DOM を用意する。
@@ -191,83 +197,13 @@ export function createViewer(deps) {
 	}
 
 	/**
-	 * キーボード操作。
-	 * @param {KeyboardEvent} event キー
-	 * @returns {void}
-	 */
-	function onKeyDown(event) {
-		if (!host) return;
-		if (event.key === KEYS.CLOSE) {
-			event.preventDefault();
-			deps.onRequestClose();
-		}
-		if (event.key === KEYS.FOCUS_NEXT) {
-			trapFocus(event);
-			return;
-		}
-		if (event.key === KEYS.NEXT_PAGE) {
-			event.preventDefault();
-			movePage(1);
-			return;
-		}
-		if (event.key === KEYS.PREV_PAGE) {
-			event.preventDefault();
-			movePage(-1);
-			return;
-		}
-		if (event.key === KEYS.NEXT_WORK) {
-			event.preventDefault();
-			void moveWork(1);
-			return;
-		}
-		if (event.key === KEYS.PREV_WORK) {
-			event.preventDefault();
-			void moveWork(-1);
-			return;
-		}
-	}
-
-	/**
-	 * 前後の作品へ移動する。
-	 * 端に達したら全作品の並びへ広げてもう一度試す。
-	 * @param {number} direction 1 なら次、-1 なら前
-	 * @returns {Promise<void>}
-	 */
-	async function moveWork(direction) {
-		if (!sequence || !currentWorkId) return;
-		let target = direction > 0 ? sequence.next(currentWorkId) : sequence.prev(currentWorkId);
-
-		// 端に来た。全作品の並びへ広げられるなら広げてもう一度
-		if (!target && deps.canExtendSequence() && !extending) {
-			const from = currentWorkId;
-			extending = true;
-			try {
-				sequence = await deps.extendSequence(sequence);
-			} catch (error) {
-				// 広げられなくても今の作品は見られる。端で止まるだけにする
-				console.warn('[PixivMaster] failed to extend sequence', error);
-				return;
-			} finally {
-				extending = false;
-			}
-			// 待っている間に上キーで戻っていたら、完了を理由に勝手に進めない
-			if (currentWorkId !== from) return;
-			target = direction > 0 ? sequence.next(currentWorkId) : sequence.prev(currentWorkId);
-		}
-		if (!target) return;
-
-		deps.onNavigate(target);
-		await openWork(target);
-	}
-
-	/**
 	 * 作品を開く (内部)。
 	 * @param {string} workId 作品 ID
 	 * @returns {Promise<void>}
 	 */
 	async function openWork(workId) {
 		const token = ++requestToken;
-		currentWorkId = workId;
+		navigation.setCurrentWorkId(workId);
 		// 既に開いている状態で body を再ロックすると、ロック済みの style を
 		// 「元の値」として保存してしまい、閉じたあとスクロールが戻らなくなる。
 		// 作品間を移動するときは open() が close() を挟まずに呼ばれる
@@ -279,7 +215,7 @@ export function createViewer(deps) {
 		if (!wasOpen) {
 			savedBodyStyle = doc.body.getAttribute('style') ?? '';
 			doc.body.setAttribute('style', `${savedBodyStyle};${BODY_LOCK_STYLE}`);
-			doc.addEventListener('keydown', onKeyDown, true);
+			doc.addEventListener('keydown', navigation.onKeyDown, true);
 			lockBackground();
 			// 開いた直後のキー操作がモーダルへ届くようにする
 			closeButton?.focus();
@@ -319,7 +255,7 @@ export function createViewer(deps) {
 		 * @returns {Promise<void>}
 		 */
 		async open(workId, nextSequence) {
-			if (nextSequence) sequence = nextSequence;
+			if (nextSequence) navigation.setSequence(nextSequence);
 			await openWork(workId);
 		},
 
@@ -331,11 +267,10 @@ export function createViewer(deps) {
 			// 開いていないのに body の style を触ると、ビュワーを開かずに
 			// ブラウザバックしただけで pixiv 本体のインラインスタイルを消してしまう
 			if (host === null) return;
-			currentWorkId = null;
-			sequence = null;
+			navigation.reset();
 			// 取得の途中で閉じたときに、応答が返ってから描き直さないようにする
 			requestToken += 1;
-			doc.removeEventListener('keydown', onKeyDown, true);
+			doc.removeEventListener('keydown', navigation.onKeyDown, true);
 			if (savedBodyStyle) doc.body.setAttribute('style', savedBodyStyle);
 			else doc.body.removeAttribute('style');
 			// 次に開くときへ持ち越さない。持ち越すと 2 回目に古い値を書き戻す
