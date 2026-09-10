@@ -128,10 +128,11 @@ export async function renderWork(detail, session, settings, targets) {
 		void commentsPane.load(detail);
 	}
 	if (plan.actions && sidebarPane) {
-		// いいね・ブックマークはカウンタの上、フォローは作者行の右端。描画先が 2 つに分かれる
+		// いいね・ブックマークはカウンタの行を押せるボタンへ差し替える形で入る。
+		// フォローだけは作者行の右端に独立して置くので、描画先が 2 つに分かれる
 		actionsPane = createActionsBar({
 			doc,
-			container: sidebarPane.actionsSlot(),
+			container: sidebarPane.countsSlot(),
 			followContainer: sidebarPane.followSlot(),
 		});
 		actionsPane.render(detail);

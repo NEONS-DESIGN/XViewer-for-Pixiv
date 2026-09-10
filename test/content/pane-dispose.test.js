@@ -157,7 +157,10 @@ test('renderWork はサイドバーにコメント区画とアクションを作
 
 	assert.equal(sidebar.hidden, false);
 	assert.ok(sidebar.querySelectorAll('.comments')[0].children.length > 0);
-	assert.ok(sidebar.querySelectorAll('.actions')[0].children.length > 0);
+	// アクションはカウンタの行へ入る。未ログインなので差し替えは起きず、案内が足される
+	const counts = sidebar.querySelectorAll('.counts')[0];
+	assert.equal(counts.children.length, 6);
+	assert.ok(counts.children.some((child) => child.className === 'status'));
 	disposeAll();
 });
 
@@ -199,6 +202,7 @@ test('主役の描画を待つ間に古くなったらコメントとアクシ�
 	assert.ok(sidebar.querySelectorAll('.title').length > 0);
 	assert.equal(stage.querySelectorAll('.frame').length, 1);
 	assert.equal(sidebar.querySelectorAll('.comments')[0].children.length, 0);
-	assert.equal(sidebar.querySelectorAll('.actions')[0].children.length, 0);
+	// カウンタ 4 つだけ。アクションが触っていれば案内が足されて増える
+	assert.equal(sidebar.querySelectorAll('.counts')[0].children.length, 4);
 	disposeAll();
 });

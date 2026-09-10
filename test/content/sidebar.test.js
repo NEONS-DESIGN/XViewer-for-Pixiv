@@ -143,14 +143,14 @@ test('サイドバーは作品情報とコメントを別の入れ物に分け�
 	assert.deepEqual(container.children.map((child) => child.className), ['sidebar-info', 'comments']);
 });
 
-test('作品情報は作者行・タイトル・投稿文・タグ・操作・カウンタの順に積む', () => {
+test('作品情報は作者行・タイトル・投稿文・タグ・カウンタの順に積む', () => {
 	// いいね等のボタンがタイトルと投稿文の間に挟まると読む流れが切れる。
-	// 操作はカウンタのすぐ上に置く
+	// 操作用の独立した列は持たない。押せるのはカウンタ自身 (actions-bar が差し替える)
 	const container = fakeElement('div');
 	createSidebar({ doc: fakeDoc(), container }).render(DETAIL);
 	assert.deepEqual(
 		container.children[0].children.map((child) => child.className),
-		['author-row', 'title', 'comment', 'tags', 'actions', 'counts', 'date', 'original-link'],
+		['author-row', 'title', 'comment', 'tags', 'counts', 'date', 'original-link'],
 	);
 });
 
@@ -186,12 +186,23 @@ test('カウンタはいいねを顔、ブックマークをハートで示す',
 	);
 });
 
+test('いいねとブックマークのカウンタには差し替え用の印が付く', () => {
+	// actions-bar がこの印を頼りに、押せるボタンへ差し替える
+	const container = fakeElement('div');
+	const sidebar = createSidebar({ doc: fakeDoc(), container });
+	sidebar.render(DETAIL);
+	assert.deepEqual(
+		sidebar.countsSlot().children.map((count) => count.className),
+		['count count-like', 'count count-bookmark', 'count', 'count'],
+	);
+});
+
 test('dispose はスロットの参照も手放す', () => {
 	const container = fakeElement('div');
 	const sidebar = createSidebar({ doc: fakeDoc(), container });
 	sidebar.render(DETAIL);
 	sidebar.dispose();
 	assert.equal(sidebar.followSlot(), null);
-	assert.equal(sidebar.actionsSlot(), null);
+	assert.equal(sidebar.countsSlot(), null);
 	assert.equal(sidebar.commentsSlot(), null);
 });
