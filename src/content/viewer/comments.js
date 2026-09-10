@@ -3,7 +3,8 @@
  * コメントの取得に失敗しても画像は見られるので、失敗はこの区画の中だけで伝える。
  */
 import { getJson } from '../../pixiv/client.js';
-import { commentRootsUrl, safeCdnUrl } from '../../pixiv/endpoints.js';
+import { commentRootsUrl, safeCdnUrl, emojiUrl, stampUrl } from '../../pixiv/endpoints.js';
+import { parseCommentText } from '../../pixiv/emoji.js';
 import { COMMENT_PAGE_SIZE } from '../../common/constants.js';
 
 /** 退会したユーザーの表示名。 */
@@ -21,6 +22,7 @@ const STAMP_PLACEHOLDER = '[スタンプ]';
  * @property {string} text
  * @property {string} date
  * @property {boolean} isStamp
+ * @property {string|null} stampId スタンプの ID。スタンプでなければ null
  * @property {boolean} hasReplies
  */
 
@@ -36,11 +38,54 @@ export function normalizeComment(raw) {
 		userId: raw.userId ?? '',
 		userName: raw.isDeletedUser ? DELETED_USER_NAME : (raw.userName ?? DELETED_USER_NAME),
 		avatarUrl: raw.img ?? '',
-		text: isStamp ? STAMP_PLACEHOLDER : (raw.comment ?? ''),
+		// スタンプのときは本文が空で届く。文字に置き換えず、描画側で画像にする
+		text: raw.comment ?? '',
 		date: raw.commentDate ?? '',
 		isStamp,
+		stampId: isStamp ? String(raw.stampId) : null,
 		hasReplies: raw.hasReplies === true,
 	};
+}
+
+/**
+ * コメント本文を描画用のノードにする。絵文字は画像へ、それ以外は文字のまま。
+ * @param {Document} doc document
+ * @param {string} text コメント本文
+ * @returns {Node[]} 並べるノード
+ */
+export function renderCommentText(doc, text) {
+	return parseCommentText(text).map((fragment) => {
+		if (fragment.kind !== 'emoji') return doc.createTextNode(fragment.text);
+		const image = doc.createElement('img');
+		image.className = 'comment-emoji';
+		image.setAttribute('src', emojiUrl(fragment.id));
+		// 読み上げと、画像が出ないときの控えを兼ねて元の文字を持たせる
+		image.setAttribute('alt', fragment.text);
+		// 落ちても本文が読めるように、元の (heaven) の形へ戻す
+		image.addEventListener('error', () => { image.replaceWith(doc.createTextNode(fragment.text)); });
+		return image;
+	});
+}
+
+/**
+ * スタンプを描画用のノードにする。
+ * @param {Document} doc document
+ * @param {string|null} stampId スタンプ ID
+ * @returns {Node} 画像。URL を組み立てられなければ文字
+ */
+export function renderStamp(doc, stampId) {
+	const url = stampUrl(stampId);
+	if (!url) {
+		const fallback = doc.createElement('span');
+		fallback.textContent = STAMP_PLACEHOLDER;
+		return fallback;
+	}
+	const image = doc.createElement('img');
+	image.className = 'comment-stamp';
+	image.setAttribute('src', url);
+	image.setAttribute('alt', 'スタンプ');
+	image.addEventListener('error', () => { image.replaceWith(doc.createTextNode(STAMP_PLACEHOLDER)); });
+	return image;
 }
 
 /**
@@ -94,7 +139,8 @@ export function createComments(deps) {
 
 		const text = doc.createElement('p');
 		text.className = 'comment-text';
-		text.textContent = comment.text;
+		if (comment.isStamp) text.appendChild(renderStamp(doc, comment.stampId));
+		else text.append(...renderCommentText(doc, comment.text));
 
 		const meta = doc.createElement('span');
 		meta.className = 'comment-date';

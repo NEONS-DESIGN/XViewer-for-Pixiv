@@ -9,6 +9,8 @@ import {
 	userProfileIllustsUrl,
 	userUrl,
 	safeCdnUrl,
+	emojiUrl,
+	stampUrl,
 } from '../../src/pixiv/endpoints.js';
 
 test('作品まわりの URL を組み立てる', () => {
@@ -41,6 +43,29 @@ test('profile/illusts は ids[] を URL エンコードして並べる', () => {
 test('profile/illusts は is_first_page が false なら 0 を入れる', () => {
 	const url = userProfileIllustsUrl('54734418', ['1'], false);
 	assert.ok(url.includes('is_first_page=0'));
+});
+
+test('絵文字の画像 URL を組み立てる', () => {
+	// SITE_SPEC 実測: 静的ファイルの CDN に ID そのままの png が置いてある
+	assert.equal(emojiUrl(104), 'https://s.pximg.net/common/images/emoji/104.png');
+});
+
+test('スタンプの画像 URL を組み立てる', () => {
+	assert.equal(
+		stampUrl('304'),
+		'https://s.pximg.net/common/images/stamp/generated-stamps/304_s.jpg',
+	);
+	// API は文字列で返すが、数値で来ても同じ URL にする
+	assert.equal(stampUrl(304), 'https://s.pximg.net/common/images/stamp/generated-stamps/304_s.jpg');
+});
+
+test('スタンプの ID が数字でなければ URL を作らない', () => {
+	// API の値をそのままパスに埋めない。safeCdnUrl と同じ考え方
+	assert.equal(stampUrl('../../evil'), null);
+	assert.equal(stampUrl('304.jpg'), null);
+	assert.equal(stampUrl(''), null);
+	assert.equal(stampUrl(null), null);
+	assert.equal(stampUrl(undefined), null);
 });
 
 test('safeCdnUrl は pixiv の CDN の URL だけを通す', () => {
