@@ -9,9 +9,10 @@ import { HOST_ELEMENT_ID, KEYS } from '../../common/constants.js';
 import { createIcon } from '../../common/icons.js';
 import { getJson } from '../../pixiv/client.js';
 import { illustUrl } from '../../pixiv/endpoints.js';
-import { normalizeDetail } from '../../pixiv/normalize.js';
+import { normalizeDetail, ILLUST_TYPES } from '../../pixiv/normalize.js';
 import { readSession } from '../../pixiv/session.js';
 import { createImagePane } from './image-pane.js';
+import { createUgoiraPlayer } from './ugoira.js';
 import { createSidebar } from './sidebar.js';
 import { createComments } from './comments.js';
 import { createActionsBar } from './actions-bar.js';
@@ -54,6 +55,8 @@ export function createViewer(deps) {
 	let savedBodyStyle = '';
 	/** @type {ReturnType<typeof createImagePane>|null} */
 	let imagePane = null;
+	/** @type {ReturnType<typeof createUgoiraPlayer>|null} */
+	let ugoiraPane = null;
 	/** @type {ReturnType<typeof createSidebar>|null} */
 	let sidebarPane = null;
 	/** @type {ReturnType<typeof createComments>|null} */
@@ -225,6 +228,8 @@ export function createViewer(deps) {
 			// 設定を戻したときに hidden が立ったままになって出てこなくなる
 			imagePane?.dispose();
 			imagePane = null;
+			ugoiraPane?.dispose();
+			ugoiraPane = null;
 			sidebarPane?.dispose();
 			sidebarPane = null;
 			commentsPane?.dispose();
@@ -247,11 +252,22 @@ export function createViewer(deps) {
 				return;
 			}
 
-			imagePane = createImagePane({
-				doc,
-				container: stage,
-				settings,
-			});
+			if (detail.illustType === ILLUST_TYPES.UGOIRA) {
+				ugoiraPane = createUgoiraPlayer({
+					doc,
+					container: stage,
+					settings,
+					onError: (message) => showStatus(message, 'error'),
+				});
+				await ugoiraPane.render(detail);
+			} else {
+				imagePane = createImagePane({
+					doc,
+					container: stage,
+					settings,
+				});
+				await imagePane.render(detail);
+			}
 			if (settings.showSidebar) {
 				sidebarPane = createSidebar({ doc, container: sidebar });
 				sidebarPane.render(detail);
@@ -264,7 +280,6 @@ export function createViewer(deps) {
 				actionsPane = createActionsBar({ doc, container: sidebarPane.actionsSlot() });
 				actionsPane.render(detail);
 			}
-			await imagePane.render(detail);
 		} catch (error) {
 			if (currentWorkId !== workId) return;
 			showStatus('作品を読み込めませんでした', 'error');
@@ -296,6 +311,8 @@ export function createViewer(deps) {
 			else doc.body.removeAttribute('style');
 			imagePane?.dispose();
 			imagePane = null;
+			ugoiraPane?.dispose();
+			ugoiraPane = null;
 			sidebarPane?.dispose();
 			sidebarPane = null;
 			commentsPane?.dispose();
