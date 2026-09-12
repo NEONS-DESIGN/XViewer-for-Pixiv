@@ -9,7 +9,7 @@
 [![version](https://img.shields.io/github/package-json/v/NEONS-DESIGN/GridViewer-for-Pixiv?color=4ea3d6)](package.json)
 [![license](https://img.shields.io/github/license/NEONS-DESIGN/GridViewer-for-Pixiv?color=4ea3d6)](LICENSE)
 ![manifest](https://img.shields.io/badge/manifest-v3-4ea3d6)
-![tests](https://img.shields.io/badge/tests-378%20passing-4ea3d6)
+![tests](https://img.shields.io/badge/tests-383%20passing-4ea3d6)
 
 </div>
 
@@ -95,6 +95,7 @@ pixiv の**ユーザーページ** (`https://www.pixiv.net/users/{id}` 系) を�
 | 画像の解像度 | 標準 (長辺 1200px) | 原寸を選ぶと鮮明になるが読み込みは重くなる |
 | 先読み | 前後 3 枚 | 次のページを先に読み込んでおく枚数 |
 | サイドバーを表示する | オン | 投稿文・コメント・アクションの表示 |
+| サイドバーのスクロール | コメントだけを送る | 投稿文を固定してコメントだけ送るか、サイドバーごと 1 つにつなげて送るか |
 | 背景クリックで閉じる | オン | 画像の外側をクリックしたときに閉じるか |
 | グリッドの Tab 移動 | ブックマークとタイトルを飛ばす | グリッドで Tab を押したときに何をフォーカス順から外すか |
 

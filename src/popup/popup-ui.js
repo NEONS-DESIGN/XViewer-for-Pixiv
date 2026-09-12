@@ -12,6 +12,7 @@ import {
 	IMAGE_QUALITY,
 	PREFETCH_CHOICES,
 	GRID_TAB_SKIP,
+	SIDEBAR_SCROLL,
 	POPUP_THEMES,
 	THEME_TOGGLE,
 	SETTINGS_DEFAULTS,
@@ -81,6 +82,24 @@ const SECTIONS = Object.freeze([
 				key: 'showSidebar',
 				label: 'サイドバーを表示する',
 				description: '投稿文・タグ・いいね数・コメントを画像の横に出します。',
+			}),
+			Object.freeze({
+				kind: 'choice',
+				key: 'sidebarScroll',
+				label: 'サイドバーのスクロール',
+				description: 'サイドバーを縦に送るときの動き方です。',
+				options: Object.freeze([
+					Object.freeze({
+						value: SIDEBAR_SCROLL.COMMENTS,
+						label: 'コメントだけを送る',
+						description: '投稿文とタグは固定したまま、コメント一覧だけを送ります。',
+					}),
+					Object.freeze({
+						value: SIDEBAR_SCROLL.WHOLE,
+						label: 'サイドバーごと送る',
+						description: '投稿文からコメントまでを 1 つにつなげて送ります。主文が長い作品でも、そのまま読み進めてコメントまで辿り着けます。',
+					}),
+				]),
 			}),
 		]),
 	}),

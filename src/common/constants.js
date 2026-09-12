@@ -105,6 +105,17 @@ export const GRID_TAB_SKIP = Object.freeze({
 });
 
 /**
+ * サイドバーを縦に送るときの動き方。
+ * 主文がとても長い作品では、コメントまで一気に読めたほうが楽なこともある。
+ */
+export const SIDEBAR_SCROLL = Object.freeze({
+	/** 投稿文とタグは固定したまま、コメント一覧だけを送る (既定。X.com の見え方) */
+	COMMENTS: 'comments',
+	/** 投稿文からコメントまでを 1 つにつなげて送る */
+	WHOLE: 'whole',
+});
+
+/**
  * popup の配色。
  * SYSTEM は OS の設定 (prefers-color-scheme) に従う。
  * 明示の選択 (DARK / LIGHT) は常に OS より優先する (UI_DESIGN_KIT §10)。
@@ -141,6 +152,7 @@ export const SETTINGS_DEFAULTS = Object.freeze({
 	imageQuality: IMAGE_QUALITY.REGULAR,
 	prefetch: 3,
 	showSidebar: true,
+	sidebarScroll: SIDEBAR_SCROLL.COMMENTS,
 	closeOnBackdrop: true,
 	gridTabSkip: GRID_TAB_SKIP.BOTH,
 	popupTheme: POPUP_THEMES.SYSTEM,

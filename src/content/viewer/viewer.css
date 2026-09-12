@@ -592,12 +592,47 @@
 	padding: 0 16px 16px;
 }
 
+/* 見出し。文字を左、「上部へ」を右端に置く */
 .comments-heading {
 	flex: 0 0 auto;
+	display: flex;
+	align-items: center;
+	gap: 8px;
 	margin: 16px 0 8px;
 	padding-top: 12px;
 	border-top: 1px solid var(--divider);
 	font-size: 14px;
+}
+
+/* 「上部へ」を右端へ寄せるのは文字側の margin で決める。
+   ボタンが隠れているときも見出しの位置が動かない */
+.comments-heading-text {
+	margin-right: auto;
+}
+
+/* サイドバーの先頭へ戻す。返信の開閉と同じ、地の無い小さなボタン。
+   戻る先が無いとき (先頭にいるとき) は hidden で消える */
+.to-top {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	padding: 2px 8px 2px 4px;
+	border: 0;
+	border-radius: 999px;
+	background: transparent;
+	color: var(--accent);
+	font: inherit;
+	font-size: 12px;
+	font-weight: normal;
+	cursor: pointer;
+}
+
+.to-top:hover { background: var(--hover); }
+.to-top:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.to-top svg {
+	width: 16px;
+	height: 16px;
 }
 
 /* スクロールするのはここだけ。min-height: 0 が無いと中身の高さで下限が決まって縮まない。
@@ -621,25 +656,50 @@
 /* スクロールバーは細く、つまみだけを見せる。
    標準の scrollbar-width / scrollbar-color を書くと Chromium は
    ::-webkit-scrollbar を丸ごと無視するので、どちらか一方に寄せること。
-   丸みと余白まで決めたいのでこちらを使う (Chromium 系専用の拡張) */
-.comment-scroll::-webkit-scrollbar {
+   丸みと余白まで決めたいのでこちらを使う (Chromium 系専用の拡張)。
+
+   サイドバー自身も同じ見た目にする。「サイドバーごと送る」設定では
+   こちらが主役のスクロールバーになるので、別物に見えてはいけない */
+.comment-scroll::-webkit-scrollbar,
+.sidebar::-webkit-scrollbar {
 	width: 6px;
 }
 
 /* 軌道も見せる。どこからどこまで送れるのかが分かるほうが、
    つまみの位置だけを見せるより読み進めた量が掴みやすい */
-.comment-scroll::-webkit-scrollbar-track {
+.comment-scroll::-webkit-scrollbar-track,
+.sidebar::-webkit-scrollbar-track {
 	border-radius: 999px;
 	background: var(--scrollbar-track);
 }
 
-.comment-scroll::-webkit-scrollbar-thumb {
+.comment-scroll::-webkit-scrollbar-thumb,
+.sidebar::-webkit-scrollbar-thumb {
 	border-radius: 999px;
 	background: var(--scrollbar-thumb);
 }
 
-.comment-scroll::-webkit-scrollbar-thumb:hover {
+.comment-scroll::-webkit-scrollbar-thumb:hover,
+.sidebar::-webkit-scrollbar-thumb:hover {
 	background: var(--scrollbar-thumb-hover);
+}
+
+/* 「サイドバーごと送る」設定 (sidebarScroll: 'whole')。
+   スクロールする箱をサイドバー 1 つにまとめる。
+   入れ子のスクロールを作らないのが要点なので、コメント区画は縮まず、
+   一覧も自分ではスクロールしない。中身の高さのまま下へ伸びる。
+
+   comments.js が入れる min-height は「中身の高さ以下」なので、
+   flex: 0 0 auto (基準が中身の高さ) のこちらでは当たらない。消さなくてよい */
+:host([data-sidebar-scroll='whole']) .comments {
+	flex: 0 0 auto;
+}
+
+:host([data-sidebar-scroll='whole']) .comment-scroll {
+	flex: 0 0 auto;
+	padding-right: 0;
+	overflow: visible;
+	scrollbar-gutter: auto;
 }
 
 .comment-list {

@@ -109,6 +109,15 @@ test('セレクトは設定値で初期化される', () => {
 	assert.equal(find(root, 'prefetch').value, '1');
 });
 
+test('サイドバーのスクロールは選んだ値が onChange に届く', () => {
+	const { root, changes } = build({ settings: { sidebarScroll: 'comments' } });
+	const select = find(root, 'sidebarScroll');
+	assert.equal(select.value, 'comments');
+	select.value = 'whole';
+	select.dispatch('change');
+	assert.deepEqual(changes, [{ sidebarScroll: 'whole' }]);
+});
+
 test('先読みの変更は数値で onChange に届く', () => {
 	// select の値は文字列。保存は数値で持つので、ここで戻さないと次回の読み込みで既定へ落ちる
 	const { root, changes } = build();

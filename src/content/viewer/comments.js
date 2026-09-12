@@ -26,6 +26,9 @@ const REPLIES_LABEL = Object.freeze({ SHOW: '返信を表示', HIDE: '返信を�
 /** 返信の 1 ページ目。replies API は offset ではなく 1 始まりの page で送る。 */
 const FIRST_REPLY_PAGE = 1;
 
+/** 見出しの右端のボタンの文言。サイドバーの先頭 (投稿文) へ戻す。 */
+const TO_TOP_LABEL = '上部へ';
+
 /**
  * コメント区画を潰してよい下限の件数。
  * 主文がとても長い作品ではサイドバーの高さが足りず、コメント区画が圧縮される。
@@ -130,6 +133,7 @@ export function renderStamp(doc, stampId) {
  * @typedef {object} CommentsDeps
  * @property {Document} doc
  * @property {HTMLElement} container 描画先
+ * @property {HTMLElement} [scrollTarget] 「上部へ」で先頭に戻す相手 (.sidebar)。無ければボタンを出さない
  * @property {(url: string) => Promise<object>} [fetchJson] 取得の差し替え。テストから通信させないために使う
  */
 
@@ -140,6 +144,7 @@ export function renderStamp(doc, stampId) {
  */
 export function createComments(deps) {
 	const { doc, container } = deps;
+	const scrollTarget = deps.scrollTarget ?? null;
 	const fetchJson = deps.fetchJson ?? ((url) => getJson(url));
 	/** 読み込み済みの件数。「もっと見る」で増やす */
 	let offset = 0;
@@ -155,6 +160,10 @@ export function createComments(deps) {
 	let failure = null;
 	/** @type {ResizeObserver|null} 中身の高さが変わったら下限を測り直す */
 	let sizeWatcher = null;
+	/** @type {HTMLButtonElement|null} 見出しの右端の「上部へ」 */
+	let toTopButton = null;
+	/** @type {(() => void)|null} scrollTarget の購読を解く */
+	let unwatchScroll = null;
 
 	/**
 	 * 要素の外側の高さ (margin 込み)。
@@ -214,6 +223,75 @@ export function createComments(deps) {
 		if (!Observer) return;
 		sizeWatcher ??= new Observer(() => { applyFloor(); });
 		sizeWatcher.observe(el);
+	}
+
+	/**
+	 * 「上部へ」の出し入れ。先頭にいるときは戻る先が無いので隠す。
+	 * 押しても何も起きないボタンを見せないため (UI_DESIGN_KIT §6)。
+	 * @returns {void}
+	 */
+	function syncToTop() {
+		if (!toTopButton || !scrollTarget) return;
+		toTopButton.hidden = !(scrollTarget.scrollTop > 0);
+	}
+
+	/**
+	 * サイドバーの先頭へ戻す。動きを抑える設定なら一気に戻す。
+	 * @returns {void}
+	 */
+	function scrollToTop() {
+		if (!scrollTarget) return;
+		const reduced = doc.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+		if (typeof scrollTarget.scrollTo === 'function') {
+			scrollTarget.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' });
+			return;
+		}
+		// scrollTo を持たない相手 (古い実装・テスト用の DOM) でも戻せるようにする
+		scrollTarget.scrollTop = 0;
+	}
+
+	/**
+	 * 見出しを作る。右端に「上部へ」を置く。
+	 *
+	 * 「サイドバーごと送る」設定では見出しもコメントも一緒に流れるので、
+	 * 読み進めたあと投稿文へ戻る手段がいる。
+	 * 「コメントだけを送る」設定ではサイドバー自体がほとんど動かないので、
+	 * 結果としてこのボタンもほとんど出ない。
+	 * @returns {HTMLElement} 見出し
+	 */
+	function createHeading() {
+		const heading = doc.createElement('h3');
+		heading.className = 'comments-heading';
+
+		// 「上部へ」を右端へ寄せるため、見出しの文字も要素に入れる
+		const title = doc.createElement('span');
+		title.className = 'comments-heading-text';
+		title.textContent = 'コメント';
+		heading.appendChild(title);
+
+		if (scrollTarget) {
+			toTopButton = doc.createElement('button');
+			toTopButton.type = 'button';
+			toTopButton.className = 'to-top';
+			toTopButton.title = TO_TOP_LABEL;
+			toTopButton.appendChild(createIcon(doc, 'expandLess'));
+			const text = doc.createElement('span');
+			text.textContent = TO_TOP_LABEL;
+			toTopButton.appendChild(text);
+			toTopButton.hidden = true;
+			toTopButton.addEventListener('click', scrollToTop);
+			heading.appendChild(toTopButton);
+
+			if (typeof scrollTarget.addEventListener === 'function') {
+				const onScroll = () => { syncToTop(); };
+				scrollTarget.addEventListener('scroll', onScroll, { passive: true });
+				unwatchScroll = () => { scrollTarget.removeEventListener('scroll', onScroll); };
+			}
+			syncToTop();
+		}
+
+		watchSize(heading);
+		return heading;
 	}
 
 	/**
@@ -456,16 +534,15 @@ export function createComments(deps) {
 			workId = detail.id;
 			offset = 0;
 			container.textContent = '';
-			// 前の作品で測った下限が残らないようにする
+			// 前の作品で測った下限と、消える見出しの購読を残さない
 			sizeWatcher?.disconnect();
+			unwatchScroll?.();
+			unwatchScroll = null;
+			toTopButton = null;
 			scroll = null;
 			container.style.minHeight = '';
 
-			const heading = doc.createElement('h3');
-			heading.className = 'comments-heading';
-			heading.textContent = 'コメント';
-			container.appendChild(heading);
-			watchSize(heading);
+			container.appendChild(createHeading());
 
 			if (detail.commentOff) {
 				const off = doc.createElement('p');
@@ -514,6 +591,9 @@ export function createComments(deps) {
 			// 見張ったままだと、閉じたあとの高さの変化で測りに行って落ちる
 			sizeWatcher?.disconnect();
 			sizeWatcher = null;
+			unwatchScroll?.();
+			unwatchScroll = null;
+			toTopButton = null;
 			list = null;
 			scroll = null;
 			moreButton = null;

@@ -12,6 +12,7 @@ import {
 	HIDDEN_SELECTOR,
 	INERT_ATTRIBUTE,
 	POPUP_THEMES,
+	SIDEBAR_SCROLL,
 } from '../../common/constants.js';
 import { createIcon } from '../../common/icons.js';
 import { getJson } from '../../pixiv/client.js';
@@ -157,6 +158,19 @@ export function createViewer(deps) {
 	}
 
 	/**
+	 * サイドバーの送り方を属性へ写す。中身は CSS が切り替える。
+	 * 描き直しは要らないので、設定が変わったらその場で書き換える。
+	 * @returns {void}
+	 */
+	function applySidebarScroll() {
+		if (!host) return;
+		// 値の語彙は設定と同じ。既定 (comments) 以外はすべて whole に倒す
+		host.dataset.sidebarScroll = settings.sidebarScroll === SIDEBAR_SCROLL.WHOLE
+			? SIDEBAR_SCROLL.WHOLE
+			: SIDEBAR_SCROLL.COMMENTS;
+	}
+
+	/**
 	 * モーダルの背後を Tab と読み上げから外す。
 	 * 自分が付けた要素だけを覚え、元から inert だった要素は閉じるときに剥がさない。
 	 * @returns {void}
@@ -250,6 +264,7 @@ export function createViewer(deps) {
 		ensureHost();
 		// テーマは毎回読み直す。開いたままホスト側で切り替えられても追従させる
 		applyTheme();
+		applySidebarScroll();
 		if (!wasOpen) {
 			savedBodyStyle = doc.body.getAttribute('style') ?? '';
 			doc.body.setAttribute('style', `${savedBodyStyle};${BODY_LOCK_STYLE}`);
@@ -342,6 +357,8 @@ export function createViewer(deps) {
 			settings = next;
 			const workId = navigation.currentWorkId();
 			if (!host || !workId) return;
+			// 送り方は CSS だけで切り替わる。描き直すと読んでいた位置が飛ぶので属性だけ差し替える
+			applySidebarScroll();
 			if (RERENDER_SETTING_KEYS.some((key) => previous[key] !== next[key])) void openWork(workId);
 		},
 

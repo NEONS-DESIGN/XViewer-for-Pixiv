@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeSettings, loadSettings, saveSetting, resetSettings, watchSettings } from '../../src/common/storage.js';
-import { SETTINGS_DEFAULTS, GRID_TAB_SKIP, POPUP_THEMES } from '../../src/common/constants.js';
+import { SETTINGS_DEFAULTS, GRID_TAB_SKIP, POPUP_THEMES, SIDEBAR_SCROLL } from '../../src/common/constants.js';
 
 /**
  * chrome.storage.sync の偽物を作る。
@@ -28,11 +28,17 @@ test('normalizeSettings は正しい値をそのまま通す', () => {
 		imageQuality: 'original',
 		prefetch: 1,
 		showSidebar: false,
+		sidebarScroll: SIDEBAR_SCROLL.WHOLE,
 		closeOnBackdrop: false,
 		gridTabSkip: GRID_TAB_SKIP.TITLE,
 		popupTheme: POPUP_THEMES.LIGHT,
 	};
 	assert.deepEqual(normalizeSettings(input), input);
+});
+
+test('normalizeSettings は知らないサイドバーの送り方を既定へ倒す', () => {
+	assert.equal(normalizeSettings({ sidebarScroll: 'both' }).sidebarScroll, SIDEBAR_SCROLL.COMMENTS);
+	assert.equal(normalizeSettings({ sidebarScroll: 42 }).sidebarScroll, SIDEBAR_SCROLL.COMMENTS);
 });
 
 test('normalizeSettings は知らない解像度を既定へ倒す', () => {

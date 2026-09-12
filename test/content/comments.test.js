@@ -308,3 +308,50 @@ test('コメント区画の下限は中身の高さを超えない (余白を作
 test('一覧が無いとき (0 件・コメント不可・失敗) の下限は文言の高さだけ', () => {
 	assert.equal(commentsFloorHeight({ outside: 109, contentHeight: 0, nthBottom: null }), 109);
 });
+
+test('見出しの「上部へ」は戻れるときだけ出て、押すとサイドバーを先頭へ戻す', async () => {
+	const container = fakeElement('div');
+	const scrollTarget = fakeElement('div');
+	scrollTarget.scrollTop = 0;
+	const comments = createComments({
+		doc: fakeDoc(),
+		container,
+		scrollTarget,
+		fetchJson: async () => ({ comments: [ROOT], hasNext: false }),
+	});
+	await comments.load(DETAIL);
+
+	// 先頭にいるので戻る先が無い。押しても何も起きないボタンは見せない
+	const toTop = find(container, '.to-top');
+	assert.equal(toTop.hidden, true);
+
+	// 読み進めたら出す
+	scrollTarget.scrollTop = 120;
+	await scrollTarget.dispatch('scroll');
+	assert.equal(toTop.hidden, false);
+
+	await toTop.click();
+	assert.equal(scrollTarget.scrollTop, 0);
+});
+
+test('scrollTarget が無ければ「上部へ」は作らない', async () => {
+	const { container, comments } = build(async () => ({ comments: [ROOT], hasNext: false }));
+	await comments.load(DETAIL);
+	assert.equal(find(container, '.to-top'), null);
+});
+
+test('dispose すると scrollTarget の購読を解く', async () => {
+	const container = fakeElement('div');
+	const scrollTarget = fakeElement('div');
+	scrollTarget.scrollTop = 0;
+	const comments = createComments({
+		doc: fakeDoc(),
+		container,
+		scrollTarget,
+		fetchJson: async () => ({ comments: [ROOT], hasNext: false }),
+	});
+	await comments.load(DETAIL);
+	assert.equal(scrollTarget.listeners.scroll.length, 1);
+	comments.dispose();
+	assert.equal(scrollTarget.listeners.scroll.length, 0);
+});
