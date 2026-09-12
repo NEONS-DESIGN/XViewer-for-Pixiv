@@ -59,6 +59,16 @@
 	--sidebar-width: 384px;
 	/* 操作部品の高さ。UI_DESIGN_KIT §3 に合わせる */
 	--control-height: 30px;
+	/* コメント 1 件分のおおよその高さ。本文 1 行のコメントの実測値
+	   (名前 19 + 本文 22 + 下段 22 + 上下の余白 16 + 罫線 1。アバター 32px より高い) 。
+	   コメント区画を潰してよい下限を決めるためだけに使う */
+	--comment-row-height: 88px;
+	/* 主文がどれだけ長くても、この件数分のコメントは残す */
+	--comment-min-rows: 3;
+	/* コメント区画のうち一覧以外が占める高さ。
+	   見出しの上余白 16 + 見出し 35 (上padding 12 + 行 22.4 + 罫線 1) + 見出しの下余白 8。
+	   .comments は content-box なので、下余白の 16px はここに含めない */
+	--comments-shell-height: 59px;
 
 	/* Shadow DOM はフォントを継承しない。ホストページの書体に引きずられないよう明示する */
 	font-family: system-ui, -apple-system, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
@@ -577,13 +587,26 @@
 .share-status:empty { display: none; }
 
 /* コメント区画。見出しと「もっと見る」は動かさず、一覧だけを縦に伸ばしてスクロールさせる。
-   縮んでよいのはここだけ。作品情報が長い作品ではここが圧縮される */
+   縮んでよいのはここだけ。作品情報が長い作品ではここが圧縮される。
+
+   min-height を 0 にしないこと。0 だと主文がとても長い作品 (例: 149224712) で
+   この箱が高さ 0 まで潰れ、見出しと一覧が箱の外へはみ出す。はみ出した分は
+   サイドバーのスクロール範囲に入らないためコメントが読めなくなり、
+   下余白 16px も効かなくなる (中身が箱の下端より下に出るため)。
+   下限は「見出し + コメント --comment-min-rows 件分」。ここから先はサイドバーごとスクロールする */
 .comments {
 	flex: 1 1 auto;
-	min-height: 0;
+	min-height: calc(var(--comment-row-height) * var(--comment-min-rows) + var(--comments-shell-height));
 	display: flex;
 	flex-direction: column;
 	padding: 0 16px 16px;
+}
+
+/* 一覧が無いとき (0 件 / コメントを受け付けていない / 読み込みに失敗) は
+   「まだコメントはありません」などの 1 行が入れば足りる。
+   3 件分を確保しても下に空白が伸びるだけになる */
+.comments:not(:has(.comment-scroll)) {
+	--comment-min-rows: 1;
 }
 
 .comments-heading {
