@@ -715,6 +715,26 @@
    flex: 0 0 auto (基準が中身の高さ) のこちらでは当たらない。消さなくてよい */
 :host([data-sidebar-scroll='whole']) .comments {
 	flex: 0 0 auto;
+	/* 見出しを上端へ貼り付けるので、その上の余白は見出しの margin ではなく区画側で持つ。
+	   margin を残すと、貼り付いた見出しの上に隙間ができてコメントが透けて通る */
+	padding-top: 16px;
+}
+
+/* コメントが多い作品では、送るうちに見出しが流れて消える。
+   見出しには「上部へ」も載っているので、消えると投稿文へ戻る手段まで無くなる。
+   上端に貼り付けて、読んでいる間ずっと残す。
+
+   margin は 0 にして padding へ移すこと。margin の分だけ下がって貼り付き、
+   その隙間をコメントが素通りする (背景は margin には塗られない)。
+   貼り付く先はサイドバー。sticky は近い方のスクロール領域を基準にする */
+:host([data-sidebar-scroll='whole']) .comments-heading {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	margin: 0;
+	padding-bottom: 8px;
+	/* 下を通るコメントを隠す。地色を敷かないと文字が重なって読めなくなる */
+	background: var(--surface);
 }
 
 :host([data-sidebar-scroll='whole']) .comment-scroll {
