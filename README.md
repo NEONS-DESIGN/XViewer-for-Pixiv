@@ -9,7 +9,7 @@
 [![version](https://img.shields.io/github/package-json/v/NEONS-DESIGN/GridViewer-for-Pixiv?color=4ea3d6)](package.json)
 [![license](https://img.shields.io/github/license/NEONS-DESIGN/GridViewer-for-Pixiv?color=4ea3d6)](LICENSE)
 ![manifest](https://img.shields.io/badge/manifest-v3-4ea3d6)
-![tests](https://img.shields.io/badge/tests-384%20passing-4ea3d6)
+![tests](https://img.shields.io/badge/tests-385%20passing-4ea3d6)
 
 </div>
 
