@@ -31,9 +31,18 @@ test('normalizeSettings は正しい値をそのまま通す', () => {
 		sidebarScroll: SIDEBAR_SCROLL.WHOLE,
 		closeOnBackdrop: false,
 		gridTabSkip: GRID_TAB_SKIP.TITLE,
+		hidePickup: true,
 		popupTheme: POPUP_THEMES.LIGHT,
 	};
 	assert.deepEqual(normalizeSettings(input), input);
+});
+
+test('normalizeSettings はピックアップ非表示を真偽値へ丸める', () => {
+	// 既定はオフ。壊れた保存値で勝手に隠れると、欄が消えた理由が分からなくなる
+	assert.equal(normalizeSettings({}).hidePickup, false);
+	assert.equal(normalizeSettings({ hidePickup: 'yes' }).hidePickup, false);
+	assert.equal(normalizeSettings({ hidePickup: 1 }).hidePickup, false);
+	assert.equal(normalizeSettings({ hidePickup: true }).hidePickup, true);
 });
 
 test('normalizeSettings は知らないサイドバーの送り方を既定へ倒す', () => {

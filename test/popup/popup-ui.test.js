@@ -69,10 +69,10 @@ function build(overrides = {}) {
 	return { doc, root, changes, resets: () => resets };
 }
 
-test('設定タブの見出しは ビュワー / 画像 / 操作 の順に並ぶ', () => {
+test('設定タブの見出しは ビュワー / 画像 / ユーザーページ / 操作 の順に並ぶ', () => {
 	const { root } = build();
 	const headings = collect(find(root, 'panel-settings'), 'h2');
-	assert.deepEqual(headings.map((heading) => heading.textContent), ['ビュワー', '画像', '操作']);
+	assert.deepEqual(headings.map((heading) => heading.textContent), ['ビュワー', '画像', 'ユーザーページ', '操作']);
 });
 
 test('ビュワーの見出しにはタイトルとテーマの切り替えボタンが並ぶ', () => {
@@ -86,6 +86,16 @@ test('チェックボックスは設定値で初期化される', () => {
 	assert.equal(find(root, 'enabled').checked, false);
 	assert.equal(find(root, 'showSidebar').checked, true);
 	assert.equal(find(root, 'closeOnBackdrop').checked, false);
+});
+
+test('ピックアップ非表示は既定でオフ、切り替えると onChange に届く', () => {
+	// 既定がオンだと、入れた覚えのない人の画面から欄が消える
+	const { root, changes } = build();
+	const input = find(root, 'hidePickup');
+	assert.equal(input.checked, false);
+	input.checked = true;
+	input.dispatch('change');
+	assert.deepEqual(changes, [{ hidePickup: true }]);
 });
 
 test('チェックボックスを変えると そのキーで onChange に届く', () => {

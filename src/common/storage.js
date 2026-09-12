@@ -74,6 +74,7 @@ export function normalizeSettings(raw) {
 		sidebarScroll: oneOf(source.sidebarScroll, Object.values(SIDEBAR_SCROLL), d.sidebarScroll),
 		closeOnBackdrop: asBoolean(source.closeOnBackdrop, d.closeOnBackdrop),
 		gridTabSkip: oneOf(source.gridTabSkip, Object.values(GRID_TAB_SKIP), d.gridTabSkip),
+		hidePickup: asBoolean(source.hidePickup, d.hidePickup),
 		popupTheme: oneOf(source.popupTheme, Object.values(POPUP_THEMES), d.popupTheme),
 	};
 }

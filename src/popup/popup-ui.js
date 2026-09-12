@@ -151,6 +151,17 @@ const SECTIONS = Object.freeze([
 		]),
 	}),
 	Object.freeze({
+		heading: 'ユーザーページ',
+		fields: Object.freeze([
+			Object.freeze({
+				kind: 'toggle',
+				key: 'hidePickup',
+				label: 'ピックアップ欄を隠す',
+				description: 'プロフィールのホームに出る「ピックアップ」を隠します。作品一覧がすぐ目に入ります。',
+			}),
+		]),
+	}),
+	Object.freeze({
 		heading: '操作',
 		fields: Object.freeze([
 			Object.freeze({

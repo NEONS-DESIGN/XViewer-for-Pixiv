@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { WORK_CATEGORY } from '../../src/common/constants.js';
-import { parseUserPage, parseArtworkPath, isViewerTarget, pageKey } from '../../src/content/page.js';
+import { parseUserPage, parseArtworkPath, isViewerTarget, isProfileHome, pageKey } from '../../src/content/page.js';
 
 test('ユーザーページの各タブを認識する', () => {
 	const works = { userId: '54734418', isWorksGrid: true, isTagFiltered: false, category: null };
@@ -98,4 +98,15 @@ test('pageKey はタグ違いを区別しない', () => {
 test('pageKey はユーザーページでないパスをそのまま返す', () => {
 	assert.equal(pageKey('/'), '/');
 	assert.equal(pageKey('/artworks/149425016'), '/artworks/149425016');
+});
+
+test('isProfileHome はプロフィールのホームだけを true にする', () => {
+	// ピックアップ欄が出るのはここだけ。下位のタブには欄自体が無い
+	assert.equal(isProfileHome('/users/54734418'), true);
+	assert.equal(isProfileHome('/users/54734418/'), true);
+	assert.equal(isProfileHome('/users/54734418/artworks'), false);
+	assert.equal(isProfileHome('/users/54734418/illustrations'), false);
+	assert.equal(isProfileHome('/users/54734418/bookmarks/artworks'), false);
+	assert.equal(isProfileHome('/artworks/149425016'), false);
+	assert.equal(isProfileHome('/'), false);
 });
