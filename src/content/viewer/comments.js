@@ -29,6 +29,25 @@ const FIRST_REPLY_PAGE = 1;
 /** 見出しの右端のボタンの文言。サイドバーの先頭 (投稿文) へ戻す。 */
 const TO_TOP_LABEL = '上部へ';
 
+/** 見出しが上端に貼り付いている間だけ付ける印。下に線を引くのに使う。 */
+const STUCK_CLASS = 'is-stuck';
+
+/**
+ * 貼り付いたと見なす許容差 (px)。
+ * 端数の丸めで 1px 足らずずれることがあり、ちょうど 0 で比べると線が点滅する。
+ */
+const STUCK_EPSILON = 1;
+
+/**
+ * 見出しがスクロール領域の上端に貼り付いているかを判定する。
+ * @param {number} headingTop 見出しの上端 (画面座標)
+ * @param {number} scrollportTop スクロール領域の上端 (画面座標)
+ * @returns {boolean} 貼り付いていれば true
+ */
+export function isHeadingStuck(headingTop, scrollportTop) {
+	return headingTop - scrollportTop <= STUCK_EPSILON;
+}
+
 /**
  * コメント区画を潰してよい下限の件数。
  * 主文がとても長い作品ではサイドバーの高さが足りず、コメント区画が圧縮される。
@@ -160,6 +179,8 @@ export function createComments(deps) {
 	let failure = null;
 	/** @type {ResizeObserver|null} 中身の高さが変わったら下限を測り直す */
 	let sizeWatcher = null;
+	/** @type {HTMLElement|null} コメントの見出し。貼り付いたかを見るのに使う */
+	let headingEl = null;
 	/** @type {HTMLButtonElement|null} 見出しの右端の「上部へ」 */
 	let toTopButton = null;
 	/** @type {(() => void)|null} scrollTarget の購読を解く */
@@ -236,6 +257,31 @@ export function createComments(deps) {
 	}
 
 	/**
+	 * 貼り付いている間だけ見出しに印を付ける。下に線を引くのは CSS 側。
+	 * 貼り付くと見出しとコメントが地続きに見えて境目が分からなくなるため。
+	 * @returns {void}
+	 */
+	function syncStuck() {
+		if (!headingEl || !scrollTarget) return;
+		// テスト用の DOM には測る口が無い。見た目の調整なので黙って何もしない
+		if (typeof headingEl.getBoundingClientRect !== 'function') return;
+		const stuck = isHeadingStuck(
+			headingEl.getBoundingClientRect().top,
+			scrollTarget.getBoundingClientRect().top,
+		);
+		headingEl.classList.toggle(STUCK_CLASS, stuck);
+	}
+
+	/**
+	 * サイドバーを送るたびに見直すもの。
+	 * @returns {void}
+	 */
+	function syncScrollState() {
+		syncToTop();
+		syncStuck();
+	}
+
+	/**
 	 * サイドバーの先頭へ戻す。動きを抑える設定なら一気に戻す。
 	 * @returns {void}
 	 */
@@ -262,6 +308,7 @@ export function createComments(deps) {
 	function createHeading() {
 		const heading = doc.createElement('h3');
 		heading.className = 'comments-heading';
+		headingEl = heading;
 
 		// 「上部へ」を右端へ寄せるため、見出しの文字も要素に入れる
 		const title = doc.createElement('span');
@@ -283,11 +330,11 @@ export function createComments(deps) {
 			heading.appendChild(toTopButton);
 
 			if (typeof scrollTarget.addEventListener === 'function') {
-				const onScroll = () => { syncToTop(); };
+				const onScroll = () => { syncScrollState(); };
 				scrollTarget.addEventListener('scroll', onScroll, { passive: true });
 				unwatchScroll = () => { scrollTarget.removeEventListener('scroll', onScroll); };
 			}
-			syncToTop();
+			syncScrollState();
 		}
 
 		watchSize(heading);
@@ -538,6 +585,7 @@ export function createComments(deps) {
 			sizeWatcher?.disconnect();
 			unwatchScroll?.();
 			unwatchScroll = null;
+			headingEl = null;
 			toTopButton = null;
 			scroll = null;
 			container.style.minHeight = '';
@@ -593,6 +641,7 @@ export function createComments(deps) {
 			sizeWatcher = null;
 			unwatchScroll?.();
 			unwatchScroll = null;
+			headingEl = null;
 			toTopButton = null;
 			list = null;
 			scroll = null;

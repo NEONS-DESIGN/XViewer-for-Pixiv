@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeComment, renderCommentText, renderStamp, createComments, commentsFloorHeight } from '../../src/content/viewer/comments.js';
+import { normalizeComment, renderCommentText, renderStamp, createComments, commentsFloorHeight, isHeadingStuck } from '../../src/content/viewer/comments.js';
 import { fakeElement, fakeDoc, find, findAll, iconName, flush } from '../helpers/dom.js';
 
 test('コメントを共通の形にする', () => {
@@ -354,4 +354,17 @@ test('dispose すると scrollTarget の購読を解く', async () => {
 	assert.equal(scrollTarget.listeners.scroll.length, 1);
 	comments.dispose();
 	assert.equal(scrollTarget.listeners.scroll.length, 0);
+});
+
+test('見出しは上端に届いたら貼り付いたと見なす', () => {
+	// スクロール領域の上端より下にいる間は貼り付いていない
+	assert.equal(isHeadingStuck(431, 0), false);
+	// 上端に並んだら貼り付き。端数で 1px 足らずずれても点滅させない
+	assert.equal(isHeadingStuck(0, 0), true);
+	assert.equal(isHeadingStuck(0.6, 0), true);
+	// 区画ごと通り過ぎて上へ出た後も貼り付き扱い (画面外なので線は見えない)
+	assert.equal(isHeadingStuck(-120, 0), true);
+	// スクロール領域が画面の上端に無いときも基準は領域側
+	assert.equal(isHeadingStuck(60, 60), true);
+	assert.equal(isHeadingStuck(90, 60), false);
 });
