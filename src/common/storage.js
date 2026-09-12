@@ -3,7 +3,7 @@
  * 保存ボタンは作らず変更のたびに書くので、書き込みは 1 項目ずつ。
  * 保存値が壊れていても既定へ倒して必ず描けるようにする (UI_DESIGN_KIT §9)。
  */
-import { SETTINGS_DEFAULTS, IMAGE_QUALITY, PREFETCH_CHOICES, GRID_TAB_SKIP } from './constants.js';
+import { SETTINGS_DEFAULTS, IMAGE_QUALITY, PREFETCH_CHOICES, GRID_TAB_SKIP, POPUP_THEMES } from './constants.js';
 
 /**
  * 既定の保存領域。テストでは deps.area で差し替える。
@@ -44,6 +44,9 @@ export function normalizeSettings(raw) {
 		gridTabSkip: Object.values(GRID_TAB_SKIP).includes(source.gridTabSkip)
 			? source.gridTabSkip
 			: SETTINGS_DEFAULTS.gridTabSkip,
+		popupTheme: Object.values(POPUP_THEMES).includes(source.popupTheme)
+			? source.popupTheme
+			: SETTINGS_DEFAULTS.popupTheme,
 	};
 }
 
@@ -103,4 +106,22 @@ export function watchSettings(callback, deps = {}) {
 			storage.onChanged.removeListener(listener);
 		},
 	};
+}
+
+/**
+ * 設定を丸ごと既定へ戻す。失敗しても投げない。
+ * 項目を消すのではなく既定を書き戻すのは、storage の中身と画面の表示を一致させるため。
+ * @param {{area?: object}} [deps] 保存領域の差し替え
+ * @returns {Promise<boolean>} 戻せたら true
+ */
+export async function resetSettings(deps = {}) {
+	const area = deps.area ?? defaultArea();
+	if (!area) return false;
+	try {
+		await area.set({ ...SETTINGS_DEFAULTS });
+		return true;
+	} catch {
+		// 呼び出し側が画面に出す。ここでは投げない
+		return false;
+	}
 }

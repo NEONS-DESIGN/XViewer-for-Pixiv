@@ -83,6 +83,37 @@ export const GRID_TAB_SKIP = Object.freeze({
 	NONE: 'none',
 });
 
+/**
+ * popup の配色。
+ * SYSTEM は OS の設定 (prefers-color-scheme) に従う。
+ * 明示の選択 (DARK / LIGHT) は常に OS より優先する (UI_DESIGN_KIT §10)。
+ */
+export const POPUP_THEMES = Object.freeze({
+	SYSTEM: 'system',
+	DARK: 'dark',
+	LIGHT: 'light',
+});
+
+/**
+ * 配色の切り替えボタンの定義。キーは今見えている配色、値は「押すと何になるか」。
+ * アイコンと文言を「次の状態」で揃えるのは、ボタンは押した結果を示すものであり、
+ * 今の状態は画面の配色そのものが伝えているため。
+ * SYSTEM は「今見えている配色」ではないのでキーに現れない。
+ * 解決済みの DARK / LIGHT だけを引く (popup-ui.js の resolveTheme を通す)。
+ */
+export const THEME_TOGGLE = Object.freeze({
+	[POPUP_THEMES.DARK]: Object.freeze({
+		next: POPUP_THEMES.LIGHT,
+		icon: 'lightMode',
+		label: 'ライトモードに切り替える',
+	}),
+	[POPUP_THEMES.LIGHT]: Object.freeze({
+		next: POPUP_THEMES.DARK,
+		icon: 'darkMode',
+		label: 'ダークモードに切り替える',
+	}),
+});
+
 /** 設定の既定値。保存値が壊れていたらここへ倒す。 */
 export const SETTINGS_DEFAULTS = Object.freeze({
 	enabled: true,
@@ -91,6 +122,7 @@ export const SETTINGS_DEFAULTS = Object.freeze({
 	showSidebar: true,
 	closeOnBackdrop: true,
 	gridTabSkip: GRID_TAB_SKIP.BOTH,
+	popupTheme: POPUP_THEMES.SYSTEM,
 });
 
 /** キー操作の割り当て。 */

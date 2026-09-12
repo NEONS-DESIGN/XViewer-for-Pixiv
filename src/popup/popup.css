@@ -1,7 +1,10 @@
 /* 配色はすべてここの変数で決める。個々の規則に色を直書きしないこと。
-   ダークが既定。ライトは :root[data-theme='light'] で変数だけを差し替える。 */
+   ダークが既定。ライトは :root[data-theme='light'] で変数だけを差し替える。
+   data-theme は popup-ui.js が設定 (popupTheme) と OS の設定から決めて付ける。
+   値は viewer.css と揃えてある。ビュワーと設定画面で同じ色に見せるため。 */
 :root {
-	/* ブラウザ標準の部品も配色に追従させる。これが無いとチェックボックスだけ暗いままになる */
+	/* ブラウザ標準の部品 (チェックボックス、セレクトのピッカー、スクロールバー) も
+	   配色に追従させる。これが無いとライトにしても白い枠の中に暗いピッカーが出る */
 	color-scheme: dark;
 	--bg: #14161c;
 	--surface: #1d212b;
@@ -15,6 +18,8 @@
 	--hover: rgba(255, 255, 255, 0.08);
 	--accent: #4ea3d6;
 	--on-accent: #04121a;
+	/* 取り返しの付かない操作 (設定の初期化の確定) の枠と文字。
+	   同じ形の 2 つのボタンのうち、戻せない側を色で区別する */
 	--danger: #e5737a;
 }
 
@@ -36,28 +41,81 @@
 }
 
 body {
-	/* Chrome 拡張の popup は幅を固定する (UI_DESIGN_KIT §10) */
+	/* Chrome 拡張の popup は幅を固定する (UI_DESIGN_KIT §10)。
+	   中身に合わせると、説明の長さで画面ごとに幅が変わる */
 	width: 320px;
 	margin: 0;
-	padding: 12px;
 	background: var(--bg);
 	color: var(--fg);
 	font-family: system-ui, -apple-system, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
-	font-size: 14px;
+	font-size: 13px;
 	line-height: 1.6;
 }
 
+.popup {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding: 14px;
+}
+
+/* --- 見出しの行 ------------------------------------------------------- */
+
+.header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+
 h1 {
-	margin: 0 0 12px;
+	margin: 0;
 	font-size: 15px;
 }
 
-.field {
-	padding: 8px 0;
-	border-bottom: 1px solid var(--divider);
+.theme-toggle {
+	/* 正方形のアイコンボタン。高さは他の操作部品と揃える */
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	width: 30px;
+	padding: 0;
+	color: var(--muted);
 }
 
-.field:last-of-type { border-bottom: none; }
+.theme-toggle:hover { color: var(--fg); }
+
+.theme-toggle svg {
+	width: 18px;
+	height: 18px;
+}
+
+/* --- セクション ------------------------------------------------------- */
+
+.section {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding-top: 10px;
+	border-top: 1px solid var(--divider);
+}
+
+.section h2 {
+	margin: 0;
+	color: var(--muted);
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	line-height: 1.4;
+}
+
+.field h3 {
+	margin: 0;
+	font-size: 13px;
+	font-weight: 400;
+	line-height: 1.4;
+}
 
 .row {
 	display: flex;
@@ -65,27 +123,48 @@ h1 {
 	gap: 8px;
 	/* クリック領域は 30px を下回らない (UI_DESIGN_KIT §6)。
 	   チェックボックス 16px とテキスト行だけでは 22px ほどにしかならず、
-	   セレクト (30px) とも揃わない */
-	min-height: 30px;
+	   セレクト (30px) とも高さが揃わない */
+	min-height: 24px;
 	cursor: pointer;
 }
 
 .label { flex: 1 1 auto; }
 
-/* 操作部品の高さを揃える (UI_DESIGN_KIT §3) */
-select {
-	width: 100%;
-	height: 30px;
-	margin-top: 4px;
-	padding: 0 8px;
-	border: 1px solid var(--control-border);
-	border-radius: 6px;
-	background: var(--control-bg);
-	color: var(--fg);
-	font: inherit;
+/* 説明文。設定項目には必ず 1 行付ける (UI_DESIGN_KIT §1 原則 6) */
+.description {
+	margin: 1px 0 0;
+	color: var(--muted);
+	font-size: 11px;
+	line-height: 1.45;
 }
 
-select:hover { background: var(--control-hover); }
+.field.choice .description { margin-bottom: 3px; }
+
+/* 保存の失敗など。読み上げには role="alert" で届く */
+.notice {
+	margin: 0;
+	padding: 8px 10px;
+	border: 1px solid var(--danger);
+	border-radius: 4px;
+	color: var(--danger);
+	font-size: 11px;
+	line-height: 1.5;
+}
+
+/* --- 操作部品 --------------------------------------------------------- */
+
+/* 操作部品の高さを揃える (UI_DESIGN_KIT §3) */
+button {
+	height: 30px;
+	border: 1px solid var(--control-border);
+	border-radius: 4px;
+	background: var(--control-bg);
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
+}
+
+button:hover { background: var(--control-hover); }
 
 input[type='checkbox'] {
 	width: 16px;
@@ -95,23 +174,157 @@ input[type='checkbox'] {
 }
 
 /* すべての操作部品に輪郭を出す (UI_DESIGN_KIT §6) */
+button:focus-visible,
 select:focus-visible,
 input[type='checkbox']:focus-visible {
 	outline: 2px solid var(--accent);
 	outline-offset: 2px;
 }
 
-/* 説明文。設定項目には必ず 1 行付ける (UI_DESIGN_KIT §1 原則 6) */
-.hint {
-	margin: 2px 0 0;
-	color: var(--muted);
-	font-size: 12px;
-	line-height: 1.4;
+select {
+	/* 見た目はボタンに揃える。popup の中で操作できるものの外見を 1 種類に保つ */
+	width: 100%;
+	height: 30px;
+	padding: 0 6px;
+	/* base-select では select が flex コンテナになり、閉じた状態の中身
+	   (selectedcontent) がその子になる。既定の stretch のままだと子が高さ一杯に
+	   伸び、その中で文字が上端の行に置かれて上寄りに見える */
+	align-items: center;
+	border: 1px solid var(--control-border);
+	border-radius: 4px;
+	background: var(--control-bg);
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
 }
 
-.status {
-	min-height: 1.4em;
-	margin: 8px 0 0;
+select:hover { background: var(--control-hover); }
+
+option {
+	/* 展開したリストは OS 側の配色になるため、ここで配色を明示しないと
+	   ダークで白地に白文字になる */
+	background: var(--control-bg);
+	color: var(--fg);
+}
+
+/* ここから下は `appearance: base-select` に対応した環境だけで効く。
+   非対応の環境では ::picker(select) が読めず、その宣言ブロックごと捨てられる
+   (選択子の一覧に 1 つでも読めないものがあると規則全体が無効になる規則)。
+   そのため対応・非対応のどちらでも、上の素の select の見た目が土台として残る。 */
+select,
+select::picker(select) {
+	appearance: base-select;
+}
+
+select > button {
+	/* base-select の閉じた状態を受け持つ要素。枠と高さは select 自身が持つので、
+	   ここで素の button の見た目が乗ると枠が二重になる */
+	width: 100%;
+	height: auto;
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	color: inherit;
+	text-align: start;
+}
+
+select > button:hover { background: transparent; }
+
+select::picker(select) {
+	/* ピッカーは中身に合わせて広がるため、放っておくと最長の説明の幅になり
+	   popup の外へはみ出す (popup は窓の幅で切られるので、はみ出した分は読めない)。
+	   セレクトと同じ幅に留め、収まらない説明は折り返させる */
+	box-sizing: border-box;
+	width: anchor-size(width);
+	margin-top: 4px;
+	padding: 4px;
+	border: 1px solid var(--control-border);
+	border-radius: 4px;
+	background: var(--control-bg);
+}
+
+select option {
+	/* 選択中を示すチェックマーク (::checkmark) を左の列に固定し、ラベルと説明を
+	   右の列に揃える。既定の並びのままだとチェックマークがラベルと同じ行に流れ、
+	   ラベルだけが字下げされて説明と左端が食い違う */
+	display: grid;
+	grid-template-columns: 14px 1fr;
+	column-gap: 4px;
+	padding: 6px 8px;
+	border-radius: 3px;
+	line-height: 1.4;
+	/* base-select の option は既定が nowrap。そのままだとピッカーの幅に収まらない
+	   説明が横スクロールになり、右側が読めなくなる */
+	white-space: normal;
+}
+
+select option::checkmark { grid-column: 1; grid-row: 1; }
+
+select option [data-role='option-label'],
+select option [data-role='option-hint'] { grid-column: 2; }
+
+select option:hover,
+select option:focus { background: var(--control-hover); }
+
+/* 選択肢どうしの隙間。ピッカー (::picker(select)) に gap を書くには display を
+   flex にする必要があるが、そうすると popover の非表示 (display: none) を上書きして
+   閉じているはずのピッカーが描かれる。option 側の余白で間を空ける */
+select option + option { margin-top: 2px; }
+
+select option [data-role='option-hint'] {
+	display: block;
 	color: var(--muted);
-	font-size: 12px;
+	font-size: 11px;
+}
+
+select selectedcontent {
+	/* 閉じた状態は 1 行に保つ。折り返すとセレクトの高さが選択肢ごとに変わる */
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+select selectedcontent [data-role='option-hint'] {
+	/* 閉じた状態はラベルだけにする。説明まで出すと高さが変わり、
+	   セレクトが選択に応じて伸び縮みする */
+	display: none;
+}
+
+/* --- 設定の初期化 ----------------------------------------------------- */
+
+.reset {
+	/* ボタンと確認の行の置き場。縦の flex にして中身を幅一杯に伸ばす */
+	display: flex;
+	flex-direction: column;
+	padding-top: 10px;
+	border-top: 1px solid var(--divider);
+}
+
+.reset-confirmation {
+	/* ボタンの場所にそのまま出す確認の行。枠を危険色にして「通常の操作ではない」ことを示す */
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 10px;
+	border: 1px solid var(--danger);
+	border-radius: 4px;
+}
+
+.reset-confirmation .description { margin: 0; }
+
+.reset-buttons {
+	display: flex;
+	gap: 8px;
+}
+
+.reset-buttons button { flex: 1; }
+
+[data-role='reset-confirm'] {
+	border-color: var(--danger);
+	color: var(--danger);
+}
+
+[data-role='reset-confirm']:hover {
+	background: color-mix(in srgb, var(--danger) 15%, transparent);
 }
