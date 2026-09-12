@@ -10,3 +10,13 @@ Copyright Google LLC
 Licensed under the Apache License, Version 2.0
 
 src/common/icon-shapes.js に含まれる図形データは Material Symbols から生成したものです。
+
+---
+
+Font Awesome Free
+https://github.com/FortAwesome/Font-Awesome
+Copyright Fonticons, Inc.
+Icons licensed under CC BY 4.0 (https://fontawesome.com/license/free)
+
+src/common/icon-shapes.js に含まれるブランドロゴの図形データは Font Awesome Free の brands から生成したものです。
+各ブランドのロゴはそれぞれの権利者の商標です。
