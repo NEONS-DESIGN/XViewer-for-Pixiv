@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { WORK_CATEGORY } from '../../src/common/constants.js';
 import { createDomSequence, sortIdsDesc, extendWithAllWorks } from '../../src/content/sequence.js';
 
 test('DOM 順の列は前後を返す', () => {
@@ -30,15 +31,27 @@ test('extendWithAllWorks は全作品 ID の列を返す', async () => {
 		illusts: { '100': null, '300': null },
 		manga: { '200': null },
 	});
-	const sequence = await extendWithAllWorks(createDomSequence(['300']), '54734418', { getJsonImpl: fakeGet });
+	const sequence = await extendWithAllWorks(createDomSequence(['300']), '54734418', null, { getJsonImpl: fakeGet });
 	assert.deepEqual(sequence.ids, ['300', '200', '100']);
 	assert.equal(sequence.next('300'), '200');
 	assert.equal(sequence.next('200'), '100');
 });
 
+test('extendWithAllWorks は種別を指定するとその作品だけに絞る', async () => {
+	// イラストタブ・漫画タブで端を越えたとき、グリッドに無い種別の作品へ飛ばないため
+	const fakeGet = async () => ({
+		illusts: { '100': null, '300': null },
+		manga: { '200': null },
+	});
+	const illusts = await extendWithAllWorks(createDomSequence(['300']), '1', WORK_CATEGORY.ILLUST, { getJsonImpl: fakeGet });
+	assert.deepEqual(illusts.ids, ['300', '100']);
+	const manga = await extendWithAllWorks(createDomSequence(['200']), '1', WORK_CATEGORY.MANGA, { getJsonImpl: fakeGet });
+	assert.deepEqual(manga.ids, ['200']);
+});
+
 test('extendWithAllWorks は失敗したら元の列を返す', async () => {
 	const fakeGet = async () => { throw new Error('boom'); };
 	const original = createDomSequence(['3', '2']);
-	const sequence = await extendWithAllWorks(original, '1', { getJsonImpl: fakeGet });
+	const sequence = await extendWithAllWorks(original, '1', null, { getJsonImpl: fakeGet });
 	assert.deepEqual(sequence.ids, ['3', '2']);
 });

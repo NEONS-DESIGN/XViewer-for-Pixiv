@@ -5,6 +5,9 @@
  */
 import { SETTINGS_DEFAULTS, IMAGE_QUALITY, PREFETCH_CHOICES, GRID_TAB_SKIP, POPUP_THEMES } from './constants.js';
 
+/** 設定を置く保存領域の名前。onChanged の areaName と比べる。 */
+const SYNC_AREA_NAME = 'sync';
+
 /**
  * 既定の保存領域。テストでは deps.area で差し替える。
  * @returns {object|null} chrome.storage.sync。拡張の外では null
@@ -24,29 +27,53 @@ function asBoolean(value, fallback) {
 }
 
 /**
+ * 選択肢のどれかとして読む。含まれていなければ既定へ倒す。
+ * @template T
+ * @param {unknown} value 保存値
+ * @param {readonly T[]} choices 許す値
+ * @param {T} fallback 既定
+ * @returns {T} 丸めた値
+ */
+function oneOf(value, choices, fallback) {
+	return choices.includes(value) ? value : fallback;
+}
+
+/**
+ * 保存領域を触る処理を包む。領域が無ければ・失敗したら fallback を返す。
+ * 読み書きのどれも「領域を解決 → 無ければ既定 → 失敗しても投げない」の同じ形になる。
+ * @template T
+ * @param {{area?: object}} deps 保存領域の差し替え
+ * @param {(area: object) => Promise<T>} run 領域に対する処理
+ * @param {T} fallback 領域が無い・失敗したときの値
+ * @returns {Promise<T>} 結果
+ */
+async function withArea(deps, run, fallback) {
+	const area = deps.area ?? defaultArea();
+	if (!area) return fallback;
+	try {
+		return await run(area);
+	} catch {
+		// 保存領域が使えなくても既定で動かす。呼び出し側が画面に出す
+		return fallback;
+	}
+}
+
+/**
  * 保存値を既定へ丸める。
  * @param {object|null} raw 保存されていた値
  * @returns {typeof SETTINGS_DEFAULTS} 丸めた設定
  */
 export function normalizeSettings(raw) {
 	const source = raw ?? {};
-	const qualities = Object.values(IMAGE_QUALITY);
+	const d = SETTINGS_DEFAULTS;
 	return {
-		enabled: asBoolean(source.enabled, SETTINGS_DEFAULTS.enabled),
-		imageQuality: qualities.includes(source.imageQuality)
-			? source.imageQuality
-			: SETTINGS_DEFAULTS.imageQuality,
-		prefetch: PREFETCH_CHOICES.includes(source.prefetch)
-			? source.prefetch
-			: SETTINGS_DEFAULTS.prefetch,
-		showSidebar: asBoolean(source.showSidebar, SETTINGS_DEFAULTS.showSidebar),
-		closeOnBackdrop: asBoolean(source.closeOnBackdrop, SETTINGS_DEFAULTS.closeOnBackdrop),
-		gridTabSkip: Object.values(GRID_TAB_SKIP).includes(source.gridTabSkip)
-			? source.gridTabSkip
-			: SETTINGS_DEFAULTS.gridTabSkip,
-		popupTheme: Object.values(POPUP_THEMES).includes(source.popupTheme)
-			? source.popupTheme
-			: SETTINGS_DEFAULTS.popupTheme,
+		enabled: asBoolean(source.enabled, d.enabled),
+		imageQuality: oneOf(source.imageQuality, Object.values(IMAGE_QUALITY), d.imageQuality),
+		prefetch: oneOf(source.prefetch, PREFETCH_CHOICES, d.prefetch),
+		showSidebar: asBoolean(source.showSidebar, d.showSidebar),
+		closeOnBackdrop: asBoolean(source.closeOnBackdrop, d.closeOnBackdrop),
+		gridTabSkip: oneOf(source.gridTabSkip, Object.values(GRID_TAB_SKIP), d.gridTabSkip),
+		popupTheme: oneOf(source.popupTheme, Object.values(POPUP_THEMES), d.popupTheme),
 	};
 }
 
@@ -55,15 +82,12 @@ export function normalizeSettings(raw) {
  * @param {{area?: object}} [deps] 保存領域の差し替え
  * @returns {Promise<typeof SETTINGS_DEFAULTS>} 設定
  */
-export async function loadSettings(deps = {}) {
-	const area = deps.area ?? defaultArea();
-	if (!area) return { ...SETTINGS_DEFAULTS };
-	try {
-		return normalizeSettings(await area.get(Object.keys(SETTINGS_DEFAULTS)));
-	} catch {
-		// 保存領域が使えなくても既定で動かす
-		return { ...SETTINGS_DEFAULTS };
-	}
+export function loadSettings(deps = {}) {
+	return withArea(
+		deps,
+		async (area) => normalizeSettings(await area.get(Object.keys(SETTINGS_DEFAULTS))),
+		{ ...SETTINGS_DEFAULTS },
+	);
 }
 
 /**
@@ -74,16 +98,8 @@ export async function loadSettings(deps = {}) {
  * @param {{area?: object}} [deps] 保存領域の差し替え
  * @returns {Promise<boolean>} 保存できたら true
  */
-export async function saveSetting(key, value, deps = {}) {
-	const area = deps.area ?? defaultArea();
-	if (!area) return false;
-	try {
-		await area.set({ [key]: value });
-		return true;
-	} catch {
-		// 呼び出し側が画面に出す。ここでは投げない
-		return false;
-	}
+export function saveSetting(key, value, deps = {}) {
+	return withArea(deps, async (area) => { await area.set({ [key]: value }); return true; }, false);
 }
 
 /**
@@ -97,8 +113,9 @@ export function watchSettings(callback, deps = {}) {
 	if (!storage?.onChanged) return { dispose() {} };
 
 	const listener = (_changes, areaName) => {
-		if (areaName !== 'sync') return;
-		void loadSettings().then(callback);
+		if (areaName !== SYNC_AREA_NAME) return;
+		// 差し替えた storage があればその sync 領域から読む。既定の chrome.storage.sync へ戻さない
+		void loadSettings({ area: storage.sync ?? undefined }).then(callback);
 	};
 	storage.onChanged.addListener(listener);
 	return {
@@ -114,14 +131,6 @@ export function watchSettings(callback, deps = {}) {
  * @param {{area?: object}} [deps] 保存領域の差し替え
  * @returns {Promise<boolean>} 戻せたら true
  */
-export async function resetSettings(deps = {}) {
-	const area = deps.area ?? defaultArea();
-	if (!area) return false;
-	try {
-		await area.set({ ...SETTINGS_DEFAULTS });
-		return true;
-	} catch {
-		// 呼び出し側が画面に出す。ここでは投げない
-		return false;
-	}
+export function resetSettings(deps = {}) {
+	return withArea(deps, async (area) => { await area.set({ ...SETTINGS_DEFAULTS }); return true; }, false);
 }

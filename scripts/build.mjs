@@ -11,7 +11,7 @@ import { context } from 'esbuild';
 import { cp, rm, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { applyVersion } from './manifest-version.mjs';
-import { ICON_OUTPUTS } from './icon-svg.mjs';
+import { ICON_OUTPUTS, iconFileName } from './icon-svg.mjs';
 
 /** 監視モードで起動するか。 */
 const WATCH = process.argv.includes('--watch');
@@ -34,8 +34,8 @@ const STATIC_FILES = [
 	['src/popup/popup.html', `${OUT_DIR}/popup/popup.html`],
 	['src/popup/popup.css', `${OUT_DIR}/popup/popup.css`],
 	...ICON_OUTPUTS.map(({ size }) => [
-		`src/icons/icon-${size}.png`,
-		`${OUT_DIR}/icons/icon-${size}.png`,
+		`src/icons/${iconFileName(size)}`,
+		`${OUT_DIR}/icons/${iconFileName(size)}`,
 	]),
 ];
 
@@ -97,11 +97,16 @@ async function writeManifest() {
  * @returns {Promise<void>}
  */
 async function copyStatic() {
-	for (const [from, to] of STATIC_FILES) {
+	await Promise.all(STATIC_FILES.map(async ([from, to]) => {
 		// コピー先からディレクトリを決める。置き場所が増えても書き足さなくて済む
 		await mkdir(dirname(to), { recursive: true });
-		await cp(from, to);
-	}
+		try {
+			await cp(from, to);
+		} catch (error) {
+			// ENOENT の素の文言だけでは、アイコンの生成忘れ (npm run build:icons) に気づきにくい
+			throw new Error(`${from} をコピーできません: ${error.message}`);
+		}
+	}));
 	console.log(`manifest version ${await writeManifest()}`);
 }
 
@@ -132,8 +137,13 @@ async function build() {
 try {
 	await build();
 } catch (error) {
-	// 途中で落ちた dist を残すと、古い成果物を読み込んで動かしてしまう
-	await rm(OUT_DIR, { recursive: true, force: true });
-	console.error(`[build] ${error.message}`);
+	console.error(`[build] ${error?.message ?? error}`);
+	// 途中で落ちた dist を残すと、古い成果物を読み込んで動かしてしまう。
+	// 片付け自体が失敗 (Chrome が dist を掴んでいる等) しても、元のエラーの表示を邪魔しない
+	try {
+		await rm(OUT_DIR, { recursive: true, force: true });
+	} catch (cleanupError) {
+		console.error(`[build] ${OUT_DIR} を消せませんでした: ${cleanupError?.message ?? cleanupError}`);
+	}
 	process.exit(1);
 }

@@ -25,12 +25,13 @@ const MARK_LABEL = 'data-pm-label';
  * 1 本目の作品リンクはサムネイル (作品を開く導線) なので決して外さない。
  * @param {ParentNode} card 作品カード (li)
  * @param {string} mode GRID_TAB_SKIP のいずれか
+ * @param {Element[]} [links] カード内の作品リンク。呼び出し側が既に集めていれば渡す (二度引かないため)
  * @returns {Element[]} 外す要素。mode が不明なら空
  */
-export function planSkipTargets(card, mode) {
+export function planSkipTargets(card, mode, links = [...card.querySelectorAll(ARTWORK_LINK_SELECTOR)]) {
 	if (mode !== GRID_TAB_SKIP.BOTH && mode !== GRID_TAB_SKIP.TITLE) return [];
 	// 2 本目以降が作品タイトルのリンク。サムネイルと同じ href を指す
-	const targets = [...card.querySelectorAll(ARTWORK_LINK_SELECTOR)].slice(1);
+	const targets = links.slice(1);
 	if (mode === GRID_TAB_SKIP.BOTH) targets.push(...card.querySelectorAll(CARD_BUTTON_SELECTOR));
 	return targets;
 }
@@ -51,8 +52,8 @@ export function attachTabSkip(doc, mode, deps = {}) {
 	const cancel = deps.cancel ?? ((id) => clearTimeout(id));
 
 	let current = mode;
+	/** 当て直しの予約。0 なら予約なし。発火したら 0 へ戻す */
 	let timer = 0;
-	let pending = false;
 
 	/**
 	 * 1 枚のカードを処理する。
@@ -61,14 +62,14 @@ export function attachTabSkip(doc, mode, deps = {}) {
 	 * @returns {void}
 	 */
 	const applyCard = (card) => {
-		const targets = planSkipTargets(card, current);
+		const links = [...card.querySelectorAll(ARTWORK_LINK_SELECTOR)];
+		const targets = planSkipTargets(card, current, links);
 		for (const el of targets) {
 			if (el.hasAttribute('tabindex')) continue;
 			el.setAttribute('tabindex', '-1');
 			el.setAttribute(MARK_TABINDEX, '');
 		}
 		// タイトルのリンクを飛ばすと読み上げから作品名が消えるので、サムネイル側へ移す
-		const links = [...card.querySelectorAll(ARTWORK_LINK_SELECTOR)];
 		const [thumb, title] = links;
 		if (!thumb || !title || !targets.includes(title)) return;
 		const name = (title.textContent ?? '').trim();
@@ -117,11 +118,11 @@ export function attachTabSkip(doc, mode, deps = {}) {
 		}
 	};
 
+	// 何も外さない設定では予約すら入れない。無限スクロールの再描画ごとに空振りのタイマを積まないため
 	const observer = createObserver(() => {
-		if (pending) return;
-		pending = true;
+		if (timer || current === GRID_TAB_SKIP.NONE) return;
 		timer = schedule(() => {
-			pending = false;
+			timer = 0;
 			apply();
 		});
 	});
@@ -140,7 +141,6 @@ export function attachTabSkip(doc, mode, deps = {}) {
 			observer.disconnect();
 			if (timer) cancel(timer);
 			timer = 0;
-			pending = false;
 			restore();
 		},
 	};

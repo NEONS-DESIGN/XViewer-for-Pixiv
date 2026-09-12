@@ -3,7 +3,7 @@
  * pixiv は SPA なので、URL が変わるたびに対象ページかどうかを判定し直す。
  */
 import { isViewerTarget, parseArtworkPath, parseUserPage, pageKey } from './page.js';
-import { createRouter } from './router.js';
+import { createRouter, isOwnHistoryEntry } from './router.js';
 import { attachGridListener, collectWorkIds } from './grid.js';
 import { attachTabSkip } from './tab-skip.js';
 import { ensureFocusStyle } from './grid-focus.js';
@@ -21,6 +21,12 @@ let focusStyle = null;
 let router = null;
 let settings = null;
 let viewer = null;
+/**
+ * @type {import('./page.js').UserPage|null} 作品を開いたときに見ていたユーザーページ。
+ * モーダルを開くと URL は /artworks/{id} になり、そこからはページの種別が読めない。
+ * 端で並びを広げる判断はここを見る
+ */
+let currentPage = null;
 /** 今購読しているページのキー。未起動なら null */
 let activeKey = null;
 /** apply() の世代。await をまたいで古い要求を捨てるために使う */
@@ -38,6 +44,8 @@ let checkTimer = 0;
  * @returns {void}
  */
 function handleOpen(workId) {
+	// タブ (イラスト / 漫画) の切り替えはページの組み直しを伴わないので、開くたびに読み直す
+	rememberPage(location.pathname);
 	const ids = collectWorkIds(document, location.origin);
 	router.open(workId);
 	void viewer.open(workId, createDomSequence(ids));
@@ -61,6 +69,26 @@ function handlePopState(workId) {
 }
 
 /**
+ * ユーザーページとして読めるパスなら覚える。読めなければ前の値を残す。
+ * @param {string} path location.pathname
+ * @returns {void}
+ */
+function rememberPage(path) {
+	const page = parseUserPage(path);
+	if (page) currentPage = page;
+}
+
+/**
+ * 自分のルーターが開いた作品を見ている最中か。
+ * URL が /artworks/{id} でも pixiv 本体の作品ページ (本体の SPA 遷移や直接アクセス) なら false。
+ * 履歴の state に付けた目印で見分ける
+ * @returns {boolean} 自分のモーダル用の履歴エントリなら true
+ */
+function isViewingOwnWork() {
+	return parseArtworkPath(location.pathname) !== null && isOwnHistoryEntry(window);
+}
+
+/**
  * 今の URL に合わせて購読を組み直す。
  *
  * 起動と停止とページ切り替えを 1 か所で扱う。ページが変わったら必ず作り直すのが要点で、
@@ -80,7 +108,14 @@ async function apply() {
 		if (token !== startToken) return;
 	}
 
-	if (!settings.enabled || !isViewerTarget(path)) {
+	if (!settings.enabled) {
+		stop();
+		return;
+	}
+	// 自分のモーダルの URL は対象外ページに見えるが、開いている最中なので止めてはいけない。
+	// 設定変更の通知でもここを通る (設定そのものは watchSettings が viewer へ渡し済み)
+	if (isViewingOwnWork()) return;
+	if (!isViewerTarget(path)) {
 		stop();
 		return;
 	}
@@ -91,10 +126,9 @@ async function apply() {
 	// 別のページへ移った。古い購読を捨ててから組み立て直す
 	stop();
 	activeKey = key;
+	rememberPage(path);
 
 	router = createRouter(handlePopState);
-	// page はこのパスから取り直す。下の 2 つのコールバックが掴むのは常に今のページ
-	const page = parseUserPage(path);
 	viewer = createViewer({
 		doc: document,
 		settings,
@@ -106,8 +140,8 @@ async function apply() {
 		// ブックマークやフォロー中に並んでいるのは他人の作品なので、
 		// 「この作者の全作品」へ広げると画面と無関係な作品へ飛んでしまう。
 		// タグ絞り込み中も profile/all と並びが一致しないので広げない
-		canExtendSequence: () => Boolean(page) && page.isWorksGrid && !page.isTagFiltered,
-		extendSequence: (current) => extendWithAllWorks(current, page.userId),
+		canExtendSequence: () => Boolean(currentPage) && currentPage.isWorksGrid && !currentPage.isTagFiltered,
+		extendSequence: (current) => extendWithAllWorks(current, currentPage.userId, currentPage.category),
 	});
 	gridListener = attachGridListener(document, handleOpen);
 	// カード 1 枚につき 3 回 Tab を押さずに済むよう、作品を開く導線以外をフォーカス順から外す
@@ -143,8 +177,9 @@ function stop() {
  */
 function handleLocationChange() {
 	// 自分のルーターが作品ページへ書き換えた直後もここへ来る。
-	// 作品パスは「ビュワーで作品を開いている最中」なので、止めてはいけない
-	if (parseArtworkPath(location.pathname)) return;
+	// 自分のモーダルの最中なら止めてはいけない。
+	// pixiv 本体が作品ページへ遷移したときは apply() へ進み、対象外として止める
+	if (isViewingOwnWork()) return;
 	void apply();
 }
 
@@ -231,6 +266,8 @@ watchSettings((next) => {
 		startNavigationWatch();
 		void apply();
 	} else {
+		// 作品を開いたまま切ると URL が /artworks/{id} に残る。先に履歴を戻して pixiv 本体に任せる
+		if (viewer?.isOpen()) router?.close();
 		stop();
 		stopNavigationWatch();
 	}

@@ -6,6 +6,8 @@ import {
 	USER_PATH_PATTERN,
 	USER_TAG_PATH_PATTERN,
 	USER_WORKS_PATH_PATTERN,
+	USER_WORKS_CATEGORY_PATTERN,
+	WORK_CATEGORY_BY_TAB,
 	ARTWORK_PATH_PATTERN,
 	PAGE_KEY_SEPARATOR,
 } from '../common/constants.js';
@@ -15,6 +17,7 @@ import {
  * @property {string} userId
  * @property {boolean} isWorksGrid その人自身の作品グリッドか (ブックマークやフォロー中は false)
  * @property {boolean} isTagFiltered タグで絞り込んでいるか
+ * @property {string|null} category グリッドに出ている作品の種別 (WORK_CATEGORY)。イラストと漫画の両方なら null
  */
 
 /**
@@ -25,10 +28,12 @@ import {
 export function parseUserPage(pathname) {
 	const matched = USER_PATH_PATTERN.exec(pathname);
 	if (!matched) return null;
+	const tab = USER_WORKS_CATEGORY_PATTERN.exec(pathname)?.[1];
 	return {
 		userId: matched[1],
 		isWorksGrid: USER_WORKS_PATH_PATTERN.test(pathname),
 		isTagFiltered: USER_TAG_PATH_PATTERN.test(pathname),
+		category: tab ? WORK_CATEGORY_BY_TAB[tab] : null,
 	};
 }
 

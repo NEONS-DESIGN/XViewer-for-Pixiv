@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readSession, clearSessionCache } from '../../src/content/session.js';
+import { buildNextData as buildNextDataWith } from '../helpers/pixiv.js';
 
 /**
  * getElementById だけを持つ最小の Document の代わり。
@@ -22,22 +23,12 @@ function fakeDoc(text) {
 }
 
 /**
- * __NEXT_DATA__ の中身を組み立てる。
+ * ログイン済み (R-18 可) の __NEXT_DATA__ を組み立てる。
  * @param {string} token CSRF トークン
  * @returns {string} script の中身
  */
 function buildNextData(token) {
-	return JSON.stringify({
-		props: {
-			pageProps: {
-				isLoggedIn: true,
-				serverSerializedPreloadedState: JSON.stringify({
-					api: { token },
-					userData: { self: { xRestrict: 1, hideAiWorks: false } },
-				}),
-			},
-		},
-	});
+	return buildNextDataWith({ token, self: { xRestrict: 1, hideAiWorks: false } });
 }
 
 test('ドキュメントからセッションを読む', () => {

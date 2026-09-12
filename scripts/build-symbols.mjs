@@ -67,28 +67,48 @@ const BRAND_SOURCE_DIR = 'node_modules/@fortawesome/fontawesome-free/svgs/brands
 /** 生成先。 */
 const OUTPUT_PATH = 'src/common/icon-shapes.js';
 
+/** viewBox が読めなかったときの既定値。Material Symbols と Font Awesome の brands はどちらも 24 単位。 */
+const DEFAULT_VIEW_BOX = '0 0 24 24';
+
 /**
  * SVG から viewBox と中身を取り出す。
  * @param {string} svg SVG の中身
+ * @param {string} source 読み込み元 (エラー表示用)
  * @returns {{viewBox: string, markup: string}} 図形
+ * @throws {Error} svg 要素が見つからないとき (パッケージの更新で形式が変わった等)
  */
-function extract(svg) {
-	const viewBox = /viewBox="([^"]+)"/.exec(svg)?.[1] ?? '0 0 24 24';
+function extract(svg, source) {
+	if (!/<svg[\s>]/.test(svg)) {
+		throw new Error(`${source} に <svg> がありません`);
+	}
+	const viewBox = /viewBox="([^"]+)"/.exec(svg)?.[1] ?? DEFAULT_VIEW_BOX;
 	const markup = svg.replace(/^[\s\S]*?<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '').trim();
 	return { viewBox, markup };
 }
 
-const shapes = {};
-for (const [name, file] of Object.entries(ICON_SOURCES)) {
-	shapes[name] = extract(await readFile(`${SOURCE_DIR}/${file}.svg`, 'utf8'));
+/**
+ * 原本の SVG を読み、名前ごとの図形にする。
+ * @param {Record<string, string>} sources 左がコード側の名前、右がファイル名 (拡張子なし)
+ * @param {string} dir 原本の置き場
+ * @returns {Promise<Record<string, {viewBox: string, markup: string}>>} 図形
+ * @throws {Error} 原本が読めない・形式が違うとき
+ */
+async function loadShapes(sources, dir) {
+	const entries = await Promise.all(Object.entries(sources).map(async ([name, file]) => {
+		const path = `${dir}/${file}.svg`;
+		let svg;
+		try {
+			svg = await readFile(path, 'utf8');
+		} catch (error) {
+			throw new Error(`${path} を読めません (npm install 済みか、パッケージの更新で名前が変わっていないか): ${error.message}`);
+		}
+		return [name, extract(svg, path)];
+	}));
+	return Object.fromEntries(entries);
 }
-for (const [name, file] of Object.entries(BRAND_SOURCES)) {
-	shapes[name] = extract(await readFile(`${BRAND_SOURCE_DIR}/${file}.svg`, 'utf8'));
-}
-// 自前の図形は最後に混ぜる。同じ名前があれば自前を優先する
-Object.assign(shapes, CUSTOM_SHAPES);
 
-const header = `/**
+/** 生成物の先頭に付ける注意書きと出典。 */
+const HEADER = `/**
  * 生成物。手で編集しない。scripts/build-symbols.mjs で作り直す。
  * 図形の出典:
  * - Material Symbols (Rounded, weight 400, FILL 1) / Apache-2.0
@@ -99,9 +119,30 @@ const header = `/**
  */
 `;
 
-await writeFile(
-	OUTPUT_PATH,
-	`${header}export const ICON_SHAPES = Object.freeze(${JSON.stringify(shapes, null, '\t')});\n`,
-	'utf8',
-);
-console.log(`generated ${OUTPUT_PATH} (${Object.keys(shapes).length} icons)`);
+/**
+ * icon-shapes.js を生成する。
+ * @returns {Promise<number>} 生成した図形の数
+ */
+async function build() {
+	const shapes = {
+		...(await loadShapes(ICON_SOURCES, SOURCE_DIR)),
+		...(await loadShapes(BRAND_SOURCES, BRAND_SOURCE_DIR)),
+		// 自前の図形は最後に混ぜる。同じ名前があれば自前を優先する
+		...CUSTOM_SHAPES,
+	};
+	await writeFile(
+		OUTPUT_PATH,
+		`${HEADER}export const ICON_SHAPES = Object.freeze(${JSON.stringify(shapes, null, '\t')});\n`,
+		'utf8',
+	);
+	return Object.keys(shapes).length;
+}
+
+try {
+	const count = await build();
+	console.log(`generated ${OUTPUT_PATH} (${count} icons)`);
+} catch (error) {
+	// 素の例外のまま落とすとスタックトレースだけが出て、どの原本が無いのか読み取りにくい
+	console.error(`[build-symbols] ${error?.message ?? error}`);
+	process.exit(1);
+}

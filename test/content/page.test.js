@@ -1,22 +1,23 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { WORK_CATEGORY } from '../../src/common/constants.js';
 import { parseUserPage, parseArtworkPath, isViewerTarget, pageKey } from '../../src/content/page.js';
 
 test('ユーザーページの各タブを認識する', () => {
-	const works = { userId: '54734418', isWorksGrid: true, isTagFiltered: false };
+	const works = { userId: '54734418', isWorksGrid: true, isTagFiltered: false, category: null };
 	assert.deepEqual(parseUserPage('/users/54734418'), works);
 	assert.deepEqual(parseUserPage('/users/54734418/artworks'), works);
-	assert.deepEqual(parseUserPage('/users/54734418/illustrations'), works);
-	assert.deepEqual(parseUserPage('/users/54734418/manga'), works);
+	assert.deepEqual(parseUserPage('/users/54734418/illustrations'), { ...works, category: WORK_CATEGORY.ILLUST });
+	assert.deepEqual(parseUserPage('/users/54734418/manga'), { ...works, category: WORK_CATEGORY.MANGA });
 	// ブックマークもユーザーページだが、並んでいるのは他人の作品なので作品グリッドではない
 	assert.deepEqual(parseUserPage('/users/54734418/bookmarks/artworks'),
-		{ userId: '54734418', isWorksGrid: false, isTagFiltered: false });
+		{ userId: '54734418', isWorksGrid: false, isTagFiltered: false, category: null });
 });
 
 test('タグ絞り込み中のユーザーページを見分ける', () => {
 	// この状態では profile/all と並び順が一致しないので、作品間移動を DOM の範囲に限る
 	const page = parseUserPage('/users/54734418/artworks/%E3%82%AA%E3%83%AA%E3%82%B8%E3%83%8A%E3%83%AB');
-	assert.deepEqual(page, { userId: '54734418', isWorksGrid: true, isTagFiltered: true });
+	assert.deepEqual(page, { userId: '54734418', isWorksGrid: true, isTagFiltered: true, category: null });
 });
 
 test('ユーザーページでない URL は null', () => {
@@ -67,6 +68,16 @@ test('parseUserPage は作品グリッドかどうかを見分ける', () => {
 	assert.equal(parseUserPage('/users/1/bookmarks/artworks').isWorksGrid, false);
 	assert.equal(parseUserPage('/users/1/following').isWorksGrid, false);
 	assert.equal(parseUserPage('/users/1/request').isWorksGrid, false);
+});
+
+test('イラストタブと漫画タブでは作品の種別を返す', () => {
+	// 端で並びを広げるときに、グリッドに無い種別の作品へ飛ばないため
+	assert.equal(parseUserPage('/users/1/illustrations').category, WORK_CATEGORY.ILLUST);
+	assert.equal(parseUserPage('/users/1/illustrations/東方').category, WORK_CATEGORY.ILLUST);
+	assert.equal(parseUserPage('/users/1/manga').category, WORK_CATEGORY.MANGA);
+	assert.equal(parseUserPage('/users/1').category, null);
+	assert.equal(parseUserPage('/users/1/artworks').category, null);
+	assert.equal(parseUserPage('/users/1/bookmarks/artworks').category, null);
 });
 
 test('pageKey は作者が違えば別のキーにする', () => {

@@ -56,9 +56,20 @@ test('署名が違うデータは空配列を返す', () => {
 });
 
 test('途中で切れている zip は読めたところまで返す', () => {
-	const zip = buildZip([{ name: 'a.jpg', data: [1, 2, 3] }]);
+	// 2 つ目のエントリの途中で切れている。1 つ目は丸ごと読めるので、それだけが返る
+	const zip = buildZip([
+		{ name: 'a.jpg', data: [1, 2, 3] },
+		{ name: 'b.jpg', data: [4, 5, 6] },
+	]);
 	const truncated = zip.slice(0, zip.byteLength - 2);
-	assert.deepEqual(parseStoredZip(truncated), []);
+	const entries = parseStoredZip(truncated);
+	assert.deepEqual(entries.map((entry) => entry.name), ['a.jpg']);
+	assert.deepEqual([...entries[0].bytes], [1, 2, 3]);
+});
+
+test('最初のエントリから切れていれば空配列を返す', () => {
+	const zip = buildZip([{ name: 'a.jpg', data: [1, 2, 3] }]);
+	assert.deepEqual(parseStoredZip(zip.slice(0, zip.byteLength - 2)), []);
 });
 
 test('STORE 以外の圧縮方式は例外を投げる', () => {

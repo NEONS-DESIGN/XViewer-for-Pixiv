@@ -18,8 +18,9 @@
  */
 import { createIcon } from '../../common/icons.js';
 import { formatCount } from './sidebar.js';
-import { readSession } from '../session.js';
+import { readSession, clearSessionCache } from '../session.js';
 import { fetchUserProfile } from '../../pixiv/user.js';
+import { PIXIV_ERROR_KINDS } from '../../pixiv/errors.js';
 import { likeIllust, addBookmark, deleteBookmark, followUser, unfollowUser } from '../../pixiv/actions.js';
 
 /**
@@ -120,6 +121,25 @@ export function createActionsBar(deps) {
 		if (!statusLine) return;
 		statusLine.textContent = message;
 		statusLine.setAttribute('data-kind', kind);
+	}
+
+	/**
+	 * 更新系の失敗を伝える。
+	 * 401 はログインが切れている (別タブでログアウトした等)。
+	 * 覚えているセッションを捨て、通信失敗とは別の文言で知らせる。
+	 * @param {string} message 通常の失敗文言
+	 * @param {unknown} error 投げられたエラー
+	 * @param {string} logLabel console に出す見出し
+	 * @returns {void}
+	 */
+	function announceFailure(message, error, logLabel) {
+		if (error?.kind === PIXIV_ERROR_KINDS.UNAUTHORIZED) {
+			clearSessionCache();
+			announce('ログインが切れています。pixiv にログインし直してください', 'error');
+		} else {
+			announce(message, 'error');
+		}
+		console.warn(`[GridViewer] ${logLabel}`, error);
 	}
 
 	/**
@@ -251,8 +271,7 @@ export function createActionsBar(deps) {
 				announce(following ? 'フォローしました' : 'フォローを解除しました');
 			} catch (error) {
 				if (disposed) return;
-				announce('フォローを変更できませんでした', 'error');
-				console.warn('[GridViewer] follow failed', error);
+				announceFailure('フォローを変更できませんでした', error, 'follow failed');
 			} finally {
 				button.disabled = false;
 			}
@@ -312,18 +331,19 @@ export function createActionsBar(deps) {
 				if (liked) return;
 				likeButton.disabled = true;
 				try {
-					await api.likeIllust(detail.id, readSession(doc).csrfToken);
+					// 戻り値は「送信前に既にいいね済みだったか」(別タブで先に押していた等)。
+					// 済みなら pixiv 側の件数は増えないので、手元の足し込みも見送る
+					const alreadyLiked = await api.likeIllust(detail.id, readSession(doc).csrfToken);
 					if (disposed) return;
 					liked = true;
-					likeCount += 1;
+					if (alreadyLiked !== true) likeCount += 1;
 					likeButton.classList.add('is-on');
 					describeCount(likeButton, likeLabel(true), likeCount);
-					announce('いいねしました');
+					announce(alreadyLiked === true ? '既にいいね済みでした' : 'いいねしました');
 				} catch (error) {
 					if (disposed) return;
 					likeButton.disabled = false;
-					announce('いいねできませんでした', 'error');
-					console.warn('[GridViewer] like failed', error);
+					announceFailure('いいねできませんでした', error, 'like failed');
 				}
 			});
 			describeCount(likeButton, likeLabel(liked), likeCount);
@@ -358,8 +378,7 @@ export function createActionsBar(deps) {
 					describeCount(bookmarkButton, bookmarkLabel(bookmarkId), bookmarkCount);
 				} catch (error) {
 					if (disposed) return;
-					announce('ブックマークを変更できませんでした', 'error');
-					console.warn('[GridViewer] bookmark failed', error);
+					announceFailure('ブックマークを変更できませんでした', error, 'bookmark failed');
 				} finally {
 					bookmarkButton.disabled = false;
 				}

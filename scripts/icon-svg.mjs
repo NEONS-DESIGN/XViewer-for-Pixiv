@@ -85,6 +85,15 @@ export const ICON_OUTPUTS = [
 ];
 
 /**
+ * PNG のファイル名。生成 (build-icons) / 配置 (build) / manifest の検査で同じ名前を使う。
+ * @param {number} size 一辺の px
+ * @returns {string} ファイル名 (ディレクトリは含まない)
+ */
+export function iconFileName(size) {
+	return `icon-${size}.png`;
+}
+
+/**
  * 図形データを取り出す。
  * @param {string} variant 'full' | 'compact'
  * @returns {typeof ARTWORKS[keyof typeof ARTWORKS]} 図形データ

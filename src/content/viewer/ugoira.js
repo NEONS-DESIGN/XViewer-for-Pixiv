@@ -17,6 +17,12 @@ import { createIcon } from '../../common/icons.js';
 import { IMAGE_QUALITY } from '../../common/constants.js';
 
 /** delay が読めなかったときに使う待ち時間 (ミリ秒)。 */
+/** 再生ボタンの表示。キーは今の再生状態、値は「押すと何になるか」。 */
+const TOGGLE = Object.freeze({
+	PLAYING: Object.freeze({ icon: 'pause', label: '一時停止' }),
+	PAUSED: Object.freeze({ icon: 'play', label: '再生' }),
+});
+
 const FALLBACK_DELAY = 100;
 
 /**
@@ -167,7 +173,8 @@ export function createUgoiraPlayer(deps) {
 		 * @returns {Promise<void>}
 		 */
 		async render(detail) {
-			container.querySelectorAll('.status, .frame, .blocked, .ugoira').forEach((node) => node.remove());
+			// 他のペインは自分の dispose() で片付ける。ここで消すのはビュワーの状態表示だけ
+			container.querySelectorAll('.status').forEach((node) => node.remove());
 
 			const wrapper = doc.createElement('div');
 			wrapper.className = 'ugoira';
@@ -186,24 +193,23 @@ export function createUgoiraPlayer(deps) {
 			const toggle = doc.createElement('button');
 			toggle.type = 'button';
 			toggle.className = 'ugoira-toggle';
-			toggle.setAttribute('aria-label', '一時停止');
-			toggle.title = '一時停止';
-			toggle.appendChild(createIcon(doc, 'pause'));
+			/**
+			 * ボタンの見た目を再生状態に合わせる。ボタンは「押すと何になるか」を示す。
+			 * @param {boolean} isPlaying 再生中か
+			 * @returns {void}
+			 */
+			const setToggle = (isPlaying) => {
+				const next = isPlaying ? TOGGLE.PLAYING : TOGGLE.PAUSED;
+				toggle.setAttribute('aria-label', next.label);
+				toggle.title = next.label;
+				toggle.replaceChildren(createIcon(doc, next.icon));
+			};
+			setToggle(true);
 			toggle.hidden = true;
 			toggle.addEventListener('click', () => {
-				if (playing) {
-					pause();
-					toggle.setAttribute('aria-label', '再生');
-					toggle.title = '再生';
-					toggle.textContent = '';
-					toggle.appendChild(createIcon(doc, 'play'));
-				} else {
-					play();
-					toggle.setAttribute('aria-label', '一時停止');
-					toggle.title = '一時停止';
-					toggle.textContent = '';
-					toggle.appendChild(createIcon(doc, 'pause'));
-				}
+				if (playing) pause();
+				else play();
+				setToggle(playing);
 			});
 
 			wrapper.append(poster, canvas, toggle);

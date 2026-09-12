@@ -3,7 +3,7 @@
  * 文言もパラメータの並びも pixiv 本体のシェアメニューの実測値に合わせている (SITE_SPEC §4)。
  * 通信はしない純粋関数だけを置く。
  */
-import { PIXIV_ORIGIN } from './endpoints.js';
+import { PIXIV_ORIGIN, artworkPath } from './endpoints.js';
 
 /** シェア文の区切り。pixiv 本体は「タイトル | 作者 #pixiv」で組む。 */
 const TEXT_SEPARATOR = ' | ';
@@ -27,7 +27,7 @@ const SHARE_TAG = '#pixiv';
  * @returns {string} URL
  */
 export function artworkUrl(illustId) {
-	return `${PIXIV_ORIGIN}/artworks/${illustId}`;
+	return `${PIXIV_ORIGIN}${artworkPath(illustId)}`;
 }
 
 /**

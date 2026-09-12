@@ -6,6 +6,7 @@
  * pixiv の CSS クラス名はビルドごとに変わるため、掴んでよいのは href だけ。
  */
 import { ARTWORK_LINK_SELECTOR } from '../common/constants.js';
+import { PIXIV_ORIGIN } from '../pixiv/endpoints.js';
 import { parseArtworkPath } from './page.js';
 
 /**
@@ -53,7 +54,7 @@ export function collectWorkIds(root, origin) {
  * @returns {{dispose: () => void}} 購読の解除
  */
 export function attachGridListener(doc, onOpen, deps = {}) {
-	const origin = deps.origin ?? doc.location?.origin ?? 'https://www.pixiv.net';
+	const origin = deps.origin ?? doc.location?.origin ?? PIXIV_ORIGIN;
 
 	/**
 	 * クリックを処理する。

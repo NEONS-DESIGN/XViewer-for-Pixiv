@@ -163,7 +163,8 @@ export function createImagePane(deps) {
 		 * @returns {Promise<void>}
 		 */
 		async render(detail) {
-			container.querySelectorAll('.status, .frame').forEach((node) => node.remove());
+			// 他のペインは自分の dispose() で片付ける。ここで消すのはビュワーの状態表示だけ
+			container.querySelectorAll('.status').forEach((node) => node.remove());
 
 			frame = doc.createElement('div');
 			frame.className = 'frame';

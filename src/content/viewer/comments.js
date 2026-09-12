@@ -9,6 +9,12 @@ import { parseCommentText } from '../../pixiv/emoji.js';
 import { COMMENT_PAGE_SIZE } from '../../common/constants.js';
 
 /** 退会したユーザーの表示名。 */
+/** 続きを読むボタンの文言。 */
+const MORE_LABEL = 'もっと見る';
+
+/** 読み込みに失敗したあとのボタンの文言。押すと同じ位置から読み直す。 */
+const RETRY_LABEL = '再試行';
+
 const DELETED_USER_NAME = '退会したユーザー';
 
 /** スタンプコメントの本文の代わり。 */
@@ -114,12 +120,12 @@ export function createComments(deps) {
 	let offset = 0;
 	/** 今表示している作品 */
 	let workId = null;
-	/** @type {HTMLElement|null} 縦にスクロールする領域。一覧と「もっと見る」を両方入れる */
-	let scroll = null;
 	/** @type {HTMLElement|null} */
 	let list = null;
 	/** @type {HTMLButtonElement|null} */
 	let moreButton = null;
+	/** @type {HTMLElement|null} 読み込み失敗の表示。再試行で消す */
+	let failure = null;
 
 	/**
 	 * コメント本体 (アバター・名前・本文・日時) を要素にする。
@@ -319,7 +325,10 @@ export function createComments(deps) {
 				list.appendChild(item);
 			}
 			offset += comments.length;
+			failure?.remove();
+			failure = null;
 			if (moreButton) {
+				moreButton.textContent = MORE_LABEL;
 				moreButton.hidden = body?.hasNext !== true;
 				moreButton.disabled = false;
 			}
@@ -327,13 +336,20 @@ export function createComments(deps) {
 			// 破棄後・別の作品へ移った後の失敗は伝えない。
 			// これを入れないと、正常な切り替えが読み込み失敗として表示される
 			if (workId !== requestedWorkId) return;
-			const failure = doc.createElement('p');
+			// 一時的な失敗で以降が読めなくならないよう、ボタンは再試行として残す。
+			// 表示は 1 つだけ。失敗のたびに積み上げない
+			failure?.remove();
+			failure = doc.createElement('p');
 			failure.className = 'status';
 			failure.dataset.kind = 'error';
 			failure.setAttribute('role', 'alert');
 			failure.textContent = 'コメントを読み込めませんでした';
 			container.appendChild(failure);
-			if (moreButton) moreButton.hidden = true;
+			if (moreButton) {
+				moreButton.textContent = RETRY_LABEL;
+				moreButton.hidden = false;
+				moreButton.disabled = false;
+			}
 			console.warn('[GridViewer] failed to load comments', requestedWorkId, error);
 		}
 	}
@@ -371,7 +387,8 @@ export function createComments(deps) {
 
 			// 一覧と「もっと見る」を同じ領域に入れてスクロールさせる。
 			// 外に置くと、一番下まで読んでいなくてもボタンが見えて不自然になる
-			scroll = doc.createElement('div');
+			// 一覧と「もっと見る」を同じ領域に入れてスクロールさせる
+			const scroll = doc.createElement('div');
 			scroll.className = 'comment-scroll';
 			container.appendChild(scroll);
 
@@ -382,7 +399,7 @@ export function createComments(deps) {
 			moreButton = doc.createElement('button');
 			moreButton.type = 'button';
 			moreButton.className = 'more';
-			moreButton.textContent = 'もっと見る';
+			moreButton.textContent = MORE_LABEL;
 			moreButton.hidden = true;
 			moreButton.addEventListener('click', () => { void loadMore(); });
 			scroll.appendChild(moreButton);
@@ -391,9 +408,9 @@ export function createComments(deps) {
 		},
 
 		dispose() {
-			scroll = null;
 			list = null;
 			moreButton = null;
+			failure = null;
 			workId = null;
 		},
 	};

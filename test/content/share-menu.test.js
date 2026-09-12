@@ -1,65 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createShareMenu } from '../../src/content/viewer/share-menu.js';
-import { ICON_SHAPES } from '../../src/common/icon-shapes.js';
-
-/**
- * リスナを配列で覚える要素の代わり。
- * シェアメニューは開閉と外側クリックを扱うので、そこまで再現する。
- * @param {string} tag タグ名
- * @returns {object} 要素の代わり
- */
-function fakeElement(tag) {
-	let text = '';
-	const element = {
-		tag,
-		children: [],
-		parent: null,
-		attributes: {},
-		innerHTML: '',
-		className: '',
-		hidden: false,
-		href: '',
-		type: '',
-		title: '',
-		focused: false,
-		listeners: {},
-		appendChild(child) { child.parent = element; element.children.push(child); return child; },
-		append(...nodes) { for (const node of nodes) element.appendChild(node); },
-		setAttribute(name, value) { element.attributes[name] = String(value); },
-		getAttribute(name) { return element.attributes[name] ?? null; },
-		removeAttribute(name) { delete element.attributes[name]; },
-		addEventListener(type, handler) { (element.listeners[type] ??= []).push(handler); },
-		removeEventListener(type, handler) {
-			element.listeners[type] = (element.listeners[type] ?? []).filter((one) => one !== handler);
-		},
-		focus() { element.focused = true; },
-		dispatch(type, event = {}) {
-			for (const handler of [...(element.listeners[type] ?? [])]) handler(event);
-		},
-	};
-	Object.defineProperty(element, 'textContent', {
-		get() { return text; },
-		set(value) { text = value; element.children = []; },
-	});
-	return element;
-}
-
-/**
- * document の代わり。要素を作り、自分に付いたリスナも覚える。
- * @returns {object} doc の代わり
- */
-function fakeDoc() {
-	const doc = fakeElement('#document');
-	doc.createElement = (tag) => fakeElement(tag);
-	doc.createElementNS = (_ns, tag) => fakeElement(tag);
-	doc.createTextNode = (value) => {
-		const node = fakeElement('#text');
-		node.textContent = value;
-		return node;
-	};
-	return doc;
-}
+import { fakeElement, fakeDoc, iconName } from '../helpers/dom.js';
 
 /** シェア対象の作品詳細の代わり。 */
 const DETAIL = Object.freeze({ id: '149431011', title: 'モンブラン', userName: 'チャイ' });
@@ -75,15 +17,6 @@ function build(overrides = {}) {
 	const button = menu.element.children[0];
 	const list = menu.element.children[1];
 	return { doc, menu, button, list };
-}
-
-/**
- * createIcon が描いた svg から図形の名前を割り出す。
- * @param {object} icon svg の代わり
- * @returns {string|undefined} ICON_SHAPES のキー
- */
-function iconName(icon) {
-	return Object.keys(ICON_SHAPES).find((name) => ICON_SHAPES[name].markup === icon.innerHTML);
 }
 
 test('最初は閉じている', () => {

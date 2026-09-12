@@ -1,103 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeComment, renderCommentText, renderStamp, createComments } from '../../src/content/viewer/comments.js';
-import { ICON_SHAPES } from '../../src/common/icon-shapes.js';
-
-/**
- * 要素の代わり。イベントの登録先と差し替え先を覚えるところが本物と違う。
- * @param {string} tag タグ名
- * @returns {object} 要素の代わり
- */
-function fakeElement(tag) {
-	let text = '';
-	const element = {
-		tag,
-		children: [],
-		className: '',
-		attributes: {},
-		listeners: {},
-		replacedWith: null,
-		innerHTML: '',
-		style: {},
-		src: '',
-		href: '',
-		type: '',
-		title: '',
-		hidden: false,
-		disabled: false,
-		dataset: {},
-		parent: null,
-		appendChild(child) { child.parent = element; element.children.push(child); return child; },
-		append(...nodes) { for (const node of nodes) element.appendChild(node); },
-		setAttribute(name, value) { element.attributes[name] = String(value); },
-		getAttribute(name) { return element.attributes[name] ?? null; },
-		addEventListener(type, handler) { (element.listeners[type] ??= []).push(handler); },
-		replaceWith(...nodes) { element.replacedWith = nodes; },
-		remove() {
-			if (!element.parent) return;
-			element.parent.children = element.parent.children.filter((child) => child !== element);
-			element.parent = null;
-		},
-		click() { for (const handler of [...(element.listeners.click ?? [])]) handler({}); },
-	};
-	Object.defineProperty(element, 'textContent', {
-		get() { return text; },
-		set(value) { text = value; element.children = []; },
-	});
-	return element;
-}
-
-/**
- * createIcon が描いた svg から図形の名前を割り出す。
- * @param {object} icon svg の代わり
- * @returns {string|undefined} ICON_SHAPES のキー
- */
-function iconName(icon) {
-	return Object.keys(ICON_SHAPES).find((name) => ICON_SHAPES[name].markup === icon.innerHTML);
-}
-
-/**
- * class 名で子孫を 1 つ探す。
- * @param {object} node 起点
- * @param {string} className 探す class 名
- * @returns {object|null} 見つかった要素
- */
-function find(node, className) {
-	if (String(node.className).split(/\s+/).includes(className)) return node;
-	for (const child of node.children ?? []) {
-		const hit = find(child, className);
-		if (hit) return hit;
-	}
-	return null;
-}
-
-/**
- * class 名で子孫をすべて集める。
- * @param {object} node 起点
- * @param {string} className 探す class 名
- * @returns {object[]} 見つかった要素
- */
-function findAll(node, className) {
-	const found = String(node.className).split(/\s+/).includes(className) ? [node] : [];
-	for (const child of node.children ?? []) found.push(...findAll(child, className));
-	return found;
-}
-
-/**
- * document の代わり。
- * @returns {object} doc の代わり
- */
-function fakeDoc() {
-	return {
-		createElement: (tag) => fakeElement(tag),
-		createElementNS: (_ns, tag) => fakeElement(tag),
-		createTextNode: (value) => {
-			const node = fakeElement('#text');
-			node.textContent = value;
-			return node;
-		},
-	};
-}
+import { fakeElement, fakeDoc, find, findAll, iconName, flush } from '../helpers/dom.js';
 
 test('コメントを共通の形にする', () => {
 	const raw = {
@@ -241,7 +145,7 @@ test('「もっと見る」はスクロールする領域の中、一覧の後�
 test('続きが無ければ「もっと見る」は出さない', async () => {
 	const { container, comments } = build(async () => ({ comments: [ROOT], hasNext: false }));
 	await comments.load(DETAIL);
-	assert.equal(find(container, 'more').hidden, true);
+	assert.equal(find(container, '.more').hidden, true);
 });
 
 test('返信があるコメントだけが返信の開閉ボタンを持つ', async () => {
@@ -250,7 +154,7 @@ test('返信があるコメントだけが返信の開閉ボタンを持つ', as
 		hasNext: false,
 	}));
 	await comments.load(DETAIL);
-	const buttons = findAll(container, 'comment-replies');
+	const buttons = findAll(container, '.comment-replies');
 	assert.equal(buttons.length, 1);
 	assert.equal(buttons[0].tag, 'button');
 	assert.equal(buttons[0].children[1].textContent, '返信を表示');
@@ -265,15 +169,14 @@ test('返信を表示すると replies API を引いてぶら下げる', async (
 		return { comments: [ROOT], hasNext: false };
 	});
 	await comments.load(DETAIL);
-	find(container, 'comment-replies').click();
-	await Promise.resolve();
-	await Promise.resolve();
+	find(container, '.comment-replies').click();
+	await flush();
 	assert.equal(asked[1], '/ajax/illusts/comments/replies?comment_id=233573595&page=1&lang=ja');
-	const list = find(container, 'comment-reply-list');
+	const list = find(container, '.comment-reply-list');
 	assert.equal(list.children.length, 1);
 	// 返信の本文もルートと同じ描き方 (絵文字は画像) にする
-	assert.equal(find(list, 'comment-emoji').attributes.src, 'https://s.pximg.net/common/images/emoji/104.png');
-	const toggle = find(container, 'comment-replies');
+	assert.equal(find(list, '.comment-emoji').attributes.src, 'https://s.pximg.net/common/images/emoji/104.png');
+	const toggle = find(container, '.comment-replies');
 	assert.equal(toggle.children[1].textContent, '返信を隠す');
 	assert.equal(toggle.getAttribute('aria-expanded'), 'true');
 });
@@ -283,12 +186,11 @@ test('もう一度押すと返信を畳む', async () => {
 		? { comments: [REPLY], hasNext: false }
 		: { comments: [ROOT], hasNext: false }));
 	await comments.load(DETAIL);
-	const toggle = find(container, 'comment-replies');
+	const toggle = find(container, '.comment-replies');
 	toggle.click();
-	await Promise.resolve();
-	await Promise.resolve();
+	await flush();
 	toggle.click();
-	assert.equal(find(container, 'comment-reply-list'), null);
+	assert.equal(find(container, '.comment-reply-list'), null);
 	assert.equal(toggle.children[1].textContent, '返信を表示');
 	assert.equal(toggle.getAttribute('aria-expanded'), 'false');
 });
@@ -303,17 +205,15 @@ test('返信に続きがあれば「返信をもっと見る」を出して次�
 			: { comments: [{ ...REPLY, id: '233573601' }], hasNext: false };
 	});
 	await comments.load(DETAIL);
-	find(container, 'comment-replies').click();
-	await Promise.resolve();
-	await Promise.resolve();
-	const more = find(container, 'reply-more');
+	find(container, '.comment-replies').click();
+	await flush();
+	const more = find(container, '.reply-more');
 	assert.equal(more.textContent, '返信をもっと見る');
 	more.click();
-	await Promise.resolve();
-	await Promise.resolve();
+	await flush();
 	assert.equal(asked[2], '/ajax/illusts/comments/replies?comment_id=233573595&page=2&lang=ja');
-	assert.equal(find(container, 'comment-reply-list').children.length, 2);
-	assert.equal(find(container, 'reply-more'), null);
+	assert.equal(find(container, '.comment-reply-list').children.length, 2);
+	assert.equal(find(container, '.reply-more'), null);
 });
 
 test('返信を読み込めなくてもコメントは読めるままにする', async () => {
@@ -322,11 +222,10 @@ test('返信を読み込めなくてもコメントは読めるままにする',
 		return { comments: [ROOT], hasNext: false };
 	});
 	await comments.load(DETAIL);
-	const toggle = find(container, 'comment-replies');
+	const toggle = find(container, '.comment-replies');
 	toggle.click();
-	await Promise.resolve();
-	await Promise.resolve();
-	assert.equal(find(container, 'reply-error').textContent, '返信を読み込めませんでした');
+	await flush();
+	assert.equal(find(container, '.reply-error').textContent, '返信を読み込めませんでした');
 	// 押し直せる状態に戻す
 	assert.equal(toggle.disabled, false);
 	assert.equal(toggle.getAttribute('aria-expanded'), 'false');
@@ -338,21 +237,20 @@ test('返信の開閉ボタンは開いているかが分かるアイコンを�
 		? { comments: [REPLY], hasNext: false }
 		: { comments: [ROOT], hasNext: false }));
 	await comments.load(DETAIL);
-	const toggle = find(container, 'comment-replies');
+	const toggle = find(container, '.comment-replies');
 	const mark = toggle.children[0];
 	assert.equal(iconName(mark.children[0]), 'expandMore');
 	toggle.click();
-	await Promise.resolve();
-	await Promise.resolve();
+	await flush();
 	assert.equal(iconName(mark.children[0]), 'expandLess');
 });
 
 test('コメントの下段は返信ボタンが左、日時が右', async () => {
 	const { container, comments } = build(async () => ({ comments: [ROOT], hasNext: false }));
 	await comments.load(DETAIL);
-	const body = find(container, 'comment-body');
+	const body = find(container, '.comment-body');
 	assert.deepEqual(body.children.map((child) => child.className), ['comment-name', 'comment-text', 'comment-meta']);
-	const meta = find(container, 'comment-meta');
+	const meta = find(container, '.comment-meta');
 	assert.deepEqual(meta.children.map((child) => child.className), ['comment-replies-slot', 'comment-date']);
 	assert.equal(meta.children[0].children[0].className, 'comment-replies');
 });
@@ -364,7 +262,33 @@ test('返信が無いコメントでも日時は同じ下段に置く', async ()
 		hasNext: false,
 	}));
 	await comments.load(DETAIL);
-	const meta = find(container, 'comment-meta');
+	const meta = find(container, '.comment-meta');
 	assert.deepEqual(meta.children.map((child) => child.className), ['comment-replies-slot', 'comment-date']);
 	assert.equal(meta.children[0].children.length, 0);
+});
+
+test('読み込みに失敗したら再試行できるようにボタンを残す', async () => {
+	// 一時的な失敗で以降のコメントが読めなくならないため。失敗の表示は積み上げない
+	let fail = true;
+	const { container, comments } = build(async () => {
+		if (fail) throw new Error('落ちた');
+		return { comments: [ROOT], hasNext: false };
+	});
+	await comments.load(DETAIL);
+	const more = find(container, '.more');
+	assert.equal(more.hidden, false);
+	assert.equal(more.disabled, false);
+	assert.equal(more.textContent, '再試行');
+	assert.equal(container.children.filter((child) => child.className === 'status').length, 1);
+
+	// もう一度失敗しても表示は 1 つのまま
+	await more.dispatch('click');
+	assert.equal(container.children.filter((child) => child.className === 'status').length, 1);
+
+	fail = false;
+	await more.dispatch('click');
+	assert.equal(container.children.filter((child) => child.className === 'status').length, 0);
+	assert.equal(find(container, '.comment-list').children.length, 1);
+	assert.equal(more.hidden, true);
+	assert.equal(more.textContent, 'もっと見る');
 });

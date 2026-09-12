@@ -29,6 +29,27 @@ export const USER_TAG_PATH_PATTERN = /^\/users\/\d+\/(?:artworks|illustrations|m
  */
 export const USER_WORKS_PATH_PATTERN = /^\/users\/\d+(?:\/(?:artworks|illustrations|manga)(?:\/.*)?)?\/?$/;
 
+/**
+ * 作品グリッドのうち、イラストか漫画のどちらかだけを出すタブのパス。
+ * 1 番目の捕捉がタブ名。/users/{id} と /users/{id}/artworks は両方を出すので合わない。
+ */
+export const USER_WORKS_CATEGORY_PATTERN = /^\/users\/\d+\/(illustrations|manga)(?:\/|$)/;
+
+/**
+ * 作品の種別。値は profile/all の応答キー (SITE_SPEC §3) と合わせてある。
+ * タブのパス名 (illustrations / manga) とは綴りが違うので WORK_CATEGORY_BY_TAB で引く。
+ */
+export const WORK_CATEGORY = Object.freeze({
+	ILLUST: 'illusts',
+	MANGA: 'manga',
+});
+
+/** タブのパス名から作品の種別を引く。 */
+export const WORK_CATEGORY_BY_TAB = Object.freeze({
+	illustrations: WORK_CATEGORY.ILLUST,
+	manga: WORK_CATEGORY.MANGA,
+});
+
 /** モーダルを載せるホスト要素の id。 */
 export const HOST_ELEMENT_ID = 'gridviewer-root';
 
