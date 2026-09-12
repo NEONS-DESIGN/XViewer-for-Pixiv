@@ -6,10 +6,15 @@
  * ホストページが Trusted Types を強制していると innerHTML が例外になる事情もある。
  */
 import { createIcon } from '../../common/icons.js';
-import { PIXIV_ORIGIN } from '../../pixiv/endpoints.js';
+import { PIXIV_ORIGIN, safeCdnUrl } from '../../pixiv/endpoints.js';
+import { fetchUserProfile } from '../../pixiv/user.js';
+import { createShareMenu } from './share-menu.js';
 
 /** リンクとして扱ってよいスキーム。 */
 const SAFE_SCHEMES = ['http:', 'https:'];
+
+/** ユーザー ID の見出し。数字だけだと何の番号か分からないので前に置く。 */
+const USER_ID_PREFIX = 'ID: ';
 
 /** 日時の表示に使うタイムゾーン。閲覧地に依らず pixiv 本体と同じ表示にするため固定する。 */
 const DISPLAY_TIME_ZONE = 'Asia/Tokyo';
@@ -150,21 +155,28 @@ export function commentToNodes(doc, html) {
  * @typedef {object} SidebarDeps
  * @property {Document} doc
  * @property {HTMLElement} container 描画先 (.sidebar)
+ * @property {(userId: string) => Promise<object>} [fetchUser] ユーザー情報の取得。既定は共有キャッシュ付きの取得
  */
 
 /**
  * サイドバーを作る。
  * @param {SidebarDeps} deps 依存
- * @returns {{render: (detail: object) => void, followSlot: () => HTMLElement, countsSlot: () => HTMLElement, commentsSlot: () => HTMLElement, dispose: () => void}}
+ * @returns {{render: (detail: object) => void, followSlot: () => HTMLElement, countsSlot: () => HTMLElement, commentsSlot: () => HTMLElement, consumeEscape: () => boolean, dispose: () => void}}
  */
 export function createSidebar(deps) {
 	const { doc, container } = deps;
+	// actions-bar (フォロー状態) と同じ応答を使う。既定は共有キャッシュ付きなので通信は 1 回で済む
+	const fetchUser = deps.fetchUser ?? ((userId) => fetchUserProfile(userId));
 	/** @type {HTMLElement|null} フォローボタンを後から差し込む場所 (作者行の右端) */
 	let follow = null;
 	/** @type {HTMLElement|null} カウンタの行。いいねとブックマークはここが押せるボタンに変わる */
 	let counts = null;
 	/** @type {HTMLElement|null} コメントを後から差し込む場所 */
 	let comments = null;
+	/** @type {ReturnType<typeof createShareMenu>|null} シェアメニュー。Escape を先に食べる */
+	let shareMenu = null;
+	/** 描画の世代。アイコンの取得を待っている間に描き直されたかを見る */
+	let generation = 0;
 
 	/**
 	 * カウンタ 1 つを作る。
@@ -190,6 +202,93 @@ export function createSidebar(deps) {
 		return item;
 	}
 
+	/**
+	 * 作者行を作る。アイコン・名前・ユーザー ID を 1 つのリンクにまとめる。
+	 *
+	 * アイコンの URL は作品詳細に無いので /ajax/user/{id} を別に引く。
+	 * render() は同期のままにして、取れたら後から src を入れる。
+	 * @param {object} detail 正規化した作品詳細
+	 * @returns {HTMLElement} .author-row
+	 */
+	function createAuthorRow(detail) {
+		const row = doc.createElement('div');
+		row.className = 'author-row';
+
+		const author = doc.createElement('a');
+		author.className = 'author';
+		author.href = `/users/${detail.userId}`;
+
+		const avatar = doc.createElement('img');
+		avatar.className = 'author-avatar';
+		// 名前が隣にあるので読み上げでは重複する。装飾として扱う
+		avatar.setAttribute('alt', '');
+		// 取れるまでは枠だけ。読み込めなかったときと同じ見え方にしておく
+		avatar.style.visibility = 'hidden';
+		avatar.addEventListener('error', () => { avatar.style.visibility = 'hidden'; });
+		author.appendChild(avatar);
+
+		const identity = doc.createElement('span');
+		identity.className = 'author-identity';
+		const name = doc.createElement('span');
+		name.className = 'author-name';
+		name.textContent = detail.userName;
+		const userId = doc.createElement('span');
+		userId.className = 'author-id';
+		userId.textContent = `${USER_ID_PREFIX}${detail.userId}`;
+		identity.append(name, userId);
+		author.appendChild(identity);
+
+		const mine = generation;
+		// 取れなくても名前とリンクは出ている。失敗は枠だけ残して黙って続ける。
+		// fetchUser が同期で投げることもあるので、ここで Promise に揃える
+		let pending;
+		try {
+			pending = Promise.resolve(fetchUser(detail.userId));
+		} catch (error) {
+			pending = Promise.reject(error);
+		}
+		pending
+			.then((user) => {
+				// 待っている間に別の作品へ移っていたら、前の作者の顔を入れない
+				if (mine !== generation) return;
+				// 応答の値をそのまま外部オリジンへのリクエストにしない
+				const url = safeCdnUrl(user?.image);
+				if (!url) return;
+				avatar.src = url;
+				avatar.style.visibility = '';
+			})
+			.catch((error) => { console.warn('[PixivMaster] failed to load author icon', detail.userId, error); });
+
+		follow = doc.createElement('div');
+		follow.className = 'follow-slot';
+		row.append(author, follow);
+		return row;
+	}
+
+	/**
+	 * 作品ページへのリンクとシェアボタンの行を作る。
+	 * @param {object} detail 正規化した作品詳細
+	 * @returns {HTMLElement} .link-row
+	 */
+	function createLinkRow(detail) {
+		const row = doc.createElement('div');
+		row.className = 'link-row';
+
+		const original = doc.createElement('a');
+		original.className = 'original-link';
+		original.href = `/artworks/${detail.id}`;
+		original.setAttribute('target', '_blank');
+		original.setAttribute('rel', 'noopener noreferrer');
+		const label = doc.createElement('span');
+		label.textContent = '作品ページを開く';
+		original.append(label, createIcon(doc, 'openInNew'));
+		row.appendChild(original);
+
+		shareMenu = createShareMenu({ doc, detail });
+		row.appendChild(shareMenu.element);
+		return row;
+	}
+
 	return {
 		/**
 		 * 作品詳細を描く。
@@ -197,6 +296,11 @@ export function createSidebar(deps) {
 		 * @returns {void}
 		 */
 		render(detail) {
+			// 前の描画で走っているアイコンの取得を切り離す。
+			// これを外すと、作品を送った直後に前の作者の顔が入ることがある
+			generation += 1;
+			shareMenu?.dispose();
+			shareMenu = null;
 			container.textContent = '';
 
 			// 作品情報とコメントを別の入れ物に分ける。
@@ -206,20 +310,9 @@ export function createSidebar(deps) {
 			info.className = 'sidebar-info';
 			container.appendChild(info);
 
-			// 作者名とフォローを同じ行に置く。pixiv 本体と同じで、誰の作品かが最初に目に入る
-			const authorRow = doc.createElement('div');
-			authorRow.className = 'author-row';
-
-			const author = doc.createElement('a');
-			author.className = 'author';
-			author.href = `/users/${detail.userId}`;
-			author.textContent = detail.userName;
-			authorRow.appendChild(author);
-
-			follow = doc.createElement('div');
-			follow.className = 'follow-slot';
-			authorRow.appendChild(follow);
-			info.appendChild(authorRow);
+			// 作者のアイコン・名前とフォローを同じ行に置く。
+			// pixiv 本体と同じで、誰の作品かが最初に目に入る
+			info.appendChild(createAuthorRow(detail));
 
 			const title = doc.createElement('h2');
 			title.className = 'title';
@@ -245,6 +338,12 @@ export function createSidebar(deps) {
 				info.appendChild(tagList);
 			}
 
+			// 投稿日時はタグの下・カウンタの罫線の上。読み物の締めくくりとして置く
+			const date = doc.createElement('p');
+			date.className = 'date';
+			date.textContent = formatDate(detail.createDate);
+			info.appendChild(date);
+
 			counts = doc.createElement('div');
 			counts.className = 'counts';
 			// アイコンの対応は pixiv 本体に合わせる。いいねは顔、ブックマークはハート
@@ -256,19 +355,7 @@ export function createSidebar(deps) {
 			);
 			info.appendChild(counts);
 
-			const date = doc.createElement('p');
-			date.className = 'date';
-			date.textContent = formatDate(detail.createDate);
-			info.appendChild(date);
-
-			const original = doc.createElement('a');
-			original.className = 'original-link';
-			original.href = `/artworks/${detail.id}`;
-			original.target = '_blank';
-			original.rel = 'noopener noreferrer';
-			original.textContent = 'pixiv で開く';
-			original.appendChild(createIcon(doc, 'openInNew'));
-			info.appendChild(original);
+			info.appendChild(createLinkRow(detail));
 
 			comments = doc.createElement('div');
 			comments.className = 'comments';
@@ -279,9 +366,21 @@ export function createSidebar(deps) {
 		countsSlot() { return counts; },
 		commentsSlot() { return comments; },
 
+		/**
+		 * Escape をシェアメニューに使わせる。
+		 * ビュワー本体がモーダルを閉じるより先に呼ばれ、true なら本体は反応しない。
+		 * @returns {boolean} 食い止めたなら true
+		 */
+		consumeEscape() {
+			return shareMenu?.consumeEscape() === true;
+		},
+
 		dispose() {
 			// 自分が描いた中身は自分で消す。
 			// これを外すと、次の作品を読み込んでいる間に前の作品の情報が残る
+			generation += 1;
+			shareMenu?.dispose();
+			shareMenu = null;
 			container.textContent = '';
 			follow = null;
 			counts = null;

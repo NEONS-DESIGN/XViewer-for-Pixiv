@@ -1,6 +1,6 @@
 /**
- * Material Symbols から必要な図形だけを抜き出し、自前で描いた図形と混ぜて
- * icon-shapes.js を生成する。
+ * Material Symbols と Font Awesome (ブランドロゴ) から必要な図形だけを抜き出し、
+ * 自前で描いた図形と混ぜて icon-shapes.js を生成する。
  * 生成物はコミットする。src/ を素の import で読めるようにするため (UI_DESIGN_KIT §5)。
  */
 import { readFile, writeFile } from 'node:fs/promises';
@@ -20,6 +20,20 @@ const ICON_SOURCES = {
 	openInNew: 'open_in_new-fill',
 	error: 'error-fill',
 	refresh: 'refresh-fill',
+	share: 'share-fill',
+	link: 'link-fill',
+	expandMore: 'keyboard_arrow_down-fill',
+	expandLess: 'keyboard_arrow_up-fill',
+};
+
+/**
+ * Font Awesome Free の brands から抜き出す図形。SNS のロゴは Material Symbols に無い。
+ * Pawoo は Mastodon インスタンスなので mastodon のロゴを使う。
+ */
+const BRAND_SOURCES = {
+	brandX: 'x-twitter',
+	brandFacebook: 'facebook',
+	brandMastodon: 'mastodon',
 };
 
 /**
@@ -45,6 +59,9 @@ const CUSTOM_SHAPES = {
 /** 原本の置き場。 */
 const SOURCE_DIR = 'node_modules/@material-symbols/svg-400/rounded';
 
+/** ブランドロゴの原本の置き場。 */
+const BRAND_SOURCE_DIR = 'node_modules/@fortawesome/fontawesome-free/svgs/brands';
+
 /** 生成先。 */
 const OUTPUT_PATH = 'src/common/icon-shapes.js';
 
@@ -63,13 +80,19 @@ const shapes = {};
 for (const [name, file] of Object.entries(ICON_SOURCES)) {
 	shapes[name] = extract(await readFile(`${SOURCE_DIR}/${file}.svg`, 'utf8'));
 }
+for (const [name, file] of Object.entries(BRAND_SOURCES)) {
+	shapes[name] = extract(await readFile(`${BRAND_SOURCE_DIR}/${file}.svg`, 'utf8'));
+}
 // 自前の図形は最後に混ぜる。同じ名前があれば自前を優先する
 Object.assign(shapes, CUSTOM_SHAPES);
 
 const header = `/**
  * 生成物。手で編集しない。scripts/build-symbols.mjs で作り直す。
- * 図形の出典: Material Symbols (Rounded, weight 400, FILL 1) / Apache-2.0
- * https://github.com/google/material-design-icons
+ * 図形の出典:
+ * - Material Symbols (Rounded, weight 400, FILL 1) / Apache-2.0
+ *   https://github.com/google/material-design-icons
+ * - Font Awesome Free 7 の brands (brandX / brandFacebook / brandMastodon) / CC BY 4.0
+ *   https://fontawesome.com/license/free
  * ただし CUSTOM_SHAPES にある図形 (like) だけは自前で描いたもの。
  */
 `;

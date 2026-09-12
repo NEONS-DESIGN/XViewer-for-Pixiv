@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createImagePane } from '../../src/content/viewer/image-pane.js';
 import { createSidebar } from '../../src/content/viewer/sidebar.js';
-import { renderWork, disposeAll } from '../../src/content/viewer/panes.js';
+import { renderWork, disposeAll, consumeEscape } from '../../src/content/viewer/panes.js';
 
 /**
  * class セレクタだけを解する最小の要素の代わり。
@@ -18,6 +18,16 @@ function fakeElement(tag) {
 		children: [],
 		parent: null,
 		className: '',
+		style: {},
+		src: '',
+		href: '',
+		type: '',
+		title: '',
+		hidden: false,
+		disabled: false,
+		listeners: {},
+		focus() {},
+		click() { for (const handler of [...(element.listeners.click ?? [])]) handler({}); },
 		appendChild(child) {
 			child.parent = element;
 			element.children.push(child);
@@ -31,9 +41,10 @@ function fakeElement(tag) {
 			element.parent.children = element.parent.children.filter((child) => child !== element);
 			element.parent = null;
 		},
-		setAttribute() {},
-		getAttribute() { return null; },
-		addEventListener() {},
+		attributes: {},
+		setAttribute(name, value) { element.attributes[name] = String(value); },
+		getAttribute(name) { return element.attributes[name] ?? null; },
+		addEventListener(type, handler) { (element.listeners[type] ??= []).push(handler); },
 		removeEventListener() {},
 		querySelectorAll(selector) { return findByClass(element, selector); },
 		querySelector(selector) { return findByClass(element, selector)[0] ?? null; },
@@ -76,6 +87,9 @@ function fakeDoc() {
 	return {
 		// actions-bar が readSession で __NEXT_DATA__ を引く。未ログイン扱いで十分
 		getElementById: () => null,
+		// シェアメニューが外側クリックを見るために document へ付ける
+		addEventListener() {},
+		removeEventListener() {},
 		createElement: (tag) => fakeElement(tag),
 		createElementNS: (_ns, tag) => fakeElement(tag),
 		createDocumentFragment: () => fakeElement('#fragment'),
@@ -121,7 +135,8 @@ const SETTINGS = Object.freeze({ showSidebar: true, imageQuality: 'regular', pre
  * @returns {{stage: object, sidebar: object}} ステージとサイドバー
  */
 function fakeTargets() {
-	return { stage: fakeElement('div'), sidebar: fakeElement('div') };
+	// fetchUser を差し込んで作者アイコンの取得で通信させない
+	return { stage: fakeElement('div'), sidebar: fakeElement('div'), fetchUser: async () => ({}) };
 }
 
 test('画像ペインは dispose で自分の枠を DOM から外す', async () => {
@@ -143,7 +158,7 @@ test('画像ペインは dispose で自分の枠を DOM から外す', async () 
 
 test('サイドバーは dispose で中身を空にする', () => {
 	const container = fakeElement('div');
-	const pane = createSidebar({ doc: fakeDoc(), container });
+	const pane = createSidebar({ doc: fakeDoc(), container, fetchUser: async () => ({}) });
 	pane.render(DETAIL);
 	assert.ok(container.children.length > 0);
 
@@ -152,8 +167,8 @@ test('サイドバーは dispose で中身を空にする', () => {
 });
 
 test('renderWork はサイドバーにコメント区画とアクションを作る', async () => {
-	const { stage, sidebar } = fakeTargets();
-	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc: fakeDoc(), stage, sidebar, onError: () => {} });
+	const { stage, sidebar, fetchUser } = fakeTargets();
+	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc: fakeDoc(), stage, sidebar, onError: () => {}, fetchUser });
 
 	assert.equal(sidebar.hidden, false);
 	assert.ok(sidebar.querySelectorAll('.comments')[0].children.length > 0);
@@ -205,4 +220,26 @@ test('主役の描画を待つ間に古くなったらコメントとアクシ�
 	// カウンタ 4 つだけ。アクションが触っていれば案内が足されて増える
 	assert.equal(sidebar.querySelectorAll('.counts')[0].children.length, 4);
 	disposeAll();
+});
+
+
+test('consumeEscape はシェアメニューが開いているときだけ true を返す', async () => {
+	// ビュワー本体の Escape (モーダルを閉じる) より先に呼ばれる。
+	// 開いていないのに true を返すと、Escape でモーダルが閉じられなくなる
+	const { stage, sidebar, fetchUser } = fakeTargets();
+	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc: fakeDoc(), stage, sidebar, onError: () => {}, fetchUser });
+	assert.equal(consumeEscape(), false);
+
+	sidebar.querySelectorAll('.share-button')[0].click();
+	assert.equal(consumeEscape(), true);
+	assert.equal(consumeEscape(), false);
+	disposeAll();
+});
+
+test('ペインを捨てた後の consumeEscape は false を返す', async () => {
+	const { stage, sidebar, fetchUser } = fakeTargets();
+	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc: fakeDoc(), stage, sidebar, onError: () => {}, fetchUser });
+	sidebar.querySelectorAll('.share-button')[0].click();
+	disposeAll();
+	assert.equal(consumeEscape(), false);
 });

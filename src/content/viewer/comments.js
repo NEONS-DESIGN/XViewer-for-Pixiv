@@ -1,9 +1,10 @@
 /**
- * コメントの表示。ルートコメントだけを出し、返信は本体ページへ誘導する。
+ * コメントの表示。ルートコメントを並べ、返信は必要なときだけ引いて下にぶら下げる。
  * コメントの取得に失敗しても画像は見られるので、失敗はこの区画の中だけで伝える。
  */
+import { createIcon } from '../../common/icons.js';
 import { getJson } from '../../pixiv/client.js';
-import { commentRootsUrl, safeCdnUrl, emojiUrl, stampUrl } from '../../pixiv/endpoints.js';
+import { commentRootsUrl, commentRepliesUrl, safeCdnUrl, emojiUrl, stampUrl } from '../../pixiv/endpoints.js';
 import { parseCommentText } from '../../pixiv/emoji.js';
 import { COMMENT_PAGE_SIZE } from '../../common/constants.js';
 
@@ -12,6 +13,12 @@ const DELETED_USER_NAME = '退会したユーザー';
 
 /** スタンプコメントの本文の代わり。 */
 const STAMP_PLACEHOLDER = '[スタンプ]';
+
+/** 返信の開閉ボタンの文言。 */
+const REPLIES_LABEL = Object.freeze({ SHOW: '返信を表示', HIDE: '返信を隠す' });
+
+/** 返信の 1 ページ目。replies API は offset ではなく 1 始まりの page で送る。 */
+const FIRST_REPLY_PAGE = 1;
 
 /**
  * @typedef {object} Comment
@@ -92,6 +99,7 @@ export function renderStamp(doc, stampId) {
  * @typedef {object} CommentsDeps
  * @property {Document} doc
  * @property {HTMLElement} container 描画先
+ * @property {(url: string) => Promise<object>} [fetchJson] 取得の差し替え。テストから通信させないために使う
  */
 
 /**
@@ -101,19 +109,23 @@ export function renderStamp(doc, stampId) {
  */
 export function createComments(deps) {
 	const { doc, container } = deps;
+	const fetchJson = deps.fetchJson ?? ((url) => getJson(url));
 	/** 読み込み済みの件数。「もっと見る」で増やす */
 	let offset = 0;
 	/** 今表示している作品 */
 	let workId = null;
+	/** @type {HTMLElement|null} 縦にスクロールする領域。一覧と「もっと見る」を両方入れる */
+	let scroll = null;
 	/** @type {HTMLElement|null} */
 	let list = null;
 	/** @type {HTMLButtonElement|null} */
 	let moreButton = null;
 
 	/**
-	 * コメント 1 件を要素にする。
+	 * コメント本体 (アバター・名前・本文・日時) を要素にする。
+	 * ルートにも返信にも同じ形を使う。
 	 * @param {Comment} comment コメント
-	 * @returns {HTMLElement} 要素
+	 * @returns {{item: HTMLElement, body: HTMLElement}} 要素と、後から足せる本文側の入れ物
 	 */
 	function createItem(comment) {
 		const item = doc.createElement('li');
@@ -147,19 +159,135 @@ export function createComments(deps) {
 		meta.textContent = comment.date;
 
 		body.append(name, text, meta);
+		item.append(avatar, body);
+		return { item, body };
+	}
 
-		if (comment.hasReplies) {
-			const replies = doc.createElement('a');
-			replies.className = 'comment-replies';
-			replies.href = `/artworks/${workId}`;
-			replies.target = '_blank';
-			replies.rel = 'noopener noreferrer';
-			replies.textContent = '返信を pixiv で見る';
-			body.appendChild(replies);
+	/**
+	 * 返信の開閉を 1 件のコメントに付ける。
+	 *
+	 * 畳んだときは DOM ごと捨てて、開き直すときに取り直す。
+	 * 残しておくとコメントの多い作品で要素が増え続ける。
+	 * @param {Comment} comment ルートコメント
+	 * @param {HTMLElement} body 差し込む先 (.comment-body)
+	 * @returns {void}
+	 */
+	function attachReplies(comment, body) {
+		/** 開いているか */
+		let open = false;
+		/** 次に取りに行くページ。1 始まり */
+		let page = FIRST_REPLY_PAGE;
+		/** @type {HTMLElement|null} 返信をまとめる入れ物。畳むとき丸ごと捨てる */
+		let area = null;
+		/** @type {HTMLElement|null} */
+		let replyList = null;
+		/** @type {HTMLButtonElement|null} */
+		let replyMore = null;
+
+		const toggle = doc.createElement('button');
+		toggle.type = 'button';
+		toggle.className = 'comment-replies';
+		toggle.setAttribute('aria-expanded', 'false');
+		// アイコンは差し替えるので、入れ物の span を挟んで中身だけ入れ替える
+		const toggleMark = doc.createElement('span');
+		toggleMark.className = 'comment-replies-mark';
+		const toggleText = doc.createElement('span');
+		toggle.append(toggleMark, toggleText);
+
+		/**
+		 * 開閉の見た目を揃える。
+		 * @param {boolean} next 開くなら true
+		 * @returns {void}
+		 */
+		function setOpen(next) {
+			open = next;
+			toggle.setAttribute('aria-expanded', String(next));
+			toggleText.textContent = next ? REPLIES_LABEL.HIDE : REPLIES_LABEL.SHOW;
+			toggleMark.textContent = '';
+			toggleMark.appendChild(createIcon(doc, next ? 'expandLess' : 'expandMore'));
 		}
 
-		item.append(avatar, body);
-		return item;
+		setOpen(false);
+
+		/**
+		 * 失敗を返信の場所に出す。コメント全体は読めるままにする。
+		 * @param {unknown} error 失敗の中身
+		 * @returns {void}
+		 */
+		function showFailure(error) {
+			const failure = doc.createElement('p');
+			failure.className = 'reply-error';
+			failure.setAttribute('role', 'alert');
+			failure.textContent = '返信を読み込めませんでした';
+			body.appendChild(failure);
+			console.warn('[PixivMaster] failed to load replies', comment.id, error);
+		}
+
+		/**
+		 * 返信を 1 ページ取って並べる。
+		 * @returns {Promise<void>}
+		 */
+		async function loadPage() {
+			const requestedWorkId = workId;
+			toggle.disabled = true;
+			if (replyMore) replyMore.disabled = true;
+			try {
+				const responseBody = await fetchJson(commentRepliesUrl(comment.id, page));
+				// 待っている間に別の作品へ移っていたら捨てる
+				if (workId !== requestedWorkId) return;
+				// 畳まれていたら並べない
+				if (!open) return;
+				if (!area) {
+					area = doc.createElement('div');
+					area.className = 'comment-replies-area';
+					replyList = doc.createElement('ul');
+					replyList.className = 'comment-reply-list';
+					area.appendChild(replyList);
+					body.appendChild(area);
+				}
+				for (const raw of responseBody?.comments ?? []) {
+					replyList.appendChild(createItem(normalizeComment(raw)).item);
+				}
+				page += 1;
+				if (responseBody?.hasNext === true) {
+					if (!replyMore) {
+						replyMore = doc.createElement('button');
+						replyMore.type = 'button';
+						replyMore.className = 'more reply-more';
+						replyMore.textContent = '返信をもっと見る';
+						replyMore.addEventListener('click', () => { void loadPage(); });
+						area.appendChild(replyMore);
+					}
+					replyMore.disabled = false;
+				} else {
+					replyMore?.remove();
+					replyMore = null;
+				}
+			} catch (error) {
+				if (workId !== requestedWorkId) return;
+				// 開けなかったので閉じた状態に戻す。押し直せばもう一度試せる
+				setOpen(false);
+				showFailure(error);
+			} finally {
+				toggle.disabled = false;
+			}
+		}
+
+		toggle.addEventListener('click', () => {
+			if (open) {
+				setOpen(false);
+				area?.remove();
+				area = null;
+				replyList = null;
+				replyMore = null;
+				page = FIRST_REPLY_PAGE;
+				return;
+			}
+			setOpen(true);
+			void loadPage();
+		});
+
+		body.appendChild(toggle);
 	}
 
 	/**
@@ -172,12 +300,15 @@ export function createComments(deps) {
 		const requestedWorkId = workId;
 		if (moreButton) moreButton.disabled = true;
 		try {
-			const body = await getJson(commentRootsUrl(requestedWorkId, offset, COMMENT_PAGE_SIZE));
+			const body = await fetchJson(commentRootsUrl(requestedWorkId, offset, COMMENT_PAGE_SIZE));
 			// 待っている間に破棄されたか、別の作品へ移っていたら捨てる
 			if (workId !== requestedWorkId || !list) return;
 			const comments = (body?.comments ?? []).map(normalizeComment);
 			for (const comment of comments) {
-				list.appendChild(createItem(comment));
+				const { item, body: commentBody } = createItem(comment);
+				// 返信の開閉はルートにだけ付ける。pixiv 側も入れ子は 1 段まで
+				if (comment.hasReplies) attachReplies(comment, commentBody);
+				list.appendChild(item);
 			}
 			offset += comments.length;
 			if (moreButton) {
@@ -230,9 +361,15 @@ export function createComments(deps) {
 				return;
 			}
 
+			// 一覧と「もっと見る」を同じ領域に入れてスクロールさせる。
+			// 外に置くと、一番下まで読んでいなくてもボタンが見えて不自然になる
+			scroll = doc.createElement('div');
+			scroll.className = 'comment-scroll';
+			container.appendChild(scroll);
+
 			list = doc.createElement('ul');
 			list.className = 'comment-list';
-			container.appendChild(list);
+			scroll.appendChild(list);
 
 			moreButton = doc.createElement('button');
 			moreButton.type = 'button';
@@ -240,12 +377,13 @@ export function createComments(deps) {
 			moreButton.textContent = 'もっと見る';
 			moreButton.hidden = true;
 			moreButton.addEventListener('click', () => { void loadMore(); });
-			container.appendChild(moreButton);
+			scroll.appendChild(moreButton);
 
 			await loadMore();
 		},
 
 		dispose() {
+			scroll = null;
 			list = null;
 			moreButton = null;
 			workId = null;

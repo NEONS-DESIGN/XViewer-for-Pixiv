@@ -260,7 +260,7 @@
 	font-size: 12px;
 }
 
-/* 作者名とフォローを同じ行に。名前が長くても畳んでフォローを右端に残す */
+/* 作者のアイコン・名前とフォローを同じ行に。名前が長くても畳んでフォローを右端に残す */
 .author-row {
 	display: flex;
 	align-items: center;
@@ -268,18 +268,53 @@
 	margin-bottom: 8px;
 }
 
+/* アイコン・名前・ユーザー ID をまとめて 1 つのリンクにする。
+   押せる範囲が広いほうが誤操作が減る */
 .author {
+	display: flex;
 	flex: 1 1 auto;
+	align-items: center;
+	gap: 8px;
 	min-width: 0;
-	overflow: hidden;
 	color: var(--fg);
-	font-weight: 600;
 	text-decoration: none;
+}
+
+/* 取得できるまでは visibility: hidden で枠だけが残る。
+   場所が動かないよう、背景を敷いて大きさを先に確保しておく */
+.author-avatar {
+	flex: 0 0 auto;
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+	background: var(--divider);
+	object-fit: cover;
+}
+
+.author-identity {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	line-height: 1.3;
+}
+
+.author-name {
+	overflow: hidden;
+	font-weight: 600;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 
-.author:hover { text-decoration: underline; }
+/* 名前の真下。名前より一段小さく、薄い色で添える */
+.author-id {
+	overflow: hidden;
+	color: var(--muted);
+	font-size: 11px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.author:hover .author-name { text-decoration: underline; }
 
 .follow-slot {
 	flex: 0 0 auto;
@@ -374,10 +409,22 @@
 	height: 16px;
 }
 
+/* 投稿日時。読み物 (投稿文・タグ) の締めくくりとして、カウンタの罫線の上に置く */
 .date {
 	margin: 0 0 12px;
 	color: var(--muted);
 	font-size: 12px;
+}
+
+/* 作品ページへのリンクとシェアを同じ行に。
+   シェアメニューを上向きに開くので、位置の基準をここに置く */
+.link-row {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding-bottom: 12px;
 }
 
 .original-link {
@@ -389,10 +436,99 @@
 	text-decoration: none;
 }
 
+.original-link:hover { text-decoration: underline; }
+
 .original-link svg {
 	width: 14px;
 	height: 14px;
 }
+
+.share-wrap {
+	position: static;
+	flex: 0 0 auto;
+}
+
+.share-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px 8px;
+	border: 0;
+	border-radius: 999px;
+	background: transparent;
+	color: var(--accent);
+	font: inherit;
+	font-size: 13px;
+	cursor: pointer;
+}
+
+.share-button:hover { background: var(--hover); }
+.share-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.share-button svg {
+	width: 16px;
+	height: 16px;
+}
+
+/* 上向きに開く。下に開くとコメント側へ張り出し、
+   サイドバーが縦に詰まっている作品では枠の外へ出て切れる */
+.share-menu {
+	position: absolute;
+	right: 0;
+	bottom: 100%;
+	z-index: 2;
+	min-width: 200px;
+	max-width: 100%;
+	padding: 8px 0;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	background: var(--surface);
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.36);
+}
+
+.share-menu-heading {
+	margin: 0;
+	padding: 4px 12px 8px;
+	color: var(--muted);
+	font-size: 12px;
+}
+
+.share-item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	padding: 8px 12px;
+	border: 0;
+	background: transparent;
+	color: var(--fg);
+	font: inherit;
+	font-size: 13px;
+	text-align: left;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.share-item:hover { background: var(--hover); }
+.share-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* ブランドのロゴは viewBox が 512 系で、余白の取り方も Material Symbols と違う。
+   文字と釣り合う大きさに揃える */
+.share-item svg {
+	flex: 0 0 auto;
+	width: 16px;
+	height: 16px;
+}
+
+/* コピーの結果。何も無いときは行を作らない */
+.share-status {
+	margin: 0;
+	padding: 0 12px;
+	color: var(--muted);
+	font-size: 12px;
+}
+
+.share-status:empty { display: none; }
 
 /* コメント区画。見出しと「もっと見る」は動かさず、一覧だけを縦に伸ばしてスクロールさせる。
    縮んでよいのはここだけ。作品情報が長い作品ではここが圧縮される */
@@ -412,19 +548,22 @@
 	font-size: 14px;
 }
 
-/* スクロールするのはここだけ。min-height: 0 が無いと中身の高さで下限が決まって縮まない */
-.comment-list {
+/* スクロールするのはここだけ。min-height: 0 が無いと中身の高さで下限が決まって縮まない。
+   「もっと見る」も中に入れて、一番下まで読んだときだけ見えるようにする */
+.comment-scroll {
 	flex: 0 1 auto;
 	min-height: 0;
 	overflow-y: auto;
+}
+
+.comment-list {
 	margin: 0;
 	padding: 0;
 	list-style: none;
 }
 
-/* 見出しと同じく動かさない。一覧の下に留める */
-.comments > .status,
-.more {
+/* 見出しと同じく動かさない */
+.comments > .status {
 	flex: 0 0 auto;
 }
 
@@ -478,10 +617,68 @@
 	font-size: 11px;
 }
 
+/* 返信の開閉。押せることが分かるように矢印を添える */
 .comment-replies {
-	display: block;
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
 	margin-top: 2px;
+	padding: 2px 6px 2px 2px;
+	border: 0;
+	border-radius: 999px;
+	background: transparent;
 	color: var(--accent);
+	font: inherit;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.comment-replies:hover:not(:disabled) { background: var(--hover); }
+.comment-replies:disabled { opacity: 0.5; cursor: default; }
+.comment-replies:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.comment-replies-mark {
+	display: inline-flex;
+}
+
+.comment-replies-mark svg {
+	width: 16px;
+	height: 16px;
+}
+
+/* 返信は元のコメントにぶら下げる。左の縦線で親子関係を示す */
+.comment-replies-area {
+	margin: 4px 0 4px 4px;
+	padding-left: 8px;
+	border-left: 2px solid var(--divider);
+}
+
+.comment-reply-list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+/* 返信の中の項目は下線を引かない。区切りは縦線が担う */
+.comment-reply-list .comment-item {
+	border-bottom: 0;
+}
+
+.comment-reply-list .comment-avatar {
+	width: 24px;
+	height: 24px;
+}
+
+.reply-error {
+	margin: 4px 0 0;
+	color: var(--danger);
+	font-size: 12px;
+}
+
+/* 返信の「もっと見る」は行いっぱいに広げない。返信の幅に収める */
+.reply-more {
+	width: auto;
+	padding: 0 10px;
 	font-size: 12px;
 }
 

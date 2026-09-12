@@ -5,6 +5,7 @@ import {
 	illustPagesUrl,
 	ugoiraMetaUrl,
 	commentRootsUrl,
+	commentRepliesUrl,
 	userProfileAllUrl,
 	userProfileIllustsUrl,
 	userUrl,
@@ -23,6 +24,18 @@ test('コメントの URL に offset と limit が入る', () => {
 	assert.equal(
 		commentRootsUrl('149425016', 0, 30),
 		'/ajax/illusts/comments/roots?illust_id=149425016&offset=0&limit=30&lang=ja',
+	);
+});
+
+test('返信の URL は page 始まりで組み立てる', () => {
+	// SITE_SPEC §4 実測: offset/limit ではなく 1 始まりの page
+	assert.equal(
+		commentRepliesUrl('233573595', 1),
+		'/ajax/illusts/comments/replies?comment_id=233573595&page=1&lang=ja',
+	);
+	assert.equal(
+		commentRepliesUrl('233573595', 2),
+		'/ajax/illusts/comments/replies?comment_id=233573595&page=2&lang=ja',
 	);
 });
 
