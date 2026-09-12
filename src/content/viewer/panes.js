@@ -73,6 +73,7 @@ export function planPanes(detail, session, settings) {
  * @property {HTMLElement} sidebar サイドバーの描画先 (.sidebar)
  * @property {(message: string) => void} onError 再生できない等を伝える
  * @property {() => boolean} [isStale] この描画がもう古いか。省略時は常に false
+ * @property {(userId: string) => Promise<object>} [fetchUser] 作者情報の取得。テストから通信させないために使う
  */
 
 /**
@@ -98,7 +99,7 @@ export async function renderWork(detail, session, settings, targets) {
 
 	// サイドバーを先に出す。文章とカウンタは画像の読み込みを待つ理由が無い
 	if (plan.sidebar) {
-		sidebarPane = createSidebar({ doc, container: sidebar });
+		sidebarPane = createSidebar({ doc, container: sidebar, fetchUser: targets.fetchUser });
 		sidebarPane.render(detail);
 	}
 
@@ -159,6 +160,19 @@ export function disposeAll() {
 	actionsPane = null;
 	blockedPane?.dispose();
 	blockedPane = null;
+}
+
+/**
+ * Escape をサイドバーに使わせる。
+ *
+ * ビュワー本体は Escape でモーダルを閉じる。シェアメニューのように
+ * 「まず自分が閉じたい」部品はここで先に食い止める。
+ * keydown は document の捕捉フェーズで受けており、後から登録したリスナでは
+ * 本体より先に処理できないので、本体側から順番に聞く形にしている。
+ * @returns {boolean} 食い止めたなら true (本体は反応してはいけない)
+ */
+export function consumeEscape() {
+	return sidebarPane?.consumeEscape() === true;
 }
 
 /**

@@ -6,6 +6,7 @@
  */
 import viewerCss from './viewer.css';
 import {
+	KEYS,
 	HOST_ELEMENT_ID,
 	FOCUSABLE_SELECTOR,
 	HIDDEN_SELECTOR,
@@ -16,7 +17,7 @@ import { getJson } from '../../pixiv/client.js';
 import { illustUrl } from '../../pixiv/endpoints.js';
 import { normalizeDetail } from '../../pixiv/normalize.js';
 import { readSession } from '../session.js';
-import { renderWork, disposeAll, movePage } from './panes.js';
+import { renderWork, disposeAll, movePage, consumeEscape } from './panes.js';
 import { createNavigation } from './navigation.js';
 
 /** ホストページのスクロールを止めるために body へ付ける style。 */
@@ -210,6 +211,23 @@ export function createViewer(deps) {
 	}
 
 	/**
+	 * キーボード操作。
+	 *
+	 * Escape はサイドバーの部品 (シェアメニュー) に先に使わせる。
+	 * 開いているメニューを閉じたつもりでモーダルごと閉じてしまうのを防ぐ。
+	 * @param {KeyboardEvent} event キー
+	 * @returns {void}
+	 */
+	function onKeyDown(event) {
+		if (event.key === KEYS.CLOSE && consumeEscape()) {
+			event.preventDefault();
+			event.stopPropagation();
+			return;
+		}
+		navigation.onKeyDown(event);
+	}
+
+	/**
 	 * 作品を開く (内部)。
 	 * @param {string} workId 作品 ID
 	 * @returns {Promise<void>}
@@ -228,7 +246,7 @@ export function createViewer(deps) {
 		if (!wasOpen) {
 			savedBodyStyle = doc.body.getAttribute('style') ?? '';
 			doc.body.setAttribute('style', `${savedBodyStyle};${BODY_LOCK_STYLE}`);
-			doc.addEventListener('keydown', navigation.onKeyDown, true);
+			doc.addEventListener('keydown', onKeyDown, true);
 			lockBackground();
 			// 開いた直後のキー操作がモーダルへ届くようにする
 			closeButton?.focus();
@@ -285,7 +303,7 @@ export function createViewer(deps) {
 			navigation.reset();
 			// 取得の途中で閉じたときに、応答が返ってから描き直さないようにする
 			requestToken += 1;
-			doc.removeEventListener('keydown', navigation.onKeyDown, true);
+			doc.removeEventListener('keydown', onKeyDown, true);
 			if (savedBodyStyle) doc.body.setAttribute('style', savedBodyStyle);
 			else doc.body.removeAttribute('style');
 			// 次に開くときへ持ち越さない。持ち越すと 2 回目に古い値を書き戻す

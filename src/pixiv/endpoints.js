@@ -110,6 +110,17 @@ export function commentRootsUrl(illustId, offset, limit) {
 }
 
 /**
+ * ルートコメントへの返信。
+ * offset/limit ではなく 1 始まりの page で送る (SITE_SPEC §4 実測)。
+ * @param {string} commentId ルートコメントの ID
+ * @param {number} page ページ番号。1 始まり
+ * @returns {string} URL
+ */
+export function commentRepliesUrl(commentId, page) {
+	return `${AJAX}/illusts/comments/replies?comment_id=${commentId}&page=${page}&${LANG}`;
+}
+
+/**
  * ユーザー情報。
  * @param {string} userId ユーザー ID
  * @returns {string} URL

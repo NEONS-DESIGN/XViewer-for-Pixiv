@@ -19,8 +19,7 @@
 import { createIcon } from '../../common/icons.js';
 import { formatCount } from './sidebar.js';
 import { readSession } from '../session.js';
-import { getJson } from '../../pixiv/client.js';
-import { userUrl } from '../../pixiv/endpoints.js';
+import { fetchUserProfile } from '../../pixiv/user.js';
 import { likeIllust, addBookmark, deleteBookmark, followUser, unfollowUser } from '../../pixiv/actions.js';
 
 /**
@@ -96,7 +95,8 @@ export function countLabel(label, count) {
  */
 export function createActionsBar(deps) {
 	const { doc, container, followContainer } = deps;
-	const fetchUser = deps.fetchUser ?? ((userId) => getJson(userUrl(userId)));
+	// サイドバー (作者アイコン) と同じ応答を使う。作品ごとに 2 本走らせない
+	const fetchUser = deps.fetchUser ?? ((userId) => fetchUserProfile(userId));
 	// 更新系はまとめて差し替えられるようにしておく。
 	// テストで本物の pixiv を叩かないためと、いいねが取り消せないため
 	const api = { likeIllust, addBookmark, deleteBookmark, followUser, unfollowUser, ...deps.actions };
