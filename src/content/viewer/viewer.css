@@ -59,16 +59,6 @@
 	--sidebar-width: 384px;
 	/* 操作部品の高さ。UI_DESIGN_KIT §3 に合わせる */
 	--control-height: 30px;
-	/* コメント 1 件分のおおよその高さ。本文 1 行のコメントの実測値
-	   (名前 19 + 本文 22 + 下段 22 + 上下の余白 16 + 罫線 1。アバター 32px より高い) 。
-	   コメント区画を潰してよい下限を決めるためだけに使う */
-	--comment-row-height: 88px;
-	/* 主文がどれだけ長くても、この件数分のコメントは残す */
-	--comment-min-rows: 3;
-	/* コメント区画のうち一覧以外が占める高さ。
-	   見出しの上余白 16 + 見出し 35 (上padding 12 + 行 22.4 + 罫線 1) + 見出しの下余白 8。
-	   .comments は content-box なので、下余白の 16px はここに含めない */
-	--comments-shell-height: 59px;
 
 	/* Shadow DOM はフォントを継承しない。ホストページの書体に引きずられないよう明示する */
 	font-family: system-ui, -apple-system, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
@@ -589,24 +579,17 @@
 /* コメント区画。見出しと「もっと見る」は動かさず、一覧だけを縦に伸ばしてスクロールさせる。
    縮んでよいのはここだけ。作品情報が長い作品ではここが圧縮される。
 
-   min-height を 0 にしないこと。0 だと主文がとても長い作品 (例: 149224712) で
-   この箱が高さ 0 まで潰れ、見出しと一覧が箱の外へはみ出す。はみ出した分は
-   サイドバーのスクロール範囲に入らないためコメントが読めなくなり、
-   下余白 16px も効かなくなる (中身が箱の下端より下に出るため)。
-   下限は「見出し + コメント --comment-min-rows 件分」。ここから先はサイドバーごとスクロールする */
+   **潰してよい下限 (min-height) は comments.js が実測して入れる。**
+   ここに固定値を書いてはいけない。欲しいのは「中身が少なければ中身の高さ、
+   多ければコメント 3 件分」だが、min-height は中身の高さを知らないので CSS では書けない。
+   固定値にすると、中身が短い作品では下に空きができ、短くしすぎると中身が切れる。
+   ここの 0 は comments.js が測るまでの初期値 (中身がまだ無いので潰れてよい) */
 .comments {
 	flex: 1 1 auto;
-	min-height: calc(var(--comment-row-height) * var(--comment-min-rows) + var(--comments-shell-height));
+	min-height: 0;
 	display: flex;
 	flex-direction: column;
 	padding: 0 16px 16px;
-}
-
-/* 一覧が無いとき (0 件 / コメントを受け付けていない / 読み込みに失敗) は
-   「まだコメントはありません」などの 1 行が入れば足りる。
-   3 件分を確保しても下に空白が伸びるだけになる */
-.comments:not(:has(.comment-scroll)) {
-	--comment-min-rows: 1;
 }
 
 .comments-heading {
@@ -621,12 +604,18 @@
    「もっと見る」も中に入れて、一番下まで読んだときだけ見えるようにする。
 
    padding-right は本文とスクロールバーの間の隙間。
-   スクロールバーは padding の外側 (境界寄り) に置かれるので、これで文字だけが内へ寄る */
+   スクロールバーは padding の外側 (境界寄り) に置かれるので、これで文字だけが内へ寄る。
+
+   scrollbar-gutter: stable は見た目のためだけではない。これが無いと
+   スクロールバーの出入りで一覧の幅が変わり、本文の折り返しが変わって高さが変わる。
+   comments.js は中身の高さを測って下限に入れるので、測る→幅が変わる→また測る、
+   の往復になりうる (docs/DECISIONS.md) */
 .comment-scroll {
 	flex: 0 1 auto;
 	min-height: 0;
 	padding-right: 5px;
 	overflow-y: auto;
+	scrollbar-gutter: stable;
 }
 
 /* スクロールバーは細く、つまみだけを見せる。
@@ -659,9 +648,17 @@
 	list-style: none;
 }
 
-/* 見出しと同じく動かさない */
+/* 見出しと同じく動かさない。
+   p の既定の上下 margin (1em) は落とす。上は見出しの下 8px、下は区画の 16px で足りるので、
+   残すと「まだコメントはありません」の下に余分な空きができる */
 .comments > .status {
 	flex: 0 0 auto;
+	margin: 0;
+}
+
+/* 読み込み失敗のときだけ一覧のすぐ下に出る。詰まって見えるので上だけ空ける */
+.comments > .status[data-kind='error'] {
+	margin-top: 8px;
 }
 
 .comment-item {

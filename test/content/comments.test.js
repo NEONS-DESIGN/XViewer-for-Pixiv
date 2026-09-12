@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeComment, renderCommentText, renderStamp, createComments } from '../../src/content/viewer/comments.js';
+import { normalizeComment, renderCommentText, renderStamp, createComments, commentsFloorHeight } from '../../src/content/viewer/comments.js';
 import { fakeElement, fakeDoc, find, findAll, iconName, flush } from '../helpers/dom.js';
 
 test('コメントを共通の形にする', () => {
@@ -291,4 +291,20 @@ test('読み込みに失敗したら再試行できるようにボタンを残�
 	assert.equal(find(container, '.comment-list').children.length, 1);
 	assert.equal(more.hidden, true);
 	assert.equal(more.textContent, 'もっと見る');
+});
+
+test('コメント区画の下限は「見出しなど + 3 件目の下端」', () => {
+	// 3 件目まで表示できる高さ。中身はそれより長いので、ここで止めて残りはスクロールさせる
+	assert.equal(commentsFloorHeight({ outside: 59, contentHeight: 772, nthBottom: 264 }), 323);
+});
+
+test('コメント区画の下限は中身の高さを超えない (余白を作らない)', () => {
+	// 1 件しか無いので 3 件目が無い。中身の高さがそのまま下限になる
+	assert.equal(commentsFloorHeight({ outside: 59, contentHeight: 88, nthBottom: null }), 147);
+	// 3 件あっても中身のほうが短いときは中身に合わせる
+	assert.equal(commentsFloorHeight({ outside: 59, contentHeight: 200, nthBottom: 264 }), 259);
+});
+
+test('一覧が無いとき (0 件・コメント不可・失敗) の下限は文言の高さだけ', () => {
+	assert.equal(commentsFloorHeight({ outside: 109, contentHeight: 0, nthBottom: null }), 109);
 });
