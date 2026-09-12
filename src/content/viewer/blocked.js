@@ -10,9 +10,7 @@
  * regular をぼかすと解除の余地が残るため、この方式を守ること。
  */
 import { canView } from '../../pixiv/normalize.js';
-
-/** pixiv の表示設定ページ。 */
-const VIEWING_SETTINGS_URL = 'https://www.pixiv.net/settings/viewing';
+import { VIEWING_SETTINGS_URL } from '../../pixiv/endpoints.js';
 
 /** ぼかしの強さ。48x48 の画像を引き伸ばす前提の値。 */
 const BLUR_PX = 32;
@@ -55,7 +53,8 @@ export function createBlocked(deps) {
 		 * @returns {void}
 		 */
 		render(detail, reason) {
-			container.querySelectorAll('.status, .frame, .blocked').forEach((node) => node.remove());
+			// 他のペインは自分の dispose() で片付ける。ここで消すのはビュワーの状態表示だけ
+			container.querySelectorAll('.status').forEach((node) => node.remove());
 
 			const blocked = doc.createElement('div');
 			blocked.className = 'blocked';

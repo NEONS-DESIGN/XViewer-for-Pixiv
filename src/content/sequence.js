@@ -8,6 +8,7 @@
  */
 import { userProfileAllUrl } from '../pixiv/endpoints.js';
 import { getJson } from '../pixiv/client.js';
+import { WORK_CATEGORY } from '../common/constants.js';
 
 /**
  * @typedef {object} Sequence
@@ -56,19 +57,21 @@ export function sortIdsDesc(ids) {
  * profile/all の全作品 ID で並びを作り直す。
  * グリッドの端を越えて作品間を移動するために使う。
  * タグ絞り込み中は並びが一致しないので呼び出し側で使わないこと。
+ *
+ * イラストタブ・漫画タブではその種別だけに絞る。両方を混ぜると、
+ * 画面のグリッドに無い種別の作品へ飛んでしまう。
  * @param {Sequence} fallback 取得に失敗したときに返す並び
  * @param {string} userId ユーザー ID
+ * @param {string|null} [category] 絞り込む種別 (WORK_CATEGORY)。null なら両方
  * @param {{getJsonImpl?: Function}} [deps] テスト用の依存
  * @returns {Promise<Sequence>} 全作品の並び。失敗したら fallback
  */
-export async function extendWithAllWorks(fallback, userId, deps = {}) {
+export async function extendWithAllWorks(fallback, userId, category = null, deps = {}) {
 	const get = deps.getJsonImpl ?? getJson;
 	try {
 		const body = await get(userProfileAllUrl(userId));
-		const ids = [
-			...Object.keys(body?.illusts ?? {}),
-			...Object.keys(body?.manga ?? {}),
-		];
+		const categories = category ? [category] : Object.values(WORK_CATEGORY);
+		const ids = categories.flatMap((key) => Object.keys(body?.[key] ?? {}));
 		if (ids.length === 0) return fallback;
 		return createDomSequence(sortIdsDesc(ids));
 	} catch {

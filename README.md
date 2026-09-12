@@ -6,10 +6,10 @@
 
 **pixiv のユーザーページに、X.com のメディア閲覧に近い画像ビュワーを追加する Chrome 拡張機能**
 
-[![version](https://img.shields.io/github/package-json/v/NEONS-DESIGN/gridviewer_for_pixiv?color=4ea3d6)](package.json)
-[![license](https://img.shields.io/github/license/NEONS-DESIGN/gridviewer_for_pixiv?color=4ea3d6)](LICENSE)
+[![version](https://img.shields.io/github/package-json/v/NEONS-DESIGN/GridViewer-for-Pixiv?color=4ea3d6)](package.json)
+[![license](https://img.shields.io/github/license/NEONS-DESIGN/GridViewer-for-Pixiv?color=4ea3d6)](LICENSE)
 ![manifest](https://img.shields.io/badge/manifest-v3-4ea3d6)
-![tests](https://img.shields.io/badge/tests-340%20passing-4ea3d6)
+![tests](https://img.shields.io/badge/tests-375%20passing-4ea3d6)
 
 </div>
 
@@ -41,25 +41,26 @@ pixiv のユーザーページで作品をクリックすると、**ページ遷
 | --- | --- |
 | **モーダルで開く** | グリッドのクリックを奪い、ページ遷移せずに表示する。URL は `/artworks/{id}` へ差し替わるので、リロードや共有もできる |
 | **複数枚の切り替え** | `←` `→` と画面端の矢印でページ送り。前後の画像を先読みするので切り替えが速い |
-| **作品の移動** | `↑` `↓` でグリッドの前後の作品へ。端まで来たら自動で次のページ分を読み足す |
+| **作品の移動** | `↑` `↓` でグリッドの前後の作品へ。端まで来たら自動で次のページ分を読み足す。イラスト / 漫画タブではその種別の作品だけをたどる |
 | **うごイラ** | zip を展開してフレームを組み立て、再生・一時停止に対応 |
 | **サイドバー** | 投稿文・タグ・投稿日・いいね/ブックマーク/閲覧数、作者のアイコンとフォローボタン |
-| **コメント** | スタンプと絵文字を画像で描画。返信の展開、続きの読み込みに対応 |
-| **アクション** | いいね、ブックマーク、フォロー、シェア (X / Facebook / Pawoo / リンクのコピー) |
+| **コメント** | スタンプと絵文字を画像で描画。返信の展開、続きの読み込みに対応。読み込みに失敗しても「再試行」から続きを読める |
+| **アクション** | いいね、ブックマーク、フォロー、シェア (X / Facebook / Pawoo / リンクのコピー)。別タブで済ませたいいねは二重に数えず、ログインが切れていればその旨を知らせる |
 | **テーマ** | ビュワーは pixiv 本体のダーク/ライト設定に追従。設定画面は自分で切り替えられる |
+| **設定の即時反映** | 画質・先読み・サイドバーの設定を変えると、開いている作品にもその場で反映される |
 | **アクセシビリティ** | フォーカストラップ、`role="dialog"`、グリッドの Tab 順の整理 |
 
 ## 対応ブラウザ
 
-Chromium 系 (Chrome / Brave / Edge など) の Manifest V3 に対応したブラウザ。Chrome 120 以上を想定しています。
+Chromium 系ブラウザ (Manifest V3 に対応した Chrome / Brave / Edge など)。Firefox / Safari には対応していません。
 
 ## インストール
 
 現在ストアでは配布していません。ビルドして読み込んでください。
 
 ```bash
-git clone https://github.com/NEONS-DESIGN/gridviewer_for_pixiv.git
-cd gridviewer_for_pixiv
+git clone https://github.com/NEONS-DESIGN/GridViewer-for-Pixiv.git
+cd GridViewer-for-Pixiv
 npm install
 npm run build
 ```
@@ -93,9 +94,9 @@ pixiv の**ユーザーページ** (`https://www.pixiv.net/users/{id}` 系) を�
 | ビュワーを使う | オン | オフにすると pixiv 標準の動作に戻る |
 | 画像の解像度 | 標準 (長辺 1200px) | 原寸を選ぶと鮮明になるが読み込みは重くなる |
 | 先読み | 前後 3 枚 | 次のページを先に読み込んでおく枚数 |
-| サイドバー | オン | 投稿文・コメント・アクションの表示 |
-| 余白のクリックで閉じる | オン | 画像の外側をクリックしたときに閉じるか |
-| グリッドの Tab 送り | 画像とタイトル | グリッドで Tab を押したときに何をフォーカス順から外すか |
+| サイドバーを表示する | オン | 投稿文・コメント・アクションの表示 |
+| 背景クリックで閉じる | オン | 画像の外側をクリックしたときに閉じるか |
+| グリッドの Tab 移動 | ブックマークとタイトルを飛ばす | グリッドで Tab を押したときに何をフォーカス順から外すか |
 
 設定画面の配色は、右上のアイコンからダーク / ライトを切り替えられます。初期状態は OS の設定に従い、
 一度切り替えると以後はその配色で固定されます (「設定を初期化」で OS 追従に戻ります)。

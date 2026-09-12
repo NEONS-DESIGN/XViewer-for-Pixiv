@@ -1,23 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseNextData } from '../../src/pixiv/session.js';
-
-/**
- * __NEXT_DATA__ の中身を組み立てる。
- * @param {object} options
- * @returns {string}
- */
-function buildNextData({ isLoggedIn = true, self = null, token = 'TOKEN' } = {}) {
-	const preloaded = { api: { token }, userData: self ? { self } : {} };
-	return JSON.stringify({
-		props: {
-			pageProps: {
-				isLoggedIn,
-				serverSerializedPreloadedState: JSON.stringify(preloaded),
-			},
-		},
-	});
-}
+import { buildNextData } from '../helpers/pixiv.js';
 
 test('ログイン中のセッションを読む', () => {
 	const text = buildNextData({ isLoggedIn: true, self: { xRestrict: 2, hideAiWorks: true }, token: 'abc' });

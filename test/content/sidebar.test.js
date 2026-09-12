@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { formatCount, formatDate, splitComment, createSidebar } from '../../src/content/viewer/sidebar.js';
-import { ICON_SHAPES } from '../../src/common/icon-shapes.js';
+import { fakeElement, fakeDoc, iconName, flush } from '../helpers/dom.js';
 
 test('formatCount は 3 桁区切りにする', () => {
 	assert.equal(formatCount(2740), '2,740');
@@ -77,62 +77,6 @@ test('splitComment は空文字で空配列を返す', () => {
 	assert.deepEqual(splitComment(''), []);
 	assert.deepEqual(splitComment(null), []);
 });
-
-/**
- * class 名と親子関係だけを持つ最小の要素の代わり。
- * ここで確かめたいのは「どの順で何を積んだか」だけなので、これで足りる。
- * @param {string} tag タグ名
- * @returns {object} 要素の代わり
- */
-function fakeElement(tag) {
-	let text = '';
-	const element = {
-		tag,
-		children: [],
-		className: '',
-		attributes: {},
-		innerHTML: '',
-		style: {},
-		src: '',
-		href: '',
-		type: '',
-		title: '',
-		hidden: false,
-		focus() {},
-		appendChild(child) { element.children.push(child); return child; },
-		append(...nodes) { for (const node of nodes) element.appendChild(node); },
-		setAttribute(name, value) { element.attributes[name] = String(value); },
-		getAttribute(name) { return element.attributes[name] ?? null; },
-		removeAttribute(name) { delete element.attributes[name]; },
-		listeners: {},
-		addEventListener(type, handler) { element.listeners[type] = handler; },
-		removeEventListener() {},
-	};
-	Object.defineProperty(element, 'textContent', {
-		get() { return text; },
-		set(value) { text = value; element.children = []; },
-	});
-	return element;
-}
-
-/**
- * document の代わり。要素を作る役だけを持つ。
- * @returns {object} doc の代わり
- */
-function fakeDoc() {
-	return {
-		addEventListener() {},
-		removeEventListener() {},
-		createElement: (tag) => fakeElement(tag),
-		createElementNS: (_ns, tag) => fakeElement(tag),
-		createDocumentFragment: () => fakeElement('#fragment'),
-		createTextNode: (value) => {
-			const node = fakeElement('#text');
-			node.textContent = value;
-			return node;
-		},
-	};
-}
 
 /** サイドバーへ渡す作品詳細の代わり。 */
 const DETAIL = Object.freeze({
@@ -211,8 +155,7 @@ test('作者のアイコンは /ajax/user の image を CDN の関門に通し�
 	const image = 'https://i.pximg.net/user-profile/img/2020/01/01/00/00/00/1_170.jpg';
 	const { container, sidebar } = build({ fetchUser: async () => ({ image }) });
 	sidebar.render(DETAIL);
-	await Promise.resolve();
-	await Promise.resolve();
+	await flush();
 	assert.equal(avatarOf(container).src, image);
 	assert.equal(avatarOf(container).attributes.alt, '');
 });
@@ -221,8 +164,7 @@ test('CDN 以外を指すアイコンは読み込まず枠だけ残す', async (
 	// 応答の値をそのまま外部オリジンへのリクエストにしない
 	const { container, sidebar } = build({ fetchUser: async () => ({ image: 'https://example.com/a.png' }) });
 	sidebar.render(DETAIL);
-	await Promise.resolve();
-	await Promise.resolve();
+	await flush();
 	assert.equal(avatarOf(container).src, '');
 	assert.equal(avatarOf(container).style.visibility, 'hidden');
 });
@@ -236,16 +178,14 @@ test('取得を待っている間に描き直したら、前の作者のアイ�
 	sidebar.render(DETAIL);
 	sidebar.render({ ...DETAIL, userId: '999', userName: '別の作者' });
 	resolveFirst({ image: 'https://i.pximg.net/user-profile/img/x_170.jpg' });
-	await Promise.resolve();
-	await Promise.resolve();
+	await flush();
 	assert.equal(avatarOf(container).src, '');
 });
 
 test('取得に失敗してもサイドバーは壊れない', async () => {
 	const { container, sidebar } = build({ fetchUser: async () => { throw new Error('落ちた'); } });
 	sidebar.render(DETAIL);
-	await Promise.resolve();
-	await Promise.resolve();
+	await flush();
 	assert.equal(avatarOf(container).style.visibility, 'hidden');
 });
 
@@ -267,20 +207,10 @@ test('consumeEscape はシェアメニューが開いているときだけ食い
 	sidebar.render(DETAIL);
 	assert.equal(sidebar.consumeEscape(), false);
 	const row = container.children[0].children.find((child) => child.className === 'link-row');
-	row.children[1].children[0].listeners.click();
+	row.children[1].children[0].click();
 	assert.equal(sidebar.consumeEscape(), true);
 	assert.equal(sidebar.consumeEscape(), false);
 });
-
-/**
- * createIcon が描いた svg から図形の名前を割り出す。
- * 偽の要素は innerHTML を覚えるだけなので、図形データと突き合わせて名前へ戻す。
- * @param {object} icon svg の代わり
- * @returns {string|undefined} ICON_SHAPES のキー
- */
-function iconName(icon) {
-	return Object.keys(ICON_SHAPES).find((name) => ICON_SHAPES[name].markup === icon.innerHTML);
-}
 
 test('カウンタはいいねを顔、ブックマークをハートで示す', () => {
 	// pixiv 本体と同じ対応にする。逆にすると意味が入れ替わって見える

@@ -9,7 +9,10 @@ import {
 	clearFollowCache,
 } from '../../src/content/viewer/actions-bar.js';
 import { clearSessionCache } from '../../src/content/session.js';
-import { ICON_SHAPES } from '../../src/common/icon-shapes.js';
+import { PixivError, PIXIV_ERROR_KINDS } from '../../src/pixiv/errors.js';
+import { find } from '../helpers/dom.js';
+import { fakeElement, fakeDoc as fakeDocWith, iconName, flush as settle } from '../helpers/dom.js';
+import { buildNextData } from '../helpers/pixiv.js';
 
 test('ブックマークのラベルは状態で変わる', () => {
 	assert.equal(bookmarkLabel(null), 'ブックマークに追加');
@@ -34,77 +37,13 @@ test('押せるカウンタの文言は操作の説明と件数を両方持つ',
 });
 
 /**
- * classList と replaceChild まで持つ要素の代わり。
- * アクションバーはカウンタをボタンへ差し替え、後から中身も書き換えるので、そこまで再現する。
- * @param {string} tag タグ名
- * @returns {object} 要素の代わり
- */
-function fakeElement(tag) {
-	let text = '';
-	const classes = new Set();
-	const element = {
-		tag,
-		children: [],
-		attributes: {},
-		innerHTML: '',
-		disabled: false,
-		title: '',
-		className: '',
-		classList: {
-			add: (name) => classes.add(name),
-			remove: (name) => classes.delete(name),
-			toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)),
-			contains: (name) => classes.has(name),
-		},
-		listeners: {},
-		appendChild(child) { element.children.push(child); return child; },
-		append(...nodes) { for (const node of nodes) element.appendChild(node); },
-		replaceChild(next, previous) {
-			const at = element.children.indexOf(previous);
-			if (at >= 0) element.children[at] = next;
-			return previous;
-		},
-		setAttribute(name, value) { element.attributes[name] = value; },
-		getAttribute(name) { return element.attributes[name] ?? null; },
-		removeAttribute(name) { delete element.attributes[name]; },
-		addEventListener(type, handler) { element.listeners[type] = handler; },
-		querySelector(selector) {
-			const wanted = selector.replace(/^\./, '');
-			return element.children.find((child) => (
-				selector.startsWith('.')
-					? String(child.className).split(/\s+/).includes(wanted)
-					: child.tag === wanted
-			)) ?? null;
-		},
-	};
-	Object.defineProperty(element, 'textContent', {
-		get() { return text; },
-		set(value) { text = value; element.children = []; },
-	});
-	return element;
-}
-
-/**
  * ログイン済みの __NEXT_DATA__ を返す document の代わり。
  * @returns {object} doc の代わり
  */
 function fakeDoc() {
-	const nextData = JSON.stringify({
-		props: {
-			pageProps: {
-				isLoggedIn: true,
-				serverSerializedPreloadedState: JSON.stringify({
-					api: { token: 'csrf-token' },
-					userData: { self: { xRestrict: 1, hideAiWorks: false } },
-				}),
-			},
-		},
+	return fakeDocWith({
+		nextData: buildNextData({ token: 'csrf-token', self: { xRestrict: 1, hideAiWorks: false } }),
 	});
-	return {
-		getElementById: () => ({ textContent: nextData }),
-		createElement: (tag) => fakeElement(tag),
-		createElementNS: (_ns, tag) => fakeElement(tag),
-	};
 }
 
 /** アクションバーへ渡す作品詳細の代わり。 */
@@ -116,15 +55,6 @@ const DETAIL = Object.freeze({
 	likeCount: 2299,
 	bookmarkCount: 2740,
 });
-
-/**
- * createIcon が描いた svg から図形の名前を割り出す。
- * @param {object} icon svg の代わり
- * @returns {string|undefined} ICON_SHAPES のキー
- */
-function iconName(icon) {
-	return Object.keys(ICON_SHAPES).find((name) => ICON_SHAPES[name].markup === icon.innerHTML);
-}
 
 /**
  * サイドバーが描いた後のカウンタの行を作る。
@@ -166,14 +96,6 @@ function setup(overrides = {}) {
 	};
 }
 
-/**
- * マイクロタスクを 1 巡させる。
- * @returns {Promise<void>}
- */
-function settle() {
-	return new Promise((resolve) => setTimeout(resolve, 0));
-}
-
 test('いいねとブックマークのカウンタを押せるボタンへ差し替える', () => {
 	// X.com と同じで、数字そのものが押す対象になる
 	const { container, bar, like, bookmark } = setup();
@@ -207,7 +129,7 @@ test('押せるカウンタは差し替えた時点の件数を出す', () => {
 test('いいねすると件数が 1 増え、押せなくなる', async () => {
 	const { bar, like } = setup({ actions: { likeIllust: async () => {} } });
 	bar.render(DETAIL);
-	await like().listeners.click({});
+	await like().dispatch('click');
 	assert.equal(like().children[1].textContent, '2,300');
 	assert.equal(like().title, 'いいね済み 2,300 件');
 	assert.equal(like().classList.contains('is-on'), true);
@@ -219,7 +141,7 @@ test('いいねすると件数が 1 増え、押せなくなる', async () => {
 test('いいねに失敗したら件数を動かさない', async () => {
 	const { bar, like } = setup({ actions: { likeIllust: async () => { throw new Error('400'); } } });
 	bar.render(DETAIL);
-	await like().listeners.click({});
+	await like().dispatch('click');
 	assert.equal(like().children[1].textContent, '2,299');
 	assert.equal(like().disabled, false);
 	assert.equal(like().classList.contains('is-on'), false);
@@ -232,12 +154,12 @@ test('ブックマークの追加と削除で件数が増減する', async () =>
 	});
 	bar.render(DETAIL);
 
-	await bookmark().listeners.click({ shiftKey: false });
+	await bookmark().dispatch('click', { shiftKey: false });
 	assert.equal(bookmark().children[1].textContent, '2,741');
 	assert.equal(bookmark().title, 'ブックマークから削除 2,741 件');
 	assert.equal(bookmark().classList.contains('is-on'), true);
 
-	await bookmark().listeners.click({ shiftKey: false });
+	await bookmark().dispatch('click', { shiftKey: false });
 	assert.equal(bookmark().children[1].textContent, '2,740');
 	assert.equal(bookmark().title, 'ブックマークに追加 2,740 件');
 	assert.equal(bookmark().classList.contains('is-on'), false);
@@ -248,7 +170,7 @@ test('ブックマーク削除で件数は負の数にならない', async () =>
 	// pixiv 側の集計とずれていても画面を壊さない
 	const { bar, bookmark } = setup({ actions: { deleteBookmark: async () => {} } });
 	bar.render({ ...DETAIL, bookmarkId: '38764402172', bookmarkCount: 0 });
-	await bookmark().listeners.click({ shiftKey: false });
+	await bookmark().dispatch('click', { shiftKey: false });
 	assert.equal(bookmark().children[1].textContent, '0');
 	bar.dispose();
 });
@@ -259,7 +181,8 @@ test('未ログインならカウンタを差し替えず案内だけ出す', ()
 	clearSessionCache();
 	const container = fakeCounts();
 	const bar = createActionsBar({
-		doc: { getElementById: () => null, createElement: (tag) => fakeElement(tag), createElementNS: (_n, tag) => fakeElement(tag) },
+		// nextData を渡さない = __NEXT_DATA__ が無い = 未ログイン
+		doc: fakeDocWith(),
 		container,
 		followContainer: fakeElement('div'),
 	});
@@ -329,5 +252,27 @@ test('フォロー状態を取れなくてもボタンは押せる状態に戻�
 	const button = followContainer.children[0];
 	assert.equal(button.disabled, false);
 	assert.equal(button.title, 'フォロー');
+	bar.dispose();
+});
+
+test('既にいいね済みだったと返ってきたら件数を増やさない', async () => {
+	// 別タブや pixiv 本体で先に押していた場合。pixiv 側の件数は増えないので手元も増やさない
+	const { bar, like } = setup({ actions: { likeIllust: async () => true } });
+	bar.render(DETAIL);
+	await like().dispatch('click');
+	assert.equal(like().children[1].textContent, '2,299');
+	assert.equal(like().title, 'いいね済み 2,299 件');
+	assert.equal(like().disabled, true);
+	bar.dispose();
+});
+
+test('ログインが切れていたら (401) セッションを読み直させる文言にする', async () => {
+	const unauthorized = new PixivError(PIXIV_ERROR_KINDS.UNAUTHORIZED, '401', 401);
+	const { bar, like, container } = setup({ actions: { likeIllust: async () => { throw unauthorized; } } });
+	bar.render(DETAIL);
+	await like().dispatch('click');
+	const status = find(container, '.action-status');
+	assert.match(status.textContent, /ログイン/);
+	assert.equal(status.getAttribute('data-kind'), 'error');
 	bar.dispose();
 });

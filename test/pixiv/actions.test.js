@@ -1,20 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { likeIllust, addBookmark, deleteBookmark, followUser, unfollowUser } from '../../src/pixiv/actions.js';
-
-/**
- * fetch の偽物。呼ばれた内容を記録する。
- * @param {unknown} body 応答の body
- * @returns {{impl: Function, calls: Array<{url: string, init: object}>}}
- */
-function fakeFetch(body) {
-	const calls = [];
-	const impl = async (url, init) => {
-		calls.push({ url, init });
-		return { ok: true, status: 200, json: async () => ({ error: false, message: '', body }) };
-	};
-	return { impl, calls };
-}
+import { fakeApiFetch as fakeFetch } from '../helpers/pixiv.js';
 
 test('likeIllust は JSON を POST し、送信前のいいね状態を返す', async () => {
 	const { impl, calls } = fakeFetch({ is_liked: false });
@@ -74,4 +61,18 @@ test('unfollowUser は rpc_group_setting.php へ送る (追加と別のエンド
 	assert.equal(params.get('mode'), 'del');
 	assert.equal(params.get('type'), 'bookuser');
 	assert.equal(params.get('id'), '934903');
+});
+
+test('addBookmark は応答に ID が無ければ失敗として投げる', async () => {
+	// ID 無しで成功扱いにすると、画面はブックマーク済みなのに削除へ進めない状態になる
+	const { impl } = fakeFetch({ stacc_status_id: '1' });
+	await assert.rejects(addBookmark('1', false, 'T', { fetchImpl: impl }), (error) => {
+		assert.equal(error.name, 'PixivError');
+		return true;
+	});
+});
+
+test('addBookmark は数値の ID を文字列にして返す', async () => {
+	const { impl } = fakeFetch({ last_bookmark_id: 38764433361 });
+	assert.equal(await addBookmark('1', false, 'T', { fetchImpl: impl }), '38764433361');
 });

@@ -1,28 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { getJson, postJson, postForm } from '../../src/pixiv/client.js';
-
-/**
- * fetch の偽物を作る。
- * @param {{status?: number, json?: unknown, throws?: boolean}} options
- * @returns {{impl: Function, calls: Array<{url: string, init: object}>}}
- */
-function fakeFetch(options) {
-	const calls = [];
-	const impl = async (url, init) => {
-		calls.push({ url, init });
-		if (options.throws) throw new TypeError('Failed to fetch');
-		return {
-			ok: (options.status ?? 200) < 400,
-			status: options.status ?? 200,
-			json: async () => {
-				if (options.json === undefined) throw new SyntaxError('Unexpected token');
-				return options.json;
-			},
-		};
-	};
-	return { impl, calls };
-}
+import { fakeFetch } from '../helpers/pixiv.js';
 
 test('getJson は body を取り出して返す', async () => {
 	const { impl } = fakeFetch({ json: { error: false, message: '', body: { id: '1' } } });

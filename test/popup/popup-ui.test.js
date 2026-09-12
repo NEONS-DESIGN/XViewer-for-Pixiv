@@ -1,74 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderPopup, resolveTheme } from '../../src/popup/popup-ui.js';
-import { ICON_SHAPES } from '../../src/common/icon-shapes.js';
 import { SETTINGS_DEFAULTS, POPUP_THEMES } from '../../src/common/constants.js';
 import { PROJECT_LICENSE, THIRD_PARTY } from '../../src/common/licenses.js';
+import { fakeElement, fakeDoc as fakeDocWith, iconName } from '../helpers/dom.js';
 
 /**
- * リスナと dataset を覚える要素の代わり。
- * jsdom を入れずに済ませるため、popup が使う口だけを備える。
- * @param {string} tag タグ名
- * @returns {object} 要素の代わり
- */
-function fakeElement(tag) {
-	let text = '';
-	const element = {
-		tag,
-		children: [],
-		parent: null,
-		attributes: {},
-		dataset: {},
-		innerHTML: '',
-		className: '',
-		type: '',
-		value: '',
-		checked: false,
-		title: '',
-		hidden: false,
-		focused: false,
-		listeners: {},
-		appendChild(child) { child.parent = element; element.children.push(child); return child; },
-		append(...nodes) { for (const node of nodes) element.appendChild(node); },
-		replaceChildren(...nodes) {
-			element.children = [];
-			text = '';
-			element.append(...nodes);
-		},
-		setAttribute(name, value) { element.attributes[name] = String(value); },
-		getAttribute(name) { return element.attributes[name] ?? null; },
-		removeAttribute(name) { delete element.attributes[name]; },
-		addEventListener(type, handler) { (element.listeners[type] ??= []).push(handler); },
-		focus() { element.focused = true; },
-		dispatch(type, event = {}) {
-			for (const handler of [...(element.listeners[type] ?? [])]) handler(event);
-		},
-	};
-	Object.defineProperty(element, 'textContent', {
-		get() {
-			if (element.children.length === 0) return text;
-			return element.children.map((child) => child.textContent).join('');
-		},
-		set(value) { text = value; element.children = []; },
-	});
-	return element;
-}
-
-/**
- * document の代わり。
+ * popup 用の document の代わり。共通の偽物に、テーマ判定が見る窓 (defaultView) を足す。
  * @param {{rich?: boolean, prefersLight?: boolean}} [options] 環境の指定
  * @returns {object} doc の代わり
  */
 function fakeDoc(options = {}) {
-	const doc = fakeElement('#document');
-	doc.createElement = (tag) => fakeElement(tag);
-	doc.createElementNS = (_ns, tag) => fakeElement(tag);
-	doc.createTextNode = (value) => {
-		const node = fakeElement('#text');
-		node.textContent = value;
-		return node;
-	};
-	doc.createDocumentFragment = () => fakeElement('#fragment');
+	const doc = fakeDocWith();
 	doc.documentElement = fakeElement('html');
 	doc.defaultView = {
 		CSS: { supports: () => options.rich === true },
@@ -102,15 +45,6 @@ function collect(node, tag) {
 	const found = node.tag === tag ? [node] : [];
 	for (const child of node.children ?? []) found.push(...collect(child, tag));
 	return found;
-}
-
-/**
- * createIcon が描いた svg から図形の名前を割り出す。
- * @param {object} icon svg の代わり
- * @returns {string|undefined} ICON_SHAPES のキー
- */
-function iconName(icon) {
-	return Object.keys(ICON_SHAPES).find((name) => ICON_SHAPES[name].markup === icon.innerHTML);
 }
 
 /**
@@ -374,7 +308,7 @@ test('タブは aria-controls で自分のパネルを指す', () => {
 });
 
 test('Tab キーで止まるのは選択中のタブだけ', () => {
-	// roving tabindex。3 つ並んだタブを順に踏まずにパネル本体へ入れるようにする
+	// roving tabindex。並んだタブを順に踏まずにパネル本体へ入れるようにする
 	const { root } = build();
 	assert.equal(find(root, 'tab-settings').getAttribute('tabindex'), '0');
 	assert.equal(find(root, 'tab-license').getAttribute('tabindex'), '-1');

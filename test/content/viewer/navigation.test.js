@@ -90,7 +90,7 @@ test('端では並びを広げてもう一度探す', async () => {
 	assert.deepEqual(deps.opened, ['3']);
 });
 
-test('広げるのに失敗しても投げず、端で止まる', async () => {
+test('広げるのに失敗しても投げず、端で止まる', async (t) => {
 	const deps = fakeDeps({
 		canExtendSequence: () => true,
 		extendSequence: async () => { throw new Error('取得に失敗'); },
@@ -99,17 +99,11 @@ test('広げるのに失敗しても投げず、端で止まる', async () => {
 	nav.setSequence(fakeSequence(['1', '2']));
 	nav.setCurrentWorkId('2');
 
-	// 失敗は警告に留める。ついでにテストの出力を汚さないよう差し替える
-	const original = console.warn;
-	let warned = 0;
-	console.warn = () => { warned += 1; };
-	try {
-		// catch が無いと unhandled rejection になる
-		await nav.moveWork(1);
-	} finally {
-		console.warn = original;
-	}
-	assert.equal(warned, 1);
+	// 失敗は警告に留める。テストの出力を汚さないよう差し替える (テストの終わりに自動で戻る)
+	const warn = t.mock.method(console, 'warn', () => {});
+	// catch が無いと unhandled rejection になる
+	await nav.moveWork(1);
+	assert.equal(warn.mock.callCount(), 1);
 	assert.deepEqual(deps.opened, []);
 });
 

@@ -72,15 +72,18 @@ export function planPanes(detail, session, settings) {
  * @property {HTMLElement} stage 主役の描画先 (.stage)
  * @property {HTMLElement} sidebar サイドバーの描画先 (.sidebar)
  * @property {(message: string) => void} onError 再生できない等を伝える
- * @property {() => boolean} [isStale] この描画がもう古いか。省略時は常に false
  * @property {(userId: string) => Promise<object>} [fetchUser] 作者情報の取得。テストから通信させないために使う
  */
 
 /**
  * 判断に従ってペインを組み立てる。
  * 呼ぶ前に disposeAll() を済ませておくこと (取得を待つ前に解体するのが決まり)。
- * 主役の描画は await するので、その間に別の作品へ移ることがある。
- * targets.isStale で世代を確かめ、古くなっていたら残りを作らない。
+ *
+ * サイドバーの中身 (本文・コメント・アクション) は主役の取得を待たずに先に作る。
+ * うごイラの zip や /pages の往復を待ってからでは、コメントとボタンが数秒出ない。
+ * await をまたがずに全ペインを作り終えるので、別の作品へ移ったあとに
+ * 古い作品のコメントやいいねを新しいサイドバーへ差し込む事故も起きない
+ * (いいねは取り消せないので、対象を間違えると実害が出る)。
  * @param {object} detail 正規化した作品詳細
  * @param {{isLoggedIn: boolean, self: object|null}} session セッション
  * @param {object} settings 設定
@@ -89,8 +92,6 @@ export function planPanes(detail, session, settings) {
  */
 export async function renderWork(detail, session, settings, targets) {
 	const { doc, stage, sidebar, onError } = targets;
-	// 渡されなければ「古くなっていない」とみなす
-	const isStale = targets.isStale ?? (() => false);
 	const plan = planPanes(detail, session, settings);
 
 	// hidden は毎回明示的に設定する。片方でしか触らないと、
@@ -102,27 +103,6 @@ export async function renderWork(detail, session, settings, targets) {
 		sidebarPane = createSidebar({ doc, container: sidebar, fetchUser: targets.fetchUser });
 		sidebarPane.render(detail);
 	}
-
-	if (plan.main === MAIN_PANE.BLOCKED) {
-		blockedPane = createBlocked({ doc, container: stage });
-		blockedPane.render(detail, plan.reason);
-		return;
-	}
-
-	if (plan.main === MAIN_PANE.UGOIRA) {
-		ugoiraPane = createUgoiraPlayer({ doc, container: stage, settings, onError });
-		await ugoiraPane.render(detail);
-	} else {
-		imagePane = createImagePane({ doc, container: stage, settings });
-		await imagePane.render(detail);
-	}
-
-	// 主役を待っている間に別の作品へ移っていたら、ここで降りる。
-	// ペインの参照はモジュール変数なので、続けると新しい作品のサイドバーへ
-	// 古い作品のコメントとアクションを差し込むことになる。
-	// いいねは取り消せないので、対象を間違えると実害が出る (CLAUDE.md 制約 7)。
-	// 資源は漏れない。新しい openWork の disposeAll() が古いペインを既に捨てている
-	if (isStale()) return;
 
 	if (plan.comments && sidebarPane) {
 		commentsPane = createComments({ doc, container: sidebarPane.commentsSlot() });
@@ -137,6 +117,20 @@ export async function renderWork(detail, session, settings, targets) {
 			followContainer: sidebarPane.followSlot(),
 		});
 		actionsPane.render(detail);
+	}
+
+	if (plan.main === MAIN_PANE.BLOCKED) {
+		blockedPane = createBlocked({ doc, container: stage });
+		blockedPane.render(detail, plan.reason);
+		return;
+	}
+
+	if (plan.main === MAIN_PANE.UGOIRA) {
+		ugoiraPane = createUgoiraPlayer({ doc, container: stage, settings, onError });
+		await ugoiraPane.render(detail);
+	} else {
+		imagePane = createImagePane({ doc, container: stage, settings });
+		await imagePane.render(detail);
 	}
 }
 

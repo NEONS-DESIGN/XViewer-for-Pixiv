@@ -40,19 +40,22 @@ function fakeCard(children) {
 }
 
 /**
- * 実測どおりの並び (サムネ → ブックマーク → タイトル) のカードを作る。
- * @param {string} id 作品 ID
+ * 作品カードの代わりを 1 枚作る。実測どおり「サムネ → ブックマーク → タイトル」の並び。
+ * 中の要素は closest('li') で自分のカードへ戻れる (attachTabSkip がカードを引くため)。
+ * @param {string} [id] 作品 ID
  * @returns {{card: object, thumb: object, button: object, title: object}}
  */
-function sampleCard(id = '1') {
+function makeCard(id = '1') {
 	const thumb = fakeEl('A', { href: `/artworks/${id}` });
 	const button = fakeEl('BUTTON', { type: 'button' });
 	const title = fakeEl('A', { href: `/artworks/${id}` }, `作品${id}`);
-	return { card: fakeCard([thumb, button, title]), thumb, button, title };
+	const card = fakeCard([thumb, button, title]);
+	for (const el of [thumb, button, title]) el.closest = (selector) => (selector === 'li' ? card : null);
+	return { card, thumb, button, title };
 }
 
 test('both はタイトルリンクとブックマークボタンを外す', () => {
-	const { card, thumb, button, title } = sampleCard();
+	const { card, thumb, button, title } = makeCard();
 	const targets = planSkipTargets(card, GRID_TAB_SKIP.BOTH);
 	assert.equal(targets.includes(title), true, 'タイトルリンクが対象に入っていない');
 	assert.equal(targets.includes(button), true, 'ブックマークボタンが対象に入っていない');
@@ -60,7 +63,7 @@ test('both はタイトルリンクとブックマークボタンを外す', () 
 });
 
 test('title はタイトルリンクだけを外す', () => {
-	const { card, thumb, button, title } = sampleCard();
+	const { card, thumb, button, title } = makeCard();
 	const targets = planSkipTargets(card, GRID_TAB_SKIP.TITLE);
 	assert.deepEqual(targets, [title]);
 	assert.equal(targets.includes(button), false);
@@ -68,12 +71,12 @@ test('title はタイトルリンクだけを外す', () => {
 });
 
 test('none は何も外さない', () => {
-	const { card } = sampleCard();
+	const { card } = makeCard();
 	assert.deepEqual(planSkipTargets(card, GRID_TAB_SKIP.NONE), []);
 });
 
 test('知らない指定は何も外さない', () => {
-	const { card } = sampleCard();
+	const { card } = makeCard();
 	assert.deepEqual(planSkipTargets(card, 'よくわからない'), []);
 });
 
@@ -84,20 +87,6 @@ test('リンクが 1 本だけのカードではサムネイルを外さない',
 	const card = fakeCard([thumb, button]);
 	assert.deepEqual(planSkipTargets(card, GRID_TAB_SKIP.BOTH), [button]);
 });
-
-/**
- * 作品カードの代わりを 1 枚作る。実測どおり「サムネ → ブックマーク → タイトル」の並び。
- * @param {string} id 作品 ID
- * @returns {{card: object, thumb: object, button: object, title: object}}
- */
-function makeCard(id) {
-	const thumb = fakeEl('A', { href: `/artworks/${id}` });
-	const button = fakeEl('BUTTON', { type: 'button' });
-	const title = fakeEl('A', { href: `/artworks/${id}` }, `作品${id}`);
-	const card = fakeCard([thumb, button, title]);
-	for (const el of [thumb, button, title]) el.closest = (selector) => (selector === 'li' ? card : null);
-	return { card, thumb, button, title };
-}
 
 /**
  * document の代わり。作品リンクと目印付きの要素を引ける。
@@ -226,4 +215,39 @@ test('後から増えたカードにも当たる', () => {
 	trigger();
 	assert.equal(added.title.getAttribute('tabindex'), '-1');
 	assert.equal(added.button.getAttribute('tabindex'), '-1');
+});
+
+test('none のときは DOM の変化で当て直しを予約しない', () => {
+	// 何も外さない設定で、無限スクロールの再描画ごとに空振りのタイマを積まないため
+	const doc = fakeDoc([makeCard('1')]);
+	let scheduled = 0;
+	const deps = {
+		createObserver(fn) { deps.callback = fn; return { observe() {}, disconnect() {} }; },
+		schedule(fn) { scheduled += 1; fn(); return 1; },
+		cancel() {},
+	};
+	const handle = attachTabSkip(doc, GRID_TAB_SKIP.NONE, deps);
+	deps.callback();
+	assert.equal(scheduled, 0);
+	handle.setMode(GRID_TAB_SKIP.BOTH);
+	deps.callback();
+	assert.equal(scheduled, 1);
+});
+
+test('予約が発火する前の DOM の変化は 1 回の当て直しにまとめる', () => {
+	const doc = fakeDoc([makeCard('1')]);
+	const queued = [];
+	const deps = {
+		createObserver(fn) { deps.callback = fn; return { observe() {}, disconnect() {} }; },
+		schedule(fn) { queued.push(fn); return queued.length; },
+		cancel() {},
+	};
+	attachTabSkip(doc, GRID_TAB_SKIP.BOTH, deps);
+	deps.callback();
+	deps.callback();
+	assert.equal(queued.length, 1);
+	// 発火したら次の変化でまた予約できる
+	queued[0]();
+	deps.callback();
+	assert.equal(queued.length, 2);
 });

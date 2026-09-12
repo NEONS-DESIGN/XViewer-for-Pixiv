@@ -15,13 +15,11 @@ import {
 	POPUP_THEMES,
 	THEME_TOGGLE,
 	SETTINGS_DEFAULTS,
+	KEYS,
 } from '../common/constants.js';
 
 /** 画面の題名。拡張の名前をそのまま出す。 */
 const TITLE = 'GridViewer for Pixiv';
-
-/** 確認の行を取り消すキー名。 */
-const ESCAPE_KEY = 'Escape';
 
 /**
  * タブの定義。順番がそのまま画面の並びと左右キーの順になる。
@@ -448,7 +446,7 @@ function renderResetField(doc, onReset) {
 		confirm.addEventListener('click', () => onReset());
 
 		row.addEventListener('keydown', (event) => {
-			if (event.key !== ESCAPE_KEY) return;
+			if (event.key !== KEYS.CLOSE) return;
 			event.preventDefault();
 			showButton();
 		});

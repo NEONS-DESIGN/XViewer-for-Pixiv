@@ -53,7 +53,7 @@ test('pushState は元の戻り値を返しつつ遷移を通知する', () => {
 	const result = globalThis.history.pushState({}, '', '/users/1');
 	assert.equal(result, 'push-result');
 	assert.equal(navigateCount, 1);
-	assert.deepEqual(page.calls.at(-1), 'pushState:/users/1');
+	assert.equal(page.calls.at(-1), 'pushState:/users/1');
 });
 
 test('replaceState も同じように透過に通知する', () => {

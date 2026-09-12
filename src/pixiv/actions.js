@@ -3,13 +3,8 @@
  * 追加と削除でエンドポイントも本体の形式も違うので、ここに閉じ込める。
  */
 import { postJson, postForm, postFormData } from './client.js';
-
-/** エンドポイント。フォローだけ /ajax ではなく旧来の PHP。 */
-const URL_LIKE = '/ajax/illusts/like';
-const URL_BOOKMARK_ADD = '/ajax/illusts/bookmarks/add';
-const URL_BOOKMARK_DELETE = '/ajax/illusts/bookmarks/delete';
-const URL_FOLLOW = '/bookmark_add.php';
-const URL_UNFOLLOW = '/rpc_group_setting.php';
+import { ACTION_URLS } from './endpoints.js';
+import { PixivError, PIXIV_ERROR_KINDS } from './errors.js';
 
 /** ブックマークの公開設定。 */
 const RESTRICT_PUBLIC = 0;
@@ -25,7 +20,7 @@ const RESTRICT_PRIVATE = 1;
  * @returns {Promise<boolean>} 送信前に既にいいね済みだったか
  */
 export async function likeIllust(illustId, token, deps) {
-	const body = await postJson(URL_LIKE, { illust_id: illustId }, token, deps);
+	const body = await postJson(ACTION_URLS.LIKE, { illust_id: illustId }, token, deps);
 	return body?.is_liked === true;
 }
 
@@ -36,15 +31,20 @@ export async function likeIllust(illustId, token, deps) {
  * @param {string} token CSRF トークン
  * @param {object} [deps] テスト用の依存
  * @returns {Promise<string>} 追加されたブックマークの ID。削除に必要
+ * @throws {PixivError} 応答に ID が無いとき。ID 無しで成功扱いにすると、次に押したときに削除へ進めない
  */
 export async function addBookmark(illustId, isPrivate, token, deps) {
-	const body = await postJson(URL_BOOKMARK_ADD, {
+	const body = await postJson(ACTION_URLS.BOOKMARK_ADD, {
 		illust_id: illustId,
 		restrict: isPrivate ? RESTRICT_PRIVATE : RESTRICT_PUBLIC,
 		comment: '',
 		tags: [],
 	}, token, deps);
-	return body?.last_bookmark_id;
+	const bookmarkId = body?.last_bookmark_id;
+	if (bookmarkId === null || bookmarkId === undefined || bookmarkId === '') {
+		throw new PixivError(PIXIV_ERROR_KINDS.API, 'bookmark add returned no last_bookmark_id');
+	}
+	return String(bookmarkId);
 }
 
 /**
@@ -57,7 +57,7 @@ export async function addBookmark(illustId, isPrivate, token, deps) {
  * @returns {Promise<void>}
  */
 export async function deleteBookmark(bookmarkId, token, deps) {
-	await postFormData(URL_BOOKMARK_DELETE, { bookmark_id: bookmarkId }, token, deps);
+	await postFormData(ACTION_URLS.BOOKMARK_DELETE, { bookmark_id: bookmarkId }, token, deps);
 }
 
 /**
@@ -68,7 +68,7 @@ export async function deleteBookmark(bookmarkId, token, deps) {
  * @returns {Promise<void>}
  */
 export async function followUser(userId, token, deps) {
-	await postForm(URL_FOLLOW, {
+	await postForm(ACTION_URLS.FOLLOW, {
 		mode: 'add',
 		type: 'user',
 		user_id: userId,
@@ -86,7 +86,7 @@ export async function followUser(userId, token, deps) {
  * @returns {Promise<void>}
  */
 export async function unfollowUser(userId, token, deps) {
-	await postForm(URL_UNFOLLOW, {
+	await postForm(ACTION_URLS.UNFOLLOW, {
 		mode: 'del',
 		type: 'bookuser',
 		id: userId,

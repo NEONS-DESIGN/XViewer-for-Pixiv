@@ -11,6 +11,7 @@ import {
 	FOCUSABLE_SELECTOR,
 	HIDDEN_SELECTOR,
 	INERT_ATTRIBUTE,
+	POPUP_THEMES,
 } from '../../common/constants.js';
 import { createIcon } from '../../common/icons.js';
 import { getJson } from '../../pixiv/client.js';
@@ -23,8 +24,11 @@ import { createNavigation } from './navigation.js';
 /** ホストページのスクロールを止めるために body へ付ける style。 */
 const BODY_LOCK_STYLE = 'overflow:hidden';
 
-/** テーマの値。ホストページの data-theme と合わせてある。 */
-const THEME = Object.freeze({ LIGHT: 'light', DARK: 'dark' });
+/**
+ * 設定のうち、変わったら今開いている作品を描き直す必要があるもの。
+ * closeOnBackdrop は押されたときに読むので入れない。popupTheme はビュワーに関係ない
+ */
+const RERENDER_SETTING_KEYS = Object.freeze(['imageQuality', 'prefetch', 'showSidebar']);
 
 /**
  * ステージの中で押しても閉じない要素。
@@ -146,7 +150,10 @@ export function createViewer(deps) {
 	 */
 	function applyTheme() {
 		if (!host) return;
-		host.dataset.theme = doc.documentElement.dataset.theme === THEME.LIGHT ? THEME.LIGHT : THEME.DARK;
+		// 値の語彙は popup と同じ (light / dark)。light 以外はすべてダークに倒す
+		host.dataset.theme = doc.documentElement.dataset.theme === POPUP_THEMES.LIGHT
+			? POPUP_THEMES.LIGHT
+			: POPUP_THEMES.DARK;
 	}
 
 	/**
@@ -270,8 +277,6 @@ export function createViewer(deps) {
 				stage,
 				sidebar,
 				onError: (message) => showStatus(message, 'error'),
-				// renderWork の内側の await をまたぐ間に別の作品へ移ったかを見せる
-				isStale: () => token !== requestToken,
 			});
 		} catch (error) {
 			if (token !== requestToken) return;
@@ -327,11 +332,17 @@ export function createViewer(deps) {
 
 		/**
 		 * 設定を差し替える。popup で変えた値を即座に反映するため。
+		 * 描画に効く項目が変わっていて作品を開いていれば、その作品を描き直す。
+		 * ペインは生成時の設定を掴んでいるので、差し替えるだけでは今の作品に効かない
 		 * @param {object} next 新しい設定
 		 * @returns {void}
 		 */
 		setSettings(next) {
+			const previous = settings;
 			settings = next;
+			const workId = navigation.currentWorkId();
+			if (!host || !workId) return;
+			if (RERENDER_SETTING_KEYS.some((key) => previous[key] !== next[key])) void openWork(workId);
 		},
 
 		dispose() {

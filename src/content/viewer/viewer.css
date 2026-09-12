@@ -53,6 +53,8 @@
 
 	/* 画像の後ろに敷く幕。pixiv 本体より濃くして画像に集中させる */
 	--backdrop: rgba(0, 0, 0, 0.92);
+	/* 浮いている部品 (シェアメニュー) の影。ライトでは薄くしないと白地の上で重い */
+	--menu-shadow: 0 8px 24px rgba(0, 0, 0, 0.36);
 	/* サイドバーの幅。X.com のメディアモーダルに近い比率 */
 	--sidebar-width: 384px;
 	/* 操作部品の高さ。UI_DESIGN_KIT §3 に合わせる */
@@ -81,8 +83,8 @@
 	--control-border: #d6d6d6;
 	--control-hover: #ebebeb;
 	--hover: rgba(0, 0, 0, 0.05);
-	/* ライトは白文字を載せる前提で暗くしてある。今の組み合わせは約 5.5:1 */
-	--accent: #1f7fb8;
+	/* ライトは白文字を載せる前提で暗くしてある。白との比は約 5.8:1 (#1f7fb8 は 4.4:1 で AA 未達だった) */
+	--accent: #1a6b9e;
 	--on-accent: #ffffff;
 	--danger: #c0392b;
 	--scrollbar-track: rgba(0, 0, 0, 0.06);
@@ -90,6 +92,7 @@
 	--scrollbar-thumb-hover: rgba(0, 0, 0, 0.4);
 	/* 幕はライトでも暗いままにする。画像の見え方を安定させるため */
 	--backdrop: rgba(0, 0, 0, 0.88);
+	--menu-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
 }
 
 .overlay {
@@ -525,7 +528,7 @@
 	border: 1px solid var(--border);
 	border-radius: 8px;
 	background: var(--surface);
-	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.36);
+	box-shadow: var(--menu-shadow);
 }
 
 .share-menu-heading {

@@ -1,6 +1,6 @@
 {
 	"name": "gridviewer_for_pixiv",
-	"version": "0.18.0",
+	"version": "0.18.1",
 	"private": true,
 	"type": "module",
 	"description": "pixiv のユーザーページに独自の画像ビュワーを追加する Chrome 拡張機能",
@@ -9,7 +9,7 @@
 		"watch": "node scripts/build.mjs --watch",
 		"build:symbols": "node scripts/build-symbols.mjs",
 		"build:icons": "node scripts/build-icons.mjs",
-		"test": "node --test"
+		"test": "node --test \"test/**/*.test.js\""
 	},
 	"devDependencies": {
 		"@fortawesome/fontawesome-free": "^7.3.1",

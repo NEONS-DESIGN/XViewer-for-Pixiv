@@ -5,13 +5,10 @@
  */
 import { Resvg } from '@resvg/resvg-js';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { ICON_OUTPUTS, buildIconSvg } from './icon-svg.mjs';
+import { ICON_OUTPUTS, buildIconSvg, iconFileName } from './icon-svg.mjs';
 
 /** 出力先のディレクトリ。 */
 const OUT_DIR = 'src/icons';
-
-/** 出力するファイル名。サイズを埋めて使う。 */
-const FILE_NAME = (size) => `icon-${size}.png`;
 
 /** 角の外側を透明で残す (アイコン自身が角丸の背景を持つため)。 */
 const TRANSPARENT = 'rgba(0, 0, 0, 0)';
@@ -43,7 +40,7 @@ async function build() {
 	await mkdir(OUT_DIR, { recursive: true });
 	for (const { size, variant } of ICON_OUTPUTS) {
 		const png = rasterize(buildIconSvg(variant), size);
-		const path = `${OUT_DIR}/${FILE_NAME(size)}`;
+		const path = `${OUT_DIR}/${iconFileName(size)}`;
 		await writeFile(path, png);
 		console.log(`${path} (${variant}, ${png.length} bytes)`);
 	}
@@ -52,6 +49,6 @@ async function build() {
 try {
 	await build();
 } catch (error) {
-	console.error(`[build-icons] ${error.message}`);
+	console.error(`[build-icons] ${error?.message ?? error}`);
 	process.exit(1);
 }

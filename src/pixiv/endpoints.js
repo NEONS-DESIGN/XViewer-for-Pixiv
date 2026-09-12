@@ -13,6 +13,49 @@ const LANG = 'lang=ja';
 /** pixiv 本体のオリジン。投稿文の相対リンクを解決する基準に使う。 */
 export const PIXIV_ORIGIN = 'https://www.pixiv.net';
 
+/** pixiv の表示設定ページ。R-18 を表示できないときの案内先。 */
+export const VIEWING_SETTINGS_URL = `${PIXIV_ORIGIN}/settings/viewing`;
+
+/**
+ * 作品ページのパス。ルーターの URL 書き換えとサイドバーのリンクで使う。
+ * 形は ARTWORK_PATH_PATTERN (constants.js) と対になっている。
+ * @param {string} illustId 作品 ID
+ * @returns {string} パス
+ */
+export function artworkPath(illustId) {
+	return `/artworks/${illustId}`;
+}
+
+/**
+ * ユーザーページのパス。
+ * @param {string} userId ユーザー ID
+ * @returns {string} パス
+ */
+export function userPath(userId) {
+	return `/users/${userId}`;
+}
+
+/**
+ * タグで絞り込んだ作品一覧のパス。
+ * @param {string} tag タグ名 (エンコード前)
+ * @returns {string} パス
+ */
+export function tagWorksPath(tag) {
+	return `/tags/${encodeURIComponent(tag)}/artworks`;
+}
+
+/**
+ * 更新系 API の URL。フォローだけ /ajax ではなく旧来の PHP (SITE_SPEC §4)。
+ * 使うのは pixiv/actions.js だけだが、URL の出どころをここに揃える。
+ */
+export const ACTION_URLS = Object.freeze({
+	LIKE: `${AJAX}/illusts/like`,
+	BOOKMARK_ADD: `${AJAX}/illusts/bookmarks/add`,
+	BOOKMARK_DELETE: `${AJAX}/illusts/bookmarks/delete`,
+	FOLLOW: '/bookmark_add.php',
+	UNFOLLOW: '/rpc_group_setting.php',
+});
+
 /**
  * 画像と zip を読み込んでよいホスト。
  * pixiv の CDN は画像・うごイラ zip の i.pximg.net と静的ファイルの s.pximg.net (SITE_SPEC §2)。

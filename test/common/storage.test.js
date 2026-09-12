@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeSettings, loadSettings, saveSetting, resetSettings } from '../../src/common/storage.js';
+import { normalizeSettings, loadSettings, saveSetting, resetSettings, watchSettings } from '../../src/common/storage.js';
 import { SETTINGS_DEFAULTS, GRID_TAB_SKIP, POPUP_THEMES } from '../../src/common/constants.js';
 
 /**
@@ -106,4 +106,29 @@ test('resetSettings は全項目を既定で書き戻す', async () => {
 test('resetSettings は保存に失敗したら false を返す', async () => {
 	const area = { set: async () => { throw new Error('no storage'); } };
 	assert.equal(await resetSettings({ area }), false);
+});
+
+test('watchSettings は差し替えた storage の sync 領域から読み直す', async () => {
+	// 既定の chrome.storage.sync へ戻ると、差し替えた領域に書いた値が届かない
+	let listener = null;
+	const { area } = fakeArea({ prefetch: 1 });
+	const storage = {
+		sync: area,
+		onChanged: {
+			addListener(fn) { listener = fn; },
+			removeListener() { listener = null; },
+		},
+	};
+	const received = [];
+	const watch = watchSettings((settings) => received.push(settings), { storage });
+	listener({}, 'sync');
+	await new Promise((resolve) => setTimeout(resolve, 0));
+	assert.equal(received.length, 1);
+	assert.equal(received[0].prefetch, 1);
+	// 別の領域の変更は無視する
+	listener({}, 'local');
+	await new Promise((resolve) => setTimeout(resolve, 0));
+	assert.equal(received.length, 1);
+	watch.dispose();
+	assert.equal(listener, null);
 });

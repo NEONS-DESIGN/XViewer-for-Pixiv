@@ -9,17 +9,21 @@
  * このモジュールだけをハッシュ方式へ差し替える。
  */
 import { parseArtworkPath } from './page.js';
+import { artworkPath } from '../pixiv/endpoints.js';
 
 /** 自分が積んだ履歴だと分かるようにする目印。 */
 const HISTORY_STATE_KEY = 'gridviewer';
 
 /**
- * 作品 ID から URL を作る。
- * @param {string} workId 作品 ID
- * @returns {string} パス
+ * 今の履歴エントリが自分の積んだものか。
+ * pixiv 本体が作品ページへ遷移したときも URL は /artworks/{id} になるので、
+ * URL の形だけでは「自分のモーダルが開いている」と区別できない。state の目印で見分ける。
+ * @param {{history: {state: unknown}}} [win] テスト用の window
+ * @returns {boolean} 自分が積んだエントリなら true
  */
-function pathFor(workId) {
-	return `/artworks/${workId}`;
+export function isOwnHistoryEntry(win = window) {
+	const state = win.history.state;
+	return typeof state === 'object' && state !== null && state[HISTORY_STATE_KEY] === true;
 }
 
 /**
@@ -39,17 +43,29 @@ function pathFor(workId) {
  */
 export function createRouter(onPopState, deps = {}) {
 	const win = deps.window ?? window;
-	const listener = () => { onPopState(parseArtworkPath(win.location.pathname)); };
+	/**
+	 * history.back() を出してから popstate が届くまでの間か。
+	 * back() は非同期なので、その間に閉じる操作が重なると履歴を 2 つ戻って
+	 * ユーザーページより前へ出てしまう。1 回目だけ通す
+	 */
+	let closing = false;
+	const listener = () => {
+		closing = false;
+		onPopState(parseArtworkPath(win.location.pathname));
+	};
 	win.addEventListener('popstate', listener);
 
 	return {
 		open(workId) {
-			win.history.pushState({ [HISTORY_STATE_KEY]: true }, '', pathFor(workId));
+			closing = false;
+			win.history.pushState({ [HISTORY_STATE_KEY]: true }, '', artworkPath(workId));
 		},
 		replace(workId) {
-			win.history.replaceState({ [HISTORY_STATE_KEY]: true }, '', pathFor(workId));
+			win.history.replaceState({ [HISTORY_STATE_KEY]: true }, '', artworkPath(workId));
 		},
 		close() {
+			if (closing) return;
+			closing = true;
 			win.history.back();
 		},
 		currentWorkId() {

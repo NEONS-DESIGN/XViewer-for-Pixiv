@@ -6,7 +6,7 @@
  * ホストページが Trusted Types を強制していると innerHTML が例外になる事情もある。
  */
 import { createIcon } from '../../common/icons.js';
-import { PIXIV_ORIGIN, safeCdnUrl } from '../../pixiv/endpoints.js';
+import { PIXIV_ORIGIN, safeCdnUrl, artworkPath, userPath, tagWorksPath } from '../../pixiv/endpoints.js';
 import { fetchUserProfile } from '../../pixiv/user.js';
 import { createShareMenu } from './share-menu.js';
 
@@ -216,7 +216,7 @@ export function createSidebar(deps) {
 
 		const author = doc.createElement('a');
 		author.className = 'author';
-		author.href = `/users/${detail.userId}`;
+		author.href = userPath(detail.userId);
 
 		const avatar = doc.createElement('img');
 		avatar.className = 'author-avatar';
@@ -276,7 +276,7 @@ export function createSidebar(deps) {
 
 		const original = doc.createElement('a');
 		original.className = 'original-link';
-		original.href = `/artworks/${detail.id}`;
+		original.href = artworkPath(detail.id);
 		original.setAttribute('target', '_blank');
 		original.setAttribute('rel', 'noopener noreferrer');
 		const label = doc.createElement('span');
@@ -330,7 +330,7 @@ export function createSidebar(deps) {
 				for (const tag of detail.tags) {
 					const item = doc.createElement('li');
 					const link = doc.createElement('a');
-					link.href = `/tags/${encodeURIComponent(tag)}/artworks`;
+					link.href = tagWorksPath(tag);
 					link.textContent = `#${tag}`;
 					item.appendChild(link);
 					tagList.appendChild(item);
