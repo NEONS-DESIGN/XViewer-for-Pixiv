@@ -328,3 +328,15 @@ select selectedcontent [data-role='option-hint'] {
 [data-role='reset-confirm']:hover {
 	background: color-mix(in srgb, var(--danger) 15%, transparent);
 }
+
+/* --- 非公式である旨の断り --------------------------------------------- */
+
+.disclaimer {
+	/* 画面の末尾に置く読み物。操作部品より一段落として、設定の並びと混ざらないようにする */
+	margin: 0;
+	padding-top: 10px;
+	border-top: 1px solid var(--divider);
+	color: var(--muted);
+	font-size: 11px;
+	line-height: 1.5;
+}
