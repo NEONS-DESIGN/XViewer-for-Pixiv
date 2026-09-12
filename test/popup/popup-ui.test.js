@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { renderPopup, resolveTheme } from '../../src/popup/popup-ui.js';
 import { ICON_SHAPES } from '../../src/common/icon-shapes.js';
 import { SETTINGS_DEFAULTS, POPUP_THEMES } from '../../src/common/constants.js';
+import { PROJECT_LICENSE, THIRD_PARTY } from '../../src/common/licenses.js';
 
 /**
  * リスナと dataset を覚える要素の代わり。
@@ -24,6 +25,7 @@ function fakeElement(tag) {
 		value: '',
 		checked: false,
 		title: '',
+		hidden: false,
 		focused: false,
 		listeners: {},
 		appendChild(child) { child.parent = element; element.children.push(child); return child; },
@@ -133,9 +135,10 @@ function build(overrides = {}) {
 	return { doc, root, changes, resets: () => resets };
 }
 
-test('見出しは ビュワー / 画像 / 操作 の順に並ぶ', () => {
+test('設定タブの見出しは ビュワー / 画像 / 操作 の順に並ぶ', () => {
 	const { root } = build();
-	assert.deepEqual(collect(root, 'h2').map((heading) => heading.textContent), ['ビュワー', '画像', '操作']);
+	const headings = collect(find(root, 'panel-settings'), 'h2');
+	assert.deepEqual(headings.map((heading) => heading.textContent), ['ビュワー', '画像', '操作']);
 });
 
 test('ビュワーの見出しにはタイトルとテーマの切り替えボタンが並ぶ', () => {
@@ -328,6 +331,128 @@ test('非公式である旨の断りを必ず出す', () => {
 	// pixiv の商標ガイドラインが求める 2 つの表記が両方揃っていること
 	assert.match(disclaimer.textContent, /非公式/);
 	assert.match(disclaimer.textContent, /作成・配布するものではありません/);
+});
+
+/* --- タブ ------------------------------------------------------------- */
+
+test('タブは 設定 / ライセンス の 2 つ', () => {
+	const { root } = build();
+	const tabs = collect(root, 'button').filter((button) => button.getAttribute('role') === 'tab');
+	assert.deepEqual(tabs.map((tab) => tab.textContent), ['設定', 'ライセンス']);
+});
+
+test('開いた直後は設定タブが選ばれている', () => {
+	const { root } = build();
+	assert.equal(find(root, 'tab-settings').getAttribute('aria-selected'), 'true');
+	assert.equal(find(root, 'tab-license').getAttribute('aria-selected'), 'false');
+	assert.equal(find(root, 'panel-settings').hidden, false);
+	assert.equal(find(root, 'panel-license').hidden, true);
+});
+
+test('タブを押すと選択とパネルの表示が入れ替わる', () => {
+	const { root } = build();
+	find(root, 'tab-license').dispatch('click');
+	assert.equal(find(root, 'tab-settings').getAttribute('aria-selected'), 'false');
+	assert.equal(find(root, 'tab-license').getAttribute('aria-selected'), 'true');
+	assert.equal(find(root, 'panel-settings').hidden, true);
+	assert.equal(find(root, 'panel-license').hidden, false);
+});
+
+test('タブは aria-controls で自分のパネルを指す', () => {
+	const { root } = build();
+	for (const id of ['settings', 'license']) {
+		const panelId = find(root, `panel-${id}`).attributes.id;
+		assert.ok(panelId, `panel-${id} に id が無い`);
+		assert.equal(find(root, `tab-${id}`).getAttribute('aria-controls'), panelId);
+	}
+});
+
+test('Tab キーで止まるのは選択中のタブだけ', () => {
+	// roving tabindex。3 つ並んだタブを順に踏まずにパネル本体へ入れるようにする
+	const { root } = build();
+	assert.equal(find(root, 'tab-settings').getAttribute('tabindex'), '0');
+	assert.equal(find(root, 'tab-license').getAttribute('tabindex'), '-1');
+});
+
+test('右キーで次のタブへ移り、フォーカスも付いてくる', () => {
+	const { root } = build();
+	find(root, 'tabs').dispatch('keydown', { key: 'ArrowRight', preventDefault() {} });
+	assert.equal(find(root, 'tab-license').getAttribute('aria-selected'), 'true');
+	assert.equal(find(root, 'tab-license').focused, true);
+});
+
+test('左キーは端で止まらず反対の端へ回る', () => {
+	const { root } = build();
+	find(root, 'tabs').dispatch('keydown', { key: 'ArrowLeft', preventDefault() {} });
+	assert.equal(find(root, 'tab-license').getAttribute('aria-selected'), 'true');
+});
+
+test('Home と End で端のタブへ飛ぶ', () => {
+	const { root } = build();
+	find(root, 'tabs').dispatch('keydown', { key: 'End', preventDefault() {} });
+	assert.equal(find(root, 'tab-license').getAttribute('aria-selected'), 'true');
+	find(root, 'tabs').dispatch('keydown', { key: 'Home', preventDefault() {} });
+	assert.equal(find(root, 'tab-settings').getAttribute('aria-selected'), 'true');
+});
+
+test('タブに関係ないキーは握りつぶさない', () => {
+	const { root } = build();
+	let prevented = false;
+	find(root, 'tabs').dispatch('keydown', { key: 'a', preventDefault() { prevented = true; } });
+	assert.equal(prevented, false);
+	assert.equal(find(root, 'tab-settings').getAttribute('aria-selected'), 'true');
+});
+
+test('タブを往復しても設定タブの状態は失われない', () => {
+	// 切り替えで描き直していたら、確認の行もチェックの状態も消える
+	const { root } = build({ settings: { enabled: false } });
+	find(root, 'reset').dispatch('click');
+	find(root, 'tab-license').dispatch('click');
+	find(root, 'tab-settings').dispatch('click');
+	assert.ok(find(root, 'reset-confirmation'), '確認の行が消えている');
+	assert.equal(find(root, 'enabled').checked, false);
+});
+
+/* --- ライセンスタブ ---------------------------------------------------- */
+
+test('ライセンスタブに第三者の成果物が並ぶ', () => {
+	const { root } = build();
+	const text = find(root, 'panel-license').textContent;
+	for (const item of THIRD_PARTY) {
+		assert.ok(text.includes(item.name), `${item.name} が無い`);
+		assert.ok(text.includes(item.license), `${item.name} のライセンス名が無い`);
+		assert.ok(text.includes(item.copyright), `${item.name} の権利者が無い`);
+	}
+});
+
+test('ライセンスタブにこの拡張自身のライセンスも出す', () => {
+	const { root } = build();
+	const text = find(root, 'panel-license').textContent;
+	assert.ok(text.includes(PROJECT_LICENSE.name));
+	assert.ok(text.includes(PROJECT_LICENSE.copyright));
+});
+
+test('免責の本文はライセンスタブにある', () => {
+	const { root } = build();
+	assert.ok(find(find(root, 'panel-license'), 'disclaimer'), '免責がライセンスタブの外にある');
+});
+
+test('設定タブの末尾には非公式である旨の 1 行が残る', () => {
+	// タブを切り替えない利用者にも、非公式であることだけは届かせる
+	const { root } = build();
+	const brief = find(find(root, 'panel-settings'), 'disclaimer-brief');
+	assert.ok(brief, '設定タブに 1 行が無い');
+	assert.match(brief.textContent, /非公式/);
+});
+
+test('外部リンクは新しいタブで開き、参照元を渡さない', () => {
+	const { root } = build();
+	const links = collect(find(root, 'panel-license'), 'a');
+	assert.ok(links.length > 0, 'リンクが 1 つも無い');
+	for (const link of links) {
+		assert.equal(link.getAttribute('target'), '_blank');
+		assert.equal(link.getAttribute('rel'), 'noopener noreferrer');
+	}
 });
 
 test('描き直しても前の中身は残らない', () => {

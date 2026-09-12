@@ -21,6 +21,12 @@
 	/* 取り返しの付かない操作 (設定の初期化の確定) の枠と文字。
 	   同じ形の 2 つのボタンのうち、戻せない側を色で区別する */
 	--danger: #e5737a;
+	--scrollbar-track: rgba(255, 255, 255, 0.07);
+	--scrollbar-thumb: rgba(255, 255, 255, 0.26);
+	--scrollbar-thumb-hover: rgba(255, 255, 255, 0.4);
+	/* パネルの高さの上限。popup 全体で Chrome の上限 (600px) に収める。
+	   ヘッダー 30 + タブ 32 + 隙間 20 + 上下の余白 28 = 110 を引いた残り */
+	--panel-max: 480px;
 }
 
 :root[data-theme='light'] {
@@ -38,6 +44,9 @@
 	--accent: #1f7fb8;
 	--on-accent: #ffffff;
 	--danger: #c0392b;
+	--scrollbar-track: rgba(0, 0, 0, 0.06);
+	--scrollbar-thumb: rgba(0, 0, 0, 0.26);
+	--scrollbar-thumb-hover: rgba(0, 0, 0, 0.4);
 }
 
 body {
@@ -329,14 +338,139 @@ select selectedcontent [data-role='option-hint'] {
 	background: color-mix(in srgb, var(--danger) 15%, transparent);
 }
 
+/* --- タブ ------------------------------------------------------------- */
+
+.tabs {
+	display: flex;
+	gap: 4px;
+	border-bottom: 1px solid var(--border);
+}
+
+.tab {
+	/* 下線で選択を示すので、ボタンの枠と背景は消す */
+	flex: 1;
+	height: 30px;
+	border: none;
+	border-radius: 4px 4px 0 0;
+	background: transparent;
+	color: var(--muted);
+	/* 枠の分だけ下へずらし、選択中の下線が .tabs の境界線に重なるようにする */
+	margin-bottom: -1px;
+	border-bottom: 2px solid transparent;
+}
+
+.tab:hover { background: var(--hover); }
+
+.tab.is-on {
+	color: var(--fg);
+	border-bottom-color: var(--accent);
+}
+
+.panel {
+	/* 中身がどれだけ伸びても popup の高さを超えさせない。
+	   ヘッダーとタブは外にあるので、スクロールするのはここだけ */
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	max-height: var(--panel-max);
+	overflow-y: auto;
+	/* つまみとテキストが触れないよう、右に隙間を空ける */
+	padding-right: 6px;
+}
+
+/* .panel の display はクラス指定なので、UA の [hidden] { display: none } に勝ってしまう。
+   これを書かないと、隠したはずのパネルが両方描かれる */
+.panel[hidden] {
+	display: none;
+}
+
+/* パネル自体が tabindex を持つ。掴んだことが分かるように輪郭を出す */
+.panel:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+/* スクロールバーは細く、軌道も見せる (viewer.css と同じ扱い)。
+   標準の scrollbar-width / scrollbar-color と混ぜて書くと
+   Chromium は ::-webkit-scrollbar を丸ごと無視するので、こちらだけに寄せる */
+.panel::-webkit-scrollbar {
+	width: 6px;
+}
+
+.panel::-webkit-scrollbar-track {
+	border-radius: 999px;
+	background: var(--scrollbar-track);
+}
+
+.panel::-webkit-scrollbar-thumb {
+	border-radius: 999px;
+	background: var(--scrollbar-thumb);
+}
+
+.panel::-webkit-scrollbar-thumb:hover {
+	background: var(--scrollbar-thumb-hover);
+}
+
 /* --- 非公式である旨の断り --------------------------------------------- */
 
-.disclaimer {
-	/* 画面の末尾に置く読み物。操作部品より一段落として、設定の並びと混ざらないようにする */
+.disclaimer-brief {
+	/* 設定タブの末尾に残す 1 行。操作部品と混ざらないよう区切りを入れる */
 	margin: 0;
 	padding-top: 10px;
 	border-top: 1px solid var(--divider);
 	color: var(--muted);
 	font-size: 11px;
 	line-height: 1.5;
+}
+
+/* --- ライセンスタブ ---------------------------------------------------- */
+
+.license h2 {
+	margin: 0;
+	font-size: 13px;
+}
+
+.license h3 {
+	margin: 0;
+	font-size: 12px;
+}
+
+.license p {
+	margin: 0;
+	font-size: 11px;
+	line-height: 1.6;
+}
+
+.disclaimer {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	color: var(--muted);
+}
+
+.license-item {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 8px 10px;
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	background: var(--surface);
+}
+
+.license-item .description { margin: 0; }
+
+.license-url {
+	/* URL は折り返さないと 320px の幅から溢れる */
+	overflow-wrap: anywhere;
+}
+
+.license a {
+	color: var(--accent);
+	text-decoration: underline;
+}
+
+.license a:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
 }
