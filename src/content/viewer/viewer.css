@@ -32,8 +32,9 @@
 	--follow-fg: #ffffff;
 	/* 取り返しの付かない操作の枠と文字 */
 	--danger: #e5737a;
-	/* スクロールバーのつまみ。背景に溶ける濃さにして、触ると濃くなる */
-	--scrollbar-thumb: rgba(255, 255, 255, 0.22);
+	/* スクロールバー。軌道は下地がうっすら分かる程度、つまみはその上で確実に読める濃さ */
+	--scrollbar-track: rgba(255, 255, 255, 0.07);
+	--scrollbar-thumb: rgba(255, 255, 255, 0.26);
 	--scrollbar-thumb-hover: rgba(255, 255, 255, 0.4);
 
 	/* 画像の後ろに敷く幕。pixiv 本体より濃くして画像に集中させる */
@@ -66,7 +67,8 @@
 	--accent: #1f7fb8;
 	--on-accent: #ffffff;
 	--danger: #c0392b;
-	--scrollbar-thumb: rgba(0, 0, 0, 0.22);
+	--scrollbar-track: rgba(0, 0, 0, 0.06);
+	--scrollbar-thumb: rgba(0, 0, 0, 0.26);
 	--scrollbar-thumb-hover: rgba(0, 0, 0, 0.4);
 	/* 幕はライトでも暗いままにする。画像の見え方を安定させるため */
 	--backdrop: rgba(0, 0, 0, 0.88);
@@ -577,8 +579,11 @@
 	width: 6px;
 }
 
+/* 軌道も見せる。どこからどこまで送れるのかが分かるほうが、
+   つまみの位置だけを見せるより読み進めた量が掴みやすい */
 .comment-scroll::-webkit-scrollbar-track {
-	background: transparent;
+	border-radius: 999px;
+	background: var(--scrollbar-track);
 }
 
 .comment-scroll::-webkit-scrollbar-thumb {
