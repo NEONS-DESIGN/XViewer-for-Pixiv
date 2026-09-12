@@ -346,3 +346,25 @@ test('返信の開閉ボタンは開いているかが分かるアイコンを�
 	await Promise.resolve();
 	assert.equal(iconName(mark.children[0]), 'expandLess');
 });
+
+test('コメントの下段は返信ボタンが左、日時が右', async () => {
+	const { container, comments } = build(async () => ({ comments: [ROOT], hasNext: false }));
+	await comments.load(DETAIL);
+	const body = find(container, 'comment-body');
+	assert.deepEqual(body.children.map((child) => child.className), ['comment-name', 'comment-text', 'comment-meta']);
+	const meta = find(container, 'comment-meta');
+	assert.deepEqual(meta.children.map((child) => child.className), ['comment-replies-slot', 'comment-date']);
+	assert.equal(meta.children[0].children[0].className, 'comment-replies');
+});
+
+test('返信が無いコメントでも日時は同じ下段に置く', async () => {
+	// 返信ボタンの有無で日時の位置が動くと、一覧が揃わない
+	const { container, comments } = build(async () => ({
+		comments: [{ ...ROOT, hasReplies: false }],
+		hasNext: false,
+	}));
+	await comments.load(DETAIL);
+	const meta = find(container, 'comment-meta');
+	assert.deepEqual(meta.children.map((child) => child.className), ['comment-replies-slot', 'comment-date']);
+	assert.equal(meta.children[0].children.length, 0);
+});

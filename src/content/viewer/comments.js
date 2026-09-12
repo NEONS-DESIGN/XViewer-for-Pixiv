@@ -125,7 +125,7 @@ export function createComments(deps) {
 	 * コメント本体 (アバター・名前・本文・日時) を要素にする。
 	 * ルートにも返信にも同じ形を使う。
 	 * @param {Comment} comment コメント
-	 * @returns {{item: HTMLElement, body: HTMLElement}} 要素と、後から足せる本文側の入れ物
+	 * @returns {{item: HTMLElement, body: HTMLElement, repliesSlot: HTMLElement}} 要素・本文側の入れ物・返信ボタンの差し込み先
 	 */
 	function createItem(comment) {
 		const item = doc.createElement('li');
@@ -154,13 +154,20 @@ export function createComments(deps) {
 		if (comment.isStamp) text.appendChild(renderStamp(doc, comment.stampId));
 		else text.append(...renderCommentText(doc, comment.text));
 
-		const meta = doc.createElement('span');
-		meta.className = 'comment-date';
-		meta.textContent = comment.date;
+		// 下段は「返信ボタンが左、日時が右」で揃える。
+		// 返信ボタンは後から差し込むので、無い場合でも枠だけ先に置いて位置をずらさない
+		const meta = doc.createElement('div');
+		meta.className = 'comment-meta';
+		const repliesSlot = doc.createElement('span');
+		repliesSlot.className = 'comment-replies-slot';
+		const date = doc.createElement('span');
+		date.className = 'comment-date';
+		date.textContent = comment.date;
+		meta.append(repliesSlot, date);
 
 		body.append(name, text, meta);
 		item.append(avatar, body);
-		return { item, body };
+		return { item, body, repliesSlot };
 	}
 
 	/**
@@ -169,10 +176,11 @@ export function createComments(deps) {
 	 * 畳んだときは DOM ごと捨てて、開き直すときに取り直す。
 	 * 残しておくとコメントの多い作品で要素が増え続ける。
 	 * @param {Comment} comment ルートコメント
-	 * @param {HTMLElement} body 差し込む先 (.comment-body)
+	 * @param {HTMLElement} body 返信をぶら下げる先 (.comment-body)
+	 * @param {HTMLElement} repliesSlot 開閉ボタンの差し込み先 (下段の左端)
 	 * @returns {void}
 	 */
-	function attachReplies(comment, body) {
+	function attachReplies(comment, body, repliesSlot) {
 		/** 開いているか */
 		let open = false;
 		/** 次に取りに行くページ。1 始まり */
@@ -287,7 +295,7 @@ export function createComments(deps) {
 			void loadPage();
 		});
 
-		body.appendChild(toggle);
+		repliesSlot.appendChild(toggle);
 	}
 
 	/**
@@ -305,9 +313,9 @@ export function createComments(deps) {
 			if (workId !== requestedWorkId || !list) return;
 			const comments = (body?.comments ?? []).map(normalizeComment);
 			for (const comment of comments) {
-				const { item, body: commentBody } = createItem(comment);
+				const { item, body: commentBody, repliesSlot } = createItem(comment);
 				// 返信の開閉はルートにだけ付ける。pixiv 側も入れ子は 1 段まで
-				if (comment.hasReplies) attachReplies(comment, commentBody);
+				if (comment.hasReplies) attachReplies(comment, commentBody, repliesSlot);
 				list.appendChild(item);
 			}
 			offset += comments.length;

@@ -32,6 +32,9 @@
 	--follow-fg: #ffffff;
 	/* 取り返しの付かない操作の枠と文字 */
 	--danger: #e5737a;
+	/* スクロールバーのつまみ。背景に溶ける濃さにして、触ると濃くなる */
+	--scrollbar-thumb: rgba(255, 255, 255, 0.22);
+	--scrollbar-thumb-hover: rgba(255, 255, 255, 0.4);
 
 	/* 画像の後ろに敷く幕。pixiv 本体より濃くして画像に集中させる */
 	--backdrop: rgba(0, 0, 0, 0.92);
@@ -63,6 +66,8 @@
 	--accent: #1f7fb8;
 	--on-accent: #ffffff;
 	--danger: #c0392b;
+	--scrollbar-thumb: rgba(0, 0, 0, 0.22);
+	--scrollbar-thumb-hover: rgba(0, 0, 0, 0.4);
 	/* 幕はライトでも暗いままにする。画像の見え方を安定させるため */
 	--backdrop: rgba(0, 0, 0, 0.88);
 }
@@ -474,6 +479,9 @@
    サイドバーが縦に詰まっている作品では枠の外へ出て切れる */
 .share-menu {
 	position: absolute;
+	/* width と padding を別々に数えると中身が枠から食み出し、
+	   サイドバー (overflow-y: auto) に横スクロールバーが出る */
+	box-sizing: border-box;
 	right: 0;
 	bottom: 100%;
 	z-index: 2;
@@ -494,6 +502,7 @@
 }
 
 .share-item {
+	box-sizing: border-box;
 	display: flex;
 	align-items: center;
 	gap: 10px;
@@ -549,11 +558,36 @@
 }
 
 /* スクロールするのはここだけ。min-height: 0 が無いと中身の高さで下限が決まって縮まない。
-   「もっと見る」も中に入れて、一番下まで読んだときだけ見えるようにする */
+   「もっと見る」も中に入れて、一番下まで読んだときだけ見えるようにする。
+
+   padding-right は本文とスクロールバーの間の隙間。
+   スクロールバーは padding の外側 (境界寄り) に置かれるので、これで文字だけが内へ寄る */
 .comment-scroll {
 	flex: 0 1 auto;
 	min-height: 0;
+	padding-right: 5px;
 	overflow-y: auto;
+}
+
+/* スクロールバーは細く、つまみだけを見せる。
+   標準の scrollbar-width / scrollbar-color を書くと Chromium は
+   ::-webkit-scrollbar を丸ごと無視するので、どちらか一方に寄せること。
+   丸みと余白まで決めたいのでこちらを使う (Chromium 系専用の拡張) */
+.comment-scroll::-webkit-scrollbar {
+	width: 6px;
+}
+
+.comment-scroll::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.comment-scroll::-webkit-scrollbar-thumb {
+	border-radius: 999px;
+	background: var(--scrollbar-thumb);
+}
+
+.comment-scroll::-webkit-scrollbar-thumb:hover {
+	background: var(--scrollbar-thumb-hover);
 }
 
 .comment-list {
@@ -582,7 +616,12 @@
 	object-fit: cover;
 }
 
-.comment-body { min-width: 0; }
+/* 本文が短くても列の幅いっぱいを取る。
+   flex: 0 1 auto のままだと中身の幅で止まり、下段の日時が右端まで届かない */
+.comment-body {
+	flex: 1 1 auto;
+	min-width: 0;
+}
 
 .comment-name {
 	color: var(--muted);
@@ -612,7 +651,17 @@
 	max-width: 100%;
 }
 
+/* コメントの下段。返信の開閉を左端、日時を右端に置く。
+   返信が無いコメントでも日時の位置が動かないよう、右寄せは日時側の margin で決める */
+.comment-meta {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-height: 22px;
+}
+
 .comment-date {
+	margin-left: auto;
 	color: var(--muted);
 	font-size: 11px;
 }
@@ -636,6 +685,11 @@
 .comment-replies:hover:not(:disabled) { background: var(--hover); }
 .comment-replies:disabled { opacity: 0.5; cursor: default; }
 .comment-replies:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.comment-replies-slot {
+	display: inline-flex;
+	min-width: 0;
+}
 
 .comment-replies-mark {
 	display: inline-flex;
@@ -683,6 +737,7 @@
 }
 
 .more {
+	box-sizing: border-box;
 	width: 100%;
 	height: var(--control-height);
 	margin-top: 8px;
