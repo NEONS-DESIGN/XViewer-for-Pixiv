@@ -247,21 +247,14 @@ export function createComments(deps) {
 	}
 
 	/**
-	 * 「上部へ」の出し入れ。先頭にいるときは戻る先が無いので隠す。
-	 * 押しても何も起きないボタンを見せないため (UI_DESIGN_KIT §6)。
+	 * サイドバーを送るたびに見直す。
+	 *
+	 * **下の線と「上部へ」は同じ合図で出す。** どちらも「見出しが上端に貼り付いた」ことに
+	 * 結び付いている: 線はコメントとの境目を示すため、ボタンは投稿文が画面から出た
+	 * ことを意味するため。貼り付いていなければ投稿文はまだ見えているので、戻す導線は要らない。
 	 * @returns {void}
 	 */
-	function syncToTop() {
-		if (!toTopButton || !scrollTarget) return;
-		toTopButton.hidden = !(scrollTarget.scrollTop > 0);
-	}
-
-	/**
-	 * 貼り付いている間だけ見出しに印を付ける。下に線を引くのは CSS 側。
-	 * 貼り付くと見出しとコメントが地続きに見えて境目が分からなくなるため。
-	 * @returns {void}
-	 */
-	function syncStuck() {
+	function syncScrollState() {
 		if (!headingEl || !scrollTarget) return;
 		// テスト用の DOM には測る口が無い。見た目の調整なので黙って何もしない
 		if (typeof headingEl.getBoundingClientRect !== 'function') return;
@@ -272,15 +265,8 @@ export function createComments(deps) {
 			scrollTarget.getBoundingClientRect().top,
 		);
 		headingEl.classList.toggle(STUCK_CLASS, stuck);
-	}
-
-	/**
-	 * サイドバーを送るたびに見直すもの。
-	 * @returns {void}
-	 */
-	function syncScrollState() {
-		syncToTop();
-		syncStuck();
+		// 押しても何も起きないボタンは見せない (UI_DESIGN_KIT §6)
+		if (toTopButton) toTopButton.hidden = !stuck;
 	}
 
 	/**
