@@ -13,9 +13,11 @@
 :host {
 	color-scheme: dark;
 	/* ダークの地の色は pixiv 本体 (charcoal) の実測値に合わせてある。
-	   --bg = --charcoal-background2 (#000000)、--surface = --charcoal-background1 (#1f1f1f)。
+	   どちらも --charcoal-background1 (#1f1f1f) = pixiv の body、つまり
+	   利用者が地として見ている色。--charcoal-background2 (#000000) は html 側で、
+	   実際にはほぼ body に覆われて見えないため使わない。
 	   ビュワーは pixiv の上に重なるので、地の色がずれると本体から浮く (SITE_SPEC.md) */
-	--bg: #000000;
+	--bg: #1f1f1f;
 	--surface: #1f1f1f;
 	--fg: #eff0f4;
 	--muted: #9aa0b4;
