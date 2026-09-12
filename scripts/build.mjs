@@ -9,7 +9,9 @@
  */
 import { context } from 'esbuild';
 import { cp, rm, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { applyVersion } from './manifest-version.mjs';
+import { ICON_OUTPUTS } from './icon-svg.mjs';
 
 /** 監視モードで起動するか。 */
 const WATCH = process.argv.includes('--watch');
@@ -24,10 +26,17 @@ const PACKAGE_JSON = 'package.json';
 const MANIFEST_SOURCE = 'src/manifest.json';
 const MANIFEST_OUTPUT = `${OUT_DIR}/manifest.json`;
 
-/** そのままコピーする静的ファイル。[コピー元, コピー先] の順。 */
+/**
+ * そのままコピーする静的ファイル。[コピー元, コピー先] の順。
+ * アイコンは build-icons.mjs が作った生成物で、サイズの出どころは ICON_OUTPUTS 1 か所。
+ */
 const STATIC_FILES = [
 	['src/popup/popup.html', `${OUT_DIR}/popup/popup.html`],
 	['src/popup/popup.css', `${OUT_DIR}/popup/popup.css`],
+	...ICON_OUTPUTS.map(({ size }) => [
+		`src/icons/icon-${size}.png`,
+		`${OUT_DIR}/icons/icon-${size}.png`,
+	]),
 ];
 
 /** @type {import('esbuild').BuildOptions} */
@@ -88,8 +97,9 @@ async function writeManifest() {
  * @returns {Promise<void>}
  */
 async function copyStatic() {
-	await mkdir(`${OUT_DIR}/popup`, { recursive: true });
 	for (const [from, to] of STATIC_FILES) {
+		// コピー先からディレクトリを決める。置き場所が増えても書き足さなくて済む
+		await mkdir(dirname(to), { recursive: true });
 		await cp(from, to);
 	}
 	console.log(`manifest version ${await writeManifest()}`);
