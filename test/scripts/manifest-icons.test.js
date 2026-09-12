@@ -20,3 +20,9 @@ test('manifest の icons は生成するサイズと一致する', () => {
 test('ツールバーのアイコンも同じ対応表を使う', () => {
 	assert.deepEqual(manifest.action.default_icon, EXPECTED);
 });
+
+test('manifest の説明文に非公式である旨がある', () => {
+	// pixiv の商標ガイドラインが求める 2 つの表記。ストアの一覧に出る文なのでここが要
+	assert.match(manifest.description, /非公式/);
+	assert.match(manifest.description, /作成・配布するものではありません/);
+});

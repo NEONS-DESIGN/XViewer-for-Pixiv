@@ -19,6 +19,13 @@ import {
 /** 画面の題名。拡張の名前をそのまま出す。 */
 const TITLE = 'PixivMaster';
 
+/**
+ * 画面の末尾に出す非公式である旨の断り。
+ * pixiv の「登録商標のガイドライン > アプリケーション、各種サービス等への使用について」が
+ * 求める 2 つの表記 (プラットフォームを利用した開発である旨 / 公式の配布物ではない旨) を満たす。
+ */
+const DISCLAIMER = 'pixiv プラットフォームを利用して開発した非公式の拡張機能です。ピクシブ株式会社が作成・配布するものではありません。';
+
 /** 確認の行を取り消すキー名。 */
 const ESCAPE_KEY = 'Escape';
 
@@ -433,6 +440,20 @@ function renderResetField(doc, onReset) {
 }
 
 /**
+ * 画面の末尾に出す断りを組み立てる。
+ * 操作する部品ではないので、読み上げ順の最後に置くだけで良い。
+ * @param {Document} doc 対象のドキュメント
+ * @returns {HTMLElement} 断りの段落
+ */
+function renderDisclaimer(doc) {
+	const footer = doc.createElement('footer');
+	footer.className = 'disclaimer';
+	footer.dataset.role = 'disclaimer';
+	footer.textContent = DISCLAIMER;
+	return footer;
+}
+
+/**
  * 設定画面を描く。何度呼んでも前の中身は残らない。
  * @param {object} deps 依存
  * @param {Document} deps.doc 対象のドキュメント
@@ -475,6 +496,6 @@ export function renderPopup({ doc, root, settings, onChange, onReset, notice = n
 		parts.push(section);
 	}
 
-	parts.push(renderResetField(doc, onReset));
+	parts.push(renderResetField(doc, onReset), renderDisclaimer(doc));
 	root.replaceChildren(...parts);
 }

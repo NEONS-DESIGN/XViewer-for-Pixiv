@@ -322,6 +322,14 @@ test('notice が無ければ一行は出さない', () => {
 	assert.equal(find(root, 'notice'), null);
 });
 
+test('非公式である旨の断りを必ず出す', () => {
+	const { root } = build();
+	const disclaimer = find(root, 'disclaimer');
+	// pixiv の商標ガイドラインが求める 2 つの表記が両方揃っていること
+	assert.match(disclaimer.textContent, /非公式/);
+	assert.match(disclaimer.textContent, /作成・配布するものではありません/);
+});
+
 test('描き直しても前の中身は残らない', () => {
 	const { doc, root } = build();
 	const before = collect(root, 'h2').length;

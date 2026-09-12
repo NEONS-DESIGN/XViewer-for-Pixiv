@@ -1,7 +1,7 @@
 {
 	"manifest_version": 3,
 	"name": "PixivMaster",
-	"description": "pixiv のユーザーページに X 風の画像ビュワーを追加します",
+	"description": "pixiv のユーザーページに X 風の画像ビュワーを追加します。pixiv プラットフォームを利用して開発した非公式の拡張機能であり、ピクシブ株式会社が作成・配布するものではありません。",
 	"icons": {
 		"16": "icons/icon-16.png",
 		"32": "icons/icon-32.png",
