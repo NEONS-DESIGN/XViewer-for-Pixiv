@@ -24,6 +24,12 @@
 	/* 取り返しの付かない操作 (設定の初期化の確定) の枠と文字。
 	   同じ形の 2 つのボタンのうち、戻せない側を色で区別する */
 	--danger: #e5737a;
+	/* スイッチ (チェックボックス) の色。pixiv 本体のスイッチと同じ値で、
+	   --bookmark と同じく本体に合わせる判断なのでテーマで変えない。
+	   ノブだけは地に合わせて明るさを変える */
+	--switch-on: #0096fa;
+	--switch-off: #858585;
+	--switch-knob: #f5f5f5;
 	--scrollbar-track: rgba(255, 255, 255, 0.07);
 	--scrollbar-thumb: rgba(255, 255, 255, 0.26);
 	--scrollbar-thumb-hover: rgba(255, 255, 255, 0.4);
@@ -51,6 +57,7 @@
 	--accent: #1f7fb8;
 	--on-accent: #ffffff;
 	--danger: #c0392b;
+	--switch-knob: #ffffff;
 	--scrollbar-track: rgba(0, 0, 0, 0.06);
 	--scrollbar-thumb: rgba(0, 0, 0, 0.26);
 	--scrollbar-thumb-hover: rgba(0, 0, 0, 0.4);
@@ -138,7 +145,7 @@ h1 {
 	align-items: center;
 	gap: 8px;
 	/* クリック領域は 30px を下回らない (UI_DESIGN_KIT §6)。
-	   チェックボックス 16px とテキスト行だけでは 22px ほどにしかならず、
+	   スイッチ 16px とテキスト行だけでは 22px ほどにしかならず、
 	   セレクト (30px) とも高さが揃わない */
 	min-height: 24px;
 	cursor: pointer;
@@ -182,11 +189,53 @@ button {
 
 button:hover { background: var(--control-hover); }
 
+/* チェックボックスは pixiv 本体 (charcoal) のスイッチと同じ見た目にする。
+   寸法・動き・色はすべて実測値 (SITE_SPEC.md「スイッチ」)。
+   28x16 の外周のうち 2px は透明な枠で、内側 24x12 の中を 12px のノブが
+   左端と右端 (translateX(12px)) の間を動く */
 input[type='checkbox'] {
-	width: 16px;
+	appearance: none;
+	box-sizing: border-box;
+	position: relative;
+	/* .row は flex。28px より縮ませない */
+	flex: 0 0 auto;
+	width: 28px;
 	height: 16px;
 	margin: 0;
-	accent-color: var(--accent);
+	/* 枠は透明。pixiv と同じ位置・同じ内寸にするためだけに置いている */
+	border: 2px solid transparent;
+	border-radius: 16px;
+	background: var(--switch-off);
+	cursor: pointer;
+	transition: background-color 0.2s;
+}
+
+input[type='checkbox']::after {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	background: var(--switch-knob);
+	transition: transform 0.2s;
+}
+
+input[type='checkbox']:checked {
+	background: var(--switch-on);
+}
+
+input[type='checkbox']:checked::after {
+	transform: translateX(12px);
+}
+
+/* 動きを抑える設定なら、色だけ変えて滑らせない */
+@media (prefers-reduced-motion: reduce) {
+	input[type='checkbox'],
+	input[type='checkbox']::after {
+		transition: none;
+	}
 }
 
 /* すべての操作部品に輪郭を出す (UI_DESIGN_KIT §6) */
