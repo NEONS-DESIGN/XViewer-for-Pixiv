@@ -368,3 +368,30 @@ test('見出しは上端に届いたら貼り付いたと見なす', () => {
 	assert.equal(isHeadingStuck(60, 60), true);
 	assert.equal(isHeadingStuck(90, 60), false);
 });
+
+test('開いた直後の見出しを貼り付き扱いにしない', async () => {
+	// 位置を測れるようにする。まだ親に入っていない間は本物と同じく全て 0 を返す
+	const doc = fakeDoc();
+	const create = doc.createElement;
+	doc.createElement = (tag) => {
+		const element = create(tag);
+		element.getBoundingClientRect = () => (element.parent ? { top: 200, height: 44, bottom: 244 } : { top: 0, height: 0, bottom: 0 });
+		return element;
+	};
+	const container = fakeElement('div');
+	const scrollTarget = fakeElement('div');
+	scrollTarget.scrollTop = 0;
+	scrollTarget.getBoundingClientRect = () => ({ top: 0, height: 861, bottom: 861 });
+
+	const comments = createComments({
+		doc,
+		container,
+		scrollTarget,
+		fetchJson: async () => ({ comments: [ROOT], hasNext: false }),
+	});
+	await comments.load(DETAIL);
+
+	// 見出しを作った時点で測ると位置が全て 0 になり、上端に並んでいることになってしまう。
+	// container へ入れてから測ること
+	assert.equal(find(container, '.comments-heading').className.includes('is-stuck'), false);
+});

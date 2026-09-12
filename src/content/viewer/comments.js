@@ -265,6 +265,8 @@ export function createComments(deps) {
 		if (!headingEl || !scrollTarget) return;
 		// テスト用の DOM には測る口が無い。見た目の調整なので黙って何もしない
 		if (typeof headingEl.getBoundingClientRect !== 'function') return;
+		// 文書に入る前は位置が全て 0 で、上端に並んでいると誤判定する
+		if (headingEl.isConnected === false) return;
 		const stuck = isHeadingStuck(
 			headingEl.getBoundingClientRect().top,
 			scrollTarget.getBoundingClientRect().top,
@@ -334,7 +336,8 @@ export function createComments(deps) {
 				scrollTarget.addEventListener('scroll', onScroll, { passive: true });
 				unwatchScroll = () => { scrollTarget.removeEventListener('scroll', onScroll); };
 			}
-			syncScrollState();
+			// 最初の判定はここではできない。まだ container に入れていないので
+			// 位置を測れず、上端に並んでいることになってしまう。入れてから load() が呼ぶ
 		}
 
 		watchSize(heading);
@@ -591,6 +594,8 @@ export function createComments(deps) {
 			container.style.minHeight = '';
 
 			container.appendChild(createHeading());
+			// 判定は文書に入れてから。createHeading() の中では位置を測れない
+			syncScrollState();
 
 			if (detail.commentOff) {
 				const off = doc.createElement('p');
