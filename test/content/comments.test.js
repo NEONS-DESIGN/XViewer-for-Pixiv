@@ -309,27 +309,63 @@ test('一覧が無いとき (0 件・コメント不可・失敗) の下限は�
 	assert.equal(commentsFloorHeight({ outside: 109, contentHeight: 0, nthBottom: null }), 109);
 });
 
-test('見出しの「上部へ」は戻れるときだけ出て、押すとサイドバーを先頭へ戻す', async () => {
+/**
+ * 位置を測れる document の代わりを作る。
+ * 本物と同じく、親に入るまでは全て 0 を返す。
+ * @param {() => number} headingTop 親に入った後の見出しの上端
+ * @returns {object} doc の代わり
+ */
+function measurableDoc(headingTop) {
+	const doc = fakeDoc();
+	const create = doc.createElement;
+	doc.createElement = (tag) => {
+		const element = create(tag);
+		element.getBoundingClientRect = () => (element.parent
+			? { top: headingTop(), height: 44, bottom: headingTop() + 44 }
+			: { top: 0, height: 0, bottom: 0 });
+		return element;
+	};
+	return doc;
+}
+
+test('見出しの「上部へ」は下の線と同じ合図 (貼り付き) で出る', async () => {
+	// 見出しの位置はサイドバーの送り量で決まる。上端に届いた時点が貼り付き
+	let scrolled = 0;
 	const container = fakeElement('div');
 	const scrollTarget = fakeElement('div');
 	scrollTarget.scrollTop = 0;
+	scrollTarget.getBoundingClientRect = () => ({ top: 0, height: 861, bottom: 861 });
 	const comments = createComments({
-		doc: fakeDoc(),
+		doc: measurableDoc(() => 431 - scrolled),
 		container,
 		scrollTarget,
 		fetchJson: async () => ({ comments: [ROOT], hasNext: false }),
 	});
 	await comments.load(DETAIL);
 
-	// 先頭にいるので戻る先が無い。押しても何も起きないボタンは見せない
 	const toTop = find(container, '.to-top');
+	const heading = find(container, '.comments-heading');
+	const stuck = () => heading.className.includes('is-stuck');
+
+	// まだ投稿文が見えている。線もボタンも出さない
+	assert.equal(stuck(), false);
 	assert.equal(toTop.hidden, true);
 
-	// 読み進めたら出す
-	scrollTarget.scrollTop = 120;
+	// 少し送っただけでは届かない
+	scrolled = 200;
+	scrollTarget.scrollTop = 200;
 	await scrollTarget.dispatch('scroll');
+	assert.equal(stuck(), false);
+	assert.equal(toTop.hidden, true);
+
+	// 上端に届いたら両方出す
+	scrolled = 431;
+	scrollTarget.scrollTop = 431;
+	await scrollTarget.dispatch('scroll');
+	assert.equal(stuck(), true);
 	assert.equal(toTop.hidden, false);
 
+	// 押すと先頭へ戻る
 	await toTop.click();
 	assert.equal(scrollTarget.scrollTop, 0);
 });
@@ -370,14 +406,7 @@ test('見出しは上端に届いたら貼り付いたと見なす', () => {
 });
 
 test('開いた直後の見出しを貼り付き扱いにしない', async () => {
-	// 位置を測れるようにする。まだ親に入っていない間は本物と同じく全て 0 を返す
-	const doc = fakeDoc();
-	const create = doc.createElement;
-	doc.createElement = (tag) => {
-		const element = create(tag);
-		element.getBoundingClientRect = () => (element.parent ? { top: 200, height: 44, bottom: 244 } : { top: 0, height: 0, bottom: 0 });
-		return element;
-	};
+	const doc = measurableDoc(() => 200);
 	const container = fakeElement('div');
 	const scrollTarget = fakeElement('div');
 	scrollTarget.scrollTop = 0;
