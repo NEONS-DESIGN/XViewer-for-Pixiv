@@ -162,6 +162,12 @@ test('チェックボックスを変えると そのキーで onChange に届く
 	assert.deepEqual(changes, [{ enabled: false }]);
 });
 
+test('チェックボックスはスイッチとして読み上げられる', () => {
+	const { root } = build({ settings: { enabled: true } });
+	// 見た目を pixiv 本体のスイッチに合わせてあるので、役割も switch で伝える
+	assert.equal(find(root, 'enabled').getAttribute('role'), 'switch');
+});
+
 test('セレクトは設定値で初期化される', () => {
 	const { root } = build({ settings: { imageQuality: 'original', gridTabSkip: 'none', prefetch: 1 } });
 	assert.equal(find(root, 'imageQuality').value, 'original');
