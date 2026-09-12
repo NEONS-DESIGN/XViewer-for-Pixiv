@@ -27,6 +27,31 @@ const REPLIES_LABEL = Object.freeze({ SHOW: '返信を表示', HIDE: '返信を�
 const FIRST_REPLY_PAGE = 1;
 
 /**
+ * コメント区画を潰してよい下限の件数。
+ * 主文がとても長い作品ではサイドバーの高さが足りず、コメント区画が圧縮される。
+ * 0 まで潰れると一覧が箱の外へ出てスクロールでも届かなくなるので、この件数は必ず残す。
+ */
+const MIN_VISIBLE_COMMENTS = 3;
+
+/**
+ * コメント区画を潰してよい下限の高さを求める。
+ *
+ * 中身が下限より低いときは中身の高さをそのまま返す。
+ * 「3 件分」を固定値にすると、中身が 1 件しか無い作品では下に空きができ、
+ * 逆に短くしすぎると中身が切れる。どちらも起きないよう実測値から決める。
+ * @param {object} sizes 実測値
+ * @param {number} sizes.outside 一覧以外の子 (見出し・状態の文言) が使う高さの合計。margin 込み
+ * @param {number} sizes.contentHeight 一覧の中身の高さ。一覧が無ければ 0
+ * @param {number|null} sizes.nthBottom 残したい件数の最後のコメントの下端。件数が足りなければ null
+ * @returns {number} 下限の高さ (px)
+ */
+export function commentsFloorHeight({ outside, contentHeight, nthBottom }) {
+	// 件数が足りないときは中身を全部残す。中身の高さそのものなので空きは出ない
+	const listFloor = nthBottom === null ? contentHeight : Math.min(contentHeight, nthBottom);
+	return outside + listFloor;
+}
+
+/**
  * @typedef {object} Comment
  * @property {string} id
  * @property {string} userId
@@ -122,10 +147,74 @@ export function createComments(deps) {
 	let workId = null;
 	/** @type {HTMLElement|null} */
 	let list = null;
+	/** @type {HTMLElement|null} 一覧のスクロール領域。下限を測るのに使う */
+	let scroll = null;
 	/** @type {HTMLButtonElement|null} */
 	let moreButton = null;
 	/** @type {HTMLElement|null} 読み込み失敗の表示。再試行で消す */
 	let failure = null;
+	/** @type {ResizeObserver|null} 中身の高さが変わったら下限を測り直す */
+	let sizeWatcher = null;
+
+	/**
+	 * 要素の外側の高さ (margin 込み)。
+	 * flex の中では上下の margin が相殺されないので、そのまま足せる。
+	 * @param {HTMLElement} el 測る要素
+	 * @returns {number} 高さ (px)
+	 */
+	function outerHeight(el) {
+		const height = el.getBoundingClientRect().height;
+		const view = doc.defaultView;
+		if (!view?.getComputedStyle) return height;
+		const style = view.getComputedStyle(el);
+		return height + (parseFloat(style.marginTop) || 0) + (parseFloat(style.marginBottom) || 0);
+	}
+
+	/**
+	 * MIN_VISIBLE_COMMENTS 件目のコメントの下端が、一覧の上から何 px かを測る。
+	 * @returns {number|null} 高さ (px)。件数が足りなければ null
+	 */
+	function nthCommentBottom() {
+		const nth = list?.children?.[MIN_VISIBLE_COMMENTS - 1];
+		if (!nth || !scroll) return null;
+		// すでに読み進めていても同じ値になるよう scrollTop を足す
+		return nth.getBoundingClientRect().bottom - scroll.getBoundingClientRect().top + scroll.scrollTop;
+	}
+
+	/**
+	 * コメント区画を潰してよい下限を実測して入れる。
+	 * 返信の開閉・「もっと見る」・幅の変化で中身の高さが変わるたびに呼ぶ。
+	 * @returns {void}
+	 */
+	function applyFloor() {
+		// テスト用の DOM には測る口が無い。見た目の調整なので黙って何もしない
+		if (typeof container.getBoundingClientRect !== 'function') return;
+		let outside = 0;
+		for (const child of container.children) {
+			if (child !== scroll) outside += outerHeight(child);
+		}
+		const height = commentsFloorHeight({
+			outside,
+			contentHeight: scroll ? scroll.scrollHeight : 0,
+			nthBottom: nthCommentBottom(),
+		});
+		const next = `${Math.ceil(height)}px`;
+		// 同じ値を書くと ResizeObserver が無駄に回る
+		if (container.style.minHeight !== next) container.style.minHeight = next;
+	}
+
+	/**
+	 * 高さが変わりうる要素を見張る。変わったら下限を測り直す。
+	 * @param {HTMLElement} el 見張る要素
+	 * @returns {void}
+	 */
+	function watchSize(el) {
+		const Observer = doc.defaultView?.ResizeObserver;
+		// テスト用の DOM には無い。見張れなくても初回の実測だけは効く
+		if (!Observer) return;
+		sizeWatcher ??= new Observer(() => { applyFloor(); });
+		sizeWatcher.observe(el);
+	}
 
 	/**
 	 * コメント本体 (アバター・名前・本文・日時) を要素にする。
@@ -332,6 +421,7 @@ export function createComments(deps) {
 				moreButton.hidden = body?.hasNext !== true;
 				moreButton.disabled = false;
 			}
+			applyFloor();
 		} catch (error) {
 			// 破棄後・別の作品へ移った後の失敗は伝えない。
 			// これを入れないと、正常な切り替えが読み込み失敗として表示される
@@ -345,11 +435,13 @@ export function createComments(deps) {
 			failure.setAttribute('role', 'alert');
 			failure.textContent = 'コメントを読み込めませんでした';
 			container.appendChild(failure);
+			watchSize(failure);
 			if (moreButton) {
 				moreButton.textContent = RETRY_LABEL;
 				moreButton.hidden = false;
 				moreButton.disabled = false;
 			}
+			applyFloor();
 			console.warn('[GridViewer] failed to load comments', requestedWorkId, error);
 		}
 	}
@@ -364,17 +456,24 @@ export function createComments(deps) {
 			workId = detail.id;
 			offset = 0;
 			container.textContent = '';
+			// 前の作品で測った下限が残らないようにする
+			sizeWatcher?.disconnect();
+			scroll = null;
+			container.style.minHeight = '';
 
 			const heading = doc.createElement('h3');
 			heading.className = 'comments-heading';
 			heading.textContent = 'コメント';
 			container.appendChild(heading);
+			watchSize(heading);
 
 			if (detail.commentOff) {
 				const off = doc.createElement('p');
 				off.className = 'status';
 				off.textContent = 'この作品はコメントを受け付けていません';
 				container.appendChild(off);
+				watchSize(off);
+				applyFloor();
 				return;
 			}
 			if (detail.commentCount === 0) {
@@ -382,19 +481,23 @@ export function createComments(deps) {
 				empty.className = 'status';
 				empty.textContent = 'まだコメントはありません';
 				container.appendChild(empty);
+				watchSize(empty);
+				applyFloor();
 				return;
 			}
 
 			// 一覧と「もっと見る」を同じ領域に入れてスクロールさせる。
 			// 外に置くと、一番下まで読んでいなくてもボタンが見えて不自然になる
 			// 一覧と「もっと見る」を同じ領域に入れてスクロールさせる
-			const scroll = doc.createElement('div');
+			scroll = doc.createElement('div');
 			scroll.className = 'comment-scroll';
 			container.appendChild(scroll);
 
 			list = doc.createElement('ul');
 			list.className = 'comment-list';
 			scroll.appendChild(list);
+			// 返信の開閉でも高さが変わる。一覧そのものを見張れば全部拾える
+			watchSize(list);
 
 			moreButton = doc.createElement('button');
 			moreButton.type = 'button';
@@ -408,7 +511,11 @@ export function createComments(deps) {
 		},
 
 		dispose() {
+			// 見張ったままだと、閉じたあとの高さの変化で測りに行って落ちる
+			sizeWatcher?.disconnect();
+			sizeWatcher = null;
 			list = null;
+			scroll = null;
 			moreButton = null;
 			failure = null;
 			workId = null;
