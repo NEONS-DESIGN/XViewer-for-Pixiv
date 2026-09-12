@@ -639,6 +639,9 @@
 	font: inherit;
 	font-size: 12px;
 	font-weight: normal;
+	/* 継承した 1.6 のままだとボタンが見出しの文字より高くなり、
+	   出入りのたびに見出しの高さが 0.8px 変わってコメントがずれる */
+	line-height: 1;
 	cursor: pointer;
 }
 
