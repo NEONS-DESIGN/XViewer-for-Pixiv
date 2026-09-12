@@ -46,6 +46,11 @@
 	--bookmark: #ff4060;
 	/* 取り返しの付かない操作の枠と文字 */
 	--danger: #e5737a;
+	/* スクロールバーの太さ */
+	--scrollbar-size: 6px;
+	/* サイドバーのスクロールバーだけ、画面の端から空ける隙間。
+	   窓の縁に貼り付いて見えないようにするためのもの (コメント一覧側には使わない) */
+	--scrollbar-inset: 5px;
 	/* スクロールバー。軌道は下地がうっすら分かる程度、つまみはその上で確実に読める濃さ */
 	--scrollbar-track: rgba(255, 255, 255, 0.07);
 	--scrollbar-thumb: rgba(255, 255, 255, 0.26);
@@ -660,28 +665,53 @@
 
    サイドバー自身も同じ見た目にする。「サイドバーごと送る」設定では
    こちらが主役のスクロールバーになるので、別物に見えてはいけない */
-.comment-scroll::-webkit-scrollbar,
-.sidebar::-webkit-scrollbar {
-	width: 6px;
+.comment-scroll::-webkit-scrollbar {
+	width: var(--scrollbar-size);
 }
 
 /* 軌道も見せる。どこからどこまで送れるのかが分かるほうが、
-   つまみの位置だけを見せるより読み進めた量が掴みやすい */
+   つまみの位置だけを見せるより読み進めた量が掴みやすい。
+
+   background-clip を後から効かせたいので、色は background ではなく
+   background-color で指定すること。一括指定の background は
+   background-clip を初期値へ戻してしまう */
 .comment-scroll::-webkit-scrollbar-track,
 .sidebar::-webkit-scrollbar-track {
 	border-radius: 999px;
-	background: var(--scrollbar-track);
+	background-color: var(--scrollbar-track);
 }
 
 .comment-scroll::-webkit-scrollbar-thumb,
 .sidebar::-webkit-scrollbar-thumb {
 	border-radius: 999px;
-	background: var(--scrollbar-thumb);
+	background-color: var(--scrollbar-thumb);
 }
 
 .comment-scroll::-webkit-scrollbar-thumb:hover,
 .sidebar::-webkit-scrollbar-thumb:hover {
-	background: var(--scrollbar-thumb-hover);
+	background-color: var(--scrollbar-thumb-hover);
+}
+
+/* サイドバーのスクロールバーだけは画面の端 (上・下・右) に接するので、
+   --scrollbar-inset だけ内側へ寄せて縁から浮かせる。
+
+   スクロールバーは padding の外側 (境界寄り) に置かれるため、余白を
+   padding では作れない。代わりに:
+   - 右: 幅を隙間の分だけ広げ、その分を透明な border にして
+     background-clip: padding-box で塗りの対象から外す
+   - 上下: 軌道の margin。つまみの可動域も軌道の中に収まる */
+.sidebar::-webkit-scrollbar {
+	width: calc(var(--scrollbar-size) + var(--scrollbar-inset));
+}
+
+.sidebar::-webkit-scrollbar-track {
+	margin: var(--scrollbar-inset) 0;
+}
+
+.sidebar::-webkit-scrollbar-track,
+.sidebar::-webkit-scrollbar-thumb {
+	border-right: var(--scrollbar-inset) solid transparent;
+	background-clip: padding-box;
 }
 
 /* 「サイドバーごと送る」設定 (sidebarScroll: 'whole')。
