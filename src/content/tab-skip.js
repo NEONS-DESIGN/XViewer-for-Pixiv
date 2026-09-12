@@ -94,7 +94,7 @@ export function attachTabSkip(doc, mode, deps = {}) {
 				applyCard(card);
 			}
 		} catch (error) {
-			console.warn('[PixivMaster] tab skip failed', error);
+			console.warn('[GridViewer] tab skip failed', error);
 		}
 	};
 
@@ -113,7 +113,7 @@ export function attachTabSkip(doc, mode, deps = {}) {
 				el.removeAttribute(MARK_LABEL);
 			}
 		} catch (error) {
-			console.warn('[PixivMaster] tab skip restore failed', error);
+			console.warn('[GridViewer] tab skip restore failed', error);
 		}
 	};
 

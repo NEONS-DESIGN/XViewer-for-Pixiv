@@ -140,7 +140,7 @@ test('見出しは ビュワー / 画像 / 操作 の順に並ぶ', () => {
 
 test('ビュワーの見出しにはタイトルとテーマの切り替えボタンが並ぶ', () => {
 	const { root } = build();
-	assert.equal(collect(root, 'h1')[0].textContent, 'PixivMaster');
+	assert.equal(collect(root, 'h1')[0].textContent, 'GridViewer for Pixiv');
 	assert.ok(find(root, 'theme-toggle'));
 });
 

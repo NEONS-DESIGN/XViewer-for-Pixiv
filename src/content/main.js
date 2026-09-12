@@ -114,7 +114,7 @@ async function apply() {
 	tabSkip = attachTabSkip(document, settings.gridTabSkip);
 	// どこにフォーカスがあるか分かるようにする。gridTabSkip の設定とは独立して常に出す
 	focusStyle = ensureFocusStyle(document);
-	console.log('[PixivMaster] ready on', path);
+	console.log('[GridViewer] ready on', path);
 }
 
 /**

@@ -17,7 +17,7 @@ import {
 } from '../common/constants.js';
 
 /** 画面の題名。拡張の名前をそのまま出す。 */
-const TITLE = 'PixivMaster';
+const TITLE = 'GridViewer for Pixiv';
 
 /**
  * 画面の末尾に出す非公式である旨の断り。

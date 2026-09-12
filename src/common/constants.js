@@ -30,7 +30,7 @@ export const USER_TAG_PATH_PATTERN = /^\/users\/\d+\/(?:artworks|illustrations|m
 export const USER_WORKS_PATH_PATTERN = /^\/users\/\d+(?:\/(?:artworks|illustrations|manga)(?:\/.*)?)?\/?$/;
 
 /** モーダルを載せるホスト要素の id。 */
-export const HOST_ELEMENT_ID = 'pixivmaster-root';
+export const HOST_ELEMENT_ID = 'gridviewer-root';
 
 /**
  * page world の注入スクリプトと content script の間でやり取りするイベント名。
@@ -38,15 +38,15 @@ export const HOST_ELEMENT_ID = 'pixivmaster-root';
  */
 export const NAV_EVENTS = Object.freeze({
 	/** 注入側 -> content script。history が呼ばれた */
-	NAVIGATE: 'pixivmaster:navigate',
+	NAVIGATE: 'gridviewer:navigate',
 	/** content script -> 注入側。history のフックを外して pixiv 標準に戻す */
-	UNHOOK: 'pixivmaster:unhook',
+	UNHOOK: 'gridviewer:unhook',
 	/** content script -> 注入側。外したフックを張り直す */
-	REHOOK: 'pixivmaster:rehook',
+	REHOOK: 'gridviewer:rehook',
 });
 
 /** history をフック済みであることを示す window のプロパティ名。二重注入の防止に使う。 */
-export const NAV_HOOK_FLAG = '__pixivmasterNavHooked';
+export const NAV_HOOK_FLAG = '__gridviewerNavHooked';
 
 /**
  * MutationObserver から location を確かめるまでの待ち時間 (ミリ秒)。

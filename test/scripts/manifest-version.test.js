@@ -53,15 +53,15 @@ test('全ての成分が 0 なら例外', () => {
 });
 
 test('applyVersion は manifest に version を差し込む', () => {
-	const manifest = { name: 'PixivMaster', permissions: ['storage'] };
+	const manifest = { name: 'GridViewer for Pixiv', permissions: ['storage'] };
 	const applied = applyVersion(manifest, '0.3.1');
 	assert.equal(applied.version, '0.3.1');
-	assert.equal(applied.name, 'PixivMaster');
+	assert.equal(applied.name, 'GridViewer for Pixiv');
 	assert.deepEqual(applied.permissions, ['storage']);
 });
 
 test('applyVersion は渡された manifest を書き換えない', () => {
-	const manifest = { name: 'PixivMaster' };
+	const manifest = { name: 'GridViewer for Pixiv' };
 	applyVersion(manifest, '0.3.1');
 	assert.equal('version' in manifest, false);
 });
