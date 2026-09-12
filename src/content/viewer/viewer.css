@@ -30,6 +30,13 @@
 	   --accent との比は約 2.8:1 で AA には届かないが、
 	   本体の見え方に揃える判断 (docs/DECISIONS.md)。他の塗りつぶしは --on-accent のまま */
 	--follow-fg: #ffffff;
+	/* いいね・ブックマークの色。ホバーでも「済み」でも同じ色を使い、
+	   ホバーが「押すとこの色になる」の予告になるようにする。
+	   --like は var() で引くのでテーマごとの --accent に自動で追従する。
+	   --bookmark は pixiv 本体のブックマークと同じ色。本体に合わせる判断なので
+	   テーマで変えない (docs/DECISIONS.md) */
+	--like: var(--accent);
+	--bookmark: #ff4060;
 	/* 取り返しの付かない操作の枠と文字 */
 	--danger: #e5737a;
 	/* スクロールバー。軌道は下地がうっすら分かる程度、つまみはその上で確実に読める濃さ */
@@ -403,6 +410,20 @@
 /* 済みの状態。塗りつぶしではなく色だけで示す */
 .count-action.is-on,
 .count-action.is-on:hover:not(:disabled) { color: var(--accent); }
+
+/* いいねとブックマークは色で見分ける。
+   上の .count-action:hover が指す --fg (ダークでは白) だと 2 つの操作が同じ見た目になり、
+   どちらを押そうとしているのか手元で分からない。
+   ホバーと「済み」に同じ色を当てるのは、ホバーを結果の予告にするため。
+   .count-action を併記して特異性を上げているのは、押せない素の .count (span) にまで
+   ホバーの色が乗らないようにするため */
+.count-action.count-like:hover:not(:disabled),
+.count-action.count-like.is-on,
+.count-action.count-like.is-on:hover:not(:disabled) { color: var(--like); }
+
+.count-action.count-bookmark:hover:not(:disabled),
+.count-action.count-bookmark.is-on,
+.count-action.count-bookmark.is-on:hover:not(:disabled) { color: var(--bookmark); }
 
 /* 未ログインの案内と失敗の文言。カウンタの隣ではなく次の行に置く */
 .counts > .status {
