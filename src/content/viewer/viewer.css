@@ -735,6 +735,16 @@
 	padding-bottom: 8px;
 	/* 下を通るコメントを隠す。地色を敷かないと文字が重なって読めなくなる */
 	background: var(--surface);
+	/* 貼り付いたときに引く線の場所を先に空けておく。
+	   後から足すと見出しが 1px 高くなって、貼り付いた瞬間に中身がずれる */
+	border-bottom: 1px solid transparent;
+}
+
+/* 貼り付いている間だけ線を引く。地続きに見えてコメントとの境目が分からなくなるため。
+   貼り付いていないときは上の罫線が境目を示しているので要らない。
+   印を付けるのは comments.js の syncStuck() */
+:host([data-sidebar-scroll='whole']) .comments-heading.is-stuck {
+	border-bottom-color: var(--divider);
 }
 
 :host([data-sidebar-scroll='whole']) .comment-scroll {
