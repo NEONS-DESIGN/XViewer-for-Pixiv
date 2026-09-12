@@ -4,6 +4,7 @@
  */
 import {
 	USER_PATH_PATTERN,
+	PROFILE_HOME_PATH_PATTERN,
 	USER_TAG_PATH_PATTERN,
 	USER_WORKS_PATH_PATTERN,
 	USER_WORKS_CATEGORY_PATTERN,
@@ -76,4 +77,15 @@ export function pageKey(pathname) {
  */
 export function isViewerTarget(pathname) {
 	return parseUserPage(pathname) !== null;
+}
+
+/**
+ * プロフィールのホームタブか。
+ * 「ピックアップ」欄が出るのはこのパスだけなので、欄を隠す CSS もここでだけ効かせる。
+ * /users/{id}/artworks のような下位のタブには欄自体が無い (SITE_SPEC §3)。
+ * @param {string} pathname location.pathname
+ * @returns {boolean} ホームタブなら true
+ */
+export function isProfileHome(pathname) {
+	return PROFILE_HOME_PATH_PATTERN.test(pathname);
 }

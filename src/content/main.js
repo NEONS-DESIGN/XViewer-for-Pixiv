@@ -2,11 +2,12 @@
  * content script のエントリ。
  * pixiv は SPA なので、URL が変わるたびに対象ページかどうかを判定し直す。
  */
-import { isViewerTarget, parseArtworkPath, parseUserPage, pageKey } from './page.js';
+import { isViewerTarget, isProfileHome, parseArtworkPath, parseUserPage, pageKey } from './page.js';
 import { createRouter, isOwnHistoryEntry } from './router.js';
 import { attachGridListener, collectWorkIds } from './grid.js';
 import { attachTabSkip } from './tab-skip.js';
 import { ensureFocusStyle } from './grid-focus.js';
+import { attachPickupHider } from './pickup.js';
 import { createViewer } from './viewer/viewer.js';
 import { createDomSequence, extendWithAllWorks } from './sequence.js';
 import { loadSettings, watchSettings } from '../common/storage.js';
@@ -18,6 +19,11 @@ let gridListener = null;
 let tabSkip = null;
 /** @type {{dispose: () => void}|null} グリッドのフォーカス枠の CSS */
 let focusStyle = null;
+/**
+ * @type {{setActive: (active: boolean) => void, dispose: () => void}|null}
+ * ピックアップ欄を隠す CSS。ビュワーの入切とは独立に効くので stop() では触らない
+ */
+let pickupHider = null;
 let router = null;
 let settings = null;
 let viewer = null;
@@ -171,6 +177,24 @@ function stop() {
 }
 
 /**
+ * ピックアップ欄を隠す CSS を、今の設定と URL に合わせる。
+ * 欄が出るのはプロフィールのホームだけなので、他のパスでは外して pixiv 標準へ戻す。
+ * @returns {void}
+ */
+function syncPickup() {
+	pickupHider?.setActive(Boolean(settings?.hidePickup) && isProfileHome(location.pathname));
+}
+
+/**
+ * SPA の遷移を追う必要があるか。
+ * ビュワーが要らなくても、ピックアップ非表示はページが変わるたびに当て直しが要る。
+ * @returns {boolean} どちらかが有効なら true
+ */
+function needsNavigationWatch() {
+	return Boolean(settings?.enabled || settings?.hidePickup);
+}
+
+/**
  * URL が変わったかもしれないときの入口。
  * 注入側のイベント・popstate・MutationObserver の 3 経路をここに集約する。
  * @returns {void}
@@ -180,6 +204,7 @@ function handleLocationChange() {
 	// 自分のモーダルの最中なら止めてはいけない。
 	// pixiv 本体が作品ページへ遷移したときは apply() へ進み、対象外として止める
 	if (isViewingOwnWork()) return;
+	syncPickup();
 	void apply();
 }
 
@@ -253,23 +278,28 @@ function stopNavigationWatch() {
  */
 async function boot() {
 	settings = await loadSettings();
-	if (!settings.enabled) return;
+	// ビュワーの入切とは独立して効かせる。ピックアップ非表示だけを使う人もいる
+	pickupHider = attachPickupHider(document);
+	syncPickup();
+	if (!needsNavigationWatch()) return;
 	startNavigationWatch();
-	await apply();
+	if (settings.enabled) await apply();
 }
 
 watchSettings((next) => {
 	settings = next;
 	viewer?.setSettings(next);
 	tabSkip?.setMode(next.gridTabSkip);
-	if (next.enabled) {
-		startNavigationWatch();
-		void apply();
-	} else {
+	syncPickup();
+	if (!next.enabled) {
 		// 作品を開いたまま切ると URL が /artworks/{id} に残る。先に履歴を戻して pixiv 本体に任せる
 		if (viewer?.isOpen()) router?.close();
 		stop();
-		stopNavigationWatch();
 	}
+	// 遷移の監視はビュワーとピックアップ非表示の両方が要らなくなったときだけ外す。
+	// apply() より先に張るのは popstate の配布順のため (boot の説明を参照)
+	if (needsNavigationWatch()) startNavigationWatch();
+	else stopNavigationWatch();
+	if (next.enabled) void apply();
 });
 void boot();

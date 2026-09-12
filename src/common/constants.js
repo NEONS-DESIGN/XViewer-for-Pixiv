@@ -7,6 +7,15 @@
 export const ARTWORK_LINK_SELECTOR = 'a[href^="/artworks/"]';
 
 /**
+ * プロフィールのホームに出る「ピックアップ」欄を指すセレクタ。
+ * 実測ではホームの `section` はこの 1 個だけで、作品グリッドは `div` なので掛からない
+ * (SITE_SPEC §3)。見出しの文言は表示言語で変わるため当てにしない。
+ * 作品リンクを持つことまで求めるのは、pixiv が作品と無関係な section を足したときに
+ * 巻き込まないため。
+ */
+export const PICKUP_SECTION_SELECTOR = `section:has(${ARTWORK_LINK_SELECTOR})`;
+
+/**
  * 作品ページのパス。
  * /users/{id}/artworks/{タグ} を除くため、末尾が数字だけであることを要求する。
  */
@@ -34,6 +43,12 @@ export const USER_WORKS_PATH_PATTERN = /^\/users\/\d+(?:\/(?:artworks|illustrati
  * 1 番目の捕捉がタブ名。/users/{id} と /users/{id}/artworks は両方を出すので合わない。
  */
 export const USER_WORKS_CATEGORY_PATTERN = /^\/users\/\d+\/(illustrations|manga)(?:\/|$)/;
+
+/**
+ * ユーザーページのうち、プロフィールのホームタブ。
+ * 「ピックアップ」欄が出るのはここだけで、/users/{id}/artworks などには出ない (SITE_SPEC §3)。
+ */
+export const PROFILE_HOME_PATH_PATTERN = /^\/users\/\d+\/?$/;
 
 /**
  * 作品の種別。値は profile/all の応答キー (SITE_SPEC §3) と合わせてある。
@@ -155,6 +170,7 @@ export const SETTINGS_DEFAULTS = Object.freeze({
 	sidebarScroll: SIDEBAR_SCROLL.COMMENTS,
 	closeOnBackdrop: true,
 	gridTabSkip: GRID_TAB_SKIP.BOTH,
+	hidePickup: false,
 	popupTheme: POPUP_THEMES.SYSTEM,
 });
 
