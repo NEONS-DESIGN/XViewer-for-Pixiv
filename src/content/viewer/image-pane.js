@@ -196,7 +196,7 @@ export function createImagePane(deps) {
 			} catch (error) {
 				// 1 枚目は出ているので、複数枚が開けないことだけを伝える
 				showPaneError('2 枚目以降を読み込めませんでした');
-				console.warn('[PixivMaster] failed to load pages', detail.id, error);
+				console.warn('[GridViewer] failed to load pages', detail.id, error);
 			}
 		},
 

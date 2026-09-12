@@ -57,5 +57,5 @@ async function main() {
 
 void main().catch((error) => {
 	// ここまで来ると画面が空のままなので、原因を残して気づけるようにする
-	console.error('[PixivMaster:popup] 設定画面の表示に失敗しました', error);
+	console.error('[GridViewer:popup] 設定画面の表示に失敗しました', error);
 });

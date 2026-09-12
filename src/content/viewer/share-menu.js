@@ -126,7 +126,7 @@ export function createShareMenu(deps) {
 				() => { status.textContent = COPY_DONE; },
 				(error) => {
 					status.textContent = COPY_FAILED;
-					console.warn('[PixivMaster] failed to copy share url', error);
+					console.warn('[GridViewer] failed to copy share url', error);
 				},
 			);
 		});

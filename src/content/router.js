@@ -11,7 +11,7 @@
 import { parseArtworkPath } from './page.js';
 
 /** 自分が積んだ履歴だと分かるようにする目印。 */
-const HISTORY_STATE_KEY = 'pixivmaster';
+const HISTORY_STATE_KEY = 'gridviewer';
 
 /**
  * 作品 ID から URL を作る。

@@ -257,7 +257,7 @@ export function createSidebar(deps) {
 				avatar.src = url;
 				avatar.style.visibility = '';
 			})
-			.catch((error) => { console.warn('[PixivMaster] failed to load author icon', detail.userId, error); });
+			.catch((error) => { console.warn('[GridViewer] failed to load author icon', detail.userId, error); });
 
 		follow = doc.createElement('div');
 		follow.className = 'follow-slot';

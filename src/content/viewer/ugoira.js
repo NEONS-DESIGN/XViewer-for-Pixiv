@@ -245,7 +245,7 @@ export function createUgoiraPlayer(deps) {
 				if (disposed) return;
 				// 静止画は出ているので、動かないことだけを伝える
 				deps.onError('うごイラを再生できませんでした');
-				console.warn('[PixivMaster] failed to play ugoira', detail.id, error);
+				console.warn('[GridViewer] failed to play ugoira', detail.id, error);
 			}
 		},
 

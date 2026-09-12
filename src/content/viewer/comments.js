@@ -228,7 +228,7 @@ export function createComments(deps) {
 			failure.setAttribute('role', 'alert');
 			failure.textContent = '返信を読み込めませんでした';
 			body.appendChild(failure);
-			console.warn('[PixivMaster] failed to load replies', comment.id, error);
+			console.warn('[GridViewer] failed to load replies', comment.id, error);
 		}
 
 		/**
@@ -334,7 +334,7 @@ export function createComments(deps) {
 			failure.textContent = 'コメントを読み込めませんでした';
 			container.appendChild(failure);
 			if (moreButton) moreButton.hidden = true;
-			console.warn('[PixivMaster] failed to load comments', requestedWorkId, error);
+			console.warn('[GridViewer] failed to load comments', requestedWorkId, error);
 		}
 	}
 

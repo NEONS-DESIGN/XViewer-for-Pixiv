@@ -252,7 +252,7 @@ export function createActionsBar(deps) {
 			} catch (error) {
 				if (disposed) return;
 				announce('フォローを変更できませんでした', 'error');
-				console.warn('[PixivMaster] follow failed', error);
+				console.warn('[GridViewer] follow failed', error);
 			} finally {
 				button.disabled = false;
 			}
@@ -267,7 +267,7 @@ export function createActionsBar(deps) {
 				following = await resolveFollowing(detail.userId);
 			} catch (error) {
 				// 取れなくても押せる状態には戻す。押せばフォロー自体は効く
-				console.warn('[PixivMaster] follow state failed', error);
+				console.warn('[GridViewer] follow state failed', error);
 			}
 			if (disposed) return;
 			applyFollowState(button, following);
@@ -323,7 +323,7 @@ export function createActionsBar(deps) {
 					if (disposed) return;
 					likeButton.disabled = false;
 					announce('いいねできませんでした', 'error');
-					console.warn('[PixivMaster] like failed', error);
+					console.warn('[GridViewer] like failed', error);
 				}
 			});
 			describeCount(likeButton, likeLabel(liked), likeCount);
@@ -359,7 +359,7 @@ export function createActionsBar(deps) {
 				} catch (error) {
 					if (disposed) return;
 					announce('ブックマークを変更できませんでした', 'error');
-					console.warn('[PixivMaster] bookmark failed', error);
+					console.warn('[GridViewer] bookmark failed', error);
 				} finally {
 					bookmarkButton.disabled = false;
 				}

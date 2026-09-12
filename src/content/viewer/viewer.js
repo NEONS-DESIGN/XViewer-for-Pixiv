@@ -276,7 +276,7 @@ export function createViewer(deps) {
 		} catch (error) {
 			if (token !== requestToken) return;
 			showStatus('作品を読み込めませんでした', 'error');
-			console.warn('[PixivMaster] failed to open', workId, error);
+			console.warn('[GridViewer] failed to open', workId, error);
 		}
 	}
 

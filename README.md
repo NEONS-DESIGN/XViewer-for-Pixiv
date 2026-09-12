@@ -1,15 +1,15 @@
 <div align="center">
 
-<img src="src/icons/icon-128.png" width="96" alt="PixivMaster のアイコン" />
+<img src="src/icons/icon-128.png" width="96" alt="GridViewer for Pixiv のアイコン" />
 
-# PixivMaster
+# GridViewer for Pixiv
 
 **pixiv のユーザーページに、X.com のメディア閲覧に近い画像ビュワーを追加する Chrome 拡張機能**
 
-[![version](https://img.shields.io/github/package-json/v/NEONS-DESIGN/PixivMaster?color=4ea3d6)](package.json)
-[![license](https://img.shields.io/github/license/NEONS-DESIGN/PixivMaster?color=4ea3d6)](LICENSE)
+[![version](https://img.shields.io/github/package-json/v/NEONS-DESIGN/gridviewer_for_pixiv?color=4ea3d6)](package.json)
+[![license](https://img.shields.io/github/license/NEONS-DESIGN/gridviewer_for_pixiv?color=4ea3d6)](LICENSE)
 ![manifest](https://img.shields.io/badge/manifest-v3-4ea3d6)
-![tests](https://img.shields.io/badge/tests-302%20passing-4ea3d6)
+![tests](https://img.shields.io/badge/tests-340%20passing-4ea3d6)
 
 </div>
 
@@ -58,8 +58,8 @@ Chromium 系 (Chrome / Brave / Edge など) の Manifest V3 に対応したブ�
 現在ストアでは配布していません。ビルドして読み込んでください。
 
 ```bash
-git clone https://github.com/NEONS-DESIGN/PixivMaster.git
-cd PixivMaster
+git clone https://github.com/NEONS-DESIGN/gridviewer_for_pixiv.git
+cd gridviewer_for_pixiv
 npm install
 npm run build
 ```

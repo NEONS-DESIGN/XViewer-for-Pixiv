@@ -9,7 +9,7 @@
 import { ARTWORK_LINK_SELECTOR } from '../common/constants.js';
 
 /** 差し込む style 要素の id。二重注入を防ぐ目印も兼ねる。 */
-export const FOCUS_STYLE_ID = 'pixivmaster-grid-focus';
+export const FOCUS_STYLE_ID = 'gridviewer-grid-focus';
 
 /** 枠の色。UI_DESIGN_KIT の --accent (ダーク側)。絵の上に乗るのでテーマでは変えない。 */
 const FOCUS_COLOR = '#4ea3d6';
@@ -69,14 +69,14 @@ export function ensureFocusStyle(doc) {
 		}
 	} catch (error) {
 		// 枠が出ないだけで操作はできる。ここで落ちてグリッドの購読ごと巻き込まないようにする
-		console.warn('[PixivMaster] focus style failed', error);
+		console.warn('[GridViewer] focus style failed', error);
 	}
 	return {
 		dispose() {
 			try {
 				style?.remove();
 			} catch (error) {
-				console.warn('[PixivMaster] focus style removal failed', error);
+				console.warn('[GridViewer] focus style removal failed', error);
 			}
 			style = null;
 		},

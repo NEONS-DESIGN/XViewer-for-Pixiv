@@ -50,7 +50,7 @@ export function createNavigation(deps) {
 				sequence = await deps.extendSequence(sequence);
 			} catch (error) {
 				// 広げられなくても今の作品は見られる。端で止まるだけにする
-				console.warn('[PixivMaster] failed to extend sequence', error);
+				console.warn('[GridViewer] failed to extend sequence', error);
 				return;
 			} finally {
 				extending = false;
