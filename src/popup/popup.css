@@ -6,15 +6,17 @@
 	/* ブラウザ標準の部品 (チェックボックス、セレクトのピッカー、スクロールバー) も
 	   配色に追従させる。これが無いとライトにしても白い枠の中に暗いピッカーが出る */
 	color-scheme: dark;
-	--bg: #14161c;
-	--surface: #1d212b;
+	/* ダークの地の色は pixiv 本体 (charcoal) の実測値。viewer.css と同じ値にする。
+	   --bg = --charcoal-background2 (#000000)、--surface = --charcoal-background1 (#1f1f1f) */
+	--bg: #000000;
+	--surface: #1f1f1f;
 	--fg: #eff0f4;
 	--muted: #9aa0b4;
-	--border: #262b38;
+	--border: #333333;
 	--divider: rgba(255, 255, 255, 0.12);
-	--control-bg: #1d212b;
-	--control-border: #333846;
-	--control-hover: #262b38;
+	--control-bg: #1f1f1f;
+	--control-border: #3a3a3a;
+	--control-hover: #333333;
 	--hover: rgba(255, 255, 255, 0.08);
 	--accent: #4ea3d6;
 	--on-accent: #04121a;
