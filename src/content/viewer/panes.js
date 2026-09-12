@@ -105,7 +105,8 @@ export async function renderWork(detail, session, settings, targets) {
 	}
 
 	if (plan.comments && sidebarPane) {
-		commentsPane = createComments({ doc, container: sidebarPane.commentsSlot() });
+		// 「上部へ」はサイドバーそのものを先頭へ戻す。区画の中からは届かないので渡す
+		commentsPane = createComments({ doc, container: sidebarPane.commentsSlot(), scrollTarget: sidebar });
 		void commentsPane.load(detail);
 	}
 	if (plan.actions && sidebarPane) {
