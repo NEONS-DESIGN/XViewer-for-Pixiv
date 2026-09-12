@@ -67,15 +67,19 @@
 
 :host([data-theme='light']) {
 	color-scheme: light;
-	--bg: #f5f6f8;
+	/* ライトも pixiv 本体 (charcoal) の実測値。地は --charcoal-background1 (#ffffff) */
+	--bg: #ffffff;
 	--surface: #ffffff;
 	--fg: #1c1e26;
 	--muted: #5c6275;
-	--border: #d6d9e0;
-	--divider: rgba(0, 0, 0, 0.12);
+	/* 線は pixiv が実際に引いている rgba(0,0,0,0.08) (ダーク側の rgba(255,255,255,0.12) と対) と、
+	   それを白地で不透明にした #ebebeb。地との明暗差はダークの #1f1f1f/#333333 と同じ比に揃えてある */
+	--border: #ebebeb;
+	--divider: rgba(0, 0, 0, 0.08);
 	--control-bg: #ffffff;
-	--control-border: #c5c9d3;
-	--control-hover: #e9ebf0;
+	/* 枠は --charcoal-surface1-press。ホバーの地 (#ebebeb) より濃いので、ホバー中も輪郭が残る */
+	--control-border: #d6d6d6;
+	--control-hover: #ebebeb;
 	--hover: rgba(0, 0, 0, 0.05);
 	/* ライトは白文字を載せる前提で暗くしてある。今の組み合わせは約 5.5:1 */
 	--accent: #1f7fb8;
