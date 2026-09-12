@@ -12,15 +12,20 @@
    Shadow DOM の中なので :root ではなく :host に置く。 */
 :host {
 	color-scheme: dark;
-	--bg: #14161c;
-	--surface: #1d212b;
+	/* ダークの地の色は pixiv 本体 (charcoal) の実測値に合わせてある。
+	   --bg = --charcoal-background2 (#000000)、--surface = --charcoal-background1 (#1f1f1f)。
+	   ビュワーは pixiv の上に重なるので、地の色がずれると本体から浮く (SITE_SPEC.md) */
+	--bg: #000000;
+	--surface: #1f1f1f;
 	--fg: #eff0f4;
 	--muted: #9aa0b4;
-	--border: #262b38;
+	/* 枠と操作部品も pixiv の階調 (#333 / #3a3a3a) に合わせる。
+	   地だけ差し替えると青寄りの中間色が残って濁る */
+	--border: #333333;
 	--divider: rgba(255, 255, 255, 0.12);
-	--control-bg: #1d212b;
-	--control-border: #333846;
-	--control-hover: #262b38;
+	--control-bg: #1f1f1f;
+	--control-border: #3a3a3a;
+	--control-hover: #333333;
 	--hover: rgba(255, 255, 255, 0.08);
 	--accent: #4ea3d6;
 	/* 塗りつぶしボタンの文字色。背景 var(--accent) との組み合わせで決める値なので、
