@@ -6,69 +6,7 @@
 		<link rel="stylesheet" href="popup.css" />
 	</head>
 	<body>
-		<h1>PixivMaster</h1>
-
-		<div class="field">
-			<label class="row">
-				<input type="checkbox" id="enabled" />
-				<span class="label">ビュワーを使う</span>
-			</label>
-			<p class="hint">オフにすると pixiv 標準の動作に戻ります</p>
-		</div>
-
-		<div class="field">
-			<label class="row" for="imageQuality">
-				<span class="label">画像の解像度</span>
-			</label>
-			<select id="imageQuality">
-				<option value="regular">標準 (長辺 1200px)</option>
-				<option value="original">原寸</option>
-			</select>
-			<p class="hint">原寸は鮮明ですが、読み込みが重くなります</p>
-		</div>
-
-		<div class="field">
-			<label class="row" for="prefetch">
-				<span class="label">先読み</span>
-			</label>
-			<select id="prefetch">
-				<option value="0">しない</option>
-				<option value="1">前後 1 枚</option>
-				<option value="3">前後 3 枚</option>
-			</select>
-			<p class="hint">次のページを先に読み込んでおくと切り替えが速くなります</p>
-		</div>
-
-		<div class="field">
-			<label class="row">
-				<input type="checkbox" id="showSidebar" />
-				<span class="label">サイドバーを表示する</span>
-			</label>
-			<p class="hint">投稿文・タグ・コメントを画像の横に出します</p>
-		</div>
-
-		<div class="field">
-			<label class="row">
-				<input type="checkbox" id="closeOnBackdrop" />
-				<span class="label">背景クリックで閉じる</span>
-			</label>
-			<p class="hint">画像の外側を押したときに閉じます。誤って閉じてしまう場合はオフに</p>
-		</div>
-
-		<div class="field">
-			<label class="row" for="gridTabSkip">
-				<span class="label">グリッドの Tab 移動</span>
-			</label>
-			<select id="gridTabSkip">
-				<option value="both">ブックマークとタイトルを飛ばす</option>
-				<option value="title">タイトルだけ飛ばす</option>
-				<option value="none">飛ばさない</option>
-			</select>
-			<p class="hint">Tab キーを 1 回押すだけで次の作品へ移れます。飛ばした操作はビュワーの中で行えます</p>
-		</div>
-
-		<p class="status" id="status" role="status"></p>
-
+		<main class="popup" id="app"></main>
 		<script src="popup.js"></script>
 	</body>
 </html>

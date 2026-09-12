@@ -1,77 +1,61 @@
 /**
- * 設定画面。
- * 保存ボタンは作らず、変更のたびに保存する (UI_DESIGN_KIT §9)。
- * 見た目の反映は保存の完了を待たない。待つと押した手応えが遅れるため。
+ * 設定画面のエントリ。
+ * 設定を読んで popup-ui に描かせ、変更をそのまま保存する。
+ * 画面の組み立ては popup-ui.js が持ち、ここは保存との橋渡しだけを受け持つ。
  */
-import { loadSettings, saveSetting } from '../common/storage.js';
-import { IMAGE_QUALITY, PREFETCH_CHOICES, SETTINGS_DEFAULTS, GRID_TAB_SKIP } from '../common/constants.js';
+import { loadSettings, saveSetting, resetSettings } from '../common/storage.js';
+import { renderPopup } from './popup-ui.js';
 
-/** 保存したことを伝える表示を消すまでの時間 (ミリ秒)。 */
-const STATUS_CLEAR_MS = 1500;
+/** 保存に失敗したときに画面へ出す一言。 */
+const SAVE_FAILED = '保存できませんでした。ブラウザの設定同期を確認してください。';
 
-/** 真偽値で持つ設定と、対応する input の id。 */
-const TOGGLE_KEYS = ['enabled', 'showSidebar', 'closeOnBackdrop'];
-
-/**
- * 保存の結果を短く伝える。
- * 失敗したときは消さずに残す。ユーザーが気づかないまま値が失われるのを防ぐため。
- * @param {HTMLElement} status 表示先
- * @param {boolean} saved 保存できたか
- * @returns {void}
- */
-function announceSaved(status, saved) {
-	status.textContent = saved ? '保存しました' : '保存できませんでした';
-	if (!saved) return;
-	setTimeout(() => { status.textContent = ''; }, STATUS_CLEAR_MS);
-}
+/** 初期化に失敗したときに画面へ出す一言。 */
+const RESET_FAILED = '初期化できませんでした。ブラウザの設定同期を確認してください。';
 
 /**
  * 画面を組み立てる。
- * @returns {Promise<void>}
+ * @returns {Promise<void>} 完了
  */
 async function main() {
-	const status = document.getElementById('status');
+	const root = document.getElementById('app');
+	if (!root) return;
 
-	// popup 自身の配色。OS の設定に合わせる。loadSettings より前に判定し、切り替わりのちらつきを防ぐ
-	const prefersLight = globalThis.matchMedia?.('(prefers-color-scheme: light)').matches;
-	if (prefersLight) document.documentElement.dataset.theme = 'light';
+	// 保存の失敗だけを画面に出す。成功は画面がそのまま変わるので言葉を足さない
+	let notice = null;
 
-	const settings = await loadSettings();
-
-	for (const key of TOGGLE_KEYS) {
-		const input = document.getElementById(key);
-		input.checked = settings[key];
-		input.addEventListener('change', () => {
-			void saveSetting(key, input.checked).then((saved) => announceSaved(status, saved));
+	/**
+	 * 設定を読み直して描き直す。
+	 * @returns {Promise<void>} 完了
+	 */
+	async function refresh() {
+		const settings = await loadSettings();
+		renderPopup({
+			doc: document,
+			root,
+			settings,
+			notice,
+			onChange: (patch) => {
+				// 1 項目ずつ書く。popup-ui からは常に 1 キーだけ届く
+				const [[key, value]] = Object.entries(patch);
+				void saveSetting(key, value).then((saved) => {
+					if (saved) return;
+					notice = SAVE_FAILED;
+					void refresh();
+				});
+			},
+			onReset: () => {
+				void resetSettings().then((done) => {
+					notice = done ? null : RESET_FAILED;
+					return refresh();
+				});
+			},
 		});
 	}
 
-	const quality = document.getElementById('imageQuality');
-	quality.value = settings.imageQuality;
-	quality.addEventListener('change', () => {
-		// 選択肢の外の値が入ることはないが、念のため既定へ倒す
-		const value = Object.values(IMAGE_QUALITY).includes(quality.value)
-			? quality.value
-			: SETTINGS_DEFAULTS.imageQuality;
-		void saveSetting('imageQuality', value).then((saved) => announceSaved(status, saved));
-	});
-
-	const tabSkip = document.getElementById('gridTabSkip');
-	tabSkip.value = settings.gridTabSkip;
-	tabSkip.addEventListener('change', () => {
-		const value = Object.values(GRID_TAB_SKIP).includes(tabSkip.value)
-			? tabSkip.value
-			: SETTINGS_DEFAULTS.gridTabSkip;
-		void saveSetting('gridTabSkip', value).then((saved) => announceSaved(status, saved));
-	});
-
-	const prefetch = document.getElementById('prefetch');
-	prefetch.value = String(settings.prefetch);
-	prefetch.addEventListener('change', () => {
-		const value = Number(prefetch.value);
-		void saveSetting('prefetch', PREFETCH_CHOICES.includes(value) ? value : SETTINGS_DEFAULTS.prefetch)
-			.then((saved) => announceSaved(status, saved));
-	});
+	await refresh();
 }
 
-void main();
+void main().catch((error) => {
+	// ここまで来ると画面が空のままなので、原因を残して気づけるようにする
+	console.error('[PixivMaster:popup] 設定画面の表示に失敗しました', error);
+});

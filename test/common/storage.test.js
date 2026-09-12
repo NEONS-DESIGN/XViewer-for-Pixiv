@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeSettings, loadSettings, saveSetting } from '../../src/common/storage.js';
-import { SETTINGS_DEFAULTS, GRID_TAB_SKIP } from '../../src/common/constants.js';
+import { normalizeSettings, loadSettings, saveSetting, resetSettings } from '../../src/common/storage.js';
+import { SETTINGS_DEFAULTS, GRID_TAB_SKIP, POPUP_THEMES } from '../../src/common/constants.js';
 
 /**
  * chrome.storage.sync の偽物を作る。
@@ -30,6 +30,7 @@ test('normalizeSettings は正しい値をそのまま通す', () => {
 		showSidebar: false,
 		closeOnBackdrop: false,
 		gridTabSkip: GRID_TAB_SKIP.TITLE,
+		popupTheme: POPUP_THEMES.LIGHT,
 	};
 	assert.deepEqual(normalizeSettings(input), input);
 });
@@ -83,4 +84,26 @@ test('saveSetting は保存に失敗したら false を返す', async () => {
 	// 呼び出し側が画面に出せるよう、握りつぶさず成否を返すこと
 	const area = { set: async () => { throw new Error('no storage'); } };
 	assert.equal(await saveSetting('enabled', false, { area }), false);
+});
+
+test('normalizeSettings は知らない配色を既定 (OS に従う) へ倒す', () => {
+	assert.equal(normalizeSettings({ popupTheme: 'むらさき' }).popupTheme, POPUP_THEMES.SYSTEM);
+	assert.equal(normalizeSettings({}).popupTheme, POPUP_THEMES.SYSTEM);
+});
+
+test('normalizeSettings は配色の選択肢をそのまま通す', () => {
+	assert.equal(normalizeSettings({ popupTheme: POPUP_THEMES.DARK }).popupTheme, POPUP_THEMES.DARK);
+});
+
+test('resetSettings は全項目を既定で書き戻す', async () => {
+	// 1 項目ずつ消すのではなく既定を書く。読み出し側が欠けた項目を既定へ倒す実装なので
+	// 消しても同じ結果になるが、書き戻す方が storage の中身と画面の表示が一致する
+	const { area, written } = fakeArea({ enabled: false, popupTheme: POPUP_THEMES.LIGHT });
+	assert.equal(await resetSettings({ area }), true);
+	assert.deepEqual(written, { ...SETTINGS_DEFAULTS });
+});
+
+test('resetSettings は保存に失敗したら false を返す', async () => {
+	const area = { set: async () => { throw new Error('no storage'); } };
+	assert.equal(await resetSettings({ area }), false);
 });
