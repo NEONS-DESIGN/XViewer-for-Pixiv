@@ -7,6 +7,7 @@
  */
 import { createIcon } from '../common/icons.js';
 import { supportsRichOptions } from '../common/rich-select.js';
+import { DISCLAIMER, PROJECT_LICENSE, THIRD_PARTY } from '../common/licenses.js';
 import {
 	IMAGE_QUALITY,
 	PREFETCH_CHOICES,
@@ -19,15 +20,35 @@ import {
 /** 画面の題名。拡張の名前をそのまま出す。 */
 const TITLE = 'GridViewer for Pixiv';
 
-/**
- * 画面の末尾に出す非公式である旨の断り。
- * pixiv の「登録商標のガイドライン > アプリケーション、各種サービス等への使用について」が
- * 求める 2 つの表記 (プラットフォームを利用した開発である旨 / 公式の配布物ではない旨) を満たす。
- */
-const DISCLAIMER = 'pixiv プラットフォームを利用して開発した非公式の拡張機能です。ピクシブ株式会社が作成・配布するものではありません。';
-
 /** 確認の行を取り消すキー名。 */
 const ESCAPE_KEY = 'Escape';
+
+/**
+ * タブの定義。順番がそのまま画面の並びと左右キーの順になる。
+ * 設定は 1 枚のまま。分けるのは「操作する画面」と「読む画面」であって、設定項目同士ではない。
+ */
+const TABS = Object.freeze([
+	Object.freeze({ id: 'settings', label: '設定' }),
+	Object.freeze({ id: 'license', label: 'ライセンス' }),
+]);
+
+/** タブの並び自体の読み上げ名。個々のタブ名だけでは何の切り替えか分からないため。 */
+const TABS_LABEL = '表示するものの切り替え';
+
+/** タブの選択を動かすキー。ここに無いキーは握りつぶさない。 */
+const TAB_KEYS = Object.freeze({
+	PREV: 'ArrowLeft',
+	NEXT: 'ArrowRight',
+	FIRST: 'Home',
+	LAST: 'End',
+});
+
+/** ライセンスタブの見出し。 */
+const LICENSE_HEADINGS = Object.freeze({
+	disclaimer: '免責事項',
+	project: 'この拡張機能のライセンス',
+	thirdParty: '同梱している第三者の成果物',
+});
 
 /** OS の配色を尋ねるメディアクエリ。 */
 const LIGHT_QUERY = '(prefers-color-scheme: light)';
@@ -440,17 +461,208 @@ function renderResetField(doc, onReset) {
 }
 
 /**
- * 画面の末尾に出す断りを組み立てる。
- * 操作する部品ではないので、読み上げ順の最後に置くだけで良い。
+ * 外部サイトへのリンクを組み立てる。
+ * popup から開くので必ず新しいタブにし、参照元を渡さない (SPEC §13-3)。
  * @param {Document} doc 対象のドキュメント
- * @returns {HTMLElement} 断りの段落
+ * @param {string} url 行き先
+ * @returns {HTMLAnchorElement} リンク
  */
-function renderDisclaimer(doc) {
-	const footer = doc.createElement('footer');
-	footer.className = 'disclaimer';
-	footer.dataset.role = 'disclaimer';
-	footer.textContent = DISCLAIMER;
-	return footer;
+function createExternalLink(doc, url) {
+	const link = doc.createElement('a');
+	link.href = url;
+	link.textContent = url;
+	link.setAttribute('target', '_blank');
+	link.setAttribute('rel', 'noopener noreferrer');
+	return link;
+}
+
+/**
+ * 設定タブの末尾に残す 1 行を組み立てる。
+ * 本文はライセンスタブにあるが、タブを切り替えない利用者にも
+ * 非公式であることだけは届かせる。
+ * @param {Document} doc 対象のドキュメント
+ * @returns {HTMLElement} 1 行
+ */
+function renderBriefDisclaimer(doc) {
+	const note = doc.createElement('p');
+	note.className = 'disclaimer-brief';
+	note.dataset.role = 'disclaimer-brief';
+	note.textContent = DISCLAIMER.brief;
+	return note;
+}
+
+/**
+ * ライセンスタブの中身を組み立てる。
+ * 文言の出どころは `common/licenses.js`。ここでは並べるだけにする。
+ * @param {Document} doc 対象のドキュメント
+ * @returns {HTMLElement} パネル
+ */
+function renderLicensePanel(doc) {
+	const panel = doc.createElement('div');
+	panel.className = 'panel license';
+
+	const disclaimerTitle = doc.createElement('h2');
+	disclaimerTitle.textContent = LICENSE_HEADINGS.disclaimer;
+
+	const disclaimer = doc.createElement('div');
+	disclaimer.className = 'disclaimer';
+	disclaimer.dataset.role = 'disclaimer';
+	for (const line of DISCLAIMER.body) {
+		const paragraph = doc.createElement('p');
+		paragraph.textContent = line;
+		disclaimer.append(paragraph);
+	}
+
+	const projectTitle = doc.createElement('h2');
+	projectTitle.textContent = LICENSE_HEADINGS.project;
+
+	const project = doc.createElement('p');
+	project.className = 'license-item';
+	project.textContent = `${PROJECT_LICENSE.name} / ${PROJECT_LICENSE.copyright}`;
+
+	const thirdPartyTitle = doc.createElement('h2');
+	thirdPartyTitle.textContent = LICENSE_HEADINGS.thirdParty;
+
+	panel.append(disclaimerTitle, disclaimer, projectTitle, project, thirdPartyTitle);
+
+	for (const item of THIRD_PARTY) {
+		const entry = doc.createElement('div');
+		entry.className = 'license-item';
+
+		const name = doc.createElement('h3');
+		name.textContent = item.name;
+
+		const terms = doc.createElement('p');
+		terms.textContent = `${item.license} / ${item.copyright}`;
+
+		const note = doc.createElement('p');
+		note.className = 'description';
+		note.textContent = item.note;
+
+		const source = doc.createElement('p');
+		source.className = 'license-url';
+		source.append(createExternalLink(doc, item.url));
+
+		entry.append(name, terms, note, source);
+		panel.append(entry);
+	}
+
+	return panel;
+}
+
+/**
+ * 設定タブの中身を組み立てる。
+ * @param {Document} doc 対象のドキュメント
+ * @param {object} settings 現在の設定 (正規化済み)
+ * @param {(patch: object) => void} onChange 設定を変えたときの処理
+ * @param {() => void} onReset 初期化を確定したときの処理
+ * @returns {HTMLElement} パネル
+ */
+function renderSettingsPanel(doc, settings, onChange, onReset) {
+	const panel = doc.createElement('div');
+	panel.className = 'panel settings';
+
+	for (const { heading, fields } of SECTIONS) {
+		const section = doc.createElement('section');
+		section.className = 'section';
+
+		const title = doc.createElement('h2');
+		title.textContent = heading;
+		section.append(title);
+
+		for (const field of fields) {
+			section.append(field.kind === 'toggle'
+				? renderToggle(doc, field, settings, onChange)
+				: renderChoice(doc, field, settings, onChange));
+		}
+		panel.append(section);
+	}
+
+	panel.append(renderResetField(doc, onReset), renderBriefDisclaimer(doc));
+	return panel;
+}
+
+/**
+ * タブの並びを組み立て、パネルの表示と結び付ける。
+ *
+ * 切り替えは `hidden` の付け外しだけで行い、パネルを描き直さない。
+ * 描き直すとチェックボックスの状態や「設定を初期化」の確認の行が消える。
+ * @param {Document} doc 対象のドキュメント
+ * @param {{id: string, label: string, panel: HTMLElement}[]} entries タブとパネルの組
+ * @returns {HTMLElement} タブの並び
+ */
+function renderTabs(doc, entries) {
+	const list = doc.createElement('div');
+	list.className = 'tabs';
+	list.dataset.role = 'tabs';
+	list.setAttribute('role', 'tablist');
+	list.setAttribute('aria-label', TABS_LABEL);
+
+	const buttons = entries.map(({ id, label, panel }) => {
+		const button = doc.createElement('button');
+		button.type = 'button';
+		button.dataset.role = `tab-${id}`;
+		button.textContent = label;
+		button.setAttribute('role', 'tab');
+		button.setAttribute('id', `tab-${id}`);
+		button.setAttribute('aria-controls', `panel-${id}`);
+
+		panel.dataset.role = `panel-${id}`;
+		panel.setAttribute('id', `panel-${id}`);
+		panel.setAttribute('role', 'tabpanel');
+		panel.setAttribute('aria-labelledby', `tab-${id}`);
+		// パネル自体を Tab で掴めるようにする。ライセンスタブは中に操作部品が無いため、
+		// 掴めないとキーボードだけではスクロールして読み進められない
+		panel.setAttribute('tabindex', '0');
+		return button;
+	});
+
+	let current = 0;
+
+	/**
+	 * index のタブを選ぶ。
+	 * @param {number} index 選ぶタブの位置
+	 * @param {boolean} moveFocus フォーカスも動かすか (キー操作のときだけ true)
+	 * @returns {void}
+	 */
+	function select(index, moveFocus) {
+		current = index;
+		entries.forEach(({ panel }, i) => {
+			const on = i === index;
+			buttons[i].className = on ? 'tab is-on' : 'tab';
+			buttons[i].setAttribute('aria-selected', String(on));
+			// 選択中のタブだけ Tab で止める。全部止めると、タブの数だけ Tab を
+			// 押さないとパネル本体へ入れない
+			buttons[i].setAttribute('tabindex', on ? '0' : '-1');
+			panel.hidden = !on;
+		});
+		if (moveFocus) buttons[index].focus();
+	}
+
+	/** キーから次に選ぶタブの位置を出す。対応しないキーは undefined。 */
+	const MOVES = {
+		[TAB_KEYS.PREV]: (i) => (i - 1 + entries.length) % entries.length,
+		[TAB_KEYS.NEXT]: (i) => (i + 1) % entries.length,
+		[TAB_KEYS.FIRST]: () => 0,
+		[TAB_KEYS.LAST]: () => entries.length - 1,
+	};
+
+	list.addEventListener('keydown', (event) => {
+		const move = MOVES[event.key];
+		// 関係ないキーは通す。ここで握りつぶすと popup 全体のキー操作を奪う
+		if (!move) return;
+		event.preventDefault();
+		select(move(current), true);
+	});
+
+	buttons.forEach((button, index) => {
+		// クリックではフォーカスを動かさない。押した時点で既にそこにある
+		button.addEventListener('click', () => select(index, false));
+		list.append(button);
+	});
+
+	select(0, false);
+	return list;
 }
 
 /**
@@ -471,7 +683,8 @@ export function renderPopup({ doc, root, settings, onChange, onReset, notice = n
 	const parts = [renderHeader(doc, theme, onChange)];
 
 	if (notice) {
-		// 保存の失敗など。黙って消えると、利用者は変えたつもりのまま画面を閉じてしまう
+		// 保存の失敗など。黙って消えると、利用者は変えたつもりのまま画面を閉じてしまう。
+		// タブの外に置く。どのタブを見ていても目に入るようにするため
 		const message = doc.createElement('p');
 		message.className = 'notice';
 		message.dataset.role = 'notice';
@@ -480,22 +693,12 @@ export function renderPopup({ doc, root, settings, onChange, onReset, notice = n
 		parts.push(message);
 	}
 
-	for (const { heading, fields } of SECTIONS) {
-		const section = doc.createElement('section');
-		section.className = 'section';
+	const panels = {
+		settings: renderSettingsPanel(doc, settings, onChange, onReset),
+		license: renderLicensePanel(doc),
+	};
+	const entries = TABS.map(({ id, label }) => ({ id, label, panel: panels[id] }));
 
-		const title = doc.createElement('h2');
-		title.textContent = heading;
-		section.append(title);
-
-		for (const field of fields) {
-			section.append(field.kind === 'toggle'
-				? renderToggle(doc, field, settings, onChange)
-				: renderChoice(doc, field, settings, onChange));
-		}
-		parts.push(section);
-	}
-
-	parts.push(renderResetField(doc, onReset), renderDisclaimer(doc));
+	parts.push(renderTabs(doc, entries), ...entries.map(({ panel }) => panel));
 	root.replaceChildren(...parts);
 }
