@@ -33,10 +33,19 @@
 	/* 塗りつぶしボタンの文字色。背景 var(--accent) との組み合わせで決める値なので、
 	   テーマごとに必ず対で見直すこと。ダークは明るい水色の上の濃紺で約 6.8:1 */
 	--on-accent: #04121a;
-	/* フォローボタンだけは pixiv 本体と同じ「青地に白文字」にする。
-	   --accent との比は約 2.8:1 で AA には届かないが、
-	   本体の見え方に揃える判断 (docs/DECISIONS.md)。他の塗りつぶしは --on-accent のまま */
+	/* フォローボタンだけは地も pixiv 本体 (charcoal) の実測値をそのまま使う。
+	   フォロー前 = --charcoal-brand、フォロー中 = --charcoal-surface3 (SITE_SPEC.md)。
+	   白文字との比は約 3.1:1 で AA には届かないが、本体の見え方に揃える判断
+	   (docs/DECISIONS.md)。他の塗りつぶしは --accent / --on-accent のまま */
 	--follow-fg: #ffffff;
+	/* --charcoal-brand。テーマで変わらない */
+	--follow-bg: #0096fa;
+	/* --charcoal-brand-hover */
+	--follow-bg-hover: #1fa3fb;
+	/* フォロー中。--charcoal-surface3 とその hover。
+	   半端な小数は charcoal が実際に持っている値 (実測) */
+	--follow-on-bg: rgba(255, 255, 255, 0.12);
+	--follow-on-bg-hover: rgba(255, 255, 255, 0.2256);
 	/* いいね・ブックマークの色。ホバーでも「済み」でも同じ色を使い、
 	   ホバーが「押すとこの色になる」の予告になるようにする。
 	   --like は var() で引くのでテーマごとの --accent に自動で追従する。
@@ -92,6 +101,11 @@
 	--accent: #1a6b9e;
 	--on-accent: #ffffff;
 	--danger: #c0392b;
+	/* フォローの地。--charcoal-brand はテーマ非依存なので --follow-bg は差し替えない。
+	   ホバーと「フォロー中」だけライトの値へ (--charcoal-brand-hover / --charcoal-surface3) */
+	--follow-bg-hover: #0090f0;
+	--follow-on-bg: rgba(0, 0, 0, 0.04);
+	--follow-on-bg-hover: rgba(0, 0, 0, 0.0784);
 	--scrollbar-track: rgba(0, 0, 0, 0.06);
 	--scrollbar-thumb: rgba(0, 0, 0, 0.26);
 	--scrollbar-thumb-hover: rgba(0, 0, 0, 0.4);
@@ -957,26 +971,26 @@
 /* 有効になっている操作。塗りつぶしではなく色だけで示す */
 .action.is-on { color: var(--accent); border-color: var(--accent); }
 
-/* フォローだけは pixiv 本体と同じく塗りつぶす。作者行で最初に目に入る操作にする */
+/* フォローだけは pixiv 本体と同じく塗りつぶす。作者行で最初に目に入る操作にする。
+   地は本体の色をそのまま使う。ホバーも本体と同じ色を持っているので filter で作らない */
 .action-follow {
 	border-color: transparent;
-	background: var(--accent);
+	background: var(--follow-bg);
 	color: var(--follow-fg);
 	font-weight: 600;
 }
 
-.action-follow:hover:not(:disabled) { background: var(--accent); filter: brightness(1.12); }
+.action-follow:hover:not(:disabled) { background: var(--follow-bg-hover); }
 
-/* フォロー中に押すと解除になる。塗りを外して誤って押しにくくする */
+/* フォロー中に押すと解除になる。本体と同じく薄い地に落として誤って押しにくくする */
 .action-follow.is-on {
 	border-color: var(--control-border);
-	background: var(--control-bg);
+	background: var(--follow-on-bg);
 	color: var(--fg);
 	font-weight: 400;
-	filter: none;
 }
 
-.action-follow.is-on:hover:not(:disabled) { background: var(--control-hover); filter: none; }
+.action-follow.is-on:hover:not(:disabled) { background: var(--follow-on-bg-hover); }
 
 /* 押した結果は読み上げにだけ渡す。
    成功はボタン自身 (ラベル・disabled・is-on) が伝えるので画面に出さない。
