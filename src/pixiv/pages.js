@@ -20,7 +20,8 @@ const idCache = new Map();
 const CACHE_LIMIT = 20;
 
 /**
- * 覚えている ID を捨てる。テストと、ページを離れたときに使う。
+ * 覚えている ID を捨てる。今はテストからだけ呼ぶ (本体に呼び出し元は無い)。
+ * 本体では上限 CACHE_LIMIT の押し出しに任せていて、明示的に捨てる場面が無い。
  * @returns {void}
  */
 export function clearPageSourceCache() {
