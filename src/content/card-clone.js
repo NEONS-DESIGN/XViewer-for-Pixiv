@@ -44,10 +44,17 @@ export function findBadge(card) {
 	if (!thumb) return null;
 	for (const span of [...thumb.querySelectorAll('span')]) {
 		if (!/^\d+$/.test((span.textContent ?? '').trim())) continue;
-		// span からオーバーレイ層の直下まで遡る。そのノードごと足したり外したりする
+		// span からオーバーレイ層の直下 (祖先の祖先が thumb) まで遡る。そのノードごと足したり外したりする。
+		// 想定より浅い構造で thumb 自身や外まで出てしまう場合は、安全側 (バッジ無し) に倒して null を返す。
 		let node = span;
-		while (parentOf(node) && parentOf(parentOf(node)) !== thumb) node = parentOf(node);
-		return parentOf(node) === thumb ? null : node;
+		while (node !== thumb) {
+			const parent = parentOf(node);
+			const grandparent = parent ? parentOf(parent) : null;
+			if (grandparent === thumb) return node;
+			if (!parent || parent === thumb) return null;
+			node = parent;
+		}
+		return null;
 	}
 	return null;
 }
@@ -55,8 +62,9 @@ export function findBadge(card) {
 /**
  * ページ上のカードから雛形を採る。
  *
- * 画像が読み込まれていないカード (figure のまま) と、ブックマーク済みのカードは
- * 雛形にしない。前者は img ごと欠け、後者は未ブックマークの色が採れない。
+ * 画像が読み込まれていないカード (figure のまま)、ハートが見つからないカード、
+ * ブックマーク済みのカードは雛形にしない。1 番目は img ごと欠け、
+ * 2 番目・3 番目は未ブックマークの色が採れない。
  * @param {object} ul グリッドの ul
  * @param {{computedStyle?: Function}} [deps] テスト用の依存
  * @returns {{single: object, multi: object|null, heartFills: string[]}|null} 雛形。採れなければ null
@@ -71,6 +79,8 @@ export function captureTemplates(ul, deps = {}) {
 			if (!card.querySelector('img')) continue;
 			const paths = heartPaths(card);
 			const fills = paths.map((path) => computed(path).fill);
+			// ハートが見つからないカードは未ブックマークの色が採れないので雛形にしない
+			if (fills.length === 0) continue;
 			if (fills.some((fill) => fill === BOOKMARKED_FILL_RGB || fill === BOOKMARKED_FILL)) continue;
 			const badge = findBadge(card);
 			if (badge && !multi) multi = card.cloneNode(true);
