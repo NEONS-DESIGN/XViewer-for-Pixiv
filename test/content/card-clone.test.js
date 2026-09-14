@@ -1,7 +1,22 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { captureTemplates, findBadge } from '../../src/content/card-clone.js';
+import { captureTemplates, findBadge, buildCard } from '../../src/content/card-clone.js';
+import { GV_CARD_ATTR } from '../../src/common/constants.js';
 import { el, makeCard, makeGrid, fakeComputedStyle } from '../helpers/card.js';
+
+/**
+ * 作品サマリの代わり。
+ * @param {object} [over] 上書きしたい値
+ * @returns {object} 作品サマリ
+ */
+function work(over = {}) {
+	return {
+		id: '777', title: '新しい作品', pageCount: 1, illustType: 0, xRestrict: 0,
+		url: 'https://i.pximg.net/c/250x250_80_a2/img-master/777_p0_square1200.jpg',
+		alt: '#オリジナル 新しい作品 - 作者のイラスト',
+		userId: '9', bookmarkData: null, ...over,
+	};
+}
 
 /**
  * 雛形を採る。getComputedStyle は偽物を渡す。
@@ -122,4 +137,97 @@ test('findBadge は想定より浅い構造でも thumb の外の無関係なノ
 	const result = findBadge(li);
 	// null か、thumb 自身か、thumb の子孫のどれかでなければならない (thumb の外は不可)
 	assert.ok(result === null || result === thumb || isDescendantOf(result, thumb));
+});
+
+test('リンクと ID を差し替える', () => {
+	const templates = capture([makeCard({ id: '1', userId: '9' })]);
+	const card = buildCard(templates, work(), { loggedIn: true });
+	for (const link of card.querySelectorAll('a[href^="/artworks/"]')) {
+		assert.equal(link.getAttribute('href'), '/artworks/777');
+	}
+	assert.equal(card.querySelector('a[data-ga4-label="thumbnail_link"]').getAttribute('data-gtm-value'), '777');
+});
+
+test('画像の src と alt を差し替え、遅延読み込みにする', () => {
+	const templates = capture([makeCard({ id: '1' })]);
+	const card = buildCard(templates, work(), { loggedIn: true });
+	const img = card.querySelector('img');
+	assert.match(img.getAttribute('src'), /777_p0_square1200\.jpg$/);
+	assert.equal(img.getAttribute('alt'), '#オリジナル 新しい作品 - 作者のイラスト');
+	assert.equal(img.getAttribute('loading'), 'lazy');
+});
+
+test('pximg 以外の画像 URL は捨ててカードを作らない', () => {
+	// API が返した URL をそのまま img へ渡さない (SPEC §9.2)
+	const templates = capture([makeCard({ id: '1' })]);
+	const card = buildCard(templates, work({ url: 'https://evil.example.com/x.jpg' }), { loggedIn: true });
+	assert.equal(card, null);
+});
+
+test('タイトルを差し替える', () => {
+	const templates = capture([makeCard({ id: '1', title: '古い作品' })]);
+	const card = buildCard(templates, work(), { loggedIn: true });
+	const links = card.querySelectorAll('a[href^="/artworks/"]');
+	const titleLink = links.find((link) => !link.querySelector('img'));
+	assert.equal(titleLink.textContent, '新しい作品');
+});
+
+test('雛形に残った aria-label を消す', () => {
+	// tab-skip.js が雛形へ前の作品名を書き込んでいる。消さないと読み上げが全部同じ名前になる
+	const templates = capture([makeCard({ id: '1', title: '古い作品', tabSkipped: true })]);
+	const card = buildCard(templates, work(), { loggedIn: true });
+	const thumb = card.querySelector('a[data-ga4-label="thumbnail_link"]');
+	assert.equal(thumb.getAttribute('aria-label'), null);
+	assert.equal(thumb.getAttribute('data-pm-label'), null);
+});
+
+test('複数枚の作品はバッジ付きの雛形を使い、数字を差し替える', () => {
+	const templates = capture([makeCard({ id: '1' }), makeCard({ id: '2', pages: 2 })]);
+	const card = buildCard(templates, work({ pageCount: 5 }), { loggedIn: true });
+	assert.equal(card.querySelector('span').textContent, '5');
+});
+
+test('複数枚の雛形が無ければバッジ無しで出す', () => {
+	// 実害はバッジが出ないことだけ。カードを落とすよりは出す
+	const templates = capture([makeCard({ id: '1' })]);
+	const card = buildCard(templates, work({ pageCount: 5 }), { loggedIn: true });
+	assert.notEqual(card, null);
+	assert.equal(card.querySelector('span'), null);
+});
+
+test('単枚の作品はバッジを外す', () => {
+	const templates = capture([makeCard({ id: '1', pages: 2 })]);
+	const card = buildCard(templates, work({ pageCount: 1 }), { loggedIn: true });
+	assert.equal(card.querySelector('span'), null);
+});
+
+test('ブックマーク済みならハートを ff4060 にする', () => {
+	const templates = capture([makeCard({ id: '1' })]);
+	const card = buildCard(templates, work({ bookmarkData: { id: '555', private: false } }), { loggedIn: true });
+	for (const path of card.querySelectorAll('path')) {
+		assert.equal(path.style.values.fill, '#ff4060');
+	}
+	assert.equal(card.getAttribute('data-gv-bookmark-id'), '555');
+});
+
+test('未ブックマークなら雛形から採った色に戻す', () => {
+	// ライトテーマでは色が違う。固定値を書かない
+	const templates = capture([makeCard({ id: '1' })]);
+	const card = buildCard(templates, work(), { loggedIn: true });
+	const fills = card.querySelectorAll('path').map((path) => path.style.values.fill);
+	assert.deepEqual(fills, ['rgb(31, 31, 31)', 'rgb(245, 245, 245)']);
+	assert.equal(card.getAttribute('data-gv-bookmark-id'), null);
+});
+
+test('未ログインならハートごと消す', () => {
+	// 押せないボタンを出さない (actions-bar.js と同じ判断)
+	const templates = capture([makeCard({ id: '1' })]);
+	const card = buildCard(templates, work(), { loggedIn: false });
+	assert.equal(card.querySelector('[data-ga4-label="bookmark_button"]'), null);
+});
+
+test('自分が作ったカードには目印が付く', () => {
+	const templates = capture([makeCard({ id: '1' })]);
+	const card = buildCard(templates, work(), { loggedIn: true });
+	assert.equal(card.getAttribute(GV_CARD_ATTR), '777');
 });
