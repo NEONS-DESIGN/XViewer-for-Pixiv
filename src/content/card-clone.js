@@ -44,10 +44,10 @@ export function heartPaths(card) {
  * カードを組むときと、継ぎ足したカードのハートを押されたときの両方から呼ぶ。
  * @param {object} card カード (li)
  * @param {boolean} bookmarked ブックマーク済みの色にするか
- * @param {string[]} heartFills 未ブックマークのときの色 (雛形から採った値)
+ * @param {string[]} [heartFills] 未ブックマークのときの色 (雛形から採った値)。無ければ指定を外す
  * @returns {void}
  */
-export function paintHeart(card, bookmarked, heartFills) {
+export function paintHeart(card, bookmarked, heartFills = []) {
 	heartPaths(card).forEach((path, index) => {
 		path.style.setProperty('fill', bookmarked ? BOOKMARKED_FILL : heartFills[index] ?? '');
 	});

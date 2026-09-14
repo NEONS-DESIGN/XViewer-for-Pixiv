@@ -1,10 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { attachInfiniteScroll, SENTINEL_TEXT } from '../../src/content/infinite.js';
+import {
+	attachInfiniteScroll, SENTINEL_TEXT, SENTINEL_STYLE_ID, PAGER_STYLE_ID, PAGER_HIDE_CSS,
+} from '../../src/content/infinite.js';
 import {
 	INFINITE_SCROLL, GV_CARD_ATTR, SENTINEL_ATTR, SENTINEL_MARGIN_PX,
-	BOOKMARK_BUTTON_SELECTOR, BOOKMARKED_FILL,
+	BOOKMARK_BUTTON_SELECTOR, BOOKMARKED_FILL, PAGER_SELECTOR,
 } from '../../src/common/constants.js';
+import { GV_BOOKMARK_ID_ATTR } from '../../src/content/card-clone.js';
 import { makeCard, makeGrid, el, fakeComputedStyle } from '../helpers/card.js';
 
 /**
@@ -111,9 +114,20 @@ function fakeDoc(wrap) {
 }
 
 /**
+ * head に入っている style を拾う。
+ * @param {object} doc 偽のドキュメント
+ * @param {string} [id] 絞り込む style の id。省略すると全部
+ * @returns {object[]} style 要素
+ */
+function stylesIn(doc, id) {
+	const styles = [...doc.head.querySelectorAll('style')];
+	return id === undefined ? styles : styles.filter((node) => node.getAttribute('id') === id);
+}
+
+/**
  * 継ぎ足しを組み立てる。
  * @param {{pages?: number, mode?: string, startPage?: number, trailing?: boolean,
- *   bookmarked?: boolean, actions?: object}} [options] 上書き
+ *   bookmarked?: boolean, actions?: object, onPageChange?: Function}} [options] 上書き
  * @returns {{ul: object, wrap: object, doc: object, handle: object, loaded: number[],
  *   observer: object, trailing: object|null}} 材料一式
  */
@@ -130,6 +144,7 @@ function setup(options = {}) {
 		mode: options.mode ?? INFINITE_SCROLL.ON_REACH,
 		loggedIn: true,
 		startPage: options.startPage ?? 1,
+		onPageChange: options.onPageChange,
 		deps: { createObserver: observer.create, computedStyle: fakeComputedStyle, actions: options.actions },
 	});
 	return { ul, wrap, doc, handle, loaded, observer, trailing };
@@ -164,6 +179,25 @@ test('何もしていないときの sentinel は空', () => {
 	assert.equal(sentinelMessage(wrap), '');
 });
 
+test('sentinel は中身が入る前から読み上げの領域として置かれる', () => {
+	// role="status" は「空の領域が先にあって、後から中身が変わる」形でないと鳴らない。
+	// 中身入りで差し込むと読み上げられず、出していないのと同じになる (UI_DESIGN_KIT §6)
+	const { wrap } = setup();
+	const sentinel = sentinelOf(wrap);
+	assert.equal(sentinel.getAttribute('role'), 'status');
+	assert.equal(sentinel.getAttribute('aria-live'), 'polite');
+	assert.equal(sentinel.children.length, 0, '領域は空のまま置かれていないといけない');
+});
+
+test('状態が変わっても sentinel 自身は置き換えない', async () => {
+	// 読み上げの領域は作り直すと鳴らなくなる。中の要素だけを差し替える
+	const { wrap, observer } = setup({ pages: 2 });
+	const before = sentinelOf(wrap);
+	await observer.trigger();
+	assert.equal(sentinelOf(wrap), before, 'sentinel を作り直している');
+	assert.equal(before.getAttribute('role'), 'status');
+});
+
 test('sentinel のスタイルは 1 度だけ入る', () => {
 	const { ul, wrap } = makeGrid([makeCard({ id: '1' })]);
 	const doc = fakeDoc(wrap);
@@ -175,7 +209,7 @@ test('sentinel のスタイルは 1 度だけ入る', () => {
 	});
 	attach().dispose();
 	attach().dispose();
-	assert.equal([...doc.head.querySelectorAll('style')].length, 1);
+	assert.equal(stylesIn(doc, SENTINEL_STYLE_ID).length, 1);
 });
 
 test('下まで来たら次のページを継ぎ足す', async () => {
@@ -280,7 +314,8 @@ test('失敗したら sentinel に文言と再試行ボタンが出る', async (
 	const { wrap, observer } = setupFlaky();
 	await observer.trigger();
 	assert.equal(sentinelMessage(wrap), SENTINEL_TEXT.ERROR);
-	// 失敗の通知は role="alert" の段落 (UI_DESIGN_KIT §6)
+	// 失敗の通知は role="alert" の段落 (UI_DESIGN_KIT §6)。
+	// alert は後から差し込んでも鳴るので、こちらは中の段落に持たせる
 	assert.equal(sentinelOf(wrap).querySelector('p').getAttribute('role'), 'alert');
 	const button = retryButton(wrap);
 	assert.ok(button, '再試行ボタンが出ていない');
@@ -318,19 +353,87 @@ test('読み込み中は読み込み中と出る', async () => {
 	});
 	const pending = observer.trigger();
 	assert.equal(sentinelMessage(wrap), SENTINEL_TEXT.LOADING);
-	// 読み上げにも伝わる形にする
-	assert.equal(sentinelOf(wrap).querySelector('p').getAttribute('role'), 'status');
+	// 読み上げは永続する sentinel の role="status" が受け持つ。段落側には持たせない
+	assert.equal(sentinelOf(wrap).getAttribute('role'), 'status');
+	assert.equal(sentinelOf(wrap).querySelector('p').getAttribute('role'), null);
 	assert.equal(retryButton(wrap), null, '読み込み中に再試行ボタンを出さない');
 	release();
 	await pending;
 	assert.equal(sentinelMessage(wrap), '', '終わったのに表示が残っている');
 });
 
+test('先読みの途中でモードを変えても読み込み中の表示が残らない', async () => {
+	// 先読みの待ちから早く抜けたときに表示を戻し損ねると、スピナーが回り続ける
+	let release = () => {};
+	const gate = new Promise((resolve) => { release = resolve; });
+	let entered = () => {};
+	const reached = new Promise((resolve) => { entered = resolve; });
+	const { ul, wrap } = makeGrid([makeCard({ id: '1' })]);
+	const observer = fakeObserver();
+	const source = {
+		async pageCount() { return 5; },
+		async loadPage(page) {
+			// 先読み (3 ページ目) だけ待たせる
+			if (page === 3) {
+				entered();
+				await gate;
+			}
+			return [{ id: `${page}`, title: '作品', pageCount: 1, userId: '9', url: `https://i.pximg.net/${page}.jpg`, alt: '作品', bookmarkData: null }];
+		},
+	};
+	const handle = attachInfiniteScroll(fakeDoc(wrap), {
+		ul, source, mode: INFINITE_SCROLL.PREFETCH, loggedIn: true, startPage: 1,
+		deps: { createObserver: observer.create, computedStyle: fakeComputedStyle },
+	});
+	const pending = observer.trigger();
+	await reached;
+	assert.equal(sentinelMessage(wrap), SENTINEL_TEXT.LOADING);
+	handle.setMode(INFINITE_SCROLL.ON_REACH);
+	release();
+	await pending;
+	assert.equal(sentinelMessage(wrap), '', 'モードが変わったせいで読み込み中の表示が残っている');
+});
+
+test('表示の組み立てが途中で失敗しても中途半端な中身を残さない', async () => {
+	// state だけ進めると、中身が半端なまま次に同じ状態を頼まれても組み直せなくなる
+	const { ul, wrap } = makeGrid([makeCard({ id: '1' })]);
+	const doc = fakeDoc(wrap);
+	let failButton = true;
+	doc.createElement = (tag) => {
+		if (tag === 'button' && failButton) {
+			failButton = false;
+			throw new Error('boom');
+		}
+		return el(tag);
+	};
+	const observer = fakeObserver();
+	let calls = 0;
+	const source = {
+		async pageCount() { return 3; },
+		async loadPage() {
+			calls += 1;
+			throw new Error(`boom ${calls}`);
+		},
+	};
+	attachInfiniteScroll(doc, {
+		ul, source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
+		deps: { createObserver: observer.create, computedStyle: fakeComputedStyle },
+	});
+	await observer.trigger();
+	// 再試行ボタンを作れなかった。押せない文言だけを残さない
+	assert.equal(sentinelOf(wrap).children.length, 0, '半端な中身が残っている');
+	assert.equal(retryButton(wrap), null);
+	await observer.trigger();
+	assert.ok(retryButton(wrap), '一度失敗したら二度と組み直せなくなっている');
+	assert.equal(sentinelMessage(wrap), SENTINEL_TEXT.ERROR);
+});
+
 test('読み切ったら読み終わりと出て、再試行ボタンは出ない', async () => {
 	const { wrap, observer } = setup({ pages: 2 });
 	await observer.trigger();
 	assert.equal(sentinelMessage(wrap), SENTINEL_TEXT.DONE);
-	assert.equal(sentinelOf(wrap).querySelector('p').getAttribute('role'), 'status');
+	assert.equal(sentinelOf(wrap).getAttribute('role'), 'status');
+	assert.equal(sentinelOf(wrap).querySelector('p').getAttribute('role'), null);
 	assert.equal(retryButton(wrap), null);
 });
 
@@ -361,6 +464,109 @@ test('雛形が採れなければ何もしない', () => {
 test('雛形が採れていれば動いている', () => {
 	const { handle } = setup();
 	assert.equal(handle.isActive(), true);
+});
+
+test('雛形が採れたら本体のページャを隠す CSS が入る', () => {
+	const { doc } = setup();
+	const styles = stylesIn(doc, PAGER_STYLE_ID);
+	assert.equal(styles.length, 1, 'ページャを隠す style が入っていない');
+	assert.equal(styles[0].textContent, PAGER_HIDE_CSS);
+	assert.ok(styles[0].textContent.includes(PAGER_SELECTOR), 'ページャのセレクタで隠していない');
+});
+
+test('雛形が採れなければページャを隠さない', () => {
+	// 継ぎ足せないのにページ送りの手段を消してはいけない
+	const { ul, wrap } = makeGrid([makeCard({ id: '1', loaded: false })]);
+	const doc = fakeDoc(wrap);
+	const handle = attachInfiniteScroll(doc, {
+		ul, source: fakeSource(3).source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
+		deps: { createObserver: fakeObserver().create, computedStyle: fakeComputedStyle },
+	});
+	assert.equal(handle.isActive(), false);
+	assert.equal(stylesIn(doc).length, 0, '継ぎ足せないのに style を入れている');
+});
+
+test('sentinel を置けなければページャを隠さない', () => {
+	// 監視を張れずに継ぎ足しを諦めた場合も、ページ送りの手段は残さないといけない
+	const { ul, wrap } = makeGrid([makeCard({ id: '1' })]);
+	const doc = fakeDoc(wrap);
+	const createObserver = () => ({
+		observe() { throw new Error('observe failed'); },
+		unobserve() {},
+		disconnect() {},
+	});
+	const handle = attachInfiniteScroll(doc, {
+		ul, source: fakeSource(3).source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
+		deps: { createObserver, computedStyle: fakeComputedStyle },
+	});
+	assert.equal(handle.isActive(), false);
+	assert.equal(stylesIn(doc, PAGER_STYLE_ID).length, 0, '継ぎ足せないのにページャを隠している');
+});
+
+test('dispose でページャの CSS も外れる', () => {
+	// 拡張をオフにしたらページャは元へ戻る
+	const { doc, handle } = setup();
+	assert.equal(stylesIn(doc, PAGER_STYLE_ID).length, 1);
+	handle.dispose();
+	assert.equal(stylesIn(doc, PAGER_STYLE_ID).length, 0, 'ページャが隠れたまま残っている');
+});
+
+test('ページャの CSS は二重に入らない', () => {
+	// 同じ doc で組み直しても 1 枚だけ
+	const { ul, wrap } = makeGrid([makeCard({ id: '1' })]);
+	const doc = fakeDoc(wrap);
+	const attach = () => attachInfiniteScroll(doc, {
+		ul, source: fakeSource(3).source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
+		deps: { createObserver: fakeObserver().create, computedStyle: fakeComputedStyle },
+	});
+	const first = attach();
+	const second = attach();
+	assert.equal(stylesIn(doc, PAGER_STYLE_ID).length, 1);
+	second.dispose();
+	first.dispose();
+	assert.equal(stylesIn(doc, PAGER_STYLE_ID).length, 0);
+});
+
+test('ページを継ぎ足したら ?p= の変更を知らせる', async () => {
+	const pages = [];
+	const { observer } = setup({ onPageChange: (page) => pages.push(page) });
+	await observer.trigger();
+	assert.deepEqual(pages, [2]);
+});
+
+test('継ぎ足すたびに ?p= の変更を知らせる', async () => {
+	const pages = [];
+	const { observer } = setup({ pages: 5, onPageChange: (page) => pages.push(page) });
+	await observer.trigger();
+	await observer.trigger();
+	assert.deepEqual(pages, [2, 3]);
+});
+
+test('読み切る最後のページも知らせる', async () => {
+	const pages = [];
+	const { observer } = setup({ pages: 2, onPageChange: (page) => pages.push(page) });
+	await observer.trigger();
+	assert.deepEqual(pages, [2]);
+});
+
+test('空のページで終わったときは知らせない', async () => {
+	// 1 枚も並んでいないのに ?p= を進めると、リロードで空のページが開く
+	const pages = [];
+	const { observer } = setup({ startPage: 3, pages: 3, onPageChange: (page) => pages.push(page) });
+	await observer.trigger();
+	assert.deepEqual(pages, []);
+});
+
+test('?p= の知らせが投げても継ぎ足しは続く', async () => {
+	const { ul, loaded, observer } = setup({
+		pages: 5,
+		onPageChange() { throw new Error('boom'); },
+	});
+	await observer.trigger();
+	assert.deepEqual(loaded, [2], 'ページは読めている');
+	assert.equal(addedCards(ul).length, 2, '知らせの失敗に巻き込まれてカードが並んでいない');
+	await observer.trigger();
+	assert.deepEqual(loaded, [2, 3], '次の継ぎ足しまで止まっている');
 });
 
 test('dispose で継ぎ足したカードと sentinel が消える', async () => {
@@ -649,6 +855,27 @@ test('返事を待っている間の二度押しは捨てる', async () => {
 	await second;
 	assert.deepEqual(calls, ['21'], '連打で 2 回送っている');
 	assert.equal(card.getAttribute('data-gv-bookmark-id'), '999');
+});
+
+test('カードの属性が読めなくても押せなくなったままにならない', async () => {
+	// 属性の読み取りで投げると finally を通らず、そのカードが二度と押せなくなる
+	const calls = [];
+	const { ul, observer } = setup({ actions: fakeActions(calls) });
+	await observer.trigger();
+	const card = addedCard(ul, '21');
+	const original = card.getAttribute;
+	let failed = false;
+	card.getAttribute = (name) => {
+		if (!failed && name === GV_BOOKMARK_ID_ATTR) {
+			failed = true;
+			throw new Error('boom');
+		}
+		return original(name);
+	};
+	await assert.doesNotReject(async () => { await pressHeart(card); });
+	assert.deepEqual(calls, [], '属性が読めないのに送っている');
+	await pressHeart(card);
+	assert.deepEqual(calls, [['add', '21', false]], '二度と押せなくなっている');
 });
 
 test('複数枚バッジのアイコンまで塗らない', async () => {
