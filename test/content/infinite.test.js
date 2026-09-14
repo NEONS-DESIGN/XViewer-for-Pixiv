@@ -314,9 +314,11 @@ test('失敗したら sentinel に文言と再試行ボタンが出る', async (
 	const { wrap, observer } = setupFlaky();
 	await observer.trigger();
 	assert.equal(sentinelMessage(wrap), SENTINEL_TEXT.ERROR);
-	// 失敗の通知は role="alert" の段落 (UI_DESIGN_KIT §6)。
-	// alert は後から差し込んでも鳴るので、こちらは中の段落に持たせる
-	assert.equal(sentinelOf(wrap).querySelector('p').getAttribute('role'), 'alert');
+	// 読み上げの領域は sentinel の 1 つだけ。中に role="alert" を入れて入れ子にすると、
+	// 実装によっては外側の polite 領域も鳴って二重に読み上げられる
+	assert.equal(sentinelOf(wrap).querySelector('p').getAttribute('role'), null, 'live region が入れ子になっている');
+	// 失敗は気づいてほしいので、sentinel 側の強さを assertive へ切り替える (UI_DESIGN_KIT §6)
+	assert.equal(sentinelOf(wrap).getAttribute('aria-live'), 'assertive');
 	const button = retryButton(wrap);
 	assert.ok(button, '再試行ボタンが出ていない');
 	assert.equal(button.textContent, SENTINEL_TEXT.RETRY);
@@ -333,6 +335,8 @@ test('再試行ボタンを押すと読み直し、成功したら表示が消�
 	assert.equal(addedCards(ul).length, 1, '再試行でカードが増えていない');
 	assert.equal(retryButton(wrap), null, '成功したのに再試行ボタンが残っている');
 	assert.equal(sentinelMessage(wrap), '');
+	// 失敗の間だけ assertive。抜けたら polite へ戻さないと、以降の文言まで割り込んで読まれる
+	assert.equal(sentinelOf(wrap).getAttribute('aria-live'), 'polite', 'assertive のまま残っている');
 });
 
 /**

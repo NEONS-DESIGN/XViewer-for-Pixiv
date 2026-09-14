@@ -298,18 +298,18 @@ export function attachInfiniteScroll(doc, options) {
 	/**
 	 * sentinel の中に文言を 1 行出す。
 	 *
-	 * 読み上げは永続する sentinel の role="status" が受け持つので、
-	 * 普通の文言に role は付けない。失敗の文言だけは role="alert" を持たせる
-	 * (alert は後から差し込んでも鳴るが、status は空の領域が先に無いと鳴らない)。
+	 * 読み上げは永続する sentinel の live region が丸ごと受け持つので、
+	 * 中の段落には role を付けない。失敗の段落へ role="alert" を持たせると
+	 * role="status" の内側で live region が入れ子になり、実装によっては
+	 * 外側の polite 領域も鳴って二重に読み上げられる余地が残る。
+	 * 失敗を強く伝えるのは sentinel 側の aria-live の切り替えで行う (showState)。
 	 * @param {string} text 文言
-	 * @param {boolean} [isError] 失敗の文言か
+	 * @param {boolean} [isError] 失敗の文言か (色を変えるためだけに使う)
 	 * @returns {void}
 	 */
 	function appendMessage(text, isError = false) {
 		const line = doc.createElement('p');
 		line.setAttribute('class', isError ? `${SENTINEL_CLASS.TEXT} ${SENTINEL_CLASS.ERROR}` : SENTINEL_CLASS.TEXT);
-		// 失敗の通知は role="alert" の段落 (UI_DESIGN_KIT §6)
-		if (isError) line.setAttribute('role', 'alert');
 		line.textContent = text;
 		sentinel.appendChild(line);
 	}
@@ -322,9 +322,14 @@ export function attachInfiniteScroll(doc, options) {
 	 * @returns {void}
 	 */
 	function showState(next) {
-		// 同じ状態を作り直さない。role="alert" が読み上げで繰り返し鳴るのを避ける
+		// 同じ状態を作り直さない。失敗の読み上げが繰り返し鳴るのを避ける
 		if (!sentinel || state === next) return;
 		try {
+			// live region の強さは中身を変える前に決める。後から変えると
+			// 変更前の値で読み上げられることがある。失敗だけは気づいてほしいので
+			// assertive、それ以外は polite (UI_DESIGN_KIT §6)。
+			// 中に role="alert" の段落を入れる手は採らない (appendMessage の注記)
+			sentinel.setAttribute('aria-live', next === SENTINEL_STATE.ERROR ? 'assertive' : 'polite');
 			// innerHTML は使わない。textContent = '' で子をまとめて落とす
 			sentinel.textContent = '';
 			if (next === SENTINEL_STATE.LOADING) {
@@ -355,6 +360,8 @@ export function attachInfiniteScroll(doc, options) {
 			console.warn('[GridViewer] infinite scroll status render failed', error);
 			try {
 				sentinel.textContent = '';
+				// 中身が空なら強さも idle と揃えておく。assertive のまま残さない
+				sentinel.setAttribute('aria-live', 'polite');
 			} catch { /* 空にもできないなら中身には触らない */ }
 			state = SENTINEL_STATE.IDLE;
 		}
@@ -597,7 +604,9 @@ export function attachInfiniteScroll(doc, options) {
 		sentinel.setAttribute(SENTINEL_ATTR, '');
 		// 読み上げの領域は「空のものが先にあって、後から中身が変わる」形でないと鳴らない
 		// (中身入りで差し込むと status は読まれない)。永続する sentinel 自身に持たせ、
-		// 中の要素だけを差し替える (UI_DESIGN_KIT §6)
+		// 中の要素だけを差し替える (UI_DESIGN_KIT §6)。
+		// 領域はここ 1 つだけ。中に role="alert" を入れて入れ子にはしない。
+		// 強さ (polite / assertive) は状態に応じて showState が切り替える
 		sentinel.setAttribute('role', 'status');
 		sentinel.setAttribute('aria-live', 'polite');
 		// ul の中に入れると flex アイテムとしてカード 1 枚分の隙間になる。
