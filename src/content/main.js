@@ -259,11 +259,17 @@ function isGridDetached() {
  * @returns {void}
  */
 function syncInfinite() {
+	// 自分のモーダルを開いている間 URL は /artworks/{id} で、対象外のページに見える。
+	// ここで判断すると継ぎ足したカードごと撤去してしまうので触らない
+	// (設定を変えても、閉じたときの handleLocationChange() が必ず追従する)
+	if (isViewingOwnWork()) return;
 	const wanted = settings?.infiniteScroll ?? INFINITE_SCROLL.OFF;
 	const page = wanted === INFINITE_SCROLL.OFF ? null : infiniteTargetPage(location.pathname);
 	// タブが変われば並ぶ作品も変わるので、作者だけでなく種別もキーに入れる
 	const key = page ? [page.userId, page.category ?? ''].join(PAGE_KEY_SEPARATOR) : null;
-	if (key !== null && key === infiniteKey && !isGridDetached()) {
+	// 同じグリッドを描き直された場合の張り直しか。初めて張るのかをここで見分ける
+	const reattach = key !== null && key === infiniteKey;
+	if (reattach && !isGridDetached()) {
 		// 同じグリッドを見続けている。設定の変更はモードの差し替えだけで追従する。
 		// ここで作り直すと、継ぎ足したカードが消えて読み進めた場所を失う
 		infinite?.setMode(wanted);
@@ -287,12 +293,23 @@ function syncInfinite() {
 			source: createPageSource(page.userId, page.category),
 			mode: wanted,
 			loggedIn: Boolean(readSession(document)?.isLoggedIn),
-			// ?p=3 を直接開かれていることがある。続きはそのページの次から読む
-			startPage: parsePageParam(location.search),
+			// ?p=3 を直接開かれていることがあるので、初回はそのページの次から読む。
+			// 張り直しのときは使えない。?p= は自分がスクロールで書いた値で、
+			// 描き直された ul には 1 ページ目しか並んでいないため
+			startPage: reattach ? 1 : parsePageParam(location.search),
 			onPageChange: writePageParam,
 		});
+		// 雛形が採れない / sentinel を置けないと inactiveHandle が返る。
+		// 掴んだのが描き途中の ul だっただけかもしれないので、張れていない扱いにして次の機会へ回す。
+		// (キーも捨てる。残すと「同じグリッド」と見なされて二度と試されない)
+		if (!infinite.isActive()) {
+			infinite = null;
+			infiniteKey = null;
+			infiniteList = null;
+		}
 	} catch (error) {
-		// 継ぎ足せなくても pixiv 標準のページャは残る。閲覧そのものは壊さない
+		// 継ぎ足せなくても pixiv 標準のページャは残る。閲覧そのものは壊さない。
+		// キーは残すので、同じグリッドにいる限り作り直しは繰り返さない
 		console.warn('[GridViewer] infinite scroll setup failed', error);
 		infinite = null;
 	}
@@ -382,7 +399,7 @@ function startNavigationWatch() {
 			// (URL が変わらないので handleLocationChange() が来ない)。
 			// グリッドを描き直されて張り先が外れたときも、ここで張り直す。
 			// 張れているうちは何もしないので、費用は間隔ごとに判定 1 回で済む
-			if (!infinite || isGridDetached()) syncInfinite();
+			if (!infinite?.isActive() || isGridDetached()) syncInfinite();
 		}, LOCATION_CHECK_DELAY_MS);
 	});
 	observer.observe(document.body, { childList: true, subtree: true });
