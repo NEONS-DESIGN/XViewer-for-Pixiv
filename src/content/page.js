@@ -100,3 +100,15 @@ export function isProfileHome(pathname) {
 export function isInfiniteScrollTarget(pathname) {
 	return USER_WORKS_TAB_PATH_PATTERN.test(pathname);
 }
+
+/**
+ * URL のクエリから ?p= のページ番号を読む。
+ * 数として読めない値 (数でない / 0 以下 / 小数) は、ページ指定なしと同じ 1 として扱う。
+ * pixiv のページャは 1 始まりなので、下限は 1 になる (SITE_SPEC §3)。
+ * @param {string} search location.search ('?p=3' の形。先頭の ? は有っても無くてもよい)
+ * @returns {number} ページ番号 (1 以上の整数)
+ */
+export function parsePageParam(search) {
+	const raw = Number(new URLSearchParams(search ?? '').get('p'));
+	return Number.isInteger(raw) && raw > 0 ? raw : 1;
+}
