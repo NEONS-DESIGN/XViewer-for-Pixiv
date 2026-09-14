@@ -139,7 +139,23 @@ function injectSentinelStyle(doc) {
  * @returns {{isActive: () => boolean, setMode: (mode: string) => void, dispose: () => void}} 操作
  */
 function inactiveHandle() {
-	return { isActive: () => false, setMode() {}, dispose() {} };
+	return {
+		/**
+		 * 継ぎ足しが動いているか。この操作では常に false。
+		 * @returns {boolean} 常に false
+		 */
+		isActive: () => false,
+		/**
+		 * モードを切り替える。動いていないので何もしない。
+		 * @returns {void}
+		 */
+		setMode() {},
+		/**
+		 * 撤去する。何も置いていないので何もしない。
+		 * @returns {void}
+		 */
+		dispose() {},
+	};
 }
 
 /**

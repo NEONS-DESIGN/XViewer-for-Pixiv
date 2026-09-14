@@ -355,6 +355,34 @@ test('dispose で継ぎ足したカードと sentinel が消える', async () =>
 	assert.equal(handle.isActive(), false, 'dispose 後は動いていない');
 });
 
+test('observe() が投げても observer は切られ、sentinel も残らない', () => {
+	const { ul, wrap } = makeGrid([makeCard({ id: '1' })]);
+	let disconnected = 0;
+	const createObserver = () => ({
+		observe() { throw new Error('observe failed'); },
+		unobserve() {},
+		disconnect() { disconnected += 1; },
+	});
+	const { source } = fakeSource(3);
+	const handle = attachInfiniteScroll(fakeDoc(wrap), {
+		ul, source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
+		deps: { createObserver, computedStyle: fakeComputedStyle },
+	});
+	assert.equal(disconnected, 1, '投げた observer が切られずに残っている');
+	assert.equal(handle.isActive(), false);
+	assert.equal(sentinelOf(wrap), null, 'sentinel が残っている');
+});
+
+test('sentinel の撤去が失敗しても継ぎ足したカードは消える', async () => {
+	// 撤去し損ねたカードが残るのは「オフにしたのに元へ戻らない」状態なので避ける
+	const { ul, wrap, handle, observer } = setup();
+	await observer.trigger();
+	assert.equal(addedCards(ul).length, 2);
+	sentinelOf(wrap).remove = () => { throw new Error('remove failed'); };
+	handle.dispose();
+	assert.equal(addedCards(ul).length, 0, 'sentinel の撤去に巻き込まれてカードが残っている');
+});
+
 test('dispose 後は見えても読まない', async () => {
 	const { handle, loaded, observer } = setup();
 	handle.dispose();
