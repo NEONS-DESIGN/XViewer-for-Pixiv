@@ -44,7 +44,9 @@ function loadIds(userId, category, get) {
 		return sortIdsDesc(categories.flatMap((name) => Object.keys(body?.[name] ?? {})));
 	})().catch((error) => {
 		// 失敗は覚えない。次に呼ばれたらもう一度取りに行く
-		idCache.delete(key);
+		// 自分が入れた Promise がまだキャッシュに居るときだけ消す。
+		// clearPageSourceCache() を挟んで既に新しい Promise に置き換わっていたら消さない
+		if (idCache.get(key) === task) idCache.delete(key);
 		throw error;
 	});
 	idCache.set(key, task);
@@ -67,6 +69,7 @@ export function createPageSource(userId, category, deps = {}) {
 			return Math.ceil(ids.length / WORKS_PER_PAGE);
 		},
 		async loadPage(page) {
+			if (page < 1) return [];
 			const ids = await loadIds(userId, category, get);
 			const slice = ids.slice((page - 1) * WORKS_PER_PAGE, page * WORKS_PER_PAGE);
 			if (slice.length === 0) return [];
