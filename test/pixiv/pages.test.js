@@ -106,3 +106,65 @@ test('失敗は投げ、覚え込まない', async () => {
 	await assert.rejects(() => source.loadPage(1));
 	assert.deepEqual((await source.loadPage(1)).map((w) => w.id), ['100']);
 });
+
+test('clearPageSourceCache を挟むと、古い呼び出しが後から失敗しても新しいキャッシュは残る', async () => {
+	// 発行中の古い loadIds が失敗で解決したとき、無条件に消すと
+	// clearPageSourceCache 後に乗った健全なキャッシュまで巻き添えで消えてしまう
+	let resolveOldProfileAll;
+	let profileAllCalls = 0;
+	const impl = async (url) => {
+		if (url.includes('/profile/all')) {
+			profileAllCalls += 1;
+			if (profileAllCalls === 1) {
+				// 1 回目 (古い呼び出し) は手動で解決するまで待たせる
+				return new Promise((resolve, reject) => {
+					resolveOldProfileAll = () => reject(new Error('boom (古い呼び出し)'));
+				});
+			}
+			// 2 回目 (clearPageSourceCache 後の新しい呼び出し) はすぐ成功する
+			return { illusts: { 100: null } };
+		}
+		const ids = [...new URL(url, 'https://www.pixiv.net').searchParams.getAll('ids[]')];
+		return { works: Object.fromEntries(ids.map((id) => [id, { id }])) };
+	};
+	const source = createPageSource('1', null, { getJsonImpl: impl });
+
+	// 1. 古い loadIds を発行 (まだ解決しない)
+	const oldPageCount = source.pageCount();
+
+	// 2. ページを離れて戻ってきた想定でキャッシュを空にし、新しい呼び出しを乗せる
+	clearPageSourceCache();
+	const newSource = createPageSource('1', null, { getJsonImpl: impl });
+	const page = await newSource.loadPage(1);
+	assert.deepEqual(page.map((w) => w.id), ['100'], '新しいキャッシュから取得できていない');
+
+	// 3. 古い呼び出しを失敗させる
+	resolveOldProfileAll();
+	await assert.rejects(() => oldPageCount);
+
+	// 4. 新しいキャッシュが古い呼び出しの失敗に巻き添えで消えていないか確認する
+	//    (消えていたら profile/all がもう一度呼ばれてしまう)
+	await newSource.loadPage(1);
+	assert.equal(profileAllCalls, 2, '古い呼び出しの失敗で新しいキャッシュが消されている');
+});
+
+test('ページ番号が 1 未満なら空配列を返す', async () => {
+	const ids = Array.from({ length: 100 }, (_, i) => String(1000 + i));
+	const { impl } = fakeGet(ids);
+	const source = createPageSource('1', null, { getJsonImpl: impl });
+	assert.deepEqual(await source.loadPage(0), []);
+	assert.deepEqual(await source.loadPage(-1), []);
+});
+
+test('応答に無い ID (非公開になった作品など) は落とす', async () => {
+	const impl = async (url) => {
+		if (url.includes('/profile/all')) {
+			return { illusts: { 300: null, 200: null, 100: null } };
+		}
+		// 200 は非公開になったなどの理由で works に含まれない想定
+		return { works: { 300: { id: '300' }, 100: { id: '100' } } };
+	};
+	const source = createPageSource('1', null, { getJsonImpl: impl });
+	const page = await source.loadPage(1);
+	assert.deepEqual(page.map((w) => w.id), ['300', '100']);
+});
