@@ -30,9 +30,10 @@ function fakeObserver() {
 /**
  * 1 ページ 2 件のページ供給の偽物。
  * @param {number} pages ページ数
+ * @param {{bookmarked?: boolean}} [options] 作品の状態
  * @returns {{source: object, loaded: number[]}} 供給と読んだページ番号
  */
-function fakeSource(pages) {
+function fakeSource(pages, options = {}) {
 	const loaded = [];
 	return {
 		loaded,
@@ -43,7 +44,8 @@ function fakeSource(pages) {
 				if (page > pages) return [];
 				return [1, 2].map((n) => ({
 					id: `${page}${n}`, title: `作品${page}-${n}`, pageCount: 1, userId: '9',
-					url: `https://i.pximg.net/${page}${n}.jpg`, alt: `作品${page}-${n}`, bookmarkData: null,
+					url: `https://i.pximg.net/${page}${n}.jpg`, alt: `作品${page}-${n}`,
+					bookmarkData: options.bookmarked ? { id: `b${page}${n}`, private: false } : null,
 				}));
 			},
 		},
@@ -88,33 +90,45 @@ function retryButton(wrap) {
 
 /**
  * 偽のドキュメント。
+ * ハートの押下を doc で受けるので、購読と ownerDocument の行き先も持たせる。
  * @param {object} wrap ul の親
- * @returns {{createElement: Function, head: object, body: object}} doc の代わり
+ * @returns {object} doc の代わり
  */
 function fakeDoc(wrap) {
-	return { createElement: (tag) => el(tag), head: el('head'), body: wrap };
+	const doc = el('#document');
+	doc.createElement = (tag) => el(tag);
+	// readSession() が引く。__NEXT_DATA__ は無い = 未ログイン扱い (トークンは空)
+	doc.getElementById = () => null;
+	doc.head = el('head');
+	doc.body = wrap;
+	// 出来事が wrap から doc まで上がれるようにする
+	wrap.ownerDocument = doc;
+	return doc;
 }
 
 /**
  * 継ぎ足しを組み立てる。
- * @param {{pages?: number, mode?: string, startPage?: number, trailing?: boolean}} [options] 上書き
- * @returns {{ul: object, wrap: object, handle: object, loaded: number[], observer: object, trailing: object|null}} 材料一式
+ * @param {{pages?: number, mode?: string, startPage?: number, trailing?: boolean,
+ *   bookmarked?: boolean, actions?: object}} [options] 上書き
+ * @returns {{ul: object, wrap: object, doc: object, handle: object, loaded: number[],
+ *   observer: object, trailing: object|null}} 材料一式
  */
 function setup(options = {}) {
 	const { ul, wrap } = makeGrid([makeCard({ id: '1' }), makeCard({ id: '2', pages: 2 })]);
 	// pixiv は ul の後ろにページャを置く。sentinel はそれより前 (= ul の直後) に入らないといけない
 	const trailing = options.trailing ? wrap.appendChild(el('nav')) : null;
-	const { source, loaded } = fakeSource(options.pages ?? 3);
+	const { source, loaded } = fakeSource(options.pages ?? 3, { bookmarked: options.bookmarked === true });
 	const observer = fakeObserver();
-	const handle = attachInfiniteScroll(fakeDoc(wrap), {
+	const doc = fakeDoc(wrap);
+	const handle = attachInfiniteScroll(doc, {
 		ul,
 		source,
 		mode: options.mode ?? INFINITE_SCROLL.ON_REACH,
 		loggedIn: true,
 		startPage: options.startPage ?? 1,
-		deps: { createObserver: observer.create, computedStyle: fakeComputedStyle },
+		deps: { createObserver: observer.create, computedStyle: fakeComputedStyle, actions: options.actions },
 	});
-	return { ul, wrap, handle, loaded, observer, trailing };
+	return { ul, wrap, doc, handle, loaded, observer, trailing };
 }
 
 test('組み立てただけでは読み込まない', () => {
@@ -468,4 +482,96 @@ test('setMode で先読みの持ち分を捨てる', async () => {
 	await observer.trigger();
 	// 捨てた分を読み直す。先読みはもうしない
 	assert.deepEqual(loaded, [2, 3, 3]);
+});
+
+/**
+ * ブックマークの更新系の偽物。呼ばれた内容を calls へ積む。
+ * @param {string[][]} calls 呼ばれた内容の置き場
+ * @returns {{addBookmark: Function, deleteBookmark: Function}} 更新系
+ */
+function fakeActions(calls) {
+	return {
+		async addBookmark(id, isPrivate) { calls.push(['add', id, isPrivate]); return '999'; },
+		async deleteBookmark(id) { calls.push(['delete', id]); },
+	};
+}
+
+test('継ぎ足したカードのハートを押すとブックマークされる', async () => {
+	const calls = [];
+	const { ul, observer } = setup({
+		actions: {
+			async addBookmark(id, isPrivate) { calls.push(['add', id, isPrivate]); return '999'; },
+			async deleteBookmark(id) { calls.push(['delete', id]); },
+		},
+	});
+	await observer.trigger();
+	const card = ul.querySelectorAll('li').find((li) => li.getAttribute(GV_CARD_ATTR) === '21');
+	await card.querySelector('button').dispatch('click', { target: card.querySelector('button'), shiftKey: false, preventDefault() {}, stopPropagation() {} });
+	assert.deepEqual(calls, [['add', '21', false]]);
+	assert.equal(card.querySelectorAll('path')[0].style.values.fill, '#ff4060');
+	assert.equal(card.getAttribute('data-gv-bookmark-id'), '999');
+});
+
+test('Shift を押しながらだと非公開ブックマークになる', async () => {
+	const calls = [];
+	const { ul, observer } = setup({
+		actions: { async addBookmark(id, isPrivate) { calls.push(isPrivate); return '999'; }, async deleteBookmark() {} },
+	});
+	await observer.trigger();
+	const card = ul.querySelectorAll('li').find((li) => li.getAttribute(GV_CARD_ATTR) === '21');
+	const button = card.querySelector('button');
+	await button.dispatch('click', { target: button, shiftKey: true, preventDefault() {}, stopPropagation() {} });
+	assert.deepEqual(calls, [true]);
+});
+
+test('ブックマーク済みをもう一度押すと外れる', async () => {
+	const calls = [];
+	const { ul, observer } = setup({
+		bookmarked: true,
+		actions: { async addBookmark() { return '1'; }, async deleteBookmark(id) { calls.push(id); } },
+	});
+	await observer.trigger();
+	const card = ul.querySelectorAll('li').find((li) => li.getAttribute(GV_CARD_ATTR) === '21');
+	const button = card.querySelector('button');
+	await button.dispatch('click', { target: button, shiftKey: false, preventDefault() {}, stopPropagation() {} });
+	assert.deepEqual(calls, ['b21'], 'bookmarkData.id で消していない');
+	assert.equal(card.getAttribute('data-gv-bookmark-id'), null);
+});
+
+test('失敗したらハートの色を戻す', async () => {
+	const { ul, observer } = setup({
+		actions: { async addBookmark() { throw new Error('boom'); }, async deleteBookmark() {} },
+	});
+	await observer.trigger();
+	const card = ul.querySelectorAll('li').find((li) => li.getAttribute(GV_CARD_ATTR) === '21');
+	const button = card.querySelector('button');
+	await button.dispatch('click', { target: button, shiftKey: false, preventDefault() {}, stopPropagation() {} });
+	assert.equal(card.querySelectorAll('path')[0].style.values.fill, 'rgb(31, 31, 31)');
+	assert.equal(card.getAttribute('data-gv-bookmark-id'), null);
+});
+
+test('本体のカードのハートには触らない', async () => {
+	// 本体のハートは React が持っている。preventDefault すると本来の動作を壊す
+	const calls = [];
+	let prevented = 0;
+	const { ul, observer } = setup({ actions: fakeActions(calls) });
+	await observer.trigger();
+	const original = ul.querySelectorAll('li').find((li) => !li.getAttribute(GV_CARD_ATTR));
+	const button = original.querySelector('button');
+	await button.dispatch('click', { target: button, shiftKey: false, preventDefault() { prevented += 1; }, stopPropagation() {} });
+	assert.deepEqual(calls, [], '本体のカードのハートを自前で処理している');
+	assert.equal(prevented, 0, '本体のハートの本来の動作を止めている');
+});
+
+test('dispose でハートの購読も外れる', async () => {
+	const calls = [];
+	const { ul, handle, observer } = setup({ actions: fakeActions(calls) });
+	await observer.trigger();
+	const card = ul.querySelectorAll('li').find((li) => li.getAttribute(GV_CARD_ATTR) === '21');
+	handle.dispose();
+	// 撤去済みのカードでも、購読が残っていれば押下を拾ってしまう。戻して確かめる
+	ul.appendChild(card);
+	const button = card.querySelector('button');
+	await button.dispatch('click', { target: button, shiftKey: false, preventDefault() {}, stopPropagation() {} });
+	assert.deepEqual(calls, [], 'dispose 後もハートの押下を拾っている');
 });
