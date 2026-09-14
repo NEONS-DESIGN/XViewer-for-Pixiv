@@ -358,6 +358,9 @@ function syncInfiniteOnce() {
 		// ?p= を動かしたのは pixiv (直接アクセス / リロード / ページャ)。
 		// pixiv はその値のページをグリッドへ並べる
 		infiniteBasePage = param;
+		// 今の URL は pixiv のもの。前に自分が書いた値はもう URL に残っていないので忘れる。
+		// 残すと、あとで pixiv がその番号へ移ったときに自分の書き込みと取り違える
+		infiniteOwnPage = null;
 	} else if (!changedGrid && detached) {
 		// ?p= はそのままでグリッドだけ描き直された。新しい ul は 1 ページ目から始まっている
 		infiniteBasePage = 1;
