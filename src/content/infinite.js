@@ -16,6 +16,7 @@ import {
 	SENTINEL_ATTR,
 	SENTINEL_MARGIN_PX,
 	BOOKMARK_BUTTON_SELECTOR,
+	PAGER_SELECTOR,
 } from '../common/constants.js';
 
 /**
@@ -46,7 +47,23 @@ const SENTINEL_CLASS = Object.freeze({
 });
 
 /** sentinel 用のスタイルを 1 枚だけ入れるための目印。 */
-const SENTINEL_STYLE_ID = 'gridviewer-sentinel-style';
+export const SENTINEL_STYLE_ID = 'gridviewer-sentinel-style';
+
+/** 本体のページャを隠す style の id。二重注入を防ぐ目印も兼ねる。 */
+export const PAGER_STYLE_ID = 'gridviewer-hide-pager';
+
+/**
+ * 本体のページャを隠す CSS。
+ * 継ぎ足しが動いている間はページ送りのリンクが要らないので消す。
+ * pickup.js と同じく、要素を消したり属性を足したりはせず style を 1 枚差し込むだけにする
+ * (pixiv は React で何度も描き直すので、JS で当てる方式だと描き直しのたびに一瞬見えてしまう)。
+ * pixiv 側の指定に競り負けないよう !important を付け、規則はこの 1 本だけに留める。
+ */
+export const PAGER_HIDE_CSS = `
+${PAGER_SELECTOR} {
+	display: none !important;
+}
+`;
 
 /**
  * sentinel の中の表示の CSS。
@@ -166,7 +183,7 @@ function inactiveHandle() {
  * 無限スクロールを始める。
  * @param {Document} doc 対象のドキュメント
  * @param {{ul: Element, source: {pageCount: () => Promise<number>, loadPage: (page: number) => Promise<object[]>},
- *   mode: string, loggedIn: boolean, startPage?: number,
+ *   mode: string, loggedIn: boolean, startPage?: number, onPageChange?: (page: number) => void,
  *   deps?: {createObserver?: Function, computedStyle?: Function, actions?: object}}} options 組み立ての材料
  * @returns {{isActive: () => boolean, setMode: (mode: string) => void, dispose: () => void}} 操作
  */
@@ -200,8 +217,49 @@ export function attachInfiniteScroll(doc, options) {
 	let observer = null;
 	/** doc にハートの購読を張ったか。dispose() で外すときの目印 */
 	let heartBound = false;
+	/** @type {object|null} 本体のページャを隠す style。隠していなければ null */
+	let pagerStyle = null;
 	/** @type {WeakSet<object>} 送信中のカード。二度押しで 2 回送らないための印 */
 	const sending = new WeakSet();
+
+	/**
+	 * 本体のページャを隠す CSS を差し込む。
+	 *
+	 * 呼ぶのは「雛形が採れて、sentinel も置けて、継ぎ足しを始められる」と決まってから。
+	 * 先に隠すと、継ぎ足せないページでページ送りの手段まで消えてしまう。
+	 * @returns {void}
+	 */
+	function hidePager() {
+		try {
+			if (!doc.head) return;
+			// 既に入っていれば足さない。dispose() で外せるよう参照は持ち直す
+			pagerStyle = doc.head.querySelector(`style[id="${PAGER_STYLE_ID}"]`);
+			if (pagerStyle) return;
+			const style = doc.createElement('style');
+			style.setAttribute('id', PAGER_STYLE_ID);
+			// innerHTML は使わない。style の中身は textContent で入れる
+			style.textContent = PAGER_HIDE_CSS;
+			doc.head.appendChild(style);
+			pagerStyle = style;
+		} catch (error) {
+			// ページャが残るだけ。継ぎ足し自体は動く
+			console.warn('[GridViewer] pager hide failed', error);
+			pagerStyle = null;
+		}
+	}
+
+	/**
+	 * 差し込んだ CSS を外し、本体のページャを元へ戻す。
+	 * @returns {void}
+	 */
+	function restorePager() {
+		try {
+			pagerStyle?.remove();
+		} catch (error) {
+			console.warn('[GridViewer] pager restore failed', error);
+		}
+		pagerStyle = null;
+	}
 
 	/**
 	 * 監視をやめる。二度呼んでも 1 回しか切らない。
@@ -239,15 +297,19 @@ export function attachInfiniteScroll(doc, options) {
 
 	/**
 	 * sentinel の中に文言を 1 行出す。
+	 *
+	 * 読み上げは永続する sentinel の role="status" が受け持つので、
+	 * 普通の文言に role は付けない。失敗の文言だけは role="alert" を持たせる
+	 * (alert は後から差し込んでも鳴るが、status は空の領域が先に無いと鳴らない)。
 	 * @param {string} text 文言
-	 * @param {string} role 読み上げへの伝え方 ('status' か 'alert')
 	 * @param {boolean} [isError] 失敗の文言か
 	 * @returns {void}
 	 */
-	function appendMessage(text, role, isError = false) {
+	function appendMessage(text, isError = false) {
 		const line = doc.createElement('p');
 		line.setAttribute('class', isError ? `${SENTINEL_CLASS.TEXT} ${SENTINEL_CLASS.ERROR}` : SENTINEL_CLASS.TEXT);
-		line.setAttribute('role', role);
+		// 失敗の通知は role="alert" の段落 (UI_DESIGN_KIT §6)
+		if (isError) line.setAttribute('role', 'alert');
 		line.textContent = text;
 		sentinel.appendChild(line);
 	}
@@ -255,13 +317,13 @@ export function attachInfiniteScroll(doc, options) {
 	/**
 	 * sentinel の中身を今の状態に合わせて作り直す (設計 §5.1)。
 	 * 失敗したときだけ再試行ボタンを出す。自動では読み直さない。
+	 * sentinel 自身は入れ替えない。読み上げの領域は作り直すと鳴らなくなる。
 	 * @param {string} next SENTINEL_STATE のいずれか
 	 * @returns {void}
 	 */
 	function showState(next) {
 		// 同じ状態を作り直さない。role="alert" が読み上げで繰り返し鳴るのを避ける
 		if (!sentinel || state === next) return;
-		state = next;
 		try {
 			// innerHTML は使わない。textContent = '' で子をまとめて落とす
 			sentinel.textContent = '';
@@ -271,25 +333,30 @@ export function attachInfiniteScroll(doc, options) {
 				// 回っている絵は読み上げに意味が無い。文言だけを伝える
 				spinner.setAttribute('aria-hidden', 'true');
 				sentinel.appendChild(spinner);
-				appendMessage(SENTINEL_TEXT.LOADING, 'status');
-				return;
-			}
-			if (next === SENTINEL_STATE.ERROR) {
-				// 失敗の通知は role="alert" の段落 (UI_DESIGN_KIT §6)
-				appendMessage(SENTINEL_TEXT.ERROR, 'alert', true);
+				appendMessage(SENTINEL_TEXT.LOADING);
+			} else if (next === SENTINEL_STATE.ERROR) {
+				appendMessage(SENTINEL_TEXT.ERROR, true);
 				const button = doc.createElement('button');
 				button.setAttribute('type', 'button');
 				button.setAttribute('class', SENTINEL_CLASS.RETRY);
 				button.textContent = SENTINEL_TEXT.RETRY;
 				button.addEventListener('click', retry);
 				sentinel.appendChild(button);
-				return;
+			} else if (next === SENTINEL_STATE.DONE) {
+				appendMessage(SENTINEL_TEXT.DONE);
 			}
-			if (next === SENTINEL_STATE.DONE) appendMessage(SENTINEL_TEXT.DONE, 'status');
 			// idle は何も出さない
+			// 組み立てに成功したときだけ状態を進める。先に進めると、投げたときに
+			// 中身と食い違ったまま「同じ状態」と見なされ、二度と組み直せなくなる
+			state = next;
 		} catch (error) {
-			// 表示が作れなくても継ぎ足し自体は動かす
+			// 表示が作れなくても継ぎ足し自体は動かす。
+			// 半端な中身は残さず空へ戻し、次の状態を必ず組み直せるようにする
 			console.warn('[GridViewer] infinite scroll status render failed', error);
+			try {
+				sentinel.textContent = '';
+			} catch { /* 空にもできないなら中身には触らない */ }
+			state = SENTINEL_STATE.IDLE;
 		}
 	}
 
@@ -346,6 +413,22 @@ export function attachInfiniteScroll(doc, options) {
 	}
 
 	/**
+	 * 今どこまで読んだかを呼び出し側へ知らせる。
+	 *
+	 * URL (?p=) は router.js の持ち物なので、ここでは history を触らない。
+	 * ビュワーのモーダルが開いている間は書かない、といった判断も呼び出し側が持つ。
+	 * @returns {void}
+	 */
+	function notifyPage() {
+		try {
+			options.onPageChange?.(lastPage);
+		} catch (error) {
+			// 知らせに失敗しても継ぎ足しは続ける。URL が追いつかないだけ
+			console.warn('[GridViewer] page change notification failed', error);
+		}
+	}
+
+	/**
 	 * 次のページを読んで並べる。読み切ったら監視をやめる。
 	 * 失敗しても自動では繰り返さない。もう一度下まで来たら読み直す。
 	 * @returns {Promise<void>}
@@ -366,6 +449,7 @@ export function attachInfiniteScroll(doc, options) {
 			}
 			render(works);
 			lastPage = next;
+			notifyPage();
 			const total = await source.pageCount();
 			if (disposed) return;
 			if (Number.isFinite(total) && lastPage >= total) {
@@ -375,9 +459,10 @@ export function attachInfiniteScroll(doc, options) {
 			// 先読みは描き終えてから。読み込みの待ちを次の操作より前に済ませる
 			if (mode === INFINITE_SCROLL.PREFETCH) {
 				const ahead = await loadQuietly(lastPage + 1);
-				// 待っている間に setMode / dispose が入ったら持ち分にしない
-				if (disposed || done || mode !== INFINITE_SCROLL.PREFETCH) return;
-				prefetched = ahead;
+				if (disposed) return;
+				// 待っている間に setMode が入ったら持ち分にしない。
+				// ここで return すると下の表示戻しに届かず、スピナーが回り続ける
+				if (mode === INFINITE_SCROLL.PREFETCH) prefetched = ahead;
 			}
 			showState(SENTINEL_STATE.IDLE);
 		} catch (error) {
@@ -447,12 +532,14 @@ export function attachInfiniteScroll(doc, options) {
 	 * @returns {Promise<void>}
 	 */
 	async function sendBookmark(card, isPrivate) {
-		const workId = card.getAttribute(GV_CARD_ATTR);
-		const bookmarkId = card.getAttribute(GV_BOOKMARK_ID_ATTR);
+		/** @type {string|null} 押す前のブックマーク ID。失敗したときの戻し先 */
+		let bookmarkId = null;
 		try {
-			// 押した結果を先に見せる。通信を待たせない。
-			// 塗りも try の中に入れる。外に出すと、投げたときに finally を通らず
-			// sending にカードが残り、そのカードが二度と押せなくなる
+			// 属性の読み取りも塗りも try の中に入れる。外に出すと、投げたときに
+			// finally を通らず sending にカードが残り、そのカードが二度と押せなくなる
+			const workId = card.getAttribute(GV_CARD_ATTR);
+			bookmarkId = card.getAttribute(GV_BOOKMARK_ID_ATTR);
+			// 押した結果を先に見せる。通信を待たせない
 			paintHeart(card, !bookmarkId, templates.heartFills);
 			// トークンは押された時点で読む。組み立て時の値を閉じ込めない
 			const token = readSession(doc)?.csrfToken ?? '';
@@ -499,6 +586,11 @@ export function attachInfiniteScroll(doc, options) {
 		doc.addEventListener('click', onHeartClick, true);
 		sentinel = doc.createElement('div');
 		sentinel.setAttribute(SENTINEL_ATTR, '');
+		// 読み上げの領域は「空のものが先にあって、後から中身が変わる」形でないと鳴らない
+		// (中身入りで差し込むと status は読まれない)。永続する sentinel 自身に持たせ、
+		// 中の要素だけを差し替える (UI_DESIGN_KIT §6)
+		sentinel.setAttribute('role', 'status');
+		sentinel.setAttribute('aria-live', 'polite');
 		// ul の中に入れると flex アイテムとしてカード 1 枚分の隙間になる。
 		// 親の末尾ではなく ul の直後に入れる。親が ul の後ろにページャ等を持つと、
 		// 末尾では sentinel がその下に落ち、rootMargin が 0 の prefetch で発火が遅れる
@@ -516,6 +608,10 @@ export function attachInfiniteScroll(doc, options) {
 		} catch { /* 置けていないので消せなくてよい */ }
 		return inactiveHandle();
 	}
+
+	// ここまで来て初めて「継ぎ足しを始められる」と決まる。本体のページャはもう要らない。
+	// これより前に隠すと、継ぎ足せないページでページ送りの手段まで消えてしまう
+	hidePager();
 
 	return {
 		/**
@@ -555,6 +651,8 @@ export function attachInfiniteScroll(doc, options) {
 			prefetched = null;
 			stopObserving();
 			unbindHeart();
+			// 隠したページャを戻す。継ぎ足しをやめた以上、ページ送りの手段が要る
+			restorePager();
 			// 撤去は別々に包む。片方が投げても、もう片方はページに残さない。
 			// 継ぎ足したカードが残るのは「拡張をオフにしたのに元へ戻らない」状態なので先に消す
 			try {

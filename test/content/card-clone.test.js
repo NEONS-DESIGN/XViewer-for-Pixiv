@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { captureTemplates, findBadge, buildCard } from '../../src/content/card-clone.js';
-import { GV_CARD_ATTR } from '../../src/common/constants.js';
+import { captureTemplates, findBadge, buildCard, paintHeart, heartPaths } from '../../src/content/card-clone.js';
+import { GV_CARD_ATTR, BOOKMARKED_FILL } from '../../src/common/constants.js';
 import { el, makeCard, makeGrid, fakeComputedStyle } from '../helpers/card.js';
 
 /**
@@ -246,4 +246,13 @@ test('自分が作ったカードには目印が付く', () => {
 	const templates = capture([makeCard({ id: '1' })]);
 	const card = buildCard(templates, work(), { loggedIn: true });
 	assert.equal(card.getAttribute(GV_CARD_ATTR), '777');
+});
+
+test('paintHeart は色の控えが無くても落ちない', () => {
+	// export された公開関数なので、呼び出し側が渡し忘れても落とさない
+	const card = makeCard({ id: '1' });
+	assert.doesNotThrow(() => paintHeart(card, true));
+	assert.deepEqual(heartPaths(card).map((path) => path.style.values.fill), [BOOKMARKED_FILL, BOOKMARKED_FILL]);
+	assert.doesNotThrow(() => paintHeart(card, false));
+	assert.deepEqual(heartPaths(card).map((path) => path.style.values.fill), ['', '']);
 });

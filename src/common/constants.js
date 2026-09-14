@@ -166,6 +166,13 @@ export const SENTINEL_ATTR = 'data-gv-sentinel';
 export const SENTINEL_MARGIN_PX = 200;
 
 /**
+ * pixiv 本体のページャ (1 2 3 ... のリンク)。ページ番号のリンクを含む nav で掴む。
+ * ページ内の nav はタブ行とページャの 2 つだけで、?p= を持つのはページャだけ (SITE_SPEC §3 実測)。
+ * クラス名 (sc-xxxx) は版ごとに変わるので掴まない。
+ */
+export const PAGER_SELECTOR = 'nav:has(a[href*="p="])';
+
+/**
  * サイドバーを縦に送るときの動き方。
  * 主文がとても長い作品では、コメントまで一気に読めたほうが楽なこともある。
  */
