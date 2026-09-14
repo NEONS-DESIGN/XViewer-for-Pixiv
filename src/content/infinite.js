@@ -72,6 +72,24 @@ export function attachInfiniteScroll(doc, options) {
 	}
 
 	/**
+	 * sentinel を見張り始める。既に見張っていれば切ってから作り直す。
+	 *
+	 * rootMargin は IntersectionObserver を作るときにしか決められないので、
+	 * モードを変えたら作り直すしかない (onReach は手前から読み始め、prefetch は手元にあるので 0)。
+	 * @returns {void}
+	 */
+	function startObserving() {
+		stopObserving();
+		observer = createObserver((entries) => {
+			if (!entries.some((entry) => entry.isIntersecting)) return undefined;
+			// 本物の IntersectionObserver は戻り値を捨てる。テストから完了を待てるように Promise を返す
+			return advance();
+		}, { rootMargin: `${mode === INFINITE_SCROLL.PREFETCH ? 0 : SENTINEL_MARGIN_PX}px` });
+		observer.observe(sentinel);
+		observing = true;
+	}
+
+	/**
 	 * 読み切った。もう監視しない。
 	 * @returns {void}
 	 */
@@ -161,13 +179,7 @@ export function attachInfiniteScroll(doc, options) {
 		const host = parentOf(ul);
 		if (!host) throw new Error('grid has no parent');
 		host.appendChild(sentinel);
-		observer = createObserver((entries) => {
-			if (!entries.some((entry) => entry.isIntersecting)) return undefined;
-			// 戻り値は本物の IntersectionObserver では捨てられる。待てる呼び出し側のために返す
-			return advance();
-		}, { rootMargin: `${mode === INFINITE_SCROLL.PREFETCH ? 0 : SENTINEL_MARGIN_PX}px` });
-		observer.observe(sentinel);
-		observing = true;
+		startObserving();
 	} catch (error) {
 		// sentinel を置けないページでは継ぎ足しを諦める。ページャはそのまま残る
 		console.warn('[GridViewer] infinite scroll setup failed', error);
@@ -181,9 +193,19 @@ export function attachInfiniteScroll(doc, options) {
 	return {
 		isActive: () => !disposed,
 		setMode(next) {
+			// 継ぎ足したカードは残す。設定を切り替えただけで読み進めた場所を失わせない
+			if (disposed || next === mode) return;
 			mode = next;
-			// 先読みの持ち分は捨てる。onReach へ戻したときに古い並びを出さないため
+			// 先読みの持ち分は捨てる。モードが変われば先読みの前提も変わる
 			prefetched = null;
+			// 読み切った後にモードを変えても監視は再開しない
+			if (done) return;
+			try {
+				startObserving();
+			} catch (error) {
+				// 監視し直せなければ継ぎ足しは止まる。ページャは残っているので閲覧は続けられる
+				console.warn('[GridViewer] infinite scroll re-observe failed', error);
+			}
 		},
 		dispose() {
 			if (disposed) return;
