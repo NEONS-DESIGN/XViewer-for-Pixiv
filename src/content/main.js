@@ -58,6 +58,13 @@ let infiniteKey = null;
  * 外れたことに気付くための手掛かりとして持つ
  */
 let infiniteList = null;
+/**
+ * 一度でも継ぎ足しを動かせたグリッドのキー。動かせていなければ null。
+ * このキーのグリッドを張り直すときは、新しい ul が 1 ページ目から始まっていると分かる。
+ * `infiniteKey` と分けてあるのは、張り直しの 1 回目が失敗して `infiniteKey` を捨てても
+ * 「一度張った」事実は消してはいけないため。捨てるのは別のグリッドへ移ったときだけ
+ */
+let infiniteBuiltKey = null;
 let router = null;
 let settings = null;
 let viewer = null;
@@ -252,6 +259,19 @@ function isGridDetached() {
 }
 
 /**
+ * 継ぎ足しを撤去し、張り先の記憶も捨てる。
+ * 「一度張った」記憶 (infiniteBuiltKey) はここでは捨てない。
+ * 同じグリッドを張り直す途中でも呼ばれるため。
+ * @returns {void}
+ */
+function disposeInfinite() {
+	infinite?.dispose();
+	infinite = null;
+	infiniteKey = null;
+	infiniteList = null;
+}
+
+/**
  * 無限スクロールを今の設定と URL に合わせる。
  *
  * ビュワーの入切とは独立に効かせる。ビュワーを使わない人も無限スクロールだけ使える
@@ -267,20 +287,22 @@ function syncInfinite() {
 	const page = wanted === INFINITE_SCROLL.OFF ? null : infiniteTargetPage(location.pathname);
 	// タブが変われば並ぶ作品も変わるので、作者だけでなく種別もキーに入れる
 	const key = page ? [page.userId, page.category ?? ''].join(PAGE_KEY_SEPARATOR) : null;
-	// 同じグリッドを描き直された場合の張り直しか。初めて張るのかをここで見分ける
-	const reattach = key !== null && key === infiniteKey;
-	if (reattach && !isGridDetached()) {
+	if (key !== null && key === infiniteKey && !isGridDetached()) {
 		// 同じグリッドを見続けている。設定の変更はモードの差し替えだけで追従する。
 		// ここで作り直すと、継ぎ足したカードが消えて読み進めた場所を失う
 		infinite?.setMode(wanted);
 		return;
 	}
+	// 一度動かせたグリッドへの張り直しか。組み立ての開始位置がここで変わる。
+	// `infiniteKey` ではなく `infiniteBuiltKey` を見る。張り直しの 1 回目が
+	// 描き途中の ul を掴んで失敗すると `infiniteKey` は捨てられるので、
+	// そちらで判定すると再挑戦が「初回」に化けて ?p= を読んでしまう
+	const reattach = key !== null && key === infiniteBuiltKey;
 	// 対象外のページへ出た / 別のグリッドへ移った / グリッドが描き直された。
 	// 前の ul に張ったものは必ず撤去する
-	infinite?.dispose();
-	infinite = null;
-	infiniteKey = null;
-	infiniteList = null;
+	disposeInfinite();
+	// 別のグリッドへ移った (または対象外へ出た) ときだけ「一度張った」記憶も捨てる
+	if (!reattach) infiniteBuiltKey = null;
 	if (!page) return;
 	const ul = findGridList(document);
 	// グリッドがまだ描かれていない。ここでは組み立てず、現れたときにもう一度呼ばれるのを待つ
@@ -302,11 +324,8 @@ function syncInfinite() {
 		// 雛形が採れない / sentinel を置けないと inactiveHandle が返る。
 		// 掴んだのが描き途中の ul だっただけかもしれないので、張れていない扱いにして次の機会へ回す。
 		// (キーも捨てる。残すと「同じグリッド」と見なされて二度と試されない)
-		if (!infinite.isActive()) {
-			infinite = null;
-			infiniteKey = null;
-			infiniteList = null;
-		}
+		if (infinite.isActive()) infiniteBuiltKey = key;
+		else disposeInfinite();
 	} catch (error) {
 		// 継ぎ足せなくても pixiv 標準のページャは残る。閲覧そのものは壊さない。
 		// キーは残すので、同じグリッドにいる限り作り直しは繰り返さない
@@ -422,6 +441,11 @@ function startNavigationWatch() {
  * @returns {void}
  */
 function stopNavigationWatch() {
+	// 監視を外すと、この先どうなっても追従できなくなる。先に後始末を済ませる。
+	// モーダルを開いたまま全部オフにされた場合、syncInfinite() はモーダル中のガードで
+	// 素通りするので、ここで解体しないと継ぎ足したカードがページに残ってしまう
+	disposeInfinite();
+	infiniteBuiltKey = null;
 	if (!navigationWatch) return;
 	navigationWatch.dispose();
 	navigationWatch = null;
