@@ -82,6 +82,8 @@ let infiniteBasePage = 1;
  * 自分が書いた値は継ぎ足した結果でしかなく、撤去すると中身と合わなくなる
  */
 let infiniteOwnPage = null;
+/** syncInfinite() を走らせている最中か。自分の ?p= の書き込みで再入するのを防ぐ目印 */
+let syncingInfinite = false;
 let router = null;
 let settings = null;
 let viewer = null;
@@ -255,6 +257,17 @@ function infiniteTargetPage(path) {
 }
 
 /**
+ * どのグリッドを見ているかを表すキーを作る。
+ * タブが変われば並ぶ作品も変わるので、作者だけでなく種別もキーに入れる。
+ * @param {string} path location.pathname
+ * @returns {string|null} グリッドのキー。対象外のページなら null
+ */
+function gridKeyOf(path) {
+	const page = infiniteTargetPage(path);
+	return page ? [page.userId, page.category ?? ''].join(PAGE_KEY_SEPARATOR) : null;
+}
+
+/**
  * 継ぎ足す先のグリッドの ul を探す。
  * 掴んでよいのは作品リンクだけ (pixiv の CSS クラス名は毎ビルド変わる。SPEC §2)。
  * @param {Document} doc 対象のドキュメント
@@ -283,9 +296,18 @@ function isGridDetached() {
  * @returns {void}
  */
 function disposeInfinite() {
+	const attachedKey = infiniteKey;
 	infinite?.dispose();
 	infinite = null;
 	infiniteKey = null;
+	// 撤去するとグリッドには pixiv が並べたぶんしか残らない。URL の ?p= もそこへ戻し、
+	// 「自分が書いた値」の記憶も揃える。URL・グリッド・記憶の 3 つを常に一致させるのが狙いで、
+	// ずれたままだと「戻ったつもりでページャを踏んだ番号」を自分の書き込みと取り違える。
+	// 張っていたグリッドをまだ見ているときだけ書く。既に別のページへ移っていたら、
+	// 今の URL は別のグリッドのものなので触らない
+	if (attachedKey !== null && attachedKey === gridKeyOf(location.pathname)) {
+		writePageParam(infiniteBasePage);
+	}
 }
 
 /**
@@ -296,6 +318,22 @@ function disposeInfinite() {
  * @returns {void}
  */
 function syncInfinite() {
+	// 自分で書いた ?p= も inject.js のフックを通って handleLocationChange() を
+	// 同期的に呼び戻す。組み立ての途中で呼び戻されると 2 本張ってしまうので、ここで閉じる
+	if (syncingInfinite) return;
+	syncingInfinite = true;
+	try {
+		syncInfiniteOnce();
+	} finally {
+		syncingInfinite = false;
+	}
+}
+
+/**
+ * 無限スクロールを今の設定と URL に合わせる本体。再入は syncInfinite() が防ぐ。
+ * @returns {void}
+ */
+function syncInfiniteOnce() {
 	// 自分のモーダルを開いている間 URL は /artworks/{id} で、対象外のページに見える。
 	// ここで判断すると継ぎ足したカードごと撤去してしまうので触らない
 	// (設定を変えても、閉じたときの handleLocationChange() が必ず追従する)
@@ -305,8 +343,7 @@ function syncInfinite() {
 	// オフにしただけでは別のグリッドへ移ったことにはならないので、
 	// このグリッドについて覚えた基準ページを失わずに済む
 	const page = infiniteTargetPage(location.pathname);
-	// タブが変われば並ぶ作品も変わるので、作者だけでなく種別もキーに入れる
-	const key = page ? [page.userId, page.category ?? ''].join(PAGE_KEY_SEPARATOR) : null;
+	const key = gridKeyOf(location.pathname);
 	const changedGrid = key !== infiniteGridKey;
 	const detached = isGridDetached();
 	if (changedGrid) {
@@ -371,13 +408,21 @@ function syncInfinite() {
  */
 function writePageParam(page) {
 	if (viewer?.isOpen()) return;
+	const previousOwn = infiniteOwnPage;
 	try {
 		const url = new URL(location.href);
-		url.searchParams.set('p', String(page));
-		history.replaceState(history.state, '', url);
-		// 書けたときだけ覚える。あとで「この ?p= は pixiv のものか自分のものか」を見分ける
+		// 1 ページ目は pixiv 自身も ?p= を付けない。付けずに揃える
+		if (page > 1) url.searchParams.set('p', String(page));
+		else url.searchParams.delete('p');
+		// 書く前に覚える。replaceState は inject.js のフックを通って同期的に
+		// handleLocationChange() を呼び戻すので、後に回すと呼び戻された先で
+		// 自分の書き込みを pixiv の書き込みと取り違える
 		infiniteOwnPage = page;
+		// 既に同じ URL なら書かない。replaceState を呼び過ぎるとブラウザに絞られる
+		if (url.href !== location.href) history.replaceState(history.state, '', url);
 	} catch (error) {
+		// 書けていないので、URL に残っているのは前に自分が書いた値のまま。記憶も戻す
+		infiniteOwnPage = previousOwn;
 		// URL がずれるだけ。継ぎ足しは続ける
 		console.warn('[GridViewer] page param update failed', error);
 	}
