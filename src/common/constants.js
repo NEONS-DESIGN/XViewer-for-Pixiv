@@ -6,6 +6,18 @@
 /** 作品リンクを拾うためのセレクタ。pixiv の CSS クラス名は当てにならないのでこれだけを使う。 */
 export const ARTWORK_LINK_SELECTOR = 'a[href^="/artworks/"]';
 
+/** カードのサムネリンク。pixiv の計測用属性で、クラス名より寿命が長い (SITE_SPEC §3 実測)。 */
+export const THUMB_LINK_SELECTOR = 'a[data-ga4-label="thumbnail_link"]';
+
+/** カードのブックマークボタンの入れ物。 */
+export const BOOKMARK_BUTTON_SELECTOR = '[data-ga4-label="bookmark_button"]';
+
+/** ブックマーク済みのハートの色 (SITE_SPEC §3 実測)。未ブックマーク側はテーマで変わるので雛形から採る。 */
+export const BOOKMARKED_FILL = '#ff4060';
+
+/** 自分が継ぎ足したカードの目印。撤去と重複判定とクリック判定に使う。 */
+export const GV_CARD_ATTR = 'data-gv-card';
+
 /**
  * プロフィールのホームに出る「ピックアップ」欄を指すセレクタ。
  * 実測ではホームの `section` はこの 1 個だけで、作品グリッドは `div` なので掛からない
