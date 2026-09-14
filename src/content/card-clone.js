@@ -65,9 +65,9 @@ export function findBadge(card) {
 /**
  * ページ上のカードから雛形を採る。
  *
- * 画像が読み込まれていないカード (figure のまま)、ハートが見つからないカード、
- * ブックマーク済みのカードは雛形にしない。1 番目は img ごと欠け、
- * 2 番目・3 番目は未ブックマークの色が採れない。
+ * 自分が継ぎ足したカード (GV_CARD_ATTR 付き)、画像が読み込まれていないカード (figure のまま)、
+ * ハートが見つからないカード、ブックマーク済みのカードは雛形にしない。
+ * 1 番目は劣化コピーの連鎖、2 番目は img ごと欠ける、3・4 番目は未ブックマークの色が採れない。
  * @param {object} ul グリッドの ul
  * @param {{computedStyle?: Function}} [deps] テスト用の依存
  * @returns {{single: object, multi: object|null, heartFills: string[]}|null} 雛形。採れなければ null
@@ -79,6 +79,8 @@ export function captureTemplates(ul, deps = {}) {
 	let heartFills = [];
 	try {
 		for (const card of [...ul.querySelectorAll('li')]) {
+			// 自分が継ぎ足したカードを雛形にすると、劣化コピーが連鎖する (原因が分かりにくい事故)
+			if (card.hasAttribute(GV_CARD_ATTR)) continue;
 			if (!card.querySelector('img')) continue;
 			const paths = heartPaths(card);
 			const fills = paths.map((path) => computed(path).fill);

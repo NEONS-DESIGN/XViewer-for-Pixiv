@@ -120,6 +120,13 @@ test('ハートが見つからないカードは雛形にしない', () => {
 	assert.equal(captureTemplates(ul, { computedStyle: fakeComputedStyle }), null);
 });
 
+test('自分が継ぎ足したカードしか無ければ null', () => {
+	// GV_CARD_ATTR 付きのカードを雛形にすると、劣化コピーが連鎖する事故になる
+	const card = makeCard({ id: '1' });
+	card.setAttribute(GV_CARD_ATTR, '1');
+	assert.equal(capture([card]), null);
+});
+
 test('findBadge は想定より浅い構造でも thumb の外の無関係なノードを返さない', () => {
 	// オーバーレイ層を挟まず、span が thumb の直接の子である極端に浅い構造
 	const li = el('li');
@@ -197,6 +204,15 @@ test('複数枚の雛形が無ければバッジ無しで出す', () => {
 
 test('単枚の作品はバッジを外す', () => {
 	const templates = capture([makeCard({ id: '1', pages: 2 })]);
+	const card = buildCard(templates, work({ pageCount: 1 }), { loggedIn: true });
+	assert.equal(card.querySelector('span'), null);
+});
+
+test('single にバッジ付きの雛形が渡されても単枚の作品はバッジを外す', () => {
+	// captureTemplates が返す single は常にバッジ無しなので、上のテストだけでは
+	// buildCard 自身のバッジ除去 (badge && !wantsBadge) を一度も通らない。
+	// buildCard は templates を引数で受け取る公開関数なので、この入力も契約上ありえる
+	const templates = { single: makeCard({ id: '1', pages: 2 }), multi: null, heartFills: ['rgb(31, 31, 31)', 'rgb(245, 245, 245)'] };
 	const card = buildCard(templates, work({ pageCount: 1 }), { loggedIn: true });
 	assert.equal(card.querySelector('span'), null);
 });
