@@ -335,6 +335,58 @@ test('再試行ボタンを押すと読み直し、成功したら表示が消�
 	assert.equal(sentinelMessage(wrap), '');
 });
 
+/**
+ * 作品は返るのに 1 枚も組めない供給で継ぎ足しを組み立てる。
+ * 画像 URL が pximg でなければ buildCard が null を返す (SPEC §9.2)。
+ * @param {{onPageChange?: Function}} [options] 上書き
+ * @returns {{ul: object, wrap: object, loaded: number[], observer: object}} 材料一式
+ */
+function setupUnbuildable(options = {}) {
+	const { ul, wrap } = makeGrid([makeCard({ id: '1' })]);
+	const observer = fakeObserver();
+	const loaded = [];
+	const source = {
+		async pageCount() { return 3; },
+		async loadPage(page) {
+			loaded.push(page);
+			return [{
+				id: '99', title: '作品', pageCount: 1, userId: '9',
+				url: 'https://example.com/99.jpg', alt: '作品', bookmarkData: null,
+			}];
+		},
+	};
+	attachInfiniteScroll(fakeDoc(wrap), {
+		ul,
+		source,
+		mode: INFINITE_SCROLL.ON_REACH,
+		loggedIn: true,
+		startPage: 1,
+		onPageChange: options.onPageChange,
+		deps: { createObserver: observer.create, computedStyle: fakeComputedStyle },
+	});
+	return { ul, wrap, loaded, observer };
+}
+
+test('作品が返っても 1 枚も組めなかったら黙って止まらず、失敗として出す', async () => {
+	// カードが増えないと sentinel も動かない。IntersectionObserver は交差が変わったときに
+	// しか鳴らないので、idle のままにすると二度と先へ進めなくなる
+	const { ul, wrap, observer } = setupUnbuildable();
+	await observer.trigger();
+	assert.equal(addedCards(ul).length, 0, '組めないはずのカードが並んでいる');
+	assert.equal(sentinelMessage(wrap), SENTINEL_TEXT.ERROR, '何も出ないまま止まっている');
+	assert.ok(retryButton(wrap), '再試行ボタンが出ていない');
+});
+
+test('1 枚も組めなかったらページを進めない', async () => {
+	// 1 枚も出ていないのに ?p= だけ進むと、URL とグリッドの中身がずれる
+	const pages = [];
+	const { loaded, wrap, observer } = setupUnbuildable({ onPageChange: (page) => pages.push(page) });
+	await observer.trigger();
+	assert.deepEqual(pages, [], '並べていないのにページの移動を知らせている');
+	await retryButton(wrap).click();
+	assert.deepEqual(loaded, [2, 2], '読み直しで同じページへ戻っていない');
+});
+
 test('読み込み中は読み込み中と出る', async () => {
 	let release = () => {};
 	const gate = new Promise((resolve) => { release = resolve; });

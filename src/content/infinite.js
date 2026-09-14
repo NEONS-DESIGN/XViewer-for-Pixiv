@@ -381,9 +381,9 @@ export function attachInfiniteScroll(doc, options) {
 	}
 
 	/**
-	 * 作品を並べる。
+	 * 作品を並べる。組めなかった作品は飛ばすので、返る数は works の数より少ないことがある。
 	 * @param {object[]} works 作品サマリ
-	 * @returns {number} 並べた数
+	 * @returns {number} 並べた数。0 なら 1 枚も組めていない
 	 */
 	function render(works) {
 		let count = 0;
@@ -431,6 +431,7 @@ export function attachInfiniteScroll(doc, options) {
 	/**
 	 * 次のページを読んで並べる。読み切ったら監視をやめる。
 	 * 失敗しても自動では繰り返さない。もう一度下まで来たら読み直す。
+	 * 作品が返っても 1 枚も組めなかったときは失敗として扱い、ページは進めない。
 	 * @returns {Promise<void>}
 	 */
 	async function advance() {
@@ -447,7 +448,15 @@ export function attachInfiniteScroll(doc, options) {
 				finish();
 				return;
 			}
-			render(works);
+			// 作品は返ってきたのに 1 枚も組めなかった (画像 URL が全て safeCdnUrl を
+			// 通らない等)。カードが増えないと sentinel も動かず、IntersectionObserver は
+			// 交差が変わったときにしか鳴らないので、放っておくと idle のまま黙って止まる。
+			// 失敗として見せて再試行ボタンを残し、lastPage も ?p= も進めない
+			// (1 枚も出ていないのにページだけ進むと、記憶と画面がずれる)
+			if (render(works) === 0) {
+				showState(SENTINEL_STATE.ERROR);
+				return;
+			}
 			lastPage = next;
 			notifyPage();
 			const total = await source.pageCount();
