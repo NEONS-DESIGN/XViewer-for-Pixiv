@@ -3,7 +3,7 @@
  * 保存ボタンは作らず変更のたびに書くので、書き込みは 1 項目ずつ。
  * 保存値が壊れていても既定へ倒して必ず描けるようにする (UI_DESIGN_KIT §9)。
  */
-import { SETTINGS_DEFAULTS, IMAGE_QUALITY, PREFETCH_CHOICES, GRID_TAB_SKIP, POPUP_THEMES, SIDEBAR_SCROLL } from './constants.js';
+import { SETTINGS_DEFAULTS, IMAGE_QUALITY, PREFETCH_CHOICES, GRID_TAB_SKIP, POPUP_THEMES, SIDEBAR_SCROLL, INFINITE_SCROLL } from './constants.js';
 
 /** 設定を置く保存領域の名前。onChanged の areaName と比べる。 */
 const SYNC_AREA_NAME = 'sync';
@@ -75,6 +75,7 @@ export function normalizeSettings(raw) {
 		closeOnBackdrop: asBoolean(source.closeOnBackdrop, d.closeOnBackdrop),
 		gridTabSkip: oneOf(source.gridTabSkip, Object.values(GRID_TAB_SKIP), d.gridTabSkip),
 		hidePickup: asBoolean(source.hidePickup, d.hidePickup),
+		infiniteScroll: oneOf(source.infiniteScroll, Object.values(INFINITE_SCROLL), d.infiniteScroll),
 		popupTheme: oneOf(source.popupTheme, Object.values(POPUP_THEMES), d.popupTheme),
 	};
 }
