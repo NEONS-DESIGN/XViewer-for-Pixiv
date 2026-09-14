@@ -17,6 +17,7 @@ import {
 	THEME_TOGGLE,
 	SETTINGS_DEFAULTS,
 	KEYS,
+	INFINITE_SCROLL,
 } from '../common/constants.js';
 
 /** 画面の題名。拡張の名前をそのまま出す。 */
@@ -158,6 +159,29 @@ const SECTIONS = Object.freeze([
 				key: 'hidePickup',
 				label: 'ピックアップ欄を隠す',
 				description: 'プロフィールのホームに出る「ピックアップ」を隠します。作品一覧がすぐ目に入ります。',
+			}),
+			Object.freeze({
+				kind: 'choice',
+				key: 'infiniteScroll',
+				label: '無限スクロール',
+				description: 'イラスト・マンガ一覧のページ送りを、下に続けて読み込む形にします。',
+				options: Object.freeze([
+					Object.freeze({
+						value: INFINITE_SCROLL.OFF,
+						label: '使わない',
+						description: 'pixiv 標準のページャ (1 2 3 …) のままにします。',
+					}),
+					Object.freeze({
+						value: INFINITE_SCROLL.ON_REACH,
+						label: '下まで来たら読み込む',
+						description: '一番下に着いてから次のページを読みます。通信は少なめです。',
+					}),
+					Object.freeze({
+						value: INFINITE_SCROLL.PREFETCH,
+						label: '常に 1 ページ先を読んでおく',
+						description: '下に着く前に次のページを用意しておくので、待たずに読み進められます。',
+					}),
+				]),
 			}),
 		]),
 	}),

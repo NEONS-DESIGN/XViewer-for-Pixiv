@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeSettings, loadSettings, saveSetting, resetSettings, watchSettings } from '../../src/common/storage.js';
-import { SETTINGS_DEFAULTS, GRID_TAB_SKIP, POPUP_THEMES, SIDEBAR_SCROLL } from '../../src/common/constants.js';
+import { SETTINGS_DEFAULTS, GRID_TAB_SKIP, POPUP_THEMES, SIDEBAR_SCROLL, INFINITE_SCROLL } from '../../src/common/constants.js';
 
 /**
  * chrome.storage.sync の偽物を作る。
@@ -32,6 +32,7 @@ test('normalizeSettings は正しい値をそのまま通す', () => {
 		closeOnBackdrop: false,
 		gridTabSkip: GRID_TAB_SKIP.TITLE,
 		hidePickup: true,
+		infiniteScroll: INFINITE_SCROLL.ON_REACH,
 		popupTheme: POPUP_THEMES.LIGHT,
 	};
 	assert.deepEqual(normalizeSettings(input), input);
@@ -146,4 +147,22 @@ test('watchSettings は差し替えた storage の sync 領域から読み直す
 	assert.equal(received.length, 1);
 	watch.dispose();
 	assert.equal(listener, null);
+});
+
+test('infiniteScroll は既定が off', async () => {
+	// 既定オフ。知らないうちにページの動きが変わらないようにする
+	const settings = await loadSettings({ area: { async get() { return {}; } } });
+	assert.equal(settings.infiniteScroll, INFINITE_SCROLL.OFF);
+});
+
+test('infiniteScroll は知らない値を off へ倒す', async () => {
+	const area = { async get() { return { infiniteScroll: 'sometimes' }; } };
+	assert.equal((await loadSettings({ area })).infiniteScroll, INFINITE_SCROLL.OFF);
+});
+
+test('infiniteScroll は onReach と prefetch をそのまま読む', async () => {
+	for (const value of [INFINITE_SCROLL.ON_REACH, INFINITE_SCROLL.PREFETCH]) {
+		const area = { async get() { return { infiniteScroll: value }; } };
+		assert.equal((await loadSettings({ area })).infiniteScroll, value);
+	}
 });

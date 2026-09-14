@@ -119,6 +119,22 @@ export const GRID_TAB_SKIP = Object.freeze({
 	NONE: 'none',
 });
 
+/** 1 ページに並ぶ作品の数。pixiv 本体のページャと同じ数 (SITE_SPEC §3 実測)。 */
+export const WORKS_PER_PAGE = 48;
+
+/**
+ * ユーザーページの作品グリッドを無限スクロールにするか。
+ * 既定はオフ。pixiv 本体のページャをそのまま使う人の見え方を変えないため。
+ */
+export const INFINITE_SCROLL = Object.freeze({
+	/** 使わない (pixiv 標準のページャのまま) */
+	OFF: 'off',
+	/** 一番下まで来たら次のページを読む */
+	ON_REACH: 'onReach',
+	/** 常に 1 ページ先を読み込んでおき、下まで来たら即座に並べる */
+	PREFETCH: 'prefetch',
+});
+
 /**
  * サイドバーを縦に送るときの動き方。
  * 主文がとても長い作品では、コメントまで一気に読めたほうが楽なこともある。
@@ -171,6 +187,7 @@ export const SETTINGS_DEFAULTS = Object.freeze({
 	closeOnBackdrop: true,
 	gridTabSkip: GRID_TAB_SKIP.BOTH,
 	hidePickup: false,
+	infiniteScroll: INFINITE_SCROLL.OFF,
 	popupTheme: POPUP_THEMES.SYSTEM,
 });
 
