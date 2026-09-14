@@ -73,7 +73,7 @@ export function createPageSource(userId, category, deps = {}) {
 			const ids = await loadIds(userId, category, get);
 			const slice = ids.slice((page - 1) * WORKS_PER_PAGE, page * WORKS_PER_PAGE);
 			if (slice.length === 0) return [];
-			const body = await get(userProfileIllustsUrl(userId, slice, page === 1));
+			const body = await get(userProfileIllustsUrl(userId, slice, page === 1, category));
 			const works = body?.works ?? {};
 			// 応答は ID をキーにした Map で順序を持たない。渡した順に並べ直す。
 			// 応答に無い ID (非公開になった作品など) は落とす

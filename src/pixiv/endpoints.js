@@ -4,6 +4,8 @@
  * 仕様の根拠は SITE_SPEC.md。
  */
 
+import { WORK_CATEGORY_QUERY, WORK_CATEGORY_QUERY_BOTH } from '../common/constants.js';
+
 /** API の共通接頭辞。 */
 const AJAX = '/ajax';
 
@@ -184,14 +186,21 @@ export function userProfileAllUrl(userId) {
 /**
  * ID を並べて作品サマリを一括取得する。
  * sensitiveFilterMode は userSetting 以外を受け付けず、省略しても結果が同じなので付けない。
+ * work_category は pixiv 本体と同じ値を送る。イラスト / 漫画タブなら illust / manga、
+ * 両方を並べる artworks タブなら illustManga (SITE_SPEC §3 実測)。
  * @param {string} userId ユーザー ID
  * @param {string[]} ids 作品 ID の配列
  * @param {boolean} isFirstPage 一覧の 1 ページ目か
+ * @param {string|null} [category] 絞り込む種別 (WORK_CATEGORY)。null なら両方
  * @returns {string} URL
  */
-export function userProfileIllustsUrl(userId, ids, isFirstPage) {
+export function userProfileIllustsUrl(userId, ids, isFirstPage, category = null) {
 	const query = ids.map((id) => `ids%5B%5D=${id}`).join('&');
 	const firstPage = isFirstPage ? 1 : 0;
+	// 知らない値が来たら両方扱いへ倒す。Object.hasOwn で prototype 由来の値を拾わない
+	const workCategory = category && Object.hasOwn(WORK_CATEGORY_QUERY, category)
+		? WORK_CATEGORY_QUERY[category]
+		: WORK_CATEGORY_QUERY_BOTH;
 	return `${AJAX}/user/${userId}/profile/illusts?${query}`
-		+ `&work_category=illustManga&is_first_page=${firstPage}&${LANG}`;
+		+ `&work_category=${workCategory}&is_first_page=${firstPage}&${LANG}`;
 }

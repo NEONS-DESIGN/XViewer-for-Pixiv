@@ -85,6 +85,18 @@ export const WORK_CATEGORY_BY_TAB = Object.freeze({
 	manga: WORK_CATEGORY.MANGA,
 });
 
+/**
+ * 作品の種別から profile/illusts の work_category クエリの値を引く (SITE_SPEC §3)。
+ * profile/all の応答キー (illusts) とは綴りが違うので、そのまま送らずここで変換する。
+ */
+export const WORK_CATEGORY_QUERY = Object.freeze({
+	[WORK_CATEGORY.ILLUST]: 'illust',
+	[WORK_CATEGORY.MANGA]: 'manga',
+});
+
+/** 種別で絞らないとき (/users/{id}/artworks タブ) の work_category。 */
+export const WORK_CATEGORY_QUERY_BOTH = 'illustManga';
+
 /** モーダルを載せるホスト要素の id。 */
 export const HOST_ELEMENT_ID = 'gridviewer-root';
 
