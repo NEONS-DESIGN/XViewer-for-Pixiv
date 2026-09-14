@@ -155,6 +155,16 @@ export const INFINITE_SCROLL = Object.freeze({
 	PREFETCH: 'prefetch',
 });
 
+/** sentinel の目印。ul の直後に置き、見えたら次のページを読む。 */
+export const SENTINEL_ATTR = 'data-gv-sentinel';
+
+/**
+ * onReach で sentinel を先読みする距離 (px)。
+ * 画面に入る手前で読み始め、下端に着いたときには並び終えている状態を狙う。
+ * prefetch では作品を手元に持っているので 0 で足りる。
+ */
+export const SENTINEL_MARGIN_PX = 200;
+
 /**
  * サイドバーを縦に送るときの動き方。
  * 主文がとても長い作品では、コメントまで一気に読めたほうが楽なこともある。

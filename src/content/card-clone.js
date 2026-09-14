@@ -22,7 +22,7 @@ const BOOKMARKED_FILL_RGB = 'rgb(255, 64, 96)';
  * @param {object} node 要素
  * @returns {object|null} 親要素。無ければ null
  */
-function parentOf(node) {
+export function parentOf(node) {
 	return node.parentElement ?? node.parent ?? null;
 }
 
