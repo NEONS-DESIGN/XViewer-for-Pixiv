@@ -2,16 +2,33 @@
  * content script のエントリ。
  * pixiv は SPA なので、URL が変わるたびに対象ページかどうかを判定し直す。
  */
-import { isViewerTarget, isProfileHome, parseArtworkPath, parseUserPage, pageKey } from './page.js';
+import {
+	isViewerTarget,
+	isProfileHome,
+	isInfiniteScrollTarget,
+	parseArtworkPath,
+	parseUserPage,
+	pageKey,
+	parsePageParam,
+} from './page.js';
 import { createRouter, isOwnHistoryEntry } from './router.js';
 import { attachGridListener, collectWorkIds } from './grid.js';
 import { attachTabSkip } from './tab-skip.js';
 import { ensureFocusStyle } from './grid-focus.js';
 import { attachPickupHider } from './pickup.js';
+import { attachInfiniteScroll } from './infinite.js';
+import { readSession } from './session.js';
 import { createViewer } from './viewer/viewer.js';
 import { createDomSequence, extendWithAllWorks } from './sequence.js';
+import { createPageSource } from '../pixiv/pages.js';
 import { loadSettings, watchSettings } from '../common/storage.js';
-import { NAV_EVENTS, LOCATION_CHECK_DELAY_MS } from '../common/constants.js';
+import {
+	NAV_EVENTS,
+	LOCATION_CHECK_DELAY_MS,
+	INFINITE_SCROLL,
+	ARTWORK_LINK_SELECTOR,
+	PAGE_KEY_SEPARATOR,
+} from '../common/constants.js';
 
 /** 今の購読。ページから離れるときに解除する。 */
 let gridListener = null;
@@ -24,6 +41,23 @@ let focusStyle = null;
  * ピックアップ欄を隠す CSS。ビュワーの入切とは独立に効くので stop() では触らない
  */
 let pickupHider = null;
+/**
+ * @type {{isActive: () => boolean, setMode: (mode: string) => void, dispose: () => void}|null}
+ * グリッドの無限スクロール。ビュワーの入切とは独立に効くので stop() では触らない
+ */
+let infinite = null;
+/**
+ * 今 infinite を張っているグリッドのキー (作者 + タブ)。張っていなければ null。
+ * 同じグリッドを見続けている間は作り直さず、別のグリッドへ移ったら必ず捨てるための目印。
+ * 組み立てに失敗したときも覚える (同じグリッドで無駄な作り直しを繰り返さないため)
+ */
+let infiniteKey = null;
+/**
+ * @type {Element|null} infinite を張っている ul。張っていなければ null。
+ * React がグリッドを描き直すと、置いた sentinel ごと DOM から外れて継ぎ足しが黙って止まる。
+ * 外れたことに気付くための手掛かりとして持つ
+ */
+let infiniteList = null;
 let router = null;
 let settings = null;
 let viewer = null;
@@ -186,12 +220,112 @@ function syncPickup() {
 }
 
 /**
+ * 無限スクロールの対象として読めるページか。
+ * 作品グリッドの 3 タブ以外は対象外 (ホーム・タグ絞り込み・ブックマークには
+ * pixiv 本体のページャが無く、profile/all と並びも一致しない)。
+ * @param {string} path location.pathname
+ * @returns {import('./page.js').UserPage|null} 対象でなければ null
+ */
+function infiniteTargetPage(path) {
+	return isInfiniteScrollTarget(path) ? parseUserPage(path) : null;
+}
+
+/**
+ * 継ぎ足す先のグリッドの ul を探す。
+ * 掴んでよいのは作品リンクだけ (pixiv の CSS クラス名は毎ビルド変わる。SPEC §2)。
+ * @param {Document} doc 対象のドキュメント
+ * @returns {Element|null} グリッドの ul。まだ描かれていなければ null
+ */
+function findGridList(doc) {
+	return doc.querySelector(ARTWORK_LINK_SELECTOR)?.closest('li')?.parentElement ?? null;
+}
+
+/**
+ * 張った先の ul が DOM から外れたか。
+ * pixiv がグリッドを描き直すと、継ぎ足したカードも sentinel もろとも外れ、
+ * 見張っている sentinel が二度と画面に入らないまま継ぎ足しが黙って止まる。
+ * この場合は張り直す必要がある。
+ * @returns {boolean} 外れていれば true
+ */
+function isGridDetached() {
+	return Boolean(infiniteList) && !infiniteList.isConnected;
+}
+
+/**
+ * 無限スクロールを今の設定と URL に合わせる。
+ *
+ * ビュワーの入切とは独立に効かせる。ビュワーを使わない人も無限スクロールだけ使える
+ * (ピックアップ非表示と同じ扱い)。
+ * @returns {void}
+ */
+function syncInfinite() {
+	const wanted = settings?.infiniteScroll ?? INFINITE_SCROLL.OFF;
+	const page = wanted === INFINITE_SCROLL.OFF ? null : infiniteTargetPage(location.pathname);
+	// タブが変われば並ぶ作品も変わるので、作者だけでなく種別もキーに入れる
+	const key = page ? [page.userId, page.category ?? ''].join(PAGE_KEY_SEPARATOR) : null;
+	if (key !== null && key === infiniteKey && !isGridDetached()) {
+		// 同じグリッドを見続けている。設定の変更はモードの差し替えだけで追従する。
+		// ここで作り直すと、継ぎ足したカードが消えて読み進めた場所を失う
+		infinite?.setMode(wanted);
+		return;
+	}
+	// 対象外のページへ出た / 別のグリッドへ移った / グリッドが描き直された。
+	// 前の ul に張ったものは必ず撤去する
+	infinite?.dispose();
+	infinite = null;
+	infiniteKey = null;
+	infiniteList = null;
+	if (!page) return;
+	const ul = findGridList(document);
+	// グリッドがまだ描かれていない。ここでは組み立てず、現れたときにもう一度呼ばれるのを待つ
+	if (!ul) return;
+	infiniteKey = key;
+	infiniteList = ul;
+	try {
+		infinite = attachInfiniteScroll(document, {
+			ul,
+			source: createPageSource(page.userId, page.category),
+			mode: wanted,
+			loggedIn: Boolean(readSession(document)?.isLoggedIn),
+			// ?p=3 を直接開かれていることがある。続きはそのページの次から読む
+			startPage: parsePageParam(location.search),
+			onPageChange: writePageParam,
+		});
+	} catch (error) {
+		// 継ぎ足せなくても pixiv 標準のページャは残る。閲覧そのものは壊さない
+		console.warn('[GridViewer] infinite scroll setup failed', error);
+		infinite = null;
+	}
+}
+
+/**
+ * 見えているページに合わせて ?p= を書き換える。
+ * 再読み込みや共有で同じ場所へ戻れるようにするための追従なので、履歴は積まない。
+ * モーダルが開いている間は書かない。その間 URL は /artworks/{id} で router.js の持ち物。
+ * @param {number} page ページ番号
+ * @returns {void}
+ */
+function writePageParam(page) {
+	if (viewer?.isOpen()) return;
+	try {
+		const url = new URL(location.href);
+		url.searchParams.set('p', String(page));
+		history.replaceState(history.state, '', url);
+	} catch (error) {
+		// URL がずれるだけ。継ぎ足しは続ける
+		console.warn('[GridViewer] page param update failed', error);
+	}
+}
+
+/**
  * SPA の遷移を追う必要があるか。
- * ビュワーが要らなくても、ピックアップ非表示はページが変わるたびに当て直しが要る。
- * @returns {boolean} どちらかが有効なら true
+ * ビュワーが要らなくても、ピックアップ非表示と無限スクロールは
+ * ページが変わるたびに当て直しが要る。
+ * @returns {boolean} どれかが有効なら true
  */
 function needsNavigationWatch() {
-	return Boolean(settings?.enabled || settings?.hidePickup);
+	const infiniteOn = (settings?.infiniteScroll ?? INFINITE_SCROLL.OFF) !== INFINITE_SCROLL.OFF;
+	return Boolean(settings?.enabled || settings?.hidePickup || infiniteOn);
 }
 
 /**
@@ -205,6 +339,7 @@ function handleLocationChange() {
 	// pixiv 本体が作品ページへ遷移したときは apply() へ進み、対象外として止める
 	if (isViewingOwnWork()) return;
 	syncPickup();
+	syncInfinite();
 	void apply();
 }
 
@@ -236,9 +371,18 @@ function startNavigationWatch() {
 		if (checkTimer) return;
 		checkTimer = setTimeout(() => {
 			checkTimer = 0;
-			if (location.pathname === observedPath) return;
-			observedPath = location.pathname;
-			handleLocationChange();
+			if (location.pathname !== observedPath) {
+				observedPath = location.pathname;
+				handleLocationChange();
+				return;
+			}
+			// URL は変わっていないが、ページを直接開いたときは content script のほうが
+			// React の描画より早く、継ぎ足す先の ul がここで初めて現れる。
+			// この経路が無いと、直接開いたページで無限スクロールが始まらない
+			// (URL が変わらないので handleLocationChange() が来ない)。
+			// グリッドを描き直されて張り先が外れたときも、ここで張り直す。
+			// 張れているうちは何もしないので、費用は間隔ごとに判定 1 回で済む
+			if (!infinite || isGridDetached()) syncInfinite();
 		}, LOCATION_CHECK_DELAY_MS);
 	});
 	observer.observe(document.body, { childList: true, subtree: true });
@@ -278,9 +422,11 @@ function stopNavigationWatch() {
  */
 async function boot() {
 	settings = await loadSettings();
-	// ビュワーの入切とは独立して効かせる。ピックアップ非表示だけを使う人もいる
+	// ビュワーの入切とは独立して効かせる。ピックアップ非表示や無限スクロールだけを使う人もいる
 	pickupHider = attachPickupHider(document);
 	syncPickup();
+	// この時点ではグリッドがまだ無いのが普通。張れなければ遷移監視の経路で張り直す
+	syncInfinite();
 	if (!needsNavigationWatch()) return;
 	startNavigationWatch();
 	if (settings.enabled) await apply();
@@ -291,12 +437,14 @@ watchSettings((next) => {
 	viewer?.setSettings(next);
 	tabSkip?.setMode(next.gridTabSkip);
 	syncPickup();
+	// ビュワーを切っても無限スクロールは切らない。設定そのものが変わったときだけ追従する
+	syncInfinite();
 	if (!next.enabled) {
 		// 作品を開いたまま切ると URL が /artworks/{id} に残る。先に履歴を戻して pixiv 本体に任せる
 		if (viewer?.isOpen()) router?.close();
 		stop();
 	}
-	// 遷移の監視はビュワーとピックアップ非表示の両方が要らなくなったときだけ外す。
+	// 遷移の監視はビュワー・ピックアップ非表示・無限スクロールの全部が要らなくなったときだけ外す。
 	// apply() より先に張るのは popstate の配布順のため (boot の説明を参照)
 	if (needsNavigationWatch()) startNavigationWatch();
 	else stopNavigationWatch();

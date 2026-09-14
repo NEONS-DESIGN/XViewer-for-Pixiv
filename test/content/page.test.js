@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { WORK_CATEGORY } from '../../src/common/constants.js';
-import { parseUserPage, parseArtworkPath, isViewerTarget, isProfileHome, pageKey, isInfiniteScrollTarget } from '../../src/content/page.js';
+import { parseUserPage, parseArtworkPath, isViewerTarget, isProfileHome, pageKey, isInfiniteScrollTarget, parsePageParam } from '../../src/content/page.js';
 
 test('ユーザーページの各タブを認識する', () => {
 	const works = { userId: '54734418', isWorksGrid: true, isTagFiltered: false, category: null };
@@ -131,4 +131,34 @@ test('無限スクロールはタグ絞り込みとブックマークを対象�
 	assert.equal(isInfiniteScrollTarget('/users/123/bookmarks/artworks'), false);
 	assert.equal(isInfiniteScrollTarget('/users/123/request'), false);
 	assert.equal(isInfiniteScrollTarget('/artworks/123'), false);
+});
+
+test('parsePageParam は ?p= を正の整数として読む', () => {
+	assert.equal(parsePageParam('?p=1'), 1);
+	assert.equal(parsePageParam('?p=3'), 3);
+	assert.equal(parsePageParam('?p=48'), 48);
+	// 他のクエリが混ざっていても読める
+	assert.equal(parsePageParam('?p=5&foo=bar'), 5);
+	assert.equal(parsePageParam('?foo=bar&p=5'), 5);
+	// 先頭の ? が無くても読める
+	assert.equal(parsePageParam('p=7'), 7);
+});
+
+test('parsePageParam は ?p= が無ければ 1 を返す', () => {
+	assert.equal(parsePageParam(''), 1);
+	assert.equal(parsePageParam('?'), 1);
+	assert.equal(parsePageParam('?foo=bar'), 1);
+	assert.equal(parsePageParam(undefined), 1);
+});
+
+test('parsePageParam は数として読めない ?p= を 1 に倒す', () => {
+	// ページ指定なしと同じ扱いにする。ここで弾いておかないと継ぎ足しの開始位置が壊れる
+	assert.equal(parsePageParam('?p='), 1);
+	assert.equal(parsePageParam('?p=abc'), 1);
+	assert.equal(parsePageParam('?p=0'), 1);
+	assert.equal(parsePageParam('?p=-1'), 1);
+	assert.equal(parsePageParam('?p=1.5'), 1);
+	assert.equal(parsePageParam('?p=NaN'), 1);
+	assert.equal(parsePageParam('?p=Infinity'), 1);
+	assert.equal(parsePageParam('?p=%20'), 1);
 });
