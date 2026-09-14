@@ -182,8 +182,13 @@ export const SENTINEL_MARGIN_PX = 200;
  * ページ内の nav はタブ行とページャの 2 つだけで、?p= を持つのはページャだけ
  * (SITE_SPEC §3「ページャ」実測)。クラス名 (sc-xxxx) は版ごとに変わるので掴まない。
  * 作品が 1 ページに収まるページャは描かれないが、その場合は当たる nav が無いだけで害は無い。
+ *
+ * 探すのは "p=" ではなく "?p=" (クエリの先頭)。実機のページャのリンクは
+ * /users/{id}/illustrations?p=2 の形なので同じものに当たるが、"p=" だけで探すと
+ * p を含むパス (/users/{id}/bookmarks/artworks 等) やクエリ付きのタブ行にも当たり、
+ * 将来 pixiv がタブ行のリンクにクエリを足した版でタブ行ごと消してしまう。
  */
-export const PAGER_SELECTOR = 'nav:has(a[href*="p="])';
+export const PAGER_SELECTOR = 'nav:has(a[href*="?p="])';
 
 /**
  * サイドバーを縦に送るときの動き方。
