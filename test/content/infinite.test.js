@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { attachInfiniteScroll } from '../../src/content/infinite.js';
-import { INFINITE_SCROLL, GV_CARD_ATTR, SENTINEL_ATTR } from '../../src/common/constants.js';
+import { INFINITE_SCROLL, GV_CARD_ATTR, SENTINEL_ATTR, SENTINEL_MARGIN_PX } from '../../src/common/constants.js';
 import { makeCard, makeGrid, el, fakeComputedStyle } from '../helpers/card.js';
 
 /**
@@ -9,10 +9,14 @@ import { makeCard, makeGrid, el, fakeComputedStyle } from '../helpers/card.js';
  * @returns {{create: Function, trigger: Function, state: object}} 生成関数と操作
  */
 function fakeObserver() {
-	const state = { observed: [], disconnected: 0, callback: null, init: null };
+	const state = { observed: [], disconnected: 0, callback: null, init: null, inits: [], created: 0 };
 	const create = (callback, init) => {
 		state.callback = callback;
 		state.init = init;
+		state.inits.push(init);
+		state.created += 1;
+		// 作り直したら監視対象も仕切り直す
+		state.observed = [];
 		return {
 			observe(node) { state.observed.push(node); },
 			unobserve(node) { state.observed = state.observed.filter((one) => one !== node); },
@@ -225,6 +229,69 @@ test('dispose は本体のカードを消さない', async () => {
 	await observer.trigger();
 	handle.dispose();
 	assert.equal([...ul.querySelectorAll('li')].length, 2, '本体の 2 枚まで消している');
+});
+
+test('onReach は sentinel を手前から見張る', () => {
+	const { observer } = setup({ mode: INFINITE_SCROLL.ON_REACH });
+	assert.equal(observer.state.init.rootMargin, `${SENTINEL_MARGIN_PX}px`);
+});
+
+test('prefetch は手元にあるので sentinel が見えてから動く', () => {
+	const { observer } = setup({ mode: INFINITE_SCROLL.PREFETCH });
+	assert.equal(observer.state.init.rootMargin, '0px');
+});
+
+test('setMode でモードを変えたら rootMargin を変えて監視し直す', () => {
+	const { wrap, handle, observer } = setup({ mode: INFINITE_SCROLL.ON_REACH });
+	handle.setMode(INFINITE_SCROLL.PREFETCH);
+	assert.equal(observer.state.created, 2, 'observer を作り直していない');
+	assert.equal(observer.state.disconnected, 1, '前の observer を切っていない');
+	assert.deepEqual(observer.state.inits.map((init) => init.rootMargin), [`${SENTINEL_MARGIN_PX}px`, '0px']);
+	const sentinels = [...wrap.querySelectorAll(`[${SENTINEL_ATTR}]`)];
+	assert.deepEqual(observer.state.observed, sentinels, 'sentinel を監視し直していない');
+});
+
+test('setMode でも継ぎ足したカードは残る', async () => {
+	// 設定を切り替えただけで読み進めた場所を失わせない
+	const { ul, handle, observer } = setup({ pages: 5 });
+	await observer.trigger();
+	assert.equal(addedCards(ul).length, 2);
+	handle.setMode(INFINITE_SCROLL.PREFETCH);
+	assert.equal(addedCards(ul).length, 2, '読み進めた分が消えている');
+	assert.equal(handle.isActive(), true);
+});
+
+test('setMode で作り直した observer でも継ぎ足せる', async () => {
+	const { ul, loaded, handle, observer } = setup({ pages: 5 });
+	handle.setMode(INFINITE_SCROLL.PREFETCH);
+	await observer.trigger();
+	assert.deepEqual(loaded, [2, 3]);
+	assert.equal(addedCards(ul).length, 2);
+});
+
+test('同じモードを渡されたら何もしない', () => {
+	const { handle, observer } = setup({ mode: INFINITE_SCROLL.ON_REACH });
+	handle.setMode(INFINITE_SCROLL.ON_REACH);
+	assert.equal(observer.state.created, 1);
+	assert.equal(observer.state.disconnected, 0);
+});
+
+test('読み切った後に setMode しても監視は再開しない', async () => {
+	const { handle, loaded, observer } = setup({ pages: 2 });
+	await observer.trigger();
+	assert.equal(observer.state.disconnected, 1);
+	handle.setMode(INFINITE_SCROLL.PREFETCH);
+	assert.equal(observer.state.created, 1, '読み切ったのに監視し直している');
+	await observer.trigger();
+	assert.deepEqual(loaded, [2]);
+});
+
+test('dispose 後の setMode は監視を作り直さない', () => {
+	const { handle, observer } = setup();
+	handle.dispose();
+	handle.setMode(INFINITE_SCROLL.PREFETCH);
+	assert.equal(observer.state.created, 1);
+	assert.equal(observer.state.disconnected, 1);
 });
 
 test('setMode で先読みの持ち分を捨てる', async () => {
