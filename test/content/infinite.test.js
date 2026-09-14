@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { attachInfiniteScroll } from '../../src/content/infinite.js';
+import { attachInfiniteScroll, SENTINEL_TEXT } from '../../src/content/infinite.js';
 import { INFINITE_SCROLL, GV_CARD_ATTR, SENTINEL_ATTR, SENTINEL_MARGIN_PX } from '../../src/common/constants.js';
 import { makeCard, makeGrid, el, fakeComputedStyle } from '../helpers/card.js';
 
@@ -60,16 +60,53 @@ function addedCards(ul) {
 }
 
 /**
+ * ページに入った sentinel を拾う。
+ * @param {object} wrap ul の親
+ * @returns {object|null} sentinel
+ */
+function sentinelOf(wrap) {
+	return wrap.querySelector(`[${SENTINEL_ATTR}]`);
+}
+
+/**
+ * sentinel に出ている文言。
+ * @param {object} wrap ul の親
+ * @returns {string} 文言。何も出ていなければ空文字
+ */
+function sentinelMessage(wrap) {
+	return sentinelOf(wrap)?.querySelector('p')?.textContent ?? '';
+}
+
+/**
+ * sentinel に出ている再試行ボタン。
+ * @param {object} wrap ul の親
+ * @returns {object|null} button。出ていなければ null
+ */
+function retryButton(wrap) {
+	return sentinelOf(wrap)?.querySelector('button') ?? null;
+}
+
+/**
+ * 偽のドキュメント。
+ * @param {object} wrap ul の親
+ * @returns {{createElement: Function, head: object, body: object}} doc の代わり
+ */
+function fakeDoc(wrap) {
+	return { createElement: (tag) => el(tag), head: el('head'), body: wrap };
+}
+
+/**
  * 継ぎ足しを組み立てる。
- * @param {{pages?: number, mode?: string, startPage?: number}} [options] 上書き
- * @returns {{ul: object, wrap: object, handle: object, loaded: number[], observer: object}} 材料一式
+ * @param {{pages?: number, mode?: string, startPage?: number, trailing?: boolean}} [options] 上書き
+ * @returns {{ul: object, wrap: object, handle: object, loaded: number[], observer: object, trailing: object|null}} 材料一式
  */
 function setup(options = {}) {
 	const { ul, wrap } = makeGrid([makeCard({ id: '1' }), makeCard({ id: '2', pages: 2 })]);
+	// pixiv は ul の後ろにページャを置く。sentinel はそれより前 (= ul の直後) に入らないといけない
+	const trailing = options.trailing ? wrap.appendChild(el('nav')) : null;
 	const { source, loaded } = fakeSource(options.pages ?? 3);
 	const observer = fakeObserver();
-	const doc = { createElement: (tag) => el(tag), body: wrap };
-	const handle = attachInfiniteScroll(doc, {
+	const handle = attachInfiniteScroll(fakeDoc(wrap), {
 		ul,
 		source,
 		mode: options.mode ?? INFINITE_SCROLL.ON_REACH,
@@ -77,7 +114,7 @@ function setup(options = {}) {
 		startPage: options.startPage ?? 1,
 		deps: { createObserver: observer.create, computedStyle: fakeComputedStyle },
 	});
-	return { ul, wrap, handle, loaded, observer };
+	return { ul, wrap, handle, loaded, observer, trailing };
 }
 
 test('組み立てただけでは読み込まない', () => {
@@ -86,13 +123,41 @@ test('組み立てただけでは読み込まない', () => {
 	assert.deepEqual(loaded, []);
 });
 
-test('sentinel は ul の直後 (親の末尾) に置かれ、監視される', () => {
+test('sentinel は ul の直後に置かれ、監視される', () => {
 	const { ul, wrap, observer } = setup();
 	const sentinels = [...wrap.querySelectorAll(`[${SENTINEL_ATTR}]`)];
 	assert.equal(sentinels.length, 1);
-	assert.equal(wrap.children.at(-1), sentinels[0], 'sentinel が ul の後ろに無い');
+	assert.equal(ul.nextSibling, sentinels[0], 'sentinel が ul の直後に無い');
 	assert.equal([...ul.querySelectorAll(`[${SENTINEL_ATTR}]`)].length, 0, 'ul の中に入れてはいけない');
 	assert.deepEqual(observer.state.observed, sentinels);
+});
+
+test('ul の後ろにページャがあっても sentinel はその前 (ul の直後) に入る', () => {
+	// 親の末尾に置くとページャの下に落ち、rootMargin が 0 の prefetch で発火が遅れる
+	const { ul, wrap, trailing } = setup({ trailing: true, mode: INFINITE_SCROLL.PREFETCH });
+	const sentinel = sentinelOf(wrap);
+	assert.equal(ul.nextSibling, sentinel, 'sentinel が ul の直後に無い');
+	assert.deepEqual(wrap.children, [ul, sentinel, trailing], '並びが ul -> sentinel -> ページャ になっていない');
+});
+
+test('何もしていないときの sentinel は空', () => {
+	const { wrap } = setup();
+	assert.equal(sentinelOf(wrap).children.length, 0);
+	assert.equal(sentinelMessage(wrap), '');
+});
+
+test('sentinel のスタイルは 1 度だけ入る', () => {
+	const { ul, wrap } = makeGrid([makeCard({ id: '1' })]);
+	const doc = fakeDoc(wrap);
+	const observer = fakeObserver();
+	const { source } = fakeSource(3);
+	const attach = () => attachInfiniteScroll(doc, {
+		ul, source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
+		deps: { createObserver: observer.create, computedStyle: fakeComputedStyle },
+	});
+	attach().dispose();
+	attach().dispose();
+	assert.equal([...doc.head.querySelectorAll('style')].length, 1);
 });
 
 test('下まで来たら次のページを継ぎ足す', async () => {
@@ -163,8 +228,12 @@ test('空のページが返ったらそこで終わる', async () => {
 	assert.equal(observer.state.disconnected, 1);
 });
 
-test('失敗しても落ちず、もう一度見えたら読み直す', async () => {
-	const { ul } = makeGrid([makeCard({ id: '1' })]);
+/**
+ * 1 回目だけ失敗する供給で継ぎ足しを組み立てる。
+ * @returns {{ul: object, wrap: object, handle: object, observer: object}} 材料一式
+ */
+function setupFlaky() {
+	const { ul, wrap } = makeGrid([makeCard({ id: '1' })]);
 	const observer = fakeObserver();
 	let calls = 0;
 	const source = {
@@ -175,14 +244,83 @@ test('失敗しても落ちず、もう一度見えたら読み直す', async ()
 			return [{ id: '99', title: '作品', pageCount: 1, userId: '9', url: 'https://i.pximg.net/99.jpg', alt: '作品', bookmarkData: null }];
 		},
 	};
-	const doc = { createElement: (tag) => el(tag), body: ul.parent };
-	attachInfiniteScroll(doc, {
+	const handle = attachInfiniteScroll(fakeDoc(wrap), {
 		ul, source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
 		deps: { createObserver: observer.create, computedStyle: fakeComputedStyle },
 	});
+	return { ul, wrap, handle, observer };
+}
+
+test('失敗しても落ちず、もう一度見えたら読み直す', async () => {
+	const { ul, observer } = setupFlaky();
 	await observer.trigger();
 	await observer.trigger();
 	assert.equal(addedCards(ul).length, 1);
+});
+
+test('失敗したら sentinel に文言と再試行ボタンが出る', async () => {
+	const { wrap, observer } = setupFlaky();
+	await observer.trigger();
+	assert.equal(sentinelMessage(wrap), SENTINEL_TEXT.ERROR);
+	// 失敗の通知は role="alert" の段落 (UI_DESIGN_KIT §6)
+	assert.equal(sentinelOf(wrap).querySelector('p').getAttribute('role'), 'alert');
+	const button = retryButton(wrap);
+	assert.ok(button, '再試行ボタンが出ていない');
+	assert.equal(button.textContent, SENTINEL_TEXT.RETRY);
+	assert.equal(button.getAttribute('type'), 'button');
+});
+
+test('再試行ボタンを押すと読み直し、成功したら表示が消える', async () => {
+	// IntersectionObserver は交差が変わったときしか鳴らない。
+	// 下端に留まったままの人はこのボタンでしか読み直せない
+	const { ul, wrap, observer } = setupFlaky();
+	await observer.trigger();
+	assert.equal(addedCards(ul).length, 0);
+	await retryButton(wrap).click();
+	assert.equal(addedCards(ul).length, 1, '再試行でカードが増えていない');
+	assert.equal(retryButton(wrap), null, '成功したのに再試行ボタンが残っている');
+	assert.equal(sentinelMessage(wrap), '');
+});
+
+test('読み込み中は読み込み中と出る', async () => {
+	let release = () => {};
+	const gate = new Promise((resolve) => { release = resolve; });
+	const { ul, wrap } = makeGrid([makeCard({ id: '1' })]);
+	const observer = fakeObserver();
+	const source = {
+		async pageCount() { return 3; },
+		async loadPage() {
+			await gate;
+			return [{ id: '99', title: '作品', pageCount: 1, userId: '9', url: 'https://i.pximg.net/99.jpg', alt: '作品', bookmarkData: null }];
+		},
+	};
+	attachInfiniteScroll(fakeDoc(wrap), {
+		ul, source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
+		deps: { createObserver: observer.create, computedStyle: fakeComputedStyle },
+	});
+	const pending = observer.trigger();
+	assert.equal(sentinelMessage(wrap), SENTINEL_TEXT.LOADING);
+	// 読み上げにも伝わる形にする
+	assert.equal(sentinelOf(wrap).querySelector('p').getAttribute('role'), 'status');
+	assert.equal(retryButton(wrap), null, '読み込み中に再試行ボタンを出さない');
+	release();
+	await pending;
+	assert.equal(sentinelMessage(wrap), '', '終わったのに表示が残っている');
+});
+
+test('読み切ったら読み終わりと出て、再試行ボタンは出ない', async () => {
+	const { wrap, observer } = setup({ pages: 2 });
+	await observer.trigger();
+	assert.equal(sentinelMessage(wrap), SENTINEL_TEXT.DONE);
+	assert.equal(sentinelOf(wrap).querySelector('p').getAttribute('role'), 'status');
+	assert.equal(retryButton(wrap), null);
+});
+
+test('読み切った後の再試行ボタンは無いので読み直せない', async () => {
+	const { wrap, loaded, observer } = setup({ pages: 2 });
+	await observer.trigger();
+	assert.equal(retryButton(wrap), null);
+	assert.deepEqual(loaded, [2]);
 });
 
 test('雛形が採れなければ何もしない', () => {

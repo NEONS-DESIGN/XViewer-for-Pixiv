@@ -15,6 +15,8 @@
  */
 export function el(tag, attrs = {}) {
 	let text = '';
+	/** @type {Map<string, Function[]>} 種類ごとの購読者 */
+	const listeners = new Map();
 	const node = {
 		tag,
 		tagName: tag.toUpperCase(),
@@ -28,6 +30,39 @@ export function el(tag, attrs = {}) {
 		},
 		appendChild(child) { child.parent = node; node.children.push(child); return child; },
 		append(...nodes) { for (const one of nodes) node.appendChild(one); },
+		// 本物と同じく、参照ノードが null なら末尾、子でなければ投げる
+		insertBefore(child, reference) {
+			if (reference === null || reference === undefined) return node.appendChild(child);
+			const index = node.children.indexOf(reference);
+			if (index < 0) throw new Error('insertBefore: reference node is not a child');
+			child.parent = node;
+			node.children.splice(index, 0, child);
+			return child;
+		},
+		addEventListener(type, handler) {
+			if (!listeners.has(type)) listeners.set(type, []);
+			listeners.get(type).push(handler);
+		},
+		removeEventListener(type, handler) {
+			listeners.set(type, (listeners.get(type) ?? []).filter((one) => one !== handler));
+		},
+		/**
+		 * 購読者を呼ぶ。
+		 * 本物は真偽値を返すが、ここでは**最後の購読者の戻り値**を返す。
+		 * 非同期の購読者をテストから await できるようにするための、意図した差。
+		 * @param {{type: string}} event 出来事
+		 * @returns {*} 最後の購読者の戻り値
+		 */
+		dispatchEvent(event) {
+			let result;
+			for (const handler of [...(listeners.get(event.type) ?? [])]) result = handler({ target: node, ...event });
+			return result;
+		},
+		/**
+		 * 押す。dispatchEvent と同じく購読者の戻り値を返す (本物は undefined)。
+		 * @returns {*} 購読者の戻り値
+		 */
+		click() { return node.dispatchEvent({ type: 'click' }); },
 		remove() {
 			if (!node.parent) return;
 			node.parent.children = node.parent.children.filter((one) => one !== node);
@@ -55,6 +90,12 @@ export function el(tag, attrs = {}) {
 			return copy;
 		},
 	};
+	Object.defineProperty(node, 'nextSibling', {
+		get() {
+			if (!node.parent) return null;
+			return node.parent.children[node.parent.children.indexOf(node) + 1] ?? null;
+		},
+	});
 	Object.defineProperty(node, 'textContent', {
 		get() { return node.children.length === 0 ? text : node.children.map((one) => one.textContent).join(''); },
 		set(value) { text = value; node.children = []; },
