@@ -6,7 +6,7 @@
  * 途中で終わっているときに空白ができて地続きにならない。
  * React は外から append した li を消さない (SITE_SPEC §3 実測)。
  */
-import { captureTemplates, buildCard, parentOf, GV_BOOKMARK_ID_ATTR } from './card-clone.js';
+import { captureTemplates, buildCard, parentOf, paintHeart, GV_BOOKMARK_ID_ATTR } from './card-clone.js';
 import { readSession, clearSessionCache } from './session.js';
 import { addBookmark, deleteBookmark } from '../pixiv/actions.js';
 import { PIXIV_ERROR_KINDS } from '../pixiv/errors.js';
@@ -16,7 +16,6 @@ import {
 	SENTINEL_ATTR,
 	SENTINEL_MARGIN_PX,
 	BOOKMARK_BUTTON_SELECTOR,
-	BOOKMARKED_FILL,
 } from '../common/constants.js';
 
 /**
@@ -393,22 +392,6 @@ export function attachInfiniteScroll(doc, options) {
 	}
 
 	/**
-	 * カードのハートを塗る。
-	 * 塗る先はブックマークボタンの中の path だけ。カード全体から集めると、
-	 * 複数枚バッジのアイコンまで赤くなる。
-	 * @param {object} card カード (li)
-	 * @param {boolean} on ブックマーク済みの色にするか
-	 * @returns {void}
-	 */
-	function paintHeart(card, on) {
-		const box = card.querySelector(BOOKMARK_BUTTON_SELECTOR);
-		if (!box) return;
-		[...box.querySelectorAll('path')].forEach((path, index) => {
-			path.style.setProperty('fill', on ? BOOKMARKED_FILL : templates.heartFills[index] ?? '');
-		});
-	}
-
-	/**
 	 * 継ぎ足したカードのハートを押したときの処理。
 	 *
 	 * clone した button は React のハンドラを持たないので、ここで自前に受ける。
@@ -441,6 +424,23 @@ export function attachInfiniteScroll(doc, options) {
 	}
 
 	/**
+	 * 押す前の見た目と状態へ戻す。
+	 * ここで投げると失敗の後始末が止まるので、DOM の操作はまとめて包む。
+	 * @param {object} card カード (li)
+	 * @param {string|null} bookmarkId 押す前のブックマーク ID。未ブックマークなら null
+	 * @returns {void}
+	 */
+	function restoreHeart(card, bookmarkId) {
+		try {
+			paintHeart(card, Boolean(bookmarkId), templates.heartFills);
+			if (bookmarkId) card.setAttribute(GV_BOOKMARK_ID_ATTR, bookmarkId);
+			else card.removeAttribute(GV_BOOKMARK_ID_ATTR);
+		} catch (error) {
+			console.warn('[GridViewer] bookmark rollback failed', error);
+		}
+	}
+
+	/**
 	 * ハートの状態を切り替えて pixiv へ送る。
 	 * @param {object} card カード (li)
 	 * @param {boolean} isPrivate 非公開で入れるか (Shift + クリック)
@@ -449,9 +449,11 @@ export function attachInfiniteScroll(doc, options) {
 	async function sendBookmark(card, isPrivate) {
 		const workId = card.getAttribute(GV_CARD_ATTR);
 		const bookmarkId = card.getAttribute(GV_BOOKMARK_ID_ATTR);
-		// 押した結果を先に見せる。通信を待たせない
-		paintHeart(card, !bookmarkId);
 		try {
+			// 押した結果を先に見せる。通信を待たせない。
+			// 塗りも try の中に入れる。外に出すと、投げたときに finally を通らず
+			// sending にカードが残り、そのカードが二度と押せなくなる
+			paintHeart(card, !bookmarkId, templates.heartFills);
 			// トークンは押された時点で読む。組み立て時の値を閉じ込めない
 			const token = readSession(doc)?.csrfToken ?? '';
 			if (bookmarkId) {
@@ -465,10 +467,7 @@ export function attachInfiniteScroll(doc, options) {
 			}
 		} catch (error) {
 			if (disposed) return;
-			// 押す前の見た目と状態へ戻す
-			paintHeart(card, Boolean(bookmarkId));
-			if (bookmarkId) card.setAttribute(GV_BOOKMARK_ID_ATTR, bookmarkId);
-			else card.removeAttribute(GV_BOOKMARK_ID_ATTR);
+			restoreHeart(card, bookmarkId);
 			// 401 はログインが切れている (別タブでログアウトした等)。覚えたセッションを捨てる
 			if (error?.kind === PIXIV_ERROR_KINDS.UNAUTHORIZED) clearSessionCache();
 			console.warn('[GridViewer] bookmark failed', error);

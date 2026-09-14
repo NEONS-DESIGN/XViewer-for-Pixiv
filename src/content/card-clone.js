@@ -28,12 +28,29 @@ export function parentOf(node) {
 
 /**
  * カードの中のハートの path を集める。
+ * 集める先はブックマークボタンの中だけ。カード全体から集めると複数枚バッジのアイコンまで混ざり、
+ * 色も index と heartFills の対応もずれる。
  * @param {object} card カード (li)
  * @returns {object[]} path
  */
-function heartPaths(card) {
+export function heartPaths(card) {
 	const box = card.querySelector(BOOKMARK_BUTTON_SELECTOR);
 	return box ? [...box.querySelectorAll('path')] : [];
+}
+
+/**
+ * カードのハートを塗る。
+ * 塗り方 (BOOKMARKED_FILL と heartFills の index 対応) はここだけが持つ。
+ * カードを組むときと、継ぎ足したカードのハートを押されたときの両方から呼ぶ。
+ * @param {object} card カード (li)
+ * @param {boolean} bookmarked ブックマーク済みの色にするか
+ * @param {string[]} heartFills 未ブックマークのときの色 (雛形から採った値)
+ * @returns {void}
+ */
+export function paintHeart(card, bookmarked, heartFills) {
+	heartPaths(card).forEach((path, index) => {
+		path.style.setProperty('fill', bookmarked ? BOOKMARKED_FILL : heartFills[index] ?? '');
+	});
 }
 
 /**
@@ -159,10 +176,7 @@ export function buildCard(templates, work, deps) {
 		if (!deps.loggedIn) heartBox?.remove();
 		else if (heartBox) {
 			const bookmarked = Boolean(work.bookmarkData);
-			const paths = [...heartBox.querySelectorAll('path')];
-			paths.forEach((path, index) => {
-				path.style.setProperty('fill', bookmarked ? BOOKMARKED_FILL : templates.heartFills[index] ?? '');
-			});
+			paintHeart(card, bookmarked, templates.heartFills);
 			if (bookmarked) card.setAttribute(GV_BOOKMARK_ID_ATTR, String(work.bookmarkData.id));
 		}
 

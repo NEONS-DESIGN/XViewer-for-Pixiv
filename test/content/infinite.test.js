@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { attachInfiniteScroll, SENTINEL_TEXT } from '../../src/content/infinite.js';
-import { INFINITE_SCROLL, GV_CARD_ATTR, SENTINEL_ATTR, SENTINEL_MARGIN_PX } from '../../src/common/constants.js';
+import {
+	INFINITE_SCROLL, GV_CARD_ATTR, SENTINEL_ATTR, SENTINEL_MARGIN_PX,
+	BOOKMARK_BUTTON_SELECTOR, BOOKMARKED_FILL,
+} from '../../src/common/constants.js';
 import { makeCard, makeGrid, el, fakeComputedStyle } from '../helpers/card.js';
 
 /**
@@ -42,8 +45,9 @@ function fakeSource(pages, options = {}) {
 			async loadPage(page) {
 				loaded.push(page);
 				if (page > pages) return [];
+				// 2 件目は複数枚。バッジ付きのカード (雛形が multi) も継ぎ足しに混ぜる
 				return [1, 2].map((n) => ({
-					id: `${page}${n}`, title: `作品${page}-${n}`, pageCount: 1, userId: '9',
+					id: `${page}${n}`, title: `作品${page}-${n}`, pageCount: n, userId: '9',
 					url: `https://i.pximg.net/${page}${n}.jpg`, alt: `作品${page}-${n}`,
 					bookmarkData: options.bookmarked ? { id: `b${page}${n}`, private: false } : null,
 				}));
@@ -485,6 +489,39 @@ test('setMode で先読みの持ち分を捨てる', async () => {
 });
 
 /**
+ * 継ぎ足したカードを 1 枚拾う。
+ * @param {object} ul グリッドの ul
+ * @param {string} id 作品 ID
+ * @returns {object} カード (li)
+ */
+function addedCard(ul, id) {
+	return [...ul.querySelectorAll('li')].find((li) => li.getAttribute(GV_CARD_ATTR) === id);
+}
+
+/**
+ * ハートの塗り。複数枚バッジの path と混ざらないよう、ボタンの中だけを見る。
+ * @param {object} card カード (li)
+ * @returns {(string|undefined)[]} path ごとの fill
+ */
+function heartFillsOf(card) {
+	const box = card.querySelector(BOOKMARK_BUTTON_SELECTOR);
+	return [...box.querySelectorAll('path')].map((path) => path.style.values.fill);
+}
+
+/**
+ * ハートを押す。押されたのは button という出来事にする。
+ * @param {object} card カード (li)
+ * @param {{shiftKey?: boolean}} [options] 押し方
+ * @returns {Promise<void>|undefined} 送信の待ち
+ */
+function pressHeart(card, options = {}) {
+	const button = card.querySelector('button');
+	return button.dispatch('click', {
+		target: button, shiftKey: options.shiftKey === true, preventDefault() {}, stopPropagation() {},
+	});
+}
+
+/**
  * ブックマークの更新系の偽物。呼ばれた内容を calls へ積む。
  * @param {string[][]} calls 呼ばれた内容の置き場
  * @returns {{addBookmark: Function, deleteBookmark: Function}} 更新系
@@ -574,4 +611,55 @@ test('dispose でハートの購読も外れる', async () => {
 	const button = card.querySelector('button');
 	await button.dispatch('click', { target: button, shiftKey: false, preventDefault() {}, stopPropagation() {} });
 	assert.deepEqual(calls, [], 'dispose 後もハートの押下を拾っている');
+});
+
+test('削除に失敗したら赤とブックマーク ID を戻す', async () => {
+	// 失敗時の戻しは追加と削除で戻す先が違う。削除の側も見る
+	const { ul, observer } = setup({
+		bookmarked: true,
+		actions: {
+			async addBookmark() { return '1'; },
+			async deleteBookmark() { throw new Error('boom'); },
+		},
+	});
+	await observer.trigger();
+	const card = addedCard(ul, '21');
+	await pressHeart(card);
+	assert.deepEqual(heartFillsOf(card), [BOOKMARKED_FILL, BOOKMARKED_FILL], '外れたままの色で残っている');
+	assert.equal(card.getAttribute('data-gv-bookmark-id'), 'b21', '消せていないのにブックマーク ID を落としている');
+});
+
+test('返事を待っている間の二度押しは捨てる', async () => {
+	// data-gv-bookmark-id は返事が返るまで付かない。素直に書くと連打で余分なブックマークが残る
+	let release = () => {};
+	const gate = new Promise((resolve) => { release = resolve; });
+	const calls = [];
+	const { ul, observer } = setup({
+		actions: {
+			async addBookmark(id) { calls.push(id); await gate; return '999'; },
+			async deleteBookmark() {},
+		},
+	});
+	await observer.trigger();
+	const card = addedCard(ul, '21');
+	const first = pressHeart(card);
+	const second = pressHeart(card);
+	release();
+	await first;
+	await second;
+	assert.deepEqual(calls, ['21'], '連打で 2 回送っている');
+	assert.equal(card.getAttribute('data-gv-bookmark-id'), '999');
+});
+
+test('複数枚バッジのアイコンまで塗らない', async () => {
+	// カード全体から path を集めると、色も heartFills との index 対応もずれる
+	const { ul, observer } = setup({ actions: fakeActions([]) });
+	await observer.trigger();
+	const card = addedCard(ul, '22');
+	const hearts = card.querySelector(BOOKMARK_BUTTON_SELECTOR).querySelectorAll('path');
+	const others = [...card.querySelectorAll('path')].filter((path) => !hearts.includes(path));
+	assert.equal(others.length, 1, 'バッジの path がある前提のテスト');
+	await pressHeart(card);
+	assert.deepEqual(heartFillsOf(card), [BOOKMARKED_FILL, BOOKMARKED_FILL]);
+	assert.notEqual(others[0].style.values.fill, BOOKMARKED_FILL, 'バッジのアイコンまで塗っている');
 });
