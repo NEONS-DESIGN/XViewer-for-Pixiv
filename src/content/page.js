@@ -8,6 +8,7 @@ import {
 	USER_TAG_PATH_PATTERN,
 	USER_WORKS_PATH_PATTERN,
 	USER_WORKS_CATEGORY_PATTERN,
+	USER_WORKS_TAB_PATH_PATTERN,
 	WORK_CATEGORY_BY_TAB,
 	ARTWORK_PATH_PATTERN,
 	PAGE_KEY_SEPARATOR,
@@ -88,4 +89,14 @@ export function isViewerTarget(pathname) {
  */
 export function isProfileHome(pathname) {
 	return PROFILE_HOME_PATH_PATTERN.test(pathname);
+}
+
+/**
+ * 無限スクロールを効かせるページか。
+ * 作品グリッドの 3 タブだけが対象。ホーム・タグ絞り込み・ブックマーク・リクエストは外す。
+ * @param {string} pathname location.pathname
+ * @returns {boolean} 対象なら true
+ */
+export function isInfiniteScrollTarget(pathname) {
+	return USER_WORKS_TAB_PATH_PATTERN.test(pathname);
 }
