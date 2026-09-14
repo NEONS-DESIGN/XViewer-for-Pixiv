@@ -72,7 +72,9 @@ export function el(tag, attrs = {}) {
 		 * @returns {*} 最後に値を返した購読者の戻り値
 		 */
 		dispatch(type, init = {}) {
-			const event = { type, target: node, ...init };
+			// target は最初に押されたノードで固定する。init より後ろに置かないと、
+			// dispatchEvent が階層ごとに自分へ差し替えてしまう
+			const event = { ...init, type, target: init.target ?? node };
 			let result;
 			let current = node;
 			while (current) {
@@ -193,7 +195,8 @@ export function makeCard(options = {}) {
 	if (pages > 1) {
 		const badge = overlay.appendChild(el('div'));
 		const inner = badge.appendChild(el('div'));
-		inner.appendChild(el('svg'));
+		// バッジのアイコンも path を持つ。ハートを塗る処理がここまで塗らないことを見られるようにする
+		inner.appendChild(el('svg')).appendChild(el('path', { 'data-fill': 'rgb(255, 255, 255)' }));
 		const count = inner.appendChild(el('span'));
 		count.textContent = String(pages);
 	}
