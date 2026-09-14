@@ -51,6 +51,14 @@ export const USER_WORKS_CATEGORY_PATTERN = /^\/users\/\d+\/(illustrations|manga)
 export const PROFILE_HOME_PATH_PATTERN = /^\/users\/\d+\/?$/;
 
 /**
+ * 作品グリッドのタブ (イラスト・マンガ・すべて) のパス。
+ * pixiv のページャ (?p=) が出るのはこの 3 つだけ。
+ * プロフィールホーム (/users/{id}) はダイジェストでページャが無いので含めない。
+ * タグ絞り込み (/artworks/{タグ}) は末尾を許さないことで外れる。
+ */
+export const USER_WORKS_TAB_PATH_PATTERN = /^\/users\/\d+\/(?:artworks|illustrations|manga)\/?$/;
+
+/**
  * 作品の種別。値は profile/all の応答キー (SITE_SPEC §3) と合わせてある。
  * タブのパス名 (illustrations / manga) とは綴りが違うので WORK_CATEGORY_BY_TAB で引く。
  */

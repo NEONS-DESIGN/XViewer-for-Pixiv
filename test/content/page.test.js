@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { WORK_CATEGORY } from '../../src/common/constants.js';
-import { parseUserPage, parseArtworkPath, isViewerTarget, isProfileHome, pageKey } from '../../src/content/page.js';
+import { parseUserPage, parseArtworkPath, isViewerTarget, isProfileHome, pageKey, isInfiniteScrollTarget } from '../../src/content/page.js';
 
 test('ユーザーページの各タブを認識する', () => {
 	const works = { userId: '54734418', isWorksGrid: true, isTagFiltered: false, category: null };
@@ -109,4 +109,26 @@ test('isProfileHome はプロフィールのホームだけを true にする', 
 	assert.equal(isProfileHome('/users/54734418/bookmarks/artworks'), false);
 	assert.equal(isProfileHome('/artworks/149425016'), false);
 	assert.equal(isProfileHome('/'), false);
+});
+
+test('無限スクロールの対象は作品グリッドの 3 タブだけ', () => {
+	// ページャ (?p=) が出るのはこの 3 つだけ (SITE_SPEC §3)
+	assert.equal(isInfiniteScrollTarget('/users/123/artworks'), true);
+	assert.equal(isInfiniteScrollTarget('/users/123/illustrations'), true);
+	assert.equal(isInfiniteScrollTarget('/users/123/manga'), true);
+	assert.equal(isInfiniteScrollTarget('/users/123/artworks/'), true);
+});
+
+test('無限スクロールはプロフィールホームを対象にしない', () => {
+	// ホームは最新数件のダイジェストでページャが無い
+	assert.equal(isInfiniteScrollTarget('/users/123'), false);
+	assert.equal(isInfiniteScrollTarget('/users/123/'), false);
+});
+
+test('無限スクロールはタグ絞り込みとブックマークを対象にしない', () => {
+	// タグ絞り込みは profile/all と並びが一致しない。ブックマークは他人の作品が並ぶ
+	assert.equal(isInfiniteScrollTarget('/users/123/artworks/%E3%82%BF%E3%82%B0'), false);
+	assert.equal(isInfiniteScrollTarget('/users/123/bookmarks/artworks'), false);
+	assert.equal(isInfiniteScrollTarget('/users/123/request'), false);
+	assert.equal(isInfiniteScrollTarget('/artworks/123'), false);
 });
