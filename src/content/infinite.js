@@ -206,8 +206,9 @@ export function attachInfiniteScroll(doc, options) {
 			// 本物の IntersectionObserver は戻り値を捨てる。テストから完了を待てるように Promise を返す
 			return advance();
 		}, { rootMargin: `${mode === INFINITE_SCROLL.PREFETCH ? 0 : SENTINEL_MARGIN_PX}px` });
-		observer.observe(sentinel);
+		// observe() が投げても dispose() で切れるように、先に印を付ける
 		observing = true;
+		observer.observe(sentinel);
 	}
 
 	/**
@@ -386,9 +387,19 @@ export function attachInfiniteScroll(doc, options) {
 	}
 
 	return {
+		/**
+		 * 継ぎ足しが動いているか。雛形が採れたうえで、まだ dispose() されていなければ true。
+		 * @returns {boolean} 動いていれば true
+		 */
 		isActive: () => !disposed,
+		/**
+		 * モードを切り替える。継ぎ足したカードには触らない
+		 * (設定を切り替えただけで読み進めた場所を失わせないため)。
+		 * @param {string} next INFINITE_SCROLL のいずれか
+		 * @returns {void}
+		 */
 		setMode(next) {
-			// 継ぎ足したカードは残す。設定を切り替えただけで読み進めた場所を失わせない
+			// dispose() 済み / 同じモードなら何もしない
 			if (disposed || next === mode) return;
 			mode = next;
 			// 先読みの持ち分は捨てる。モードが変われば先読みの前提も変わる
@@ -402,17 +413,27 @@ export function attachInfiniteScroll(doc, options) {
 				console.warn('[GridViewer] infinite scroll re-observe failed', error);
 			}
 		},
+		/**
+		 * 継ぎ足しをやめ、置いたものを全て撤去してページを元へ戻す。
+		 * 二度呼んでも 1 回しか効かない。
+		 * @returns {void}
+		 */
 		dispose() {
 			if (disposed) return;
 			disposed = true;
 			prefetched = null;
 			stopObserving();
+			// 撤去は別々に包む。片方が投げても、もう片方はページに残さない。
+			// 継ぎ足したカードが残るのは「拡張をオフにしたのに元へ戻らない」状態なので先に消す
 			try {
-				sentinel?.remove();
 				for (const card of [...ul.querySelectorAll(`[${GV_CARD_ATTR}]`)]) card.remove();
 			} catch (error) {
-				// 撤去しきれなくても content script 全体は巻き込まない
-				console.warn('[GridViewer] infinite scroll dispose failed', error);
+				console.warn('[GridViewer] infinite scroll card removal failed', error);
+			}
+			try {
+				sentinel?.remove();
+			} catch (error) {
+				console.warn('[GridViewer] infinite scroll sentinel removal failed', error);
 			}
 		},
 	};
