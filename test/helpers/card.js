@@ -63,6 +63,25 @@ export function el(tag, attrs = {}) {
 		 * @returns {*} 購読者の戻り値
 		 */
 		click() { return node.dispatchEvent({ type: 'click' }); },
+		/**
+		 * 出来事を起こし、自分から祖先 (最後に ownerDocument) へ向けて購読者を呼ぶ。
+		 * capture と bubble の順序は区別しない (拡張は capture でしか購読しないため)。
+		 * 戻り値は最後に値を返した購読者のもの。非同期の購読者をテストから await するために返す。
+		 * @param {string} type 出来事の種類
+		 * @param {object} [init] 出来事に足す値 (shiftKey や preventDefault など)
+		 * @returns {*} 最後に値を返した購読者の戻り値
+		 */
+		dispatch(type, init = {}) {
+			const event = { type, target: node, ...init };
+			let result;
+			let current = node;
+			while (current) {
+				const returned = current.dispatchEvent?.(event);
+				if (returned !== undefined) result = returned;
+				current = current.parent ?? current.ownerDocument ?? null;
+			}
+			return result;
+		},
 		remove() {
 			if (!node.parent) return;
 			node.parent.children = node.parent.children.filter((one) => one !== node);

@@ -6,12 +6,17 @@
  * 途中で終わっているときに空白ができて地続きにならない。
  * React は外から append した li を消さない (SITE_SPEC §3 実測)。
  */
-import { captureTemplates, buildCard, parentOf } from './card-clone.js';
+import { captureTemplates, buildCard, parentOf, GV_BOOKMARK_ID_ATTR } from './card-clone.js';
+import { readSession, clearSessionCache } from './session.js';
+import { addBookmark, deleteBookmark } from '../pixiv/actions.js';
+import { PIXIV_ERROR_KINDS } from '../pixiv/errors.js';
 import {
 	INFINITE_SCROLL,
 	GV_CARD_ATTR,
 	SENTINEL_ATTR,
 	SENTINEL_MARGIN_PX,
+	BOOKMARK_BUTTON_SELECTOR,
+	BOOKMARKED_FILL,
 } from '../common/constants.js';
 
 /**
@@ -163,7 +168,7 @@ function inactiveHandle() {
  * @param {Document} doc 対象のドキュメント
  * @param {{ul: Element, source: {pageCount: () => Promise<number>, loadPage: (page: number) => Promise<object[]>},
  *   mode: string, loggedIn: boolean, startPage?: number,
- *   deps?: {createObserver?: Function, computedStyle?: Function}}} options 組み立ての材料
+ *   deps?: {createObserver?: Function, computedStyle?: Function, actions?: object}}} options 組み立ての材料
  * @returns {{isActive: () => boolean, setMode: (mode: string) => void, dispose: () => void}} 操作
  */
 export function attachInfiniteScroll(doc, options) {
@@ -171,6 +176,8 @@ export function attachInfiniteScroll(doc, options) {
 	const deps = options.deps ?? {};
 	const createObserver = deps.createObserver
 		?? ((callback, init) => new globalThis.IntersectionObserver(callback, init));
+	// 更新系は差し替えられるようにしておく (テストから本物の pixiv を叩かないため)
+	const actions = { addBookmark, deleteBookmark, ...deps.actions };
 
 	const templates = captureTemplates(ul, { computedStyle: deps.computedStyle });
 	// 雛形が採れないページでは何もしない。呼び出し側はページャを隠さない
@@ -192,6 +199,10 @@ export function attachInfiniteScroll(doc, options) {
 	let sentinel = null;
 	/** @type {object|null} sentinel を見張る IntersectionObserver */
 	let observer = null;
+	/** doc にハートの購読を張ったか。dispose() で外すときの目印 */
+	let heartBound = false;
+	/** @type {WeakSet<object>} 送信中のカード。二度押しで 2 回送らないための印 */
+	const sending = new WeakSet();
 
 	/**
 	 * 監視をやめる。二度呼んでも 1 回しか切らない。
@@ -381,8 +392,112 @@ export function attachInfiniteScroll(doc, options) {
 		}
 	}
 
+	/**
+	 * カードのハートを塗る。
+	 * 塗る先はブックマークボタンの中の path だけ。カード全体から集めると、
+	 * 複数枚バッジのアイコンまで赤くなる。
+	 * @param {object} card カード (li)
+	 * @param {boolean} on ブックマーク済みの色にするか
+	 * @returns {void}
+	 */
+	function paintHeart(card, on) {
+		const box = card.querySelector(BOOKMARK_BUTTON_SELECTOR);
+		if (!box) return;
+		[...box.querySelectorAll('path')].forEach((path, index) => {
+			path.style.setProperty('fill', on ? BOOKMARKED_FILL : templates.heartFills[index] ?? '');
+		});
+	}
+
+	/**
+	 * 継ぎ足したカードのハートを押したときの処理。
+	 *
+	 * clone した button は React のハンドラを持たないので、ここで自前に受ける。
+	 * 本体のカードのハートには触らない (React が持っているので、preventDefault すると本来の動作を壊す)。
+	 * 削除の反映は数秒遅れるため、押した見た目を先に変えて再取得では確かめない。
+	 * @param {MouseEvent} event クリック
+	 * @returns {Promise<void>|undefined} 送信の待ち。対象外なら undefined
+	 */
+	function onHeartClick(event) {
+		let card = null;
+		try {
+			if (disposed) return undefined;
+			// path や svg を押されることもあるので button まで遡ってから絞る
+			const button = event.target?.closest?.('button');
+			if (!button?.closest(BOOKMARK_BUTTON_SELECTOR)) return undefined;
+			// 継ぎ足したカードだけが対象。本体のカードはここで抜ける
+			card = button.closest(`[${GV_CARD_ATTR}]`);
+			if (!card) return undefined;
+		} catch (error) {
+			// 押された場所が読めないなら本体の動作に任せる
+			console.warn('[GridViewer] bookmark target lookup failed', error);
+			return undefined;
+		}
+		event.preventDefault();
+		event.stopPropagation();
+		// 返事を待っている間の二度押しは捨てる。待たずに 2 回送ると余分なブックマークが残る
+		if (sending.has(card)) return undefined;
+		sending.add(card);
+		return sendBookmark(card, event.shiftKey === true);
+	}
+
+	/**
+	 * ハートの状態を切り替えて pixiv へ送る。
+	 * @param {object} card カード (li)
+	 * @param {boolean} isPrivate 非公開で入れるか (Shift + クリック)
+	 * @returns {Promise<void>}
+	 */
+	async function sendBookmark(card, isPrivate) {
+		const workId = card.getAttribute(GV_CARD_ATTR);
+		const bookmarkId = card.getAttribute(GV_BOOKMARK_ID_ATTR);
+		// 押した結果を先に見せる。通信を待たせない
+		paintHeart(card, !bookmarkId);
+		try {
+			// トークンは押された時点で読む。組み立て時の値を閉じ込めない
+			const token = readSession(doc)?.csrfToken ?? '';
+			if (bookmarkId) {
+				await actions.deleteBookmark(bookmarkId, token);
+				if (disposed) return;
+				card.removeAttribute(GV_BOOKMARK_ID_ATTR);
+			} else {
+				const id = await actions.addBookmark(workId, isPrivate, token);
+				if (disposed) return;
+				card.setAttribute(GV_BOOKMARK_ID_ATTR, String(id));
+			}
+		} catch (error) {
+			if (disposed) return;
+			// 押す前の見た目と状態へ戻す
+			paintHeart(card, Boolean(bookmarkId));
+			if (bookmarkId) card.setAttribute(GV_BOOKMARK_ID_ATTR, bookmarkId);
+			else card.removeAttribute(GV_BOOKMARK_ID_ATTR);
+			// 401 はログインが切れている (別タブでログアウトした等)。覚えたセッションを捨てる
+			if (error?.kind === PIXIV_ERROR_KINDS.UNAUTHORIZED) clearSessionCache();
+			console.warn('[GridViewer] bookmark failed', error);
+		} finally {
+			sending.delete(card);
+		}
+	}
+
+	/**
+	 * ハートの購読を外す。二度呼んでも 1 回しか外さない。
+	 * @returns {void}
+	 */
+	function unbindHeart() {
+		if (!heartBound) return;
+		heartBound = false;
+		try {
+			doc.removeEventListener('click', onHeartClick, true);
+		} catch (error) {
+			// 外せなくても dispose 済みなら handler は何もしない
+			console.warn('[GridViewer] bookmark listener removal failed', error);
+		}
+	}
+
 	try {
 		injectSentinelStyle(doc);
+		// 継ぎ足したカードのハートを受ける。カードごとに張ると 48 枚ぶん増えるので doc で 1 本。
+		// React より先に受けたいので capture で張る
+		heartBound = true;
+		doc.addEventListener('click', onHeartClick, true);
 		sentinel = doc.createElement('div');
 		sentinel.setAttribute(SENTINEL_ATTR, '');
 		// ul の中に入れると flex アイテムとしてカード 1 枚分の隙間になる。
@@ -396,6 +511,7 @@ export function attachInfiniteScroll(doc, options) {
 		// sentinel を置けないページでは継ぎ足しを諦める。ページャはそのまま残る
 		console.warn('[GridViewer] infinite scroll setup failed', error);
 		stopObserving();
+		unbindHeart();
 		try {
 			sentinel?.remove();
 		} catch { /* 置けていないので消せなくてよい */ }
@@ -439,6 +555,7 @@ export function attachInfiniteScroll(doc, options) {
 			disposed = true;
 			prefetched = null;
 			stopObserving();
+			unbindHeart();
 			// 撤去は別々に包む。片方が投げても、もう片方はページに残さない。
 			// 継ぎ足したカードが残るのは「拡張をオフにしたのに元へ戻らない」状態なので先に消す
 			try {
