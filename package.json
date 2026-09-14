@@ -1,6 +1,6 @@
 {
 	"name": "gridviewer_for_pixiv",
-	"version": "0.20.0",
+	"version": "0.21.0",
 	"private": true,
 	"type": "module",
 	"description": "pixiv のユーザーページに独自の画像ビュワーを追加する Chrome 拡張機能",
