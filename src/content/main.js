@@ -53,18 +53,35 @@ let infinite = null;
  */
 let infiniteKey = null;
 /**
- * @type {Element|null} infinite を張っている ul。張っていなければ null。
+ * @type {Element|null} このグリッドで最後に見た ul。まだ見ていなければ null。
  * React がグリッドを描き直すと、置いた sentinel ごと DOM から外れて継ぎ足しが黙って止まる。
- * 外れたことに気付くための手掛かりとして持つ
+ * 外れたことに気付くための手掛かりとして持つ。
+ * 撤去 (dispose) では捨てない。監視を止めている間に描き直されたことにも気付きたいため
  */
 let infiniteList = null;
 /**
- * 一度でも継ぎ足しを動かせたグリッドのキー。動かせていなければ null。
- * このキーのグリッドを張り直すときは、新しい ul が 1 ページ目から始まっていると分かる。
- * `infiniteKey` と分けてあるのは、張り直しの 1 回目が失敗して `infiniteKey` を捨てても
- * 「一度張った」事実は消してはいけないため。捨てるのは別のグリッドへ移ったときだけ
+ * 下の `infiniteBasePage` がどのグリッドについての記憶か。対象外のページなら null。
+ * ページ (作者 + タブ) だけで決める。**設定を切っても変わらない**のが要点で、
+ * オフの間も「このグリッドは何ページ目を並べているか」を覚えておくために `infiniteKey` と分けてある
  */
-let infiniteBuiltKey = null;
+let infiniteGridKey = null;
+/**
+ * pixiv 自身がグリッドに並べているページ番号 (継ぎ足したぶんは数えない)。
+ * 継ぎ足しはこの次のページから読む。値が動くのは次の 2 つのときだけ:
+ * - 別のグリッドを見始めた: URL の `?p=` が指すページ (pixiv はそれを並べている)
+ * - 同じグリッドを描き直された: 1 (描き直された ul は 1 ページ目から始まる)
+ *
+ * `?p=` をそのまま使えないのは、継ぎ足しに合わせて自分で書き換えているため。
+ * 撤去して張り直す (オフ→オンなど) と、グリッドには pixiv が並べたぶんしか残らない
+ */
+let infiniteBasePage = 1;
+/**
+ * 自分が `?p=` に書いた値。書いていなければ null。
+ * `?p=` を動かしたのが pixiv (直接アクセス / リロード / ページャ) なのか自分なのかを見分ける。
+ * pixiv が動かした値はグリッドの中身と一致するので基準ページにできるが、
+ * 自分が書いた値は継ぎ足した結果でしかなく、撤去すると中身と合わなくなる
+ */
+let infiniteOwnPage = null;
 let router = null;
 let settings = null;
 let viewer = null;
@@ -248,10 +265,10 @@ function findGridList(doc) {
 }
 
 /**
- * 張った先の ul が DOM から外れたか。
+ * 最後に見た ul が DOM から外れたか。
  * pixiv がグリッドを描き直すと、継ぎ足したカードも sentinel もろとも外れ、
  * 見張っている sentinel が二度と画面に入らないまま継ぎ足しが黙って止まる。
- * この場合は張り直す必要がある。
+ * この場合は張り直しが要るうえ、新しい ul は 1 ページ目から始まっている。
  * @returns {boolean} 外れていれば true
  */
 function isGridDetached() {
@@ -259,16 +276,16 @@ function isGridDetached() {
 }
 
 /**
- * 継ぎ足しを撤去し、張り先の記憶も捨てる。
- * 「一度張った」記憶 (infiniteBuiltKey) はここでは捨てない。
- * 同じグリッドを張り直す途中でも呼ばれるため。
+ * 継ぎ足しを撤去する。
+ * グリッドについての記憶 (`infiniteGridKey` / `infiniteBasePage` / `infiniteList`) は捨てない。
+ * 設定を切っただけでも呼ばれるので、ここで捨てると再び入れたときに
+ * 「グリッドが何ページ目を並べているか」を見失う。
  * @returns {void}
  */
 function disposeInfinite() {
 	infinite?.dispose();
 	infinite = null;
 	infiniteKey = null;
-	infiniteList = null;
 }
 
 /**
@@ -284,26 +301,40 @@ function syncInfinite() {
 	// (設定を変えても、閉じたときの handleLocationChange() が必ず追従する)
 	if (isViewingOwnWork()) return;
 	const wanted = settings?.infiniteScroll ?? INFINITE_SCROLL.OFF;
-	const page = wanted === INFINITE_SCROLL.OFF ? null : infiniteTargetPage(location.pathname);
+	// 設定とは切り離し、「どのグリッドを見ているか」はページだけで決める。
+	// オフにしただけでは別のグリッドへ移ったことにはならないので、
+	// このグリッドについて覚えた基準ページを失わずに済む
+	const page = infiniteTargetPage(location.pathname);
 	// タブが変われば並ぶ作品も変わるので、作者だけでなく種別もキーに入れる
 	const key = page ? [page.userId, page.category ?? ''].join(PAGE_KEY_SEPARATOR) : null;
-	if (key !== null && key === infiniteKey && !isGridDetached()) {
-		// 同じグリッドを見続けている。設定の変更はモードの差し替えだけで追従する。
+	const changedGrid = key !== infiniteGridKey;
+	const detached = isGridDetached();
+	if (changedGrid) {
+		// 別のグリッドを見始めた (対象外のページへ出た場合も含む)。前のグリッドの記憶を捨てる
+		infiniteGridKey = key;
+		infiniteList = null;
+		infiniteOwnPage = null;
+	}
+	// グリッドが今どのページを並べているかを決め直す
+	const param = parsePageParam(location.search);
+	if (param !== infiniteOwnPage) {
+		// ?p= を動かしたのは pixiv (直接アクセス / リロード / ページャ)。
+		// pixiv はその値のページをグリッドへ並べる
+		infiniteBasePage = param;
+	} else if (!changedGrid && detached) {
+		// ?p= はそのままでグリッドだけ描き直された。新しい ul は 1 ページ目から始まっている
+		infiniteBasePage = 1;
+	}
+	if (wanted !== INFINITE_SCROLL.OFF && key !== null && key === infiniteKey && !detached) {
+		// 同じグリッドに張ったまま見続けている。設定の変更はモードの差し替えだけで追従する。
 		// ここで作り直すと、継ぎ足したカードが消えて読み進めた場所を失う
 		infinite?.setMode(wanted);
 		return;
 	}
-	// 一度動かせたグリッドへの張り直しか。組み立ての開始位置がここで変わる。
-	// `infiniteKey` ではなく `infiniteBuiltKey` を見る。張り直しの 1 回目が
-	// 描き途中の ul を掴んで失敗すると `infiniteKey` は捨てられるので、
-	// そちらで判定すると再挑戦が「初回」に化けて ?p= を読んでしまう
-	const reattach = key !== null && key === infiniteBuiltKey;
-	// 対象外のページへ出た / 別のグリッドへ移った / グリッドが描き直された。
+	// 対象外のページへ出た / 別のグリッドへ移った / 描き直された / オフにされた。
 	// 前の ul に張ったものは必ず撤去する
 	disposeInfinite();
-	// 別のグリッドへ移った (または対象外へ出た) ときだけ「一度張った」記憶も捨てる
-	if (!reattach) infiniteBuiltKey = null;
-	if (!page) return;
+	if (!page || wanted === INFINITE_SCROLL.OFF) return;
 	const ul = findGridList(document);
 	// グリッドがまだ描かれていない。ここでは組み立てず、現れたときにもう一度呼ばれるのを待つ
 	if (!ul) return;
@@ -315,17 +346,14 @@ function syncInfinite() {
 			source: createPageSource(page.userId, page.category),
 			mode: wanted,
 			loggedIn: Boolean(readSession(document)?.isLoggedIn),
-			// ?p=3 を直接開かれていることがあるので、初回はそのページの次から読む。
-			// 張り直しのときは使えない。?p= は自分がスクロールで書いた値で、
-			// 描き直された ul には 1 ページ目しか並んでいないため
-			startPage: reattach ? 1 : parsePageParam(location.search),
+			// グリッドに並んでいるのは基準ページのぶんだけ。続きはその次から読む
+			startPage: infiniteBasePage,
 			onPageChange: writePageParam,
 		});
 		// 雛形が採れない / sentinel を置けないと inactiveHandle が返る。
-		// 掴んだのが描き途中の ul だっただけかもしれないので、張れていない扱いにして次の機会へ回す。
-		// (キーも捨てる。残すと「同じグリッド」と見なされて二度と試されない)
-		if (infinite.isActive()) infiniteBuiltKey = key;
-		else disposeInfinite();
+		// 掴んだのが描き途中の ul だっただけかもしれないので、張れていない扱いにして次の機会へ回す
+		// (基準ページは触らない。まだ 1 件も継ぎ足していないので、グリッドの中身は変わっていない)
+		if (!infinite.isActive()) disposeInfinite();
 	} catch (error) {
 		// 継ぎ足せなくても pixiv 標準のページャは残る。閲覧そのものは壊さない。
 		// キーは残すので、同じグリッドにいる限り作り直しは繰り返さない
@@ -347,6 +375,8 @@ function writePageParam(page) {
 		const url = new URL(location.href);
 		url.searchParams.set('p', String(page));
 		history.replaceState(history.state, '', url);
+		// 書けたときだけ覚える。あとで「この ?p= は pixiv のものか自分のものか」を見分ける
+		infiniteOwnPage = page;
 	} catch (error) {
 		// URL がずれるだけ。継ぎ足しは続ける
 		console.warn('[GridViewer] page param update failed', error);
@@ -443,9 +473,10 @@ function startNavigationWatch() {
 function stopNavigationWatch() {
 	// 監視を外すと、この先どうなっても追従できなくなる。先に後始末を済ませる。
 	// モーダルを開いたまま全部オフにされた場合、syncInfinite() はモーダル中のガードで
-	// 素通りするので、ここで解体しないと継ぎ足したカードがページに残ってしまう
+	// 素通りするので、ここで解体しないと継ぎ足したカードがページに残ってしまう。
+	// グリッドについての記憶は残す。監視していない間に描き直されても、
+	// 最後に見た ul が外れていることで次に張るときに気付ける
 	disposeInfinite();
-	infiniteBuiltKey = null;
 	if (!navigationWatch) return;
 	navigationWatch.dispose();
 	navigationWatch = null;
