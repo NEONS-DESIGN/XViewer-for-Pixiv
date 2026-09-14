@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { captureTemplates } from '../../src/content/card-clone.js';
-import { makeCard, makeGrid, fakeComputedStyle } from '../helpers/card.js';
+import { captureTemplates, findBadge } from '../../src/content/card-clone.js';
+import { el, makeCard, makeGrid, fakeComputedStyle } from '../helpers/card.js';
 
 /**
  * 雛形を採る。getComputedStyle は偽物を渡す。
@@ -11,6 +11,41 @@ import { makeCard, makeGrid, fakeComputedStyle } from '../helpers/card.js';
 function capture(cards) {
 	const { ul } = makeGrid(cards);
 	return captureTemplates(ul, { computedStyle: fakeComputedStyle });
+}
+
+/**
+ * ブックマークボタンを持たないカードを組む。ハートの色が採れない状況を作るため。
+ * @param {string} id 作品 id
+ * @returns {object} li の代わり
+ */
+function makeCardWithoutHeart(id) {
+	const li = el('li');
+	const outer = li.appendChild(el('div'));
+	const thumbBox = outer.appendChild(el('div'));
+	const sized = thumbBox.appendChild(el('div', { width: '184', height: '184' }));
+	const thumb = sized.appendChild(el('a', {
+		href: `/artworks/${id}`,
+		'data-ga4-label': 'thumbnail_link',
+		'data-gtm-value': id,
+	}));
+	const imgBox = thumb.appendChild(el('div')).appendChild(el('div', { radius: '4' }));
+	imgBox.appendChild(el('img', { src: `https://i.pximg.net/${id}.jpg` }));
+	return li;
+}
+
+/**
+ * node が ancestor の子孫かどうか (自分自身は含めない)。
+ * @param {object} node 調べたい要素
+ * @param {object} ancestor 祖先の候補
+ * @returns {boolean} 子孫なら true
+ */
+function isDescendantOf(node, ancestor) {
+	let current = node.parent;
+	while (current) {
+		if (current === ancestor) return true;
+		current = current.parent;
+	}
+	return false;
 }
 
 test('画像が読み込まれたカードだけを雛形にする', () => {
@@ -62,4 +97,29 @@ test('雛形は元のカードから切り離されている', () => {
 	const templates = capture([card]);
 	templates.single.setAttribute('data-touched', '1');
 	assert.equal(card.getAttribute('data-touched'), null);
+});
+
+test('ハートが見つからないカードは雛形にしない', () => {
+	// bookmark_button が無いとハートの色を採れず、未ブックマーク判定ができない
+	const { ul } = makeGrid([makeCardWithoutHeart('1')]);
+	assert.equal(captureTemplates(ul, { computedStyle: fakeComputedStyle }), null);
+});
+
+test('findBadge は想定より浅い構造でも thumb の外の無関係なノードを返さない', () => {
+	// オーバーレイ層を挟まず、span が thumb の直接の子である極端に浅い構造
+	const li = el('li');
+	const wrap = li.appendChild(el('div'));
+	const sized = wrap.appendChild(el('div', { width: '184', height: '184' }));
+	const thumb = sized.appendChild(el('a', {
+		href: '/artworks/1',
+		'data-ga4-label': 'thumbnail_link',
+		'data-gtm-value': '1',
+	}));
+	thumb.appendChild(el('img', { src: 'https://i.pximg.net/1.jpg' }));
+	const span = thumb.appendChild(el('span'));
+	span.textContent = '3';
+
+	const result = findBadge(li);
+	// null か、thumb 自身か、thumb の子孫のどれかでなければならない (thumb の外は不可)
+	assert.ok(result === null || result === thumb || isDescendantOf(result, thumb));
 });
