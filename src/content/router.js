@@ -31,7 +31,6 @@ export function isOwnHistoryEntry(win = window) {
  * @property {(workId: string) => void} open 履歴を積んで作品を開く
  * @property {(workId: string) => void} replace 履歴を積まずに作品を差し替える
  * @property {() => void} close 履歴を 1 つ戻す
- * @property {() => string|null} currentWorkId 今の URL が指す作品 ID
  * @property {() => void} dispose 購読を解除する
  */
 
@@ -67,9 +66,6 @@ export function createRouter(onPopState, deps = {}) {
 			if (closing) return;
 			closing = true;
 			win.history.back();
-		},
-		currentWorkId() {
-			return parseArtworkPath(win.location.pathname);
 		},
 		dispose() {
 			win.removeEventListener('popstate', listener);

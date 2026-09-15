@@ -1,8 +1,21 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { captureTemplates, findBadge, buildCard, paintHeart, heartPaths } from '../../src/content/card-clone.js';
-import { GV_CARD_ATTR, BOOKMARKED_FILL } from '../../src/common/constants.js';
+import {
+	captureTemplates, findBadge, buildCard, paintHeart, heartPaths, hexToRgb, isBookmarkedFill,
+} from '../../src/content/card-clone.js';
+import {
+	GV_CARD_ATTR, GV_BOOKMARK_ID_ATTR, BOOKMARKED_FILL, TAB_SKIP_MARK_ATTR, TAB_SKIP_LABEL_ATTR,
+} from '../../src/common/constants.js';
 import { el, makeCard, makeGrid, fakeComputedStyle } from '../helpers/card.js';
+
+/**
+ * ハートの path が持つ inline の fill を集める。書いていなければ undefined。
+ * @param {object} card カード (li)
+ * @returns {(string|undefined)[]} path ごとの inline の fill
+ */
+function inlineHeartFills(card) {
+	return heartPaths(card).map((path) => path.style.values.fill);
+}
 
 /**
  * 作品サマリの代わり。
@@ -80,7 +93,18 @@ test('ブックマーク済みのカードは雛形にしない', () => {
 	// 済みのカードから採ると、未ブックマークの色が #ff4060 になってしまう
 	const templates = capture([makeCard({ id: '1', bookmarked: true }), makeCard({ id: '2' })]);
 	assert.equal(templates.single.querySelector('a[data-ga4-label="thumbnail_link"]').getAttribute('data-gtm-value'), '2');
-	assert.deepEqual(templates.heartFills, ['rgb(31, 31, 31)', 'rgb(245, 245, 245)']);
+	// 未ブックマークの色は雛形 (本体の CSS) に任せるので、雛形は色を持ち歩かない
+	assert.equal('heartFills' in templates, false);
+});
+
+test('ブックマーク済みの判定は BOOKMARKED_FILL から導く', () => {
+	// hex と rgb() の 2 通りを別々の定数で持つと、片方だけ変えたときに判定が壊れる
+	assert.equal(hexToRgb(BOOKMARKED_FILL), 'rgb(255, 64, 96)');
+	assert.equal(hexToRgb('not a color'), null);
+	assert.equal(isBookmarkedFill('rgb(255, 64, 96)'), true);
+	assert.equal(isBookmarkedFill(BOOKMARKED_FILL), true);
+	assert.equal(isBookmarkedFill('rgb(31, 31, 31)'), false);
+	assert.equal(isBookmarkedFill(undefined), false);
 });
 
 test('ブックマーク済みしか無ければ null', () => {
@@ -185,7 +209,30 @@ test('雛形に残った aria-label を消す', () => {
 	const card = buildCard(templates, work(), { loggedIn: true });
 	const thumb = card.querySelector('a[data-ga4-label="thumbnail_link"]');
 	assert.equal(thumb.getAttribute('aria-label'), null);
-	assert.equal(thumb.getAttribute('data-pm-label'), null);
+	assert.equal(thumb.hasAttribute(TAB_SKIP_LABEL_ATTR), false);
+});
+
+test('雛形に残った tabindex="-1" と目印を外す', () => {
+	// 雛形は tab-skip が当てた後に採られることが多い。ビュワーを切った後 (tab-skip が居ない) に
+	// 組んだカードだけ Tab 順が違ってはいけない。当て直しは生きている tab-skip に任せる
+	const source = makeCard({ id: '1', tabSkipped: true });
+	const title = source.querySelectorAll('a[href^="/artworks/"]').find((link) => !link.querySelector('img'));
+	title.setAttribute('tabindex', '-1');
+	title.setAttribute(TAB_SKIP_MARK_ATTR, '');
+	const templates = capture([source]);
+	const card = buildCard(templates, work(), { loggedIn: true });
+	for (const el of [card.querySelector('button'), ...card.querySelectorAll('a[href^="/artworks/"]')]) {
+		assert.equal(el.getAttribute('tabindex'), null, `${el.tag} に tabindex が残っている`);
+		assert.equal(el.hasAttribute(TAB_SKIP_MARK_ATTR), false, `${el.tag} に目印が残っている`);
+	}
+});
+
+test('pixiv 側が持たせた tabindex (目印なし) はそのまま残す', () => {
+	const source = makeCard({ id: '1', tabSkipped: false });
+	source.querySelector('button').setAttribute('tabindex', '0');
+	const templates = capture([source]);
+	const card = buildCard(templates, work(), { loggedIn: true });
+	assert.equal(card.querySelector('button').getAttribute('tabindex'), '0');
 });
 
 test('複数枚の作品はバッジ付きの雛形を使い、数字を差し替える', () => {
@@ -212,7 +259,7 @@ test('single にバッジ付きの雛形が渡されても単枚の作品はバ�
 	// captureTemplates が返す single は常にバッジ無しなので、上のテストだけでは
 	// buildCard 自身のバッジ除去 (badge && !wantsBadge) を一度も通らない。
 	// buildCard は templates を引数で受け取る公開関数なので、この入力も契約上ありえる
-	const templates = { single: makeCard({ id: '1', pages: 2 }), multi: null, heartFills: ['rgb(31, 31, 31)', 'rgb(245, 245, 245)'] };
+	const templates = { single: makeCard({ id: '1', pages: 2 }), multi: null };
 	const card = buildCard(templates, work({ pageCount: 1 }), { loggedIn: true });
 	assert.equal(card.querySelector('span'), null);
 });
@@ -220,19 +267,34 @@ test('single にバッジ付きの雛形が渡されても単枚の作品はバ�
 test('ブックマーク済みならハートを ff4060 にする', () => {
 	const templates = capture([makeCard({ id: '1' })]);
 	const card = buildCard(templates, work({ bookmarkData: { id: '555', private: false } }), { loggedIn: true });
-	for (const path of card.querySelectorAll('path')) {
-		assert.equal(path.style.values.fill, '#ff4060');
-	}
-	assert.equal(card.getAttribute('data-gv-bookmark-id'), '555');
+	assert.deepEqual(inlineHeartFills(card), [BOOKMARKED_FILL, BOOKMARKED_FILL]);
+	assert.equal(card.getAttribute(GV_BOOKMARK_ID_ATTR), '555');
 });
 
-test('未ブックマークなら雛形から採った色に戻す', () => {
-	// ライトテーマでは色が違う。固定値を書かない
+test('未ブックマークならハートに色を書かない (本体の CSS に任せる)', () => {
+	// 未ブックマークの色はテーマで変わる (SITE_SPEC §3)。inline で焼き付けると
+	// テーマを切り替えたときに継ぎ足したカードだけ前の色で残る
 	const templates = capture([makeCard({ id: '1' })]);
 	const card = buildCard(templates, work(), { loggedIn: true });
-	const fills = card.querySelectorAll('path').map((path) => path.style.values.fill);
-	assert.deepEqual(fills, ['rgb(31, 31, 31)', 'rgb(245, 245, 245)']);
-	assert.equal(card.getAttribute('data-gv-bookmark-id'), null);
+	assert.deepEqual(inlineHeartFills(card), [undefined, undefined]);
+	assert.equal(card.getAttribute(GV_BOOKMARK_ID_ATTR), null);
+});
+
+test('ブックマーク済みの色は paintHeart(card, false) で外れて本体の CSS に戻る', () => {
+	// 取り消しのときは雛形の色を書き戻すのではなく inline を外す
+	const templates = capture([makeCard({ id: '1' })]);
+	const card = buildCard(templates, work({ bookmarkData: { id: '555', private: false } }), { loggedIn: true });
+	paintHeart(card, false);
+	assert.deepEqual(inlineHeartFills(card), ['', '']);
+});
+
+test('複数枚バッジのアイコンまで塗らない', () => {
+	// カード全体から path を集めると、バッジのアイコンまでハートの色になる
+	const templates = capture([makeCard({ id: '1' }), makeCard({ id: '2', pages: 2 })]);
+	const card = buildCard(templates, work({ pageCount: 3, bookmarkData: { id: '1', private: false } }), { loggedIn: true });
+	const badgePaths = card.querySelectorAll('path').filter((path) => !heartPaths(card).includes(path));
+	assert.equal(badgePaths.length, 1);
+	assert.equal(badgePaths[0].style.values.fill, undefined);
 });
 
 test('未ログインならハートごと消す', () => {

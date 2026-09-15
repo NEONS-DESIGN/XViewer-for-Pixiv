@@ -1,6 +1,9 @@
-import { test } from 'node:test';
+import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createDomSequence, extendWithAllWorks } from '../../src/content/sequence.js';
+import { clearPageSourceCache } from '../../src/pixiv/pages.js';
+
+beforeEach(() => { clearPageSourceCache(); });
 
 test('端に来たら全作品の並びへ広げて続きへ進める', async () => {
 	// グリッドには 3 件しか無いが、全作品は 5 件ある状況

@@ -68,6 +68,41 @@ test('normalizeDetail はブックマークしていない作品の bookmarkId �
 	assert.equal(detail.likedByMe, false);
 });
 
+test('normalizeDetail は欠けた数値カウンタを 0 に倒す', () => {
+	// undefined のまま通すと、いいね押下の likeCount += 1 で画面に NaN が出る
+	const detail = normalizeDetail({
+		illustId: '1', illustTitle: 'x', illustType: 0, pageCount: 1, xRestrict: 0, aiType: 1,
+		userId: '2', userName: 'y', createDate: '', likeData: false, bookmarkData: null, urls: {},
+	});
+	assert.equal(detail.likeCount, 0);
+	assert.equal(detail.bookmarkCount, 0);
+	assert.equal(detail.viewCount, 0);
+	assert.equal(detail.commentCount, 0);
+	assert.deepEqual(detail.tags, []);
+	assert.equal(detail.comment, '');
+});
+
+test('normalizeDetail は数値でないカウンタを 0 に倒し、数値の文字列は数値にする', () => {
+	const base = {
+		illustId: '1', illustTitle: 'x', illustType: 0, pageCount: 1, xRestrict: 0, aiType: 1,
+		userId: '2', userName: 'y', createDate: '', likeData: false, bookmarkData: null, urls: {},
+	};
+	const detail = normalizeDetail({ ...base, likeCount: '12', bookmarkCount: null, viewCount: 'many', commentCount: NaN });
+	assert.equal(detail.likeCount, 12);
+	assert.equal(detail.bookmarkCount, 0);
+	assert.equal(detail.viewCount, 0);
+	assert.equal(detail.commentCount, 0);
+});
+
+test('normalizeDetail はタグ配列の null と名前の無い要素を落とす', () => {
+	const detail = normalizeDetail({
+		illustId: '1', illustTitle: 'x', illustType: 0, pageCount: 1, xRestrict: 0, aiType: 1,
+		userId: '2', userName: 'y', createDate: '', likeData: false, bookmarkData: null, urls: {},
+		tags: { tags: [{ tag: 'a' }, null, {}, { tag: 'b' }, { tag: 3 }] },
+	});
+	assert.deepEqual(detail.tags, ['a', 'b']);
+});
+
 test('ILLUST_TYPES はうごイラを 2 とする', () => {
 	assert.equal(ILLUST_TYPES.ILLUST, 0);
 	assert.equal(ILLUST_TYPES.MANGA, 1);

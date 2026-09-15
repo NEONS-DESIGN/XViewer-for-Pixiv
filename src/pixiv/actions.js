@@ -6,6 +6,8 @@ import { postJson, postForm, postFormData } from './client.js';
 import { ACTION_URLS } from './endpoints.js';
 import { PixivError, PIXIV_ERROR_KINDS } from './errors.js';
 
+/** @typedef {import('./client.js').ClientDeps} ClientDeps */
+
 /** ブックマークの公開設定。 */
 const RESTRICT_PUBLIC = 0;
 const RESTRICT_PRIVATE = 1;
@@ -16,7 +18,7 @@ const RESTRICT_PRIVATE = 1;
  * 冪等なので二重送信しても状態は変わらない。
  * @param {string} illustId 作品 ID
  * @param {string} token CSRF トークン
- * @param {object} [deps] テスト用の依存
+ * @param {ClientDeps} [deps] テスト用の依存
  * @returns {Promise<boolean>} 送信前に既にいいね済みだったか
  */
 export async function likeIllust(illustId, token, deps) {
@@ -29,7 +31,7 @@ export async function likeIllust(illustId, token, deps) {
  * @param {string} illustId 作品 ID
  * @param {boolean} isPrivate 非公開にするか
  * @param {string} token CSRF トークン
- * @param {object} [deps] テスト用の依存
+ * @param {ClientDeps} [deps] テスト用の依存
  * @returns {Promise<string>} 追加されたブックマークの ID。削除に必要
  * @throws {PixivError} 応答に ID が無いとき。ID 無しで成功扱いにすると、次に押したときに削除へ進めない
  */
@@ -53,7 +55,7 @@ export async function addBookmark(illustId, isPrivate, token, deps) {
  * 呼び出し側は再取得で確認せず楽観的に画面を更新すること。
  * @param {string} bookmarkId ブックマーク ID
  * @param {string} token CSRF トークン
- * @param {object} [deps] テスト用の依存
+ * @param {ClientDeps} [deps] テスト用の依存
  * @returns {Promise<void>}
  */
 export async function deleteBookmark(bookmarkId, token, deps) {
@@ -62,9 +64,11 @@ export async function deleteBookmark(bookmarkId, token, deps) {
 
 /**
  * ユーザーをフォローする。
+ * 応答本体の形は SITE_SPEC §4 に未記録 (リクエスト形のみ実測)。
+ * {error, message, body} でなければ client.js が PARSE として投げる。
  * @param {string} userId ユーザー ID
  * @param {string} token CSRF トークン
- * @param {object} [deps] テスト用の依存
+ * @param {ClientDeps} [deps] テスト用の依存
  * @returns {Promise<void>}
  */
 export async function followUser(userId, token, deps) {
@@ -80,9 +84,10 @@ export async function followUser(userId, token, deps) {
 
 /**
  * フォローを外す。追加とはエンドポイントもパラメータ名も違う。
+ * 応答本体の形は followUser と同じく SITE_SPEC §4 に未記録。
  * @param {string} userId ユーザー ID
  * @param {string} token CSRF トークン
- * @param {object} [deps] テスト用の依存
+ * @param {ClientDeps} [deps] テスト用の依存
  * @returns {Promise<void>}
  */
 export async function unfollowUser(userId, token, deps) {

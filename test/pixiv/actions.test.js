@@ -1,7 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { likeIllust, addBookmark, deleteBookmark, followUser, unfollowUser } from '../../src/pixiv/actions.js';
-import { fakeApiFetch as fakeFetch } from '../helpers/pixiv.js';
+import { fakeApiFetch } from '../helpers/pixiv.js';
+
+/**
+ * helpers の fakeApiFetch に text() を足す。client.js の unwrap() は text() で読む。
+ * @param {unknown} body 応答の body
+ * @returns {{impl: Function, calls: Array<{url: string, init: object}>}} 偽の fetch と呼び出しの記録
+ */
+function fakeFetch(body) {
+	const { impl, calls } = fakeApiFetch(body);
+	const text = JSON.stringify({ error: false, message: '', body });
+	const wrapped = async (url, init) => ({ ...(await impl(url, init)), text: async () => text });
+	return { impl: wrapped, calls };
+}
 
 test('likeIllust は JSON を POST し、送信前のいいね状態を返す', async () => {
 	const { impl, calls } = fakeFetch({ is_liked: false });

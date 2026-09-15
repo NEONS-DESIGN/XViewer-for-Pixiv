@@ -162,3 +162,13 @@ test('parsePageParam は数として読めない ?p= を 1 に倒す', () => {
 	assert.equal(parsePageParam('?p=Infinity'), 1);
 	assert.equal(parsePageParam('?p=%20'), 1);
 });
+
+test('parsePageParam は 10 進の数字以外を 1 に倒す', () => {
+	// Number() は '1e2' や '0x10' も整数として読むが、pixiv が同じ解釈をする保証は無い
+	assert.equal(parsePageParam('?p=1e2'), 1);
+	assert.equal(parsePageParam('?p=0x10'), 1);
+	assert.equal(parsePageParam('?p=+3'), 1);
+	assert.equal(parsePageParam('?p=%203'), 1);
+	assert.equal(parsePageParam('?p=3%20'), 1);
+	assert.equal(parsePageParam('?p=1_000'), 1);
+});

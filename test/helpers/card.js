@@ -6,6 +6,7 @@
  *                div > a(title) ]
  * dom.js の findAll は属性セレクタを解さないので、ここでは属性まで見る簡易セレクタを持つ。
  */
+import { TAB_SKIP_MARK_ATTR, TAB_SKIP_LABEL_ATTR } from '../../src/common/constants.js';
 
 /**
  * 要素の代わりを作る。cloneNode と closest を持つ。
@@ -111,6 +112,10 @@ export function el(tag, attrs = {}) {
 			return copy;
 		},
 	};
+	// 本物と同じ名前で親を引けるようにする。src 側が偽物の parent を知らずに済む
+	Object.defineProperty(node, 'parentElement', {
+		get() { return node.parent; },
+	});
 	Object.defineProperty(node, 'nextSibling', {
 		get() {
 			if (!node.parent) return null;
@@ -183,7 +188,7 @@ export function makeCard(options = {}) {
 		'data-ga4-label': 'thumbnail_link',
 		'data-gtm-value': id,
 		'data-gtm-user-id': userId,
-		...(tabSkipped ? { 'aria-label': title, 'data-pm-label': '' } : {}),
+		...(tabSkipped ? { 'aria-label': title, [TAB_SKIP_LABEL_ATTR]: '' } : {}),
 	}));
 	const imgBox = thumb.appendChild(el('div')).appendChild(el('div', { radius: '4' }));
 	imgBox.appendChild(loaded
@@ -204,7 +209,7 @@ export function makeCard(options = {}) {
 	const heartBox = thumbBox.appendChild(el('div')).appendChild(el('div', { 'data-ga4-label': 'bookmark_button' }));
 	const button = heartBox.appendChild(el('button', {
 		type: 'button',
-		...(tabSkipped ? { tabindex: '-1', 'data-pm-tabskip': '' } : {}),
+		...(tabSkipped ? { tabindex: '-1', [TAB_SKIP_MARK_ATTR]: '' } : {}),
 	}));
 	const svg = button.appendChild(el('svg'));
 	const fills = bookmarked ? ['rgb(255, 64, 96)', 'rgb(255, 64, 96)'] : ['rgb(31, 31, 31)', 'rgb(245, 245, 245)'];

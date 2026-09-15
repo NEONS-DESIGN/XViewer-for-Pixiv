@@ -1,66 +1,31 @@
-/* 配色はすべてここの変数で決める。個々の規則に色を直書きしないこと。
-   ダークが既定。ライトは :root[data-theme='light'] で変数だけを差し替える。
-   data-theme は popup-ui.js が設定 (popupTheme) と OS の設定から決めて付ける。
-   値は viewer.css と揃えてある。ビュワーと設定画面で同じ色に見せるため。 */
+/* 配色トークン (--bg / --fg / --accent / --danger / --scrollbar-* / --focus-ring など)、
+   color-scheme、書体、スクロールバーの見た目は common/tokens.css にある。
+   popup.html が popup.css の前に <link> で読む。ビュワー (viewer.css) と同じ 1 本を読むので、
+   同じ拡張の 2 つの画面で色がずれない。値を直すときは tokens.css を直す。
+   data-theme は popup-ui.js が設定 (popupTheme) と OS の設定から決めて html 要素に付ける。
+   ここにはこの画面でしか使わないトークンだけを置く。 */
 :root {
-	/* ブラウザ標準の部品 (チェックボックス、セレクトのピッカー、スクロールバー) も
-	   配色に追従させる。これが無いとライトにしても白い枠の中に暗いピッカーが出る */
-	color-scheme: dark;
-	/* ダークの地の色は pixiv 本体 (charcoal) の実測値。viewer.css と同じ値にする。
-	   どちらも --charcoal-background1 (#1f1f1f) = pixiv が地として見せている色。
-	   html 側の --charcoal-background2 (#000000) は popup では黒が強すぎた */
-	--bg: #1f1f1f;
-	--surface: #1f1f1f;
-	--fg: #eff0f4;
-	--muted: #9aa0b4;
-	--border: #333333;
-	--divider: rgba(255, 255, 255, 0.12);
-	--control-bg: #1f1f1f;
-	--control-border: #3a3a3a;
-	--control-hover: #333333;
-	--hover: rgba(255, 255, 255, 0.08);
-	--accent: #4ea3d6;
-	--on-accent: #04121a;
-	/* 取り返しの付かない操作 (設定の初期化の確定) の枠と文字。
-	   同じ形の 2 つのボタンのうち、戻せない側を色で区別する */
-	--danger: #e5737a;
 	/* スイッチ (チェックボックス) の色。pixiv 本体のスイッチと同じ値で、
-	   --bookmark と同じく本体に合わせる判断なのでテーマで変えない。
+	   ビュワーの --bookmark と同じく本体に合わせる判断なのでテーマで変えない。
 	   ノブだけは地に合わせて明るさを変える */
 	--switch-on: #0096fa;
 	--switch-off: #858585;
 	--switch-knob: #f5f5f5;
-	--scrollbar-track: rgba(255, 255, 255, 0.07);
-	--scrollbar-thumb: rgba(255, 255, 255, 0.26);
-	--scrollbar-thumb-hover: rgba(255, 255, 255, 0.4);
-	/* パネルの高さの上限。popup 全体で Chrome の上限 (600px) に収める。
-	   ヘッダー 30 + タブ 32 + 隙間 20 + 上下の余白 28 = 110 を引いた残り */
-	--panel-max: 480px;
 }
 
+/* ライトの値。下のメディアクエリの中にも同じ宣言がある。
+   片方だけ直さないこと (中身が同じであることは test/popup/popup-css.test.js が見張る) */
 :root[data-theme='light'] {
-	color-scheme: light;
-	/* ライトも pixiv 本体 (charcoal) の実測値。地は --charcoal-background1 (#ffffff) */
-	--bg: #ffffff;
-	--surface: #ffffff;
-	--fg: #1c1e26;
-	--muted: #5c6275;
-	/* 線は pixiv が実際に引いている rgba(0,0,0,0.08) (ダーク側の rgba(255,255,255,0.12) と対) と、
-	   それを白地で不透明にした #ebebeb。地との明暗差はダークの #1f1f1f/#333333 と同じ比に揃えてある */
-	--border: #ebebeb;
-	--divider: rgba(0, 0, 0, 0.08);
-	--control-bg: #ffffff;
-	/* 枠は --charcoal-surface1-press。ホバーの地 (#ebebeb) より濃いので、ホバー中も輪郭が残る */
-	--control-border: #d6d6d6;
-	--control-hover: #ebebeb;
-	--hover: rgba(0, 0, 0, 0.05);
-	--accent: #1a6b9e;
-	--on-accent: #ffffff;
-	--danger: #c0392b;
 	--switch-knob: #ffffff;
-	--scrollbar-track: rgba(0, 0, 0, 0.06);
-	--scrollbar-thumb: rgba(0, 0, 0, 0.26);
-	--scrollbar-thumb-hover: rgba(0, 0, 0, 0.4);
+}
+
+/* data-theme が付く前 (設定を読む前の最初の描画) だけ OS の設定に従ってライトで描く。
+   仕組みの説明は tokens.css の同じメディアクエリにある。
+   宣言は上の :root[data-theme='light'] と同じ内容にする */
+@media (prefers-color-scheme: light) {
+	:root:not([data-theme]) {
+		--switch-knob: #ffffff;
+	}
 }
 
 body {
@@ -70,7 +35,7 @@ body {
 	margin: 0;
 	background: var(--bg);
 	color: var(--fg);
-	font-family: system-ui, -apple-system, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+	/* font-family は tokens.css の :root にあり、html から継承する */
 	font-size: 13px;
 	line-height: 1.6;
 }
@@ -79,6 +44,11 @@ body {
 	display: flex;
 	flex-direction: column;
 	gap: 10px;
+	box-sizing: border-box;
+	/* Chrome の popup の上限。これを超えると popup 自体に縦スクロールが出る。
+	   ヘッダー・通知・タブは固定で、残りをパネル (.panel) が埋めてそこだけスクロールする。
+	   通知の有無で固定部分の高さが変わっても、パネルの上限を計算し直さなくて済む */
+	max-height: 600px;
 	padding: 14px;
 }
 
@@ -86,6 +56,7 @@ body {
 
 .header {
 	display: flex;
+	flex: none;
 	align-items: center;
 	justify-content: space-between;
 	gap: 8px;
@@ -147,7 +118,7 @@ h1 {
 	/* クリック領域は 30px を下回らない (UI_DESIGN_KIT §6)。
 	   スイッチ 16px とテキスト行だけでは 22px ほどにしかならず、
 	   セレクト (30px) とも高さが揃わない */
-	min-height: 24px;
+	min-height: 30px;
 	cursor: pointer;
 }
 
@@ -163,13 +134,15 @@ h1 {
 
 .field.choice .description { margin-bottom: 3px; }
 
-/* 保存の失敗など。読み上げには role="alert" で届く */
+/* 保存の失敗など。読み上げには role="alert" で届く。
+   やり直せる失敗なので --danger は使わない (--danger は取り消せない操作専用。UI_DESIGN_KIT §2) */
 .notice {
+	flex: none;
 	margin: 0;
 	padding: 8px 10px;
-	border: 1px solid var(--danger);
+	border: 1px solid var(--muted);
 	border-radius: 4px;
-	color: var(--danger);
+	color: var(--fg);
 	font-size: 11px;
 	line-height: 1.5;
 }
@@ -188,6 +161,16 @@ button {
 }
 
 button:hover { background: var(--control-hover); }
+
+/* 取り消せない操作のボタン (UI_DESIGN_KIT §4.1) */
+button.danger {
+	border-color: var(--danger);
+	color: var(--danger);
+}
+
+button.danger:hover {
+	background: color-mix(in srgb, var(--danger) 15%, transparent);
+}
 
 /* チェックボックスは pixiv 本体 (charcoal) のスイッチと同じ見た目にする。
    寸法・動き・色はすべて実測値 (SITE_SPEC.md「スイッチ」)。
@@ -238,11 +221,10 @@ input[type='checkbox']:checked::after {
 	}
 }
 
-/* すべての操作部品に輪郭を出す (UI_DESIGN_KIT §6) */
-button:focus-visible,
-select:focus-visible,
-input[type='checkbox']:focus-visible {
-	outline: 2px solid var(--accent);
+/* すべての操作部品に同じ輪郭を出す (UI_DESIGN_KIT §6)。1 規則にまとめて出方を 1 種類に保つ。
+   offset は外側 (+2px)。KIT の -2px (内側) だと 16px のスイッチでは輪郭が本体に埋もれる */
+:is(button, select, input[type='checkbox'], .panel, .license a):focus-visible {
+	outline: var(--focus-ring);
 	outline-offset: 2px;
 }
 
@@ -356,17 +338,21 @@ select selectedcontent [data-role='option-hint'] {
 	display: none;
 }
 
-/* --- 設定の初期化 ----------------------------------------------------- */
+/* --- 取り返しの付かない操作の確認 (common/confirm-row.js) ---------------- */
 
-.reset {
+.confirm {
 	/* ボタンと確認の行の置き場。縦の flex にして中身を幅一杯に伸ばす */
 	display: flex;
 	flex-direction: column;
+}
+
+.reset {
+	/* 「設定を初期化」の置き場所。設定項目との区切りを入れる */
 	padding-top: 10px;
 	border-top: 1px solid var(--divider);
 }
 
-.reset-confirmation {
+.confirmation {
 	/* ボタンの場所にそのまま出す確認の行。枠を危険色にして「通常の操作ではない」ことを示す */
 	display: flex;
 	flex-direction: column;
@@ -376,28 +362,20 @@ select selectedcontent [data-role='option-hint'] {
 	border-radius: 4px;
 }
 
-.reset-confirmation .description { margin: 0; }
+.confirmation .description { margin: 0; }
 
-.reset-buttons {
+.confirm-buttons {
 	display: flex;
 	gap: 8px;
 }
 
-.reset-buttons button { flex: 1; }
+.confirm-buttons button { flex: 1; }
 
-[data-role='reset-confirm'] {
-	border-color: var(--danger);
-	color: var(--danger);
-}
-
-[data-role='reset-confirm']:hover {
-	background: color-mix(in srgb, var(--danger) 15%, transparent);
-}
-
-/* --- タブ ------------------------------------------------------------- */
+/* --- タブ (common/tabs.js) --------------------------------------------- */
 
 .tabs {
 	display: flex;
+	flex: none;
 	gap: 4px;
 	border-bottom: 1px solid var(--border);
 }
@@ -417,18 +395,21 @@ select selectedcontent [data-role='option-hint'] {
 
 .tab:hover { background: var(--hover); }
 
-.tab.is-on {
+/* 選択状態は aria-selected だけで持つ (UI_DESIGN_KIT §4.3)。クラスと二重に持たない */
+.tab[aria-selected='true'] {
 	color: var(--fg);
 	border-bottom-color: var(--accent);
 }
 
 .panel {
-	/* 中身がどれだけ伸びても popup の高さを超えさせない。
-	   ヘッダーとタブは外にあるので、スクロールするのはここだけ */
+	/* .popup (max-height 600px) の残りを埋め、収まらない分だけスクロールする。
+	   ヘッダーとタブは外にあるので、スクロールするのはここだけ。
+	   min-height: 0 が無いと flex の子は中身の高さより縮まず、popup からはみ出す */
 	display: flex;
+	flex: 1 1 auto;
 	flex-direction: column;
 	gap: 10px;
-	max-height: var(--panel-max);
+	min-height: 0;
 	overflow-y: auto;
 	/* つまみとテキストが触れないよう、右に隙間を空ける */
 	padding-right: 6px;
@@ -440,32 +421,8 @@ select selectedcontent [data-role='option-hint'] {
 	display: none;
 }
 
-/* パネル自体が tabindex を持つ。掴んだことが分かるように輪郭を出す */
-.panel:focus-visible {
-	outline: 2px solid var(--accent);
-	outline-offset: 2px;
-}
-
-/* スクロールバーは細く、軌道も見せる (viewer.css と同じ扱い)。
-   標準の scrollbar-width / scrollbar-color と混ぜて書くと
-   Chromium は ::-webkit-scrollbar を丸ごと無視するので、こちらだけに寄せる */
-.panel::-webkit-scrollbar {
-	width: 6px;
-}
-
-.panel::-webkit-scrollbar-track {
-	border-radius: 999px;
-	background: var(--scrollbar-track);
-}
-
-.panel::-webkit-scrollbar-thumb {
-	border-radius: 999px;
-	background: var(--scrollbar-thumb);
-}
-
-.panel::-webkit-scrollbar-thumb:hover {
-	background: var(--scrollbar-thumb-hover);
-}
+/* .panel のスクロールバーの見た目 (細く、軌道も見せる) は tokens.css の ::-webkit-scrollbar が
+   文書全体に当てる。ビュワーと同じ扱い */
 
 /* --- 非公式である旨の断り --------------------------------------------- */
 
@@ -524,9 +481,4 @@ select selectedcontent [data-role='option-hint'] {
 .license a {
 	color: var(--accent);
 	text-decoration: underline;
-}
-
-.license a:focus-visible {
-	outline: 2px solid var(--accent);
-	outline-offset: 2px;
 }

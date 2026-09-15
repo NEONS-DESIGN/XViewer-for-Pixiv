@@ -7,32 +7,15 @@
 	display: none !important;
 }
 
-/* 配色はすべてここの変数で決める。個々の規則に色を直書きしないこと。
-   ダークが既定。ライトは :host([data-theme='light']) で変数だけを差し替える。
-   Shadow DOM の中なので :root ではなく :host に置く。 */
+/* 配色トークン (--bg / --fg / --accent / --danger / --scrollbar-* / --focus-ring など)、
+   color-scheme、書体、スクロールバーの見た目は common/tokens.css にある。
+   viewer.js が tokens.css を文字列として import し、この CSS の前に同じ <style> へ入れる。
+   設定画面 (popup.css) と同じ 1 本を読むので、同じ拡張の 2 つの画面で色がずれない。
+   値を直すときは tokens.css を直す。
+   tokens.css は :root と :host の両方を選択子に持ち、Shadow DOM の中では :host 側が当たる。
+   ここにはビュワーでしか使わないトークンと、Shadow DOM 固有の規則だけを置く。
+   ダークが既定。ライトは :host([data-theme='light']) で変数だけを差し替える。 */
 :host {
-	color-scheme: dark;
-	/* ダークの地の色は pixiv 本体 (charcoal) の実測値に合わせてある。
-	   どちらも --charcoal-background1 (#1f1f1f) = pixiv の body、つまり
-	   利用者が地として見ている色。--charcoal-background2 (#000000) は html 側で、
-	   実際にはほぼ body に覆われて見えないため使わない。
-	   ビュワーは pixiv の上に重なるので、地の色がずれると本体から浮く (SITE_SPEC.md) */
-	--bg: #1f1f1f;
-	--surface: #1f1f1f;
-	--fg: #eff0f4;
-	--muted: #9aa0b4;
-	/* 枠と操作部品も pixiv の階調 (#333 / #3a3a3a) に合わせる。
-	   地だけ差し替えると青寄りの中間色が残って濁る */
-	--border: #333333;
-	--divider: rgba(255, 255, 255, 0.12);
-	--control-bg: #1f1f1f;
-	--control-border: #3a3a3a;
-	--control-hover: #333333;
-	--hover: rgba(255, 255, 255, 0.08);
-	--accent: #4ea3d6;
-	/* 塗りつぶしボタンの文字色。背景 var(--accent) との組み合わせで決める値なので、
-	   テーマごとに必ず対で見直すこと。ダークは明るい水色の上の濃紺で約 6.8:1 */
-	--on-accent: #04121a;
 	/* フォローボタンだけは地も pixiv 本体 (charcoal) の実測値をそのまま使う。
 	   フォロー前 = --charcoal-brand、フォロー中 = --charcoal-surface3 (SITE_SPEC.md)。
 	   白文字との比は約 3.1:1 で AA には届かないが、本体の見え方に揃える判断
@@ -53,17 +36,10 @@
 	   テーマで変えない (docs/DECISIONS.md) */
 	--like: var(--accent);
 	--bookmark: #ff4060;
-	/* 取り返しの付かない操作の枠と文字 */
-	--danger: #e5737a;
-	/* スクロールバーの太さ */
-	--scrollbar-size: 6px;
 	/* サイドバーのスクロールバーだけ、画面の端から空ける隙間。
-	   窓の縁に貼り付いて見えないようにするためのもの (コメント一覧側には使わない) */
+	   窓の縁に貼り付いて見えないようにするためのもの (コメント一覧側には使わない)。
+	   太さ (--scrollbar-size) と色は tokens.css */
 	--scrollbar-inset: 5px;
-	/* スクロールバー。軌道は下地がうっすら分かる程度、つまみはその上で確実に読める濃さ */
-	--scrollbar-track: rgba(255, 255, 255, 0.07);
-	--scrollbar-thumb: rgba(255, 255, 255, 0.26);
-	--scrollbar-thumb-hover: rgba(255, 255, 255, 0.4);
 
 	/* 画像の後ろに敷く幕。pixiv 本体より濃くして画像に集中させる */
 	--backdrop: rgba(0, 0, 0, 0.92);
@@ -74,41 +50,19 @@
 	/* 操作部品の高さ。UI_DESIGN_KIT §3 に合わせる */
 	--control-height: 30px;
 
-	/* Shadow DOM はフォントを継承しない。ホストページの書体に引きずられないよう明示する */
-	font-family: system-ui, -apple-system, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+	/* Shadow DOM はフォントを継承しない。書体 (font-family) は tokens.css の :host が明示する。
+	   文字の大きさと色はここで決める */
 	font-size: 14px;
 	line-height: 1.6;
 	color: var(--fg);
 }
 
 :host([data-theme='light']) {
-	color-scheme: light;
-	/* ライトも pixiv 本体 (charcoal) の実測値。地は --charcoal-background1 (#ffffff) */
-	--bg: #ffffff;
-	--surface: #ffffff;
-	--fg: #1c1e26;
-	--muted: #5c6275;
-	/* 線は pixiv が実際に引いている rgba(0,0,0,0.08) (ダーク側の rgba(255,255,255,0.12) と対) と、
-	   それを白地で不透明にした #ebebeb。地との明暗差はダークの #1f1f1f/#333333 と同じ比に揃えてある */
-	--border: #ebebeb;
-	--divider: rgba(0, 0, 0, 0.08);
-	--control-bg: #ffffff;
-	/* 枠は --charcoal-surface1-press。ホバーの地 (#ebebeb) より濃いので、ホバー中も輪郭が残る */
-	--control-border: #d6d6d6;
-	--control-hover: #ebebeb;
-	--hover: rgba(0, 0, 0, 0.05);
-	/* ライトは白文字を載せる前提で暗くしてある。白との比は約 5.8:1 (#1f7fb8 は 4.4:1 で AA 未達だった) */
-	--accent: #1a6b9e;
-	--on-accent: #ffffff;
-	--danger: #c0392b;
 	/* フォローの地。--charcoal-brand はテーマ非依存なので --follow-bg は差し替えない。
 	   ホバーと「フォロー中」だけライトの値へ (--charcoal-brand-hover / --charcoal-surface3) */
 	--follow-bg-hover: #0090f0;
 	--follow-on-bg: rgba(0, 0, 0, 0.04);
 	--follow-on-bg-hover: rgba(0, 0, 0, 0.0784);
-	--scrollbar-track: rgba(0, 0, 0, 0.06);
-	--scrollbar-thumb: rgba(0, 0, 0, 0.26);
-	--scrollbar-thumb-hover: rgba(0, 0, 0, 0.4);
 	/* 幕はライトでも暗いままにする。画像の見え方を安定させるため */
 	--backdrop: rgba(0, 0, 0, 0.88);
 	--menu-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
@@ -303,6 +257,11 @@
 	font-size: 12px;
 }
 
+/* うごイラの失敗表示は再生ボタンと同じ下端に並ぶので、ボタンの上へ逃がす */
+.ugoira > .pane-error {
+	bottom: 64px;
+}
+
 /* ペイン内のエラー行。画像を消さずに下へ重ねて出す */
 .pane-error {
 	position: absolute;
@@ -337,7 +296,7 @@
 	text-decoration: none;
 }
 
-/* 取得できるまでは visibility: hidden で枠だけが残る。
+/* 取得できるまでは is-pending で中身を隠し、枠だけが残る。
    場所が動かないよう、背景を敷いて大きさを先に確保しておく */
 .author-avatar {
 	flex: 0 0 auto;
@@ -346,6 +305,13 @@
 	border-radius: 50%;
 	background: var(--divider);
 	object-fit: cover;
+}
+
+/* 取得前・取得失敗のアバター (sidebar.js の createAvatar)。
+   コメント一覧の投稿者アイコンも同じ仕組みに寄せられるよう、両方に当てておく */
+.author-avatar.is-pending,
+.comment-avatar.is-pending {
+	visibility: hidden;
 }
 
 .author-identity {
@@ -685,36 +651,12 @@
 	scrollbar-gutter: stable;
 }
 
-/* スクロールバーは細く、つまみだけを見せる。
-   標準の scrollbar-width / scrollbar-color を書くと Chromium は
-   ::-webkit-scrollbar を丸ごと無視するので、どちらか一方に寄せること。
-   丸みと余白まで決めたいのでこちらを使う (Chromium 系専用の拡張)。
-
-   サイドバー自身も同じ見た目にする。「サイドバーごと送る」設定では
-   こちらが主役のスクロールバーになるので、別物に見えてはいけない */
-.comment-scroll::-webkit-scrollbar,
-.sidebar::-webkit-scrollbar {
-	width: var(--scrollbar-size);
-}
-
-/* 軌道も見せる。どこからどこまで送れるのかが分かるほうが、
-   つまみの位置だけを見せるより読み進めた量が掴みやすい */
-.comment-scroll::-webkit-scrollbar-track,
-.sidebar::-webkit-scrollbar-track {
-	border-radius: 999px;
-	background: var(--scrollbar-track);
-}
-
-.comment-scroll::-webkit-scrollbar-thumb,
-.sidebar::-webkit-scrollbar-thumb {
-	border-radius: 999px;
-	background: var(--scrollbar-thumb);
-}
-
-.comment-scroll::-webkit-scrollbar-thumb:hover,
-.sidebar::-webkit-scrollbar-thumb:hover {
-	background: var(--scrollbar-thumb-hover);
-}
+/* スクロールバーの見た目 (細く、軌道も見せる) は tokens.css の ::-webkit-scrollbar が
+   Shadow DOM 全体に当てる。コメント一覧 (.comment-scroll) とサイドバー (.sidebar) の両方が対象。
+   サイドバー自身も同じ見た目になる。「サイドバーごと送る」設定では
+   こちらが主役のスクロールバーになるので、別物に見えてはいけない。
+   標準の scrollbar-width / scrollbar-color をここに書かないこと (書くと Chromium は
+   ::-webkit-scrollbar を丸ごと無視する) */
 
 /* サイドバーのスクロールバーだけは画面の端に接するので、上下も --scrollbar-inset 離す。
    右は .sidebar の透明な border-right が担う。
@@ -992,10 +934,14 @@
 
 .action-follow.is-on:hover:not(:disabled) { background: var(--follow-on-bg-hover); }
 
-/* 押した結果は読み上げにだけ渡す。
-   成功はボタン自身 (ラベル・disabled・is-on) が伝えるので画面に出さない。
-   要素を消すと role="status" の読み上げも消えるため、隠すだけにする */
-.action-status {
+/* 読み上げにだけ渡す文字。見た目からは消すが DOM には残す。
+   - .visually-hidden: 押せないカウンタの「いいね」「閲覧数」など、何の数字かを示す名前。
+     role の無い span の aria-label は読み上げに届かないので、文字として置く
+   - .action-status: 押した結果。成功はボタン自身 (ラベル・disabled・is-on) が伝えるので
+     画面に出さない。要素を消すと role="status" の読み上げも消えるため、隠すだけにする。
+     失敗 (data-kind='error') だけは下の規則で目にも見せる */
+.visually-hidden,
+.action-status:not([data-kind='error']) {
 	position: absolute;
 	width: 1px;
 	height: 1px;
@@ -1008,13 +954,8 @@
 
 /* 失敗だけは目にも見せる。ボタンの見た目には出ない情報 */
 .action-status[data-kind='error'] {
-	position: static;
 	width: 100%;
-	height: auto;
 	margin: 4px 0 0;
-	overflow: visible;
-	clip-path: none;
-	white-space: normal;
 	color: var(--danger);
 	font-size: 12px;
 }
@@ -1035,6 +976,9 @@
 	width: 100%;
 	height: 100%;
 	object-fit: cover;
+	/* 48x48 (urls.mini) を引き伸ばす前提のぼかし。
+	   元が極小なので拡大しても中身は読めないが、弱めると輪郭が浮くので値を下げないこと */
+	filter: blur(32px);
 	/* ぼかしの端が透けないよう少しはみ出させる */
 	transform: scale(1.2);
 	opacity: 0.6;
@@ -1060,6 +1004,13 @@
 .blocked-link {
 	color: var(--accent);
 	font-size: 13px;
+}
+
+/* 設定を変えても再読み込みまで反映されない旨。補足なので控えめに */
+.blocked-note {
+	margin: 0;
+	color: var(--muted);
+	font-size: 12px;
 }
 
 .ugoira {

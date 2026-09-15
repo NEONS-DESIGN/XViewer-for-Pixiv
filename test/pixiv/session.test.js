@@ -33,6 +33,22 @@ test('null を渡しても未ログイン相当を返す', () => {
 	assert.deepEqual(parseNextData(null), { isLoggedIn: false, self: null, csrfToken: null });
 });
 
+test('api.token が無ければ csrfToken は null', () => {
+	// 旧 UI ページなど token を持たない __NEXT_DATA__。client.js が空トークンを unauthorized に倒す
+	const text = JSON.stringify({
+		props: {
+			pageProps: {
+				isLoggedIn: true,
+				serverSerializedPreloadedState: JSON.stringify({ userData: { self: { xRestrict: 1 } } }),
+			},
+		},
+	});
+	const session = parseNextData(text);
+	assert.equal(session.isLoggedIn, true);
+	assert.equal(session.csrfToken, null);
+	assert.equal(session.self.xRestrict, 1);
+});
+
 test('preloadedState が壊れていてもログイン状態だけは読める', () => {
 	const text = JSON.stringify({
 		props: { pageProps: { isLoggedIn: true, serverSerializedPreloadedState: '{壊れている' } },

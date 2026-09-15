@@ -6,6 +6,11 @@
  * DOM を直接は触らないので、依存を差し替えれば単体で確かめられる。
  */
 import { KEYS } from '../../common/constants.js';
+import { warn } from '../../common/log.js';
+
+/**
+ * @typedef {import('../sequence.js').Sequence} Sequence
+ */
 
 /**
  * @typedef {object} NavigationDeps
@@ -14,23 +19,86 @@ import { KEYS } from '../../common/constants.js';
  * @property {() => void} onRequestClose 閉じたいときに呼ばれる
  * @property {(workId: string) => void} onNavigate 作品が切り替わったときに呼ばれる
  * @property {() => boolean} canExtendSequence 全作品の並びへ広げてよいか
- * @property {(current: import('../sequence.js').Sequence) => Promise<import('../sequence.js').Sequence>} extendSequence 端で並びを広げる
+ * @property {(current: Sequence) => Promise<Sequence>} extendSequence 端で並びを広げる
  * @property {(direction: number) => void} movePage ページを送る (1 なら次、-1 なら前)
  * @property {(event: KeyboardEvent) => void} focusNext Tab のフォーカスを巡回させる
  */
 
 /**
+ * @typedef {object} Navigation
+ * @property {(direction: number) => Promise<void>} moveWork 前後の作品へ移動する
+ * @property {(event: KeyboardEvent) => void} onKeyDown キーボード操作
+ * @property {(next: Sequence) => void} setSequence 並びを差し替える
+ * @property {(workId: string) => void} setCurrentWorkId 今開いている作品を記録する
+ * @property {() => string|null} currentWorkId 今開いている作品
+ * @property {() => void} reset 閉じたときに状態を捨てる
+ */
+
+/**
+ * 修飾キーが押されているか。
+ * Alt+← (ブラウザの「戻る」) や Ctrl+← (OS の操作) をビュワーが潰さないための判定。
+ * Shift は含めない (Shift+Tab は逆向きの巡回として focusNext が扱う)。
+ * @param {KeyboardEvent} event キー
+ * @returns {boolean} Alt / Ctrl / Meta のどれかが押されていれば true
+ */
+function hasModifier(event) {
+	return event.altKey === true || event.ctrlKey === true || event.metaKey === true;
+}
+
+/**
  * 移動の担当を作る。
  * @param {NavigationDeps} deps 依存
- * @returns {{moveWork: (direction: number) => Promise<void>, onKeyDown: (event: KeyboardEvent) => void, setSequence: (next: object) => void, setCurrentWorkId: (workId: string) => void, currentWorkId: () => string|null, reset: () => void}}
+ * @returns {Navigation} 移動の操作
  */
 export function createNavigation(deps) {
-	/** 今開いている作品の並び。上下キーでの移動に使う */
+	/** @type {Sequence|null} 今開いている作品の並び。上下キーでの移動に使う */
 	let sequence = null;
-	/** 今開いている作品。移動の基準 */
+	/** @type {string|null} 今開いている作品。移動の基準 */
 	let currentWorkId = null;
 	/** 端で全作品の並びへ広げている最中かどうか。二重に広げないためのガード */
 	let extending = false;
+	/** 今の並びを全作品へ広げ済みか。真の端で押すたびに取り直さないためのガード */
+	let extended = false;
+
+	/**
+	 * 今の並びで隣の作品を探す。
+	 * @param {number} direction 1 なら次、-1 なら前
+	 * @returns {string|null} 隣の作品 ID。端なら null
+	 */
+	function neighbor(direction) {
+		if (!sequence || !currentWorkId) return null;
+		return direction > 0 ? sequence.next(currentWorkId) : sequence.prev(currentWorkId);
+	}
+
+	/**
+	 * 並びを全作品へ広げる。
+	 * 広げた並びに今の作品が含まれていなければ差し替えない (差し替えると next も prev も
+	 * null になり、元の並びで戻れたはずの上キーまで効かなくなる)。
+	 * 待っている間に閉じたり別の作品へ移ったりしていたら、結果は捨てる。
+	 * @returns {Promise<boolean>} 並びを差し替えたら true
+	 */
+	async function extend() {
+		const from = currentWorkId;
+		const base = sequence;
+		extending = true;
+		let next;
+		try {
+			next = await deps.extendSequence(base);
+		} catch (error) {
+			// 広げられなくても今の作品は見られる。端で止まるだけにする
+			warn('failed to extend sequence', error);
+			return false;
+		} finally {
+			extending = false;
+		}
+		// reset() で捨てた後や、待っている間に別の作品へ移った後の結果は使わない
+		if (sequence !== base || currentWorkId !== from) return false;
+		// 一度試した並びは、含まれていなくても取り直さない (取り直しても同じ結果になる)
+		extended = true;
+		if (!next || typeof next.has !== 'function' || !next.has(from)) return false;
+		sequence = next;
+		return true;
+	}
 
 	/**
 	 * 前後の作品へ移動する。
@@ -40,24 +108,15 @@ export function createNavigation(deps) {
 	 */
 	async function moveWork(direction) {
 		if (!sequence || !currentWorkId) return;
-		let target = direction > 0 ? sequence.next(currentWorkId) : sequence.prev(currentWorkId);
+		let target = neighbor(direction);
 
 		// 端に来た。全作品の並びへ広げられるなら広げてもう一度
-		if (!target && deps.canExtendSequence() && !extending) {
+		if (!target && !extended && !extending && deps.canExtendSequence()) {
 			const from = currentWorkId;
-			extending = true;
-			try {
-				sequence = await deps.extendSequence(sequence);
-			} catch (error) {
-				// 広げられなくても今の作品は見られる。端で止まるだけにする
-				console.warn('[GridViewer] failed to extend sequence', error);
-				return;
-			} finally {
-				extending = false;
-			}
+			if (!(await extend())) return;
 			// 待っている間に上キーで戻っていたら、完了を理由に勝手に進めない
 			if (currentWorkId !== from) return;
-			target = direction > 0 ? sequence.next(currentWorkId) : sequence.prev(currentWorkId);
+			target = neighbor(direction);
 		}
 		if (!target) return;
 
@@ -67,11 +126,14 @@ export function createNavigation(deps) {
 
 	/**
 	 * キーボード操作。
+	 * IME の変換中と修飾キー付き (Escape を除く) は奪わない。
+	 * 作品移動はキーリピートでは動かさない (リピートごとに通信と replaceState が走るため)。
 	 * @param {KeyboardEvent} event キー
 	 * @returns {void}
 	 */
 	function onKeyDown(event) {
 		if (!deps.isOpen()) return;
+		if (event.isComposing === true) return;
 		if (event.key === KEYS.CLOSE) {
 			event.preventDefault();
 			deps.onRequestClose();
@@ -81,6 +143,7 @@ export function createNavigation(deps) {
 			deps.focusNext(event);
 			return;
 		}
+		if (hasModifier(event)) return;
 		if (event.key === KEYS.NEXT_PAGE) {
 			event.preventDefault();
 			deps.movePage(1);
@@ -91,15 +154,11 @@ export function createNavigation(deps) {
 			deps.movePage(-1);
 			return;
 		}
-		if (event.key === KEYS.NEXT_WORK) {
+		if (event.key === KEYS.NEXT_WORK || event.key === KEYS.PREV_WORK) {
+			// ページのスクロールは押しっぱなしでも起こさない。移動だけを 1 回に留める
 			event.preventDefault();
-			void moveWork(1);
-			return;
-		}
-		if (event.key === KEYS.PREV_WORK) {
-			event.preventDefault();
-			void moveWork(-1);
-			return;
+			if (event.repeat === true) return;
+			void moveWork(event.key === KEYS.NEXT_WORK ? 1 : -1);
 		}
 	}
 
@@ -109,11 +168,12 @@ export function createNavigation(deps) {
 
 		/**
 		 * 並びを差し替える。
-		 * @param {import('../sequence.js').Sequence} next 新しい並び
+		 * @param {Sequence} next 新しい並び
 		 * @returns {void}
 		 */
 		setSequence(next) {
 			sequence = next;
+			extended = false;
 		},
 
 		/**
@@ -125,6 +185,10 @@ export function createNavigation(deps) {
 			currentWorkId = workId;
 		},
 
+		/**
+		 * 今開いている作品を返す。
+		 * @returns {string|null} 作品 ID。閉じていれば null
+		 */
 		currentWorkId() {
 			return currentWorkId;
 		},
@@ -136,6 +200,7 @@ export function createNavigation(deps) {
 		reset() {
 			sequence = null;
 			currentWorkId = null;
+			extended = false;
 		},
 	};
 }

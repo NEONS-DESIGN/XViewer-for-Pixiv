@@ -18,6 +18,24 @@ export const BOOKMARKED_FILL = '#ff4060';
 /** 自分が継ぎ足したカードの目印。撤去と重複判定とクリック判定に使う。 */
 export const GV_CARD_ATTR = 'data-gv-card';
 
+/** 継ぎ足したカードが持つブックマーク ID。取り消しに使う。無ければ未ブックマーク。 */
+export const GV_BOOKMARK_ID_ATTR = 'data-gv-bookmark-id';
+
+/**
+ * グリッドのカード 1 枚を指す要素と、その中のブックマークボタン。
+ * pixiv のグリッドは ul > li で、ボタンは li の中の button 1 つだけ (SITE_SPEC §3 実測)。
+ * 構造の前提なので、散らさずここで持つ。
+ */
+export const CARD_SELECTOR = 'li';
+export const CARD_BUTTON_SELECTOR = 'button';
+
+/**
+ * tab-skip がフォーカス順から外した要素と、読み上げ名を補ったサムネリンクの目印。
+ * dispose で元へ戻すときと、継ぎ足したカードから雛形由来の印を落とすときに使う。
+ */
+export const TAB_SKIP_MARK_ATTR = 'data-gv-tabskip';
+export const TAB_SKIP_LABEL_ATTR = 'data-gv-label';
+
 /**
  * プロフィールのホームに出る「ピックアップ」欄を指すセレクタ。
  * 実測ではホームの `section` はこの 1 個だけで、作品グリッドは `div` なので掛からない
@@ -122,14 +140,23 @@ export const NAV_HOOK_FLAG = '__gridviewerNavHooked';
  */
 export const LOCATION_CHECK_DELAY_MS = 200;
 
+/**
+ * ログイン情報が読めないときの閲覧設定 (R-18 を出さない)。
+ * SITE_SPEC §6 の xRestrict の値と同じ尺度で、0 は全年齢のみ。
+ */
+export const DEFAULT_X_RESTRICT = 0;
+
 /** 画像の解像度。urls のキー名と合わせてある。 */
 export const IMAGE_QUALITY = Object.freeze({
 	REGULAR: 'regular',
 	ORIGINAL: 'original',
 });
 
-/** 先読みする枚数の選択肢。 */
+/** 先読みする枚数の選択肢。昇順に並べる (設定画面はこの並びで選択肢を出す)。 */
 export const PREFETCH_CHOICES = Object.freeze([0, 1, 3]);
+
+/** 先読みの既定値。選択肢の一番大きいもの (値の出どころを PREFETCH_CHOICES 1 つにする)。 */
+export const DEFAULT_PREFETCH = PREFETCH_CHOICES[PREFETCH_CHOICES.length - 1];
 
 /** コメントを 1 回に読む件数。 */
 export const COMMENT_PAGE_SIZE = 30;
@@ -236,7 +263,7 @@ export const THEME_TOGGLE = Object.freeze({
 export const SETTINGS_DEFAULTS = Object.freeze({
 	enabled: true,
 	imageQuality: IMAGE_QUALITY.REGULAR,
-	prefetch: 3,
+	prefetch: DEFAULT_PREFETCH,
 	showSidebar: true,
 	sidebarScroll: SIDEBAR_SCROLL.COMMENTS,
 	closeOnBackdrop: true,
@@ -268,6 +295,15 @@ export const FOCUSABLE_SELECTOR = [
 	'textarea:not([disabled])',
 	'[tabindex]:not([tabindex="-1"])',
 ].join(',');
+
+/**
+ * 状態表示 (role="status" / "alert") の種別。文言の横に出す見た目の区別に使う。
+ * viewer の showStatus と actions-bar の announce が同じ語彙で書く。
+ */
+export const STATUS_KINDS = Object.freeze({
+	INFO: 'info',
+	ERROR: 'error',
+});
 
 /** 隠れている要素。フォーカスの巡回から外すために使う。 */
 export const HIDDEN_SELECTOR = '[hidden]';

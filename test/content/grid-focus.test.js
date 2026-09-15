@@ -35,6 +35,28 @@ test('ensureFocusStyle は head に style を 1 枚入れる', () => {
 	assert.equal(doc.head.children.length, 1);
 	assert.equal(doc.head.children[0].tagName, 'STYLE');
 	assert.equal(doc.head.children[0].id, FOCUS_STYLE_ID);
+	assert.equal(doc.head.children[0].textContent, GRID_FOCUS_CSS);
+});
+
+test('既に同じ id の style があれば足さず、dispose でそれを外す', () => {
+	// 別の経路で残った style を掴み直す (二重注入の防止と後片付けの両方)
+	const doc = fakeDoc();
+	const first = ensureFocusStyle(doc);
+	const second = ensureFocusStyle(doc);
+	assert.equal(doc.head.children.length, 1);
+	second.dispose();
+	assert.equal(doc.head.children.length, 0);
+	assert.doesNotThrow(() => first.dispose());
+});
+
+test('appendChild が投げても投げずに戻り、dispose も投げない', (t) => {
+	const warn = t.mock.method(console, 'warn', () => {});
+	const doc = fakeDoc();
+	doc.head.appendChild = () => { throw new Error('head is sealed'); };
+	let handle;
+	assert.doesNotThrow(() => { handle = ensureFocusStyle(doc); });
+	assert.doesNotThrow(() => handle.dispose());
+	assert.equal(warn.mock.callCount(), 1);
 });
 
 test('ensureFocusStyle を 2 回呼んでも style は増えない', () => {

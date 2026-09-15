@@ -71,8 +71,7 @@ export function planPanes(detail, session, settings) {
  * @property {Document} doc 対象のドキュメント
  * @property {HTMLElement} stage 主役の描画先 (.stage)
  * @property {HTMLElement} sidebar サイドバーの描画先 (.sidebar)
- * @property {(message: string) => void} onError 再生できない等を伝える
- * @property {(userId: string) => Promise<object>} [fetchUser] 作者情報の取得。テストから通信させないために使う
+ * @property {(userId: string) => Promise<object>} [fetchUser] 作者情報の取得 (サイドバーとアクションの両方へ渡す)。テストから通信させないために使う
  */
 
 /**
@@ -91,33 +90,37 @@ export function planPanes(detail, session, settings) {
  * @returns {Promise<void>}
  */
 export async function renderWork(detail, session, settings, targets) {
-	const { doc, stage, sidebar, onError } = targets;
+	const { doc, stage, sidebar } = targets;
 	const plan = planPanes(detail, session, settings);
 
 	// hidden は毎回明示的に設定する。片方でしか触らないと、
 	// 設定を戻したときに hidden が立ったままになって出てこなくなる
 	sidebar.hidden = !plan.sidebar;
 
-	// サイドバーを先に出す。文章とカウンタは画像の読み込みを待つ理由が無い
+	// サイドバーを先に出す。文章とカウンタは画像の読み込みを待つ理由が無い。
+	// コメントとアクションはサイドバーの中に入るので (plan.comments / plan.actions は
+	// plan.sidebar を含意する)、この 1 ブロックで済ませる
 	if (plan.sidebar) {
 		sidebarPane = createSidebar({ doc, container: sidebar, fetchUser: targets.fetchUser });
 		sidebarPane.render(detail);
-	}
 
-	if (plan.comments && sidebarPane) {
-		// 「上部へ」はサイドバーそのものを先頭へ戻す。区画の中からは届かないので渡す
-		commentsPane = createComments({ doc, container: sidebarPane.commentsSlot(), scrollTarget: sidebar });
-		void commentsPane.load(detail);
-	}
-	if (plan.actions && sidebarPane) {
-		// いいね・ブックマークはカウンタの行を押せるボタンへ差し替える形で入る。
-		// フォローだけは作者行の右端に独立して置くので、描画先が 2 つに分かれる
-		actionsPane = createActionsBar({
-			doc,
-			container: sidebarPane.countsSlot(),
-			followContainer: sidebarPane.followSlot(),
-		});
-		actionsPane.render(detail);
+		if (plan.comments) {
+			// 「上部へ」はサイドバーそのものを先頭へ戻す。区画の中からは届かないので渡す
+			commentsPane = createComments({ doc, container: sidebarPane.commentsSlot(), scrollTarget: sidebar });
+			void commentsPane.load(detail);
+		}
+		if (plan.actions) {
+			// いいね・ブックマークはカウンタの行を押せるボタンへ差し替える形で入る。
+			// フォローだけは作者行の右端に独立して置くので、描画先が 2 つに分かれる。
+			// fetchUser はサイドバーと同じ差し替え口。渡さないとテストでも /ajax/user を叩きに行く
+			actionsPane = createActionsBar({
+				doc,
+				container: sidebarPane.countsSlot(),
+				followContainer: sidebarPane.followSlot(),
+				fetchUser: targets.fetchUser,
+			});
+			actionsPane.render(detail);
+		}
 	}
 
 	if (plan.main === MAIN_PANE.BLOCKED) {
@@ -127,7 +130,7 @@ export async function renderWork(detail, session, settings, targets) {
 	}
 
 	if (plan.main === MAIN_PANE.UGOIRA) {
-		ugoiraPane = createUgoiraPlayer({ doc, container: stage, settings, onError });
+		ugoiraPane = createUgoiraPlayer({ doc, container: stage, settings });
 		await ugoiraPane.render(detail);
 	} else {
 		imagePane = createImagePane({ doc, container: stage, settings });
@@ -168,6 +171,17 @@ export function disposeAll() {
  */
 export function consumeEscape() {
 	return sidebarPane?.consumeEscape() === true;
+}
+
+/**
+ * キー操作をサイドバーに先に使わせる。
+ * consumeEscape() の一般形。開いたシェアメニューは Escape だけでなく上下 / Home / End も
+ * 自分で使うので、本体が作品の移動に使う前にここで聞く。
+ * @param {KeyboardEvent} event キー
+ * @returns {boolean} 食い止めたなら true (本体は反応してはいけない)
+ */
+export function consumeKey(event) {
+	return sidebarPane?.consumeKey(event) === true;
 }
 
 /**

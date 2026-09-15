@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderPopup, resolveTheme } from '../../src/popup/popup-ui.js';
-import { SETTINGS_DEFAULTS, POPUP_THEMES } from '../../src/common/constants.js';
+import { SECTIONS } from '../../src/popup/sections.js';
+import { SETTINGS_DEFAULTS, POPUP_THEMES, PREFETCH_CHOICES } from '../../src/common/constants.js';
 import { PROJECT_LICENSE, THIRD_PARTY } from '../../src/common/licenses.js';
 import { fakeElement, fakeDoc as fakeDocWith, iconName } from '../helpers/dom.js';
 
@@ -58,7 +59,7 @@ function build(overrides = {}) {
 	const root = fakeElement('main');
 	const changes = [];
 	let resets = 0;
-	renderPopup({
+	const screen = renderPopup({
 		doc,
 		root,
 		settings: { ...SETTINGS_DEFAULTS, ...settings },
@@ -66,8 +67,23 @@ function build(overrides = {}) {
 		onReset: () => { resets += 1; },
 		...rest,
 	});
-	return { doc, root, changes, resets: () => resets };
+	return { doc, root, changes, resets: () => resets, screen };
 }
+
+test('定義表のキーは popupTheme を除く全設定と 1 対 1 に対応する', () => {
+	// タイポしたキーで saveSetting が成功し、読み込み側は既定へ倒すので誰も気づけない
+	const keys = SECTIONS.flatMap((section) => section.fields.map((field) => field.key));
+	assert.equal(new Set(keys).size, keys.length, 'キーが重複している');
+	assert.deepEqual(new Set([...keys, 'popupTheme']), new Set(Object.keys(SETTINGS_DEFAULTS)));
+});
+
+test('先読みの選択肢は PREFETCH_CHOICES の値と並びから起こす', () => {
+	const field = SECTIONS.flatMap((section) => section.fields).find((one) => one.key === 'prefetch');
+	assert.deepEqual(field.options.map((option) => option.value), PREFETCH_CHOICES.map(String));
+	for (const option of field.options) {
+		assert.ok(option.label.length > 0 && option.description.length > 0, `${option.value} の文言が無い`);
+	}
+});
 
 test('設定タブの見出しは ビュワー / 画像 / ユーザーページ / 操作 の順に並ぶ', () => {
 	const { root } = build();
@@ -272,6 +288,31 @@ test('フィールド全体の説明は装飾の可否によらず出す', () =>
 	}
 });
 
+test('スイッチとセレクトは aria-describedby で説明文と結び付く', () => {
+	// 読み上げ環境ではラベルしか聞こえず、説明文が届かない
+	const { root } = build({ rich: true });
+	const toggle = find(root, 'enabled');
+	assert.equal(toggle.getAttribute('aria-describedby'), find(root, 'enabled-description').attributes.id);
+	const select = find(root, 'imageQuality');
+	assert.equal(select.getAttribute('aria-describedby'), find(root, 'imageQuality-description').attributes.id);
+});
+
+test('装飾に対応しない環境では、下の説明もセレクトの aria-describedby に入る', () => {
+	const { root } = build({ rich: false });
+	const select = find(root, 'imageQuality');
+	const ids = select.getAttribute('aria-describedby').split(' ');
+	assert.deepEqual(ids, [find(root, 'imageQuality-description').attributes.id, find(root, 'imageQuality-hint').attributes.id]);
+});
+
+test('セレクトの名前は見出し (h3) から aria-labelledby で引く', () => {
+	// 見出しは label ではないので、結び付けないと読み上げに名前が無い。文言を二重に持たない
+	const { root } = build();
+	const select = find(root, 'imageQuality');
+	const heading = collect(root, 'h3').find((one) => one.textContent === '画像の解像度');
+	assert.equal(select.getAttribute('aria-labelledby'), heading.attributes.id);
+	assert.equal(select.getAttribute('aria-label'), null);
+});
+
 test('notice を渡すと読み上げに届く一行が出る', () => {
 	const { root } = build({ notice: '保存できませんでした' });
 	const notice = find(root, 'notice');
@@ -360,6 +401,40 @@ test('タブに関係ないキーは握りつぶさない', () => {
 	find(root, 'tabs').dispatch('keydown', { key: 'a', preventDefault() { prevented = true; } });
 	assert.equal(prevented, false);
 	assert.equal(find(root, 'tab-settings').getAttribute('aria-selected'), 'true');
+});
+
+test('initialTab を渡すとそのタブが開いた状態で描く', () => {
+	// 描き直しのたびに先頭へ戻ると、ライセンスを読んでいる途中で操作が続けられない
+	const { root, screen } = build({ initialTab: 'license' });
+	assert.equal(find(root, 'tab-license').getAttribute('aria-selected'), 'true');
+	assert.equal(find(root, 'panel-settings').hidden, true);
+	assert.equal(screen.currentTab(), 'license');
+});
+
+test('initialTab が無い・知らない id なら先頭のタブを開く', () => {
+	assert.equal(build().screen.currentTab(), 'settings');
+	assert.equal(build({ initialTab: 'unknown' }).screen.currentTab(), 'settings');
+});
+
+test('currentTab は切り替えに追従する', () => {
+	const { root, screen } = build();
+	find(root, 'tab-license').dispatch('click');
+	assert.equal(screen.currentTab(), 'license');
+});
+
+test('パネル自身の tabindex は操作部品を持たないライセンスタブだけ', () => {
+	// 設定タブに付けると Tab の停止が 1 つ増え、最初のスイッチへ行くのに 1 回多く押す
+	const { root } = build();
+	assert.equal(find(root, 'panel-license').getAttribute('tabindex'), '0');
+	assert.equal(find(root, 'panel-settings').getAttribute('tabindex'), null);
+});
+
+test('タブの選択状態はクラスではなく aria-selected だけで持つ', () => {
+	const { root } = build();
+	find(root, 'tab-license').dispatch('click');
+	for (const id of ['settings', 'license']) {
+		assert.equal(find(root, `tab-${id}`).className, 'tab');
+	}
 });
 
 test('タブを往復しても設定タブの状態は失われない', () => {
