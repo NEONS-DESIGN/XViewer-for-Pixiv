@@ -4,30 +4,41 @@
  */
 import { createIcon } from '../../common/icons.js';
 import { getJson } from '../../pixiv/client.js';
-import { commentRootsUrl, commentRepliesUrl, safeCdnUrl, emojiUrl, stampUrl } from '../../pixiv/endpoints.js';
+import { commentRootsUrl, commentRepliesUrl, emojiUrl, stampUrl } from '../../pixiv/endpoints.js';
+import { createAvatar, showAvatar } from './avatar.js';
 import { parseCommentText } from '../../pixiv/emoji.js';
 import { COMMENT_PAGE_SIZE } from '../../common/constants.js';
+import { warn } from '../../common/log.js';
 
-/** 退会したユーザーの表示名。 */
-/** 続きを読むボタンの文言。 */
-const MORE_LABEL = 'もっと見る';
-
-/** 読み込みに失敗したあとのボタンの文言。押すと同じ位置から読み直す。 */
-const RETRY_LABEL = '再試行';
-
-const DELETED_USER_NAME = '退会したユーザー';
-
-/** スタンプコメントの本文の代わり。 */
-const STAMP_PLACEHOLDER = '[スタンプ]';
-
-/** 返信の開閉ボタンの文言。 */
-const REPLIES_LABEL = Object.freeze({ SHOW: '返信を表示', HIDE: '返信を隠す' });
+/** 画面に出す文言。 */
+const MESSAGES = Object.freeze({
+	/** 見出し */
+	HEADING: 'コメント',
+	/** 続きを読むボタン */
+	MORE: 'もっと見る',
+	/** 読み込みに失敗したあとのボタン。押すと同じ位置から読み直す */
+	RETRY: '再試行',
+	/** 退会したユーザーの表示名 */
+	DELETED_USER: '退会したユーザー',
+	/** スタンプコメントの本文の代わり (画像が出せないとき) */
+	STAMP_PLACEHOLDER: '[スタンプ]',
+	/** スタンプ画像の alt */
+	STAMP_ALT: 'スタンプ',
+	/** 返信の開閉ボタン */
+	REPLIES_SHOW: '返信を表示',
+	REPLIES_HIDE: '返信を隠す',
+	/** 返信の続きを読むボタン */
+	REPLY_MORE: '返信をもっと見る',
+	REPLY_FAILED: '返信を読み込めませんでした',
+	LOAD_FAILED: 'コメントを読み込めませんでした',
+	COMMENT_OFF: 'この作品はコメントを受け付けていません',
+	EMPTY: 'まだコメントはありません',
+	/** 見出しの右端のボタン。サイドバーの先頭 (投稿文) へ戻す */
+	TO_TOP: '上部へ',
+});
 
 /** 返信の 1 ページ目。replies API は offset ではなく 1 始まりの page で送る。 */
 const FIRST_REPLY_PAGE = 1;
-
-/** 見出しの右端のボタンの文言。サイドバーの先頭 (投稿文) へ戻す。 */
-const TO_TOP_LABEL = '上部へ';
 
 /** 見出しが上端に貼り付いている間だけ付ける印。下に線を引くのに使う。 */
 const STUCK_CLASS = 'is-stuck';
@@ -96,7 +107,7 @@ export function normalizeComment(raw) {
 	return {
 		id: raw.id,
 		userId: raw.userId ?? '',
-		userName: raw.isDeletedUser ? DELETED_USER_NAME : (raw.userName ?? DELETED_USER_NAME),
+		userName: raw.isDeletedUser ? MESSAGES.DELETED_USER : (raw.userName ?? MESSAGES.DELETED_USER),
 		avatarUrl: raw.img ?? '',
 		// スタンプのときは本文が空で届く。文字に置き換えず、描画側で画像にする
 		text: raw.comment ?? '',
@@ -137,14 +148,14 @@ export function renderStamp(doc, stampId) {
 	const url = stampUrl(stampId);
 	if (!url) {
 		const fallback = doc.createElement('span');
-		fallback.textContent = STAMP_PLACEHOLDER;
+		fallback.textContent = MESSAGES.STAMP_PLACEHOLDER;
 		return fallback;
 	}
 	const image = doc.createElement('img');
 	image.className = 'comment-stamp';
 	image.setAttribute('src', url);
-	image.setAttribute('alt', 'スタンプ');
-	image.addEventListener('error', () => { image.replaceWith(doc.createTextNode(STAMP_PLACEHOLDER)); });
+	image.setAttribute('alt', MESSAGES.STAMP_ALT);
+	image.addEventListener('error', () => { image.replaceWith(doc.createTextNode(MESSAGES.STAMP_PLACEHOLDER)); });
 	return image;
 }
 
@@ -185,6 +196,17 @@ export function createComments(deps) {
 	let toTopButton = null;
 	/** @type {(() => void)|null} scrollTarget の購読を解く */
 	let unwatchScroll = null;
+
+	/**
+	 * 要素にフォーカスがあるか。
+	 * Shadow DOM の中では document.activeElement がホストを返すので、自分の属する木から引く。
+	 * @param {HTMLElement} el 調べる要素
+	 * @returns {boolean} フォーカスがあれば true
+	 */
+	function isFocused(el) {
+		const tree = typeof el.getRootNode === 'function' ? el.getRootNode() : null;
+		return (tree?.activeElement ?? doc.activeElement ?? null) === el;
+	}
 
 	/**
 	 * 要素の外側の高さ (margin 込み)。
@@ -301,17 +323,17 @@ export function createComments(deps) {
 		// 「上部へ」を右端へ寄せるため、見出しの文字も要素に入れる
 		const title = doc.createElement('span');
 		title.className = 'comments-heading-text';
-		title.textContent = 'コメント';
+		title.textContent = MESSAGES.HEADING;
 		heading.appendChild(title);
 
 		if (scrollTarget) {
 			toTopButton = doc.createElement('button');
 			toTopButton.type = 'button';
 			toTopButton.className = 'to-top';
-			toTopButton.title = TO_TOP_LABEL;
+			// 文言が見えているので title は付けない (同じ文字が重なるだけ)
 			toTopButton.appendChild(createIcon(doc, 'expandLess'));
 			const text = doc.createElement('span');
-			text.textContent = TO_TOP_LABEL;
+			text.textContent = MESSAGES.TO_TOP;
 			toTopButton.appendChild(text);
 			toTopButton.hidden = true;
 			toTopButton.addEventListener('click', scrollToTop);
@@ -340,16 +362,9 @@ export function createComments(deps) {
 		const item = doc.createElement('li');
 		item.className = 'comment-item';
 
-		const avatar = doc.createElement('img');
-		avatar.className = 'comment-avatar';
-		avatar.alt = '';
-		// API が返した値をそのまま外部オリジンへのリクエストにしない。
-		// pixiv の CDN 以外を指していたら読み込まず、読み込み失敗と同じ見え方にする
-		const avatarUrl = safeCdnUrl(comment.avatarUrl);
-		if (avatarUrl) avatar.src = avatarUrl;
-		else avatar.style.visibility = 'hidden';
-		// 読み込めなくても本文は読めるので、枠だけ残して黙って続ける
-		avatar.addEventListener('error', () => { avatar.style.visibility = 'hidden'; });
+		// 作者行と同じ部品。CDN 以外の URL や読み込み失敗は枠だけ残して黙って続ける
+		const avatar = createAvatar(doc, 'comment-avatar');
+		showAvatar(avatar, comment.avatarUrl);
 
 		const body = doc.createElement('div');
 		body.className = 'comment-body';
@@ -400,6 +415,8 @@ export function createComments(deps) {
 		let replyList = null;
 		/** @type {HTMLButtonElement|null} */
 		let replyMore = null;
+		/** @type {HTMLElement|null} 返信の読み込み失敗の表示。1 つだけ持ち、次の読み込みの前に消す */
+		let replyError = null;
 
 		const toggle = doc.createElement('button');
 		toggle.type = 'button';
@@ -419,7 +436,7 @@ export function createComments(deps) {
 		function setOpen(next) {
 			open = next;
 			toggle.setAttribute('aria-expanded', String(next));
-			toggleText.textContent = next ? REPLIES_LABEL.HIDE : REPLIES_LABEL.SHOW;
+			toggleText.textContent = next ? MESSAGES.REPLIES_HIDE : MESSAGES.REPLIES_SHOW;
 			toggleMark.textContent = '';
 			toggleMark.appendChild(createIcon(doc, next ? 'expandLess' : 'expandMore'));
 		}
@@ -427,17 +444,28 @@ export function createComments(deps) {
 		setOpen(false);
 
 		/**
+		 * 失敗の表示を消す。
+		 * @returns {void}
+		 */
+		function clearFailure() {
+			replyError?.remove();
+			replyError = null;
+		}
+
+		/**
 		 * 失敗を返信の場所に出す。コメント全体は読めるままにする。
+		 * 表示は 1 つだけ。失敗のたびに積み上げない
 		 * @param {unknown} error 失敗の中身
 		 * @returns {void}
 		 */
 		function showFailure(error) {
-			const failure = doc.createElement('p');
-			failure.className = 'reply-error';
-			failure.setAttribute('role', 'alert');
-			failure.textContent = '返信を読み込めませんでした';
-			body.appendChild(failure);
-			console.warn('[GridViewer] failed to load replies', comment.id, error);
+			clearFailure();
+			replyError = doc.createElement('p');
+			replyError.className = 'reply-error';
+			replyError.setAttribute('role', 'alert');
+			replyError.textContent = MESSAGES.REPLY_FAILED;
+			body.appendChild(replyError);
+			warn('failed to load replies', comment.id, error);
 		}
 
 		/**
@@ -446,6 +474,9 @@ export function createComments(deps) {
 		 */
 		async function loadPage() {
 			const requestedWorkId = workId;
+			// disabled にするとフォーカスが body へ落ちる。終わったら押したボタンへ戻す
+			const focusedMore = replyMore !== null && isFocused(replyMore);
+			const focusedToggle = isFocused(toggle);
 			toggle.disabled = true;
 			if (replyMore) replyMore.disabled = true;
 			try {
@@ -454,6 +485,7 @@ export function createComments(deps) {
 				if (workId !== requestedWorkId) return;
 				// 畳まれていたら並べない
 				if (!open) return;
+				clearFailure();
 				if (!area) {
 					area = doc.createElement('div');
 					area.className = 'comment-replies-area';
@@ -471,22 +503,31 @@ export function createComments(deps) {
 						replyMore = doc.createElement('button');
 						replyMore.type = 'button';
 						replyMore.className = 'more reply-more';
-						replyMore.textContent = '返信をもっと見る';
 						replyMore.addEventListener('click', () => { void loadPage(); });
 						area.appendChild(replyMore);
 					}
-					replyMore.disabled = false;
+					// 再試行から読み直せたら文言を戻す
+					replyMore.textContent = MESSAGES.REPLY_MORE;
 				} else {
 					replyMore?.remove();
 					replyMore = null;
 				}
 			} catch (error) {
 				if (workId !== requestedWorkId) return;
-				// 開けなかったので閉じた状態に戻す。押し直せばもう一度試せる
-				setOpen(false);
+				if (page === FIRST_REPLY_PAGE) {
+					// 1 件も出せていない。閉じた状態に戻し、押し直せばもう一度試せるようにする
+					setOpen(false);
+				} else if (replyMore) {
+					// 続きだけが取れなかった。見えている返信は残し、ボタンを再試行に替える
+					replyMore.textContent = MESSAGES.RETRY;
+				}
 				showFailure(error);
 			} finally {
 				toggle.disabled = false;
+				if (replyMore) replyMore.disabled = false;
+				// 押したボタンが消えていたら (続きが無くなった) 開閉ボタンへ戻す
+				if (focusedMore) (replyMore ?? toggle).focus();
+				else if (focusedToggle) toggle.focus();
 			}
 		}
 
@@ -497,6 +538,7 @@ export function createComments(deps) {
 				area = null;
 				replyList = null;
 				replyMore = null;
+				clearFailure();
 				page = FIRST_REPLY_PAGE;
 				return;
 			}
@@ -515,11 +557,16 @@ export function createComments(deps) {
 		// 読み込み中に別の作品へ移ることがある。応答が返ったときに
 		// まだ同じ作品を見ているかを確かめてから描く
 		const requestedWorkId = workId;
-		if (moreButton) moreButton.disabled = true;
+		// 同じ作品で load() を呼び直されたときも捨てられるよう、一覧そのものを世代の印にする
+		const requestedList = list;
+		const button = moreButton;
+		// disabled にするとフォーカスが body へ落ちる。終わったら押したボタンへ戻す
+		const focused = button !== null && isFocused(button);
+		if (button) button.disabled = true;
 		try {
 			const body = await fetchJson(commentRootsUrl(requestedWorkId, offset, COMMENT_PAGE_SIZE));
-			// 待っている間に破棄されたか、別の作品へ移っていたら捨てる
-			if (workId !== requestedWorkId || !list) return;
+			// 待っている間に破棄されたか、別の作品へ移ったか、描き直されていたら捨てる
+			if (workId !== requestedWorkId || !list || list !== requestedList) return;
 			const comments = (body?.comments ?? []).map(normalizeComment);
 			for (const comment of comments) {
 				const { item, body: commentBody, repliesSlot } = createItem(comment);
@@ -531,15 +578,15 @@ export function createComments(deps) {
 			failure?.remove();
 			failure = null;
 			if (moreButton) {
-				moreButton.textContent = MORE_LABEL;
+				moreButton.textContent = MESSAGES.MORE;
 				moreButton.hidden = body?.hasNext !== true;
 				moreButton.disabled = false;
 			}
 			applyFloor();
 		} catch (error) {
-			// 破棄後・別の作品へ移った後の失敗は伝えない。
+			// 破棄後・別の作品へ移った後・描き直した後の失敗は伝えない。
 			// これを入れないと、正常な切り替えが読み込み失敗として表示される
-			if (workId !== requestedWorkId) return;
+			if (workId !== requestedWorkId || list !== requestedList) return;
 			// 一時的な失敗で以降が読めなくならないよう、ボタンは再試行として残す。
 			// 表示は 1 つだけ。失敗のたびに積み上げない
 			failure?.remove();
@@ -547,22 +594,26 @@ export function createComments(deps) {
 			failure.className = 'status';
 			failure.dataset.kind = 'error';
 			failure.setAttribute('role', 'alert');
-			failure.textContent = 'コメントを読み込めませんでした';
+			failure.textContent = MESSAGES.LOAD_FAILED;
 			container.appendChild(failure);
 			watchSize(failure);
 			if (moreButton) {
-				moreButton.textContent = RETRY_LABEL;
+				moreButton.textContent = MESSAGES.RETRY;
 				moreButton.hidden = false;
 				moreButton.disabled = false;
 			}
 			applyFloor();
-			console.warn('[GridViewer] failed to load comments', requestedWorkId, error);
+			warn('failed to load comments', requestedWorkId, error);
+		} finally {
+			// 隠れたボタン (続きが無い) にはフォーカスを置けない。その場合は諦める
+			if (focused && button && list === requestedList && !button.hidden) button.focus();
 		}
 	}
 
 	return {
 		/**
 		 * 作品のコメントを読み込む。
+		 * 前の作品の描画は全て捨てる。
 		 * @param {object} detail 正規化した作品詳細
 		 * @returns {Promise<void>}
 		 */
@@ -570,13 +621,17 @@ export function createComments(deps) {
 			workId = detail.id;
 			offset = 0;
 			container.textContent = '';
-			// 前の作品で測った下限と、消える見出しの購読を残さない
+			// 前の作品で測った下限と、消える見出しの購読を残さない。
+			// 一覧やボタンの参照も戻す。残すと前の作品の応答が新しい一覧へ追記される
 			sizeWatcher?.disconnect();
 			unwatchScroll?.();
 			unwatchScroll = null;
 			headingEl = null;
 			toTopButton = null;
 			scroll = null;
+			list = null;
+			moreButton = null;
+			failure = null;
 			container.style.minHeight = '';
 
 			container.appendChild(createHeading());
@@ -586,7 +641,7 @@ export function createComments(deps) {
 			if (detail.commentOff) {
 				const off = doc.createElement('p');
 				off.className = 'status';
-				off.textContent = 'この作品はコメントを受け付けていません';
+				off.textContent = MESSAGES.COMMENT_OFF;
 				container.appendChild(off);
 				watchSize(off);
 				applyFloor();
@@ -595,7 +650,7 @@ export function createComments(deps) {
 			if (detail.commentCount === 0) {
 				const empty = doc.createElement('p');
 				empty.className = 'status';
-				empty.textContent = 'まだコメントはありません';
+				empty.textContent = MESSAGES.EMPTY;
 				container.appendChild(empty);
 				watchSize(empty);
 				applyFloor();
@@ -604,7 +659,6 @@ export function createComments(deps) {
 
 			// 一覧と「もっと見る」を同じ領域に入れてスクロールさせる。
 			// 外に置くと、一番下まで読んでいなくてもボタンが見えて不自然になる
-			// 一覧と「もっと見る」を同じ領域に入れてスクロールさせる
 			scroll = doc.createElement('div');
 			scroll.className = 'comment-scroll';
 			container.appendChild(scroll);
@@ -618,7 +672,7 @@ export function createComments(deps) {
 			moreButton = doc.createElement('button');
 			moreButton.type = 'button';
 			moreButton.className = 'more';
-			moreButton.textContent = MORE_LABEL;
+			moreButton.textContent = MESSAGES.MORE;
 			moreButton.hidden = true;
 			moreButton.addEventListener('click', () => { void loadMore(); });
 			scroll.appendChild(moreButton);

@@ -1,6 +1,7 @@
-import { test } from 'node:test';
+import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeSettings, loadSettings, saveSetting, resetSettings, watchSettings } from '../../src/common/storage.js';
+import { LOG_PREFIX } from '../../src/common/log.js';
 import { SETTINGS_DEFAULTS, GRID_TAB_SKIP, POPUP_THEMES, SIDEBAR_SCROLL, INFINITE_SCROLL } from '../../src/common/constants.js';
 
 /**
@@ -102,6 +103,21 @@ test('saveSetting は保存に失敗したら false を返す', async () => {
 	assert.equal(await saveSetting('enabled', false, { area }), false);
 });
 
+test('saveSetting は SETTINGS_DEFAULTS に無いキーを書かず false を返す', async () => {
+	// 知らないキーは読み出しで捨てられるだけなのに sync 領域の容量を食う
+	const { area, written } = fakeArea();
+	const warn = mock.method(console, 'warn', () => {});
+	try {
+		assert.equal(await saveSetting('noSuchKey', true, { area }), false);
+		assert.equal(await saveSetting('toString', true, { area }), false);
+		assert.deepEqual(written, {});
+		assert.equal(warn.mock.callCount(), 2);
+		assert.ok(String(warn.mock.calls[0].arguments[0]).startsWith(LOG_PREFIX));
+	} finally {
+		warn.mock.restore();
+	}
+});
+
 test('normalizeSettings は知らない配色を既定 (OS に従う) へ倒す', () => {
 	assert.equal(normalizeSettings({ popupTheme: 'むらさき' }).popupTheme, POPUP_THEMES.SYSTEM);
 	assert.equal(normalizeSettings({}).popupTheme, POPUP_THEMES.SYSTEM);
@@ -147,6 +163,35 @@ test('watchSettings は差し替えた storage の sync 領域から読み直す
 	assert.equal(received.length, 1);
 	watch.dispose();
 	assert.equal(listener, null);
+});
+
+test('watchSettings はコールバックが投げても unhandled rejection にせず warn に残す', async () => {
+	let listener = null;
+	const { area } = fakeArea();
+	const storage = {
+		sync: area,
+		onChanged: {
+			addListener(fn) { listener = fn; },
+			removeListener() { listener = null; },
+		},
+	};
+	const warn = mock.method(console, 'warn', () => {});
+	const unhandled = [];
+	const onUnhandled = (reason) => unhandled.push(reason);
+	process.on('unhandledRejection', onUnhandled);
+	try {
+		const watch = watchSettings(() => { throw new Error('描画で落ちた'); }, { storage });
+		listener({}, 'sync');
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		assert.equal(warn.mock.callCount(), 1);
+		assert.ok(String(warn.mock.calls[0].arguments[0]).startsWith(LOG_PREFIX));
+		assert.equal(warn.mock.calls[0].arguments[1].message, '描画で落ちた');
+		assert.deepEqual(unhandled, []);
+		watch.dispose();
+	} finally {
+		process.off('unhandledRejection', onUnhandled);
+		warn.mock.restore();
+	}
 });
 
 test('infiniteScroll は既定が off', async () => {

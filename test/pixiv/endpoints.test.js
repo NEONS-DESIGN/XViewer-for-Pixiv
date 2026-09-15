@@ -72,6 +72,18 @@ test('profile/illusts の work_category はタブの種別に合わせる', () =
 	);
 });
 
+test('profile/illusts は知らない種別を両方 (illustManga) に倒す', () => {
+	// 値は WORK_CATEGORY_BY_TAB 経由でしか来ないが、来ても pixiv に知らない値を送らない
+	assert.ok(
+		userProfileIllustsUrl('54734418', ['1'], true, 'novels')
+			.includes('&work_category=illustManga&'),
+	);
+	assert.ok(
+		userProfileIllustsUrl('54734418', ['1'], true, undefined)
+			.includes('&work_category=illustManga&'),
+	);
+});
+
 test('profile/illusts は is_first_page が false なら 0 を入れる', () => {
 	const url = userProfileIllustsUrl('54734418', ['1'], false);
 	assert.ok(url.includes('is_first_page=0'));

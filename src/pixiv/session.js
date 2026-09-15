@@ -6,20 +6,23 @@
  * ここは文字列を受け取る純粋関数だけを置く。DOM から読み出す役は content/session.js。
  */
 
+import { DEFAULT_X_RESTRICT } from '../common/constants.js';
+
 /** 読めなかったときに返す値。未ログインと同じ扱いにする。 */
 const EMPTY_SESSION = Object.freeze({ isLoggedIn: false, self: null, csrfToken: null });
 
 /**
  * @typedef {object} SessionSelf
  * @property {number} xRestrict 表示設定 0=全年齢のみ 1=R-18まで 2=R-18Gまで
- * @property {boolean} hideAiWorks AI 作品を隠す設定
+ * @property {boolean} hideAiWorks AI 作品を隠す設定。未使用。SPEC §16 のとおり AI 生成の表示は未実装で、
+ *   サーバー側フィルタなので拡張側で判定に使う場面も無い (SITE_SPEC §6)。読めるように残してある
  */
 
 /**
  * @typedef {object} Session
  * @property {boolean} isLoggedIn
  * @property {SessionSelf|null} self 未ログインなら null
- * @property {string|null} csrfToken 更新系 API に必要
+ * @property {string|null} csrfToken 更新系 API に必要。api.token が無ければ null (client.js が UNAUTHORIZED に倒す)
  */
 
 /**
@@ -56,7 +59,7 @@ export function parseNextData(text) {
 		const self = preloaded?.userData?.self;
 		if (self) {
 			session.self = {
-				xRestrict: typeof self.xRestrict === 'number' ? self.xRestrict : 0,
+				xRestrict: typeof self.xRestrict === 'number' ? self.xRestrict : DEFAULT_X_RESTRICT,
 				hideAiWorks: self.hideAiWorks === true,
 			};
 		}

@@ -71,6 +71,13 @@ const OUTPUT_PATH = 'src/common/icon-shapes.js';
 const DEFAULT_VIEW_BOX = '0 0 24 24';
 
 /**
+ * SVG の中のコメント。Font Awesome は各ファイルの先頭に帰属のコメントを持つ。
+ * 帰属は HEADER と NOTICE に書いてあるので、図形データには残さない
+ * (残すと createIcon のたびに innerHTML でコメントノードが注入され、生成物も膨らむ)。
+ */
+const SVG_COMMENT_PATTERN = /<!--[\s\S]*?-->/g;
+
+/**
  * SVG から viewBox と中身を取り出す。
  * @param {string} svg SVG の中身
  * @param {string} source 読み込み元 (エラー表示用)
@@ -82,7 +89,11 @@ function extract(svg, source) {
 		throw new Error(`${source} に <svg> がありません`);
 	}
 	const viewBox = /viewBox="([^"]+)"/.exec(svg)?.[1] ?? DEFAULT_VIEW_BOX;
-	const markup = svg.replace(/^[\s\S]*?<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '').trim();
+	const markup = svg
+		.replace(SVG_COMMENT_PATTERN, '')
+		.replace(/^[\s\S]*?<svg[^>]*>/, '')
+		.replace(/<\/svg>\s*$/, '')
+		.trim();
 	return { viewBox, markup };
 }
 

@@ -9,7 +9,11 @@ import { WORK_CATEGORY_QUERY, WORK_CATEGORY_QUERY_BOTH } from '../common/constan
 /** API の共通接頭辞。 */
 const AJAX = '/ajax';
 
-/** 応答の言語。日本語固定。 */
+/**
+ * 応答の言語。日本語固定。
+ * pageProps.lang にページの言語はあるが、この拡張は UI の文言が日本語のみなので
+ * タグの翻訳や日付文言もそれに揃える。
+ */
 const LANG = 'lang=ja';
 
 /** pixiv 本体のオリジン。投稿文の相対リンクを解決する基準に使う。 */
@@ -197,10 +201,8 @@ export function userProfileAllUrl(userId) {
 export function userProfileIllustsUrl(userId, ids, isFirstPage, category = null) {
 	const query = ids.map((id) => `ids%5B%5D=${id}`).join('&');
 	const firstPage = isFirstPage ? 1 : 0;
-	// 知らない値が来たら両方扱いへ倒す。Object.hasOwn で prototype 由来の値を拾わない
-	const workCategory = category && Object.hasOwn(WORK_CATEGORY_QUERY, category)
-		? WORK_CATEGORY_QUERY[category]
-		: WORK_CATEGORY_QUERY_BOTH;
+	// 知らない値 (null / undefined を含む) は両方扱いへ倒す。値は WORK_CATEGORY_BY_TAB 経由でしか来ない
+	const workCategory = WORK_CATEGORY_QUERY[category] ?? WORK_CATEGORY_QUERY_BOTH;
 	return `${AJAX}/user/${userId}/profile/illusts?${query}`
 		+ `&work_category=${workCategory}&is_first_page=${firstPage}&${LANG}`;
 }

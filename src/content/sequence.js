@@ -4,17 +4,17 @@
  *
  * 並びの出どころは 2 つある:
  *   - グリッドの DOM 順 (確実に画面と一致する)
- *   - profile/all の全 ID を数値降順に並べたもの (端を越えて移動するため)
+ *   - profile/all の全 ID を数値降順に並べたもの (端を越えて移動するため)。
+ *     取得とキャッシュは pixiv/pages.js が持つ
  */
-import { userProfileAllUrl } from '../pixiv/endpoints.js';
-import { getJson } from '../pixiv/client.js';
-import { WORK_CATEGORY } from '../common/constants.js';
+import { loadAllWorkIds } from '../pixiv/pages.js';
 
 /**
  * @typedef {object} Sequence
  * @property {string[]} ids 並び
  * @property {(id: string) => string|null} next 次の ID。端なら null
  * @property {(id: string) => string|null} prev 前の ID。端なら null
+ * @property {(id: string) => boolean} has 並びに含まれるか
  */
 
 /**
@@ -24,33 +24,25 @@ import { WORK_CATEGORY } from '../common/constants.js';
  */
 export function createDomSequence(ids) {
 	const list = [...ids];
+	/** @type {Map<string, number>} ID から添字。広げた並びは数千件になるので毎回 indexOf しない */
+	const indexOf = new Map(list.map((id, index) => [id, index]));
 	/**
 	 * 指定した ID から相対位置の ID を返す。
 	 * @param {string} id 基準の ID
-	 * @param {number} step 相対位置
+	 * @param {number} offset 相対位置
 	 * @returns {string|null} 見つからなければ null
 	 */
 	const step = (id, offset) => {
-		const index = list.indexOf(id);
-		if (index < 0) return null;
+		const index = indexOf.get(id);
+		if (index === undefined) return null;
 		return list[index + offset] ?? null;
 	};
 	return {
 		ids: list,
 		next: (id) => step(id, 1),
 		prev: (id) => step(id, -1),
+		has: (id) => indexOf.has(id),
 	};
-}
-
-/**
- * 作品 ID を数値の降順に並べる。
- * pixiv の作品 ID は単調増加なので、降順が新しい順になる。
- * 文字列のまま比べると桁数の違う ID の順序が壊れるため数値で比べる。
- * @param {string[]} ids 作品 ID
- * @returns {string[]} 降順に並べた ID
- */
-export function sortIdsDesc(ids) {
-	return [...ids].sort((a, b) => Number(b) - Number(a));
 }
 
 /**
@@ -67,13 +59,10 @@ export function sortIdsDesc(ids) {
  * @returns {Promise<Sequence>} 全作品の並び。失敗したら fallback
  */
 export async function extendWithAllWorks(fallback, userId, category = null, deps = {}) {
-	const get = deps.getJsonImpl ?? getJson;
 	try {
-		const body = await get(userProfileAllUrl(userId));
-		const categories = category ? [category] : Object.values(WORK_CATEGORY);
-		const ids = categories.flatMap((key) => Object.keys(body?.[key] ?? {}));
+		const ids = await loadAllWorkIds(userId, category, deps);
 		if (ids.length === 0) return fallback;
-		return createDomSequence(sortIdsDesc(ids));
+		return createDomSequence(ids);
 	} catch {
 		// 端で止まるだけで、閲覧そのものは続けられる
 		return fallback;

@@ -424,3 +424,172 @@ test('開いた直後の見出しを貼り付き扱いにしない', async () =>
 	// container へ入れてから測ること
 	assert.equal(find(container, '.comments-heading').className.includes('is-stuck'), false);
 });
+
+test('返信の失敗表示は 1 つだけで、読み直せたら消す', async () => {
+	let fail = true;
+	const { container, comments } = build(async (url) => {
+		if (!url.includes('replies')) return { comments: [ROOT], hasNext: false };
+		if (fail) throw new Error('落ちた');
+		return { comments: [REPLY], hasNext: false };
+	});
+	await comments.load(DETAIL);
+	const toggle = find(container, '.comment-replies');
+	await toggle.click();
+	await toggle.click();
+	// 2 回失敗しても積み上げない
+	assert.equal(findAll(container, '.reply-error').length, 1);
+	fail = false;
+	await toggle.click();
+	assert.equal(findAll(container, '.reply-error').length, 0);
+	assert.equal(find(container, '.comment-reply-list').children.length, 1);
+});
+
+test('返信を畳んだら失敗の表示も消す', async () => {
+	let fail = true;
+	const { container, comments } = build(async (url) => {
+		if (!url.includes('replies')) return { comments: [ROOT], hasNext: false };
+		if (fail) throw new Error('落ちた');
+		return { comments: [REPLY], hasNext: true };
+	});
+	await comments.load(DETAIL);
+	const toggle = find(container, '.comment-replies');
+	await toggle.click();
+	assert.equal(findAll(container, '.reply-error').length, 1);
+	// 開き直して読めたあと畳む
+	fail = false;
+	await toggle.click();
+	assert.equal(findAll(container, '.reply-error').length, 0);
+	await toggle.click();
+	assert.equal(find(container, '.comment-replies-area'), null);
+	assert.equal(findAll(container, '.reply-error').length, 0);
+});
+
+test('2 ページ目以降の返信に失敗しても、見えている返信は残して再試行にする', async () => {
+	// 1 ページ目が見えているのに「返信を表示」へ戻すと、開いていないのに返信が出ている状態になる
+	let failNext = true;
+	const { container, comments } = build(async (url) => {
+		if (!url.includes('replies')) return { comments: [ROOT], hasNext: false };
+		if (url.includes('page=1')) return { comments: [REPLY], hasNext: true };
+		if (failNext) throw new Error('落ちた');
+		return { comments: [{ ...REPLY, id: '233573601' }], hasNext: false };
+	});
+	await comments.load(DETAIL);
+	const toggle = find(container, '.comment-replies');
+	await toggle.click();
+	const more = find(container, '.reply-more');
+	await more.click();
+	assert.equal(find(container, '.comment-reply-list').children.length, 1);
+	assert.equal(toggle.getAttribute('aria-expanded'), 'true');
+	assert.equal(toggle.children[1].textContent, '返信を隠す');
+	assert.equal(more.textContent, '再試行');
+	assert.equal(more.disabled, false);
+	assert.equal(find(container, '.reply-error').textContent, '返信を読み込めませんでした');
+	// 押し直せば同じページから読み直し、文言を戻す
+	failNext = false;
+	await more.click();
+	assert.equal(find(container, '.comment-reply-list').children.length, 2);
+	assert.equal(find(container, '.reply-error'), null);
+	assert.equal(find(container, '.reply-more'), null);
+});
+
+test('キーボードで押した返信ボタンへ読み込み後にフォーカスを戻す', async () => {
+	// disabled にした瞬間にフォーカスが body へ落ち、Tab の起点を失う
+	const doc = fakeDoc();
+	const container = fakeElement('div');
+	const comments = createComments({
+		doc,
+		container,
+		fetchJson: async (url) => (url.includes('replies')
+			? { comments: [REPLY], hasNext: true }
+			: { comments: [ROOT], hasNext: false }),
+	});
+	await comments.load(DETAIL);
+	const toggle = find(container, '.comment-replies');
+	doc.activeElement = toggle;
+	await toggle.click();
+	assert.equal(toggle.focused, true);
+
+	const more = find(container, '.reply-more');
+	doc.activeElement = more;
+	await more.click();
+	assert.equal(more.focused, true);
+});
+
+test('フォーカスが無いボタンには読み込み後もフォーカスを移さない', async () => {
+	// マウスで押した人の画面を勝手にスクロールさせない
+	const doc = fakeDoc();
+	const container = fakeElement('div');
+	const comments = createComments({
+		doc,
+		container,
+		fetchJson: async (url) => (url.includes('replies')
+			? { comments: [REPLY], hasNext: false }
+			: { comments: [ROOT], hasNext: true }),
+	});
+	await comments.load(DETAIL);
+	const toggle = find(container, '.comment-replies');
+	doc.activeElement = null;
+	await toggle.click();
+	assert.equal(toggle.focused, false);
+	const more = find(container, '.more');
+	await more.click();
+	assert.equal(more.focused, false);
+});
+
+test('「もっと見る」をキーボードで押したら読み込み後にフォーカスを戻す', async () => {
+	const doc = fakeDoc();
+	const container = fakeElement('div');
+	let page = 0;
+	const comments = createComments({
+		doc,
+		container,
+		fetchJson: async () => {
+			page += 1;
+			return { comments: [{ ...ROOT, id: String(page), hasReplies: false }], hasNext: page < 3 };
+		},
+	});
+	await comments.load(DETAIL);
+	const more = find(container, '.more');
+	doc.activeElement = more;
+	await more.click();
+	assert.equal(more.focused, true);
+});
+
+test('load を呼び直すと前の作品の一覧へは追記しない', async () => {
+	let release;
+	const { container, comments } = build((url) => {
+		if (url.includes('offset=0')) {
+			return new Promise((resolve) => { release = resolve; });
+		}
+		return Promise.resolve({ comments: [ROOT], hasNext: false });
+	});
+	// 1 回目は応答を止めておく
+	const first = comments.load(DETAIL);
+	const firstList = find(container, '.comment-list');
+	// 2 回目 (同じ作品を描き直す) は即座に応答する
+	const releaseFirst = release;
+	const second = comments.load(DETAIL);
+	releaseFirst({ comments: [ROOT, { ...ROOT, id: '2' }], hasNext: false });
+	release({ comments: [ROOT], hasNext: false });
+	await Promise.all([first, second]);
+	// 1 回目の応答 (2 件) は捨てられ、2 回目の 1 件だけが今の一覧にある
+	const list = find(container, '.comment-list');
+	assert.notEqual(list, firstList);
+	assert.equal(list.children.length, 1);
+});
+
+test('文字が見えている「上部へ」に title を重ねない', async () => {
+	const container = fakeElement('div');
+	const scrollTarget = fakeElement('div');
+	scrollTarget.scrollTop = 0;
+	const comments = createComments({
+		doc: fakeDoc(),
+		container,
+		scrollTarget,
+		fetchJson: async () => ({ comments: [ROOT], hasNext: false }),
+	});
+	await comments.load(DETAIL);
+	const toTop = find(container, '.to-top');
+	assert.equal(toTop.title, '');
+	assert.equal(toTop.children[1].textContent, '上部へ');
+});

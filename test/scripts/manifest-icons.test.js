@@ -17,8 +17,9 @@ test('manifest の icons は生成するサイズと一致する', () => {
 	assert.deepEqual(manifest.icons, EXPECTED);
 });
 
-test('ツールバーのアイコンも同じ対応表を使う', () => {
-	assert.deepEqual(manifest.action.default_icon, EXPECTED);
+test('action は default_popup だけを持つ', () => {
+	// default_icon / default_title は省略すると icons / name に倒れる。書くと同じ内容を 2 か所で持つことになる
+	assert.deepEqual(Object.keys(manifest.action), ['default_popup']);
 });
 
 test('manifest の説明文に非公式である旨がある', () => {

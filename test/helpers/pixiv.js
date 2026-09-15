@@ -19,17 +19,23 @@ export function buildNextData({ isLoggedIn = true, self = null, token = 'TOKEN' 
 	});
 }
 
+/** JSON を指定しなかったときの応答本体。ログインページのような HTML を模す。 */
+const NON_JSON_BODY = '<!DOCTYPE html>';
+
 /**
  * fetch の偽物を作る。呼ばれた内容を記録する。
- * @param {{status?: number, json?: unknown, throws?: boolean}} [options] 応答の指定。
- *   json を省くと JSON として読めない応答 (HTML 等) になる
+ * 応答は json() と text() の両方を持つ (client.js は text() で読んでから JSON.parse する)。
+ * @param {{status?: number, json?: unknown, text?: string, throws?: boolean|Error}} [options] 応答の指定。
+ *   json を省くと JSON として読めない応答 (HTML 等) になる。text で本文を直接指定してもよい。
+ *   throws に Error を渡すとそれを投げる (cause の検証用)。true なら TypeError を投げる
  * @returns {{impl: Function, calls: Array<{url: string, init: object}>}} 偽の fetch と呼び出しの記録
  */
 export function fakeFetch(options = {}) {
 	const calls = [];
 	const impl = async (url, init) => {
 		calls.push({ url, init });
-		if (options.throws) throw new TypeError('Failed to fetch');
+		if (options.throws) throw options.throws instanceof Error ? options.throws : new TypeError('Failed to fetch');
+		const text = options.text ?? (options.json === undefined ? NON_JSON_BODY : JSON.stringify(options.json));
 		return {
 			ok: (options.status ?? 200) < 400,
 			status: options.status ?? 200,
@@ -37,6 +43,7 @@ export function fakeFetch(options = {}) {
 				if (options.json === undefined) throw new SyntaxError('Unexpected token');
 				return options.json;
 			},
+			text: async () => text,
 		};
 	};
 	return { impl, calls };

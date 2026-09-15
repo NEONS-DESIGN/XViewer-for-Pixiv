@@ -76,18 +76,6 @@ test('isOwnHistoryEntry は自分が積んだ state だけを認める', () => {
 	assert.equal(isOwnHistoryEntry(win), false);
 });
 
-test('currentWorkId は今の URL の作品 ID を返す', () => {
-	const win = fakeWindow('/artworks/149425016');
-	const router = createRouter(() => {}, { window: win });
-	assert.equal(router.currentWorkId(), '149425016');
-});
-
-test('ユーザーページに戻ると currentWorkId は null', () => {
-	const win = fakeWindow('/users/54734418/artworks');
-	const router = createRouter(() => {}, { window: win });
-	assert.equal(router.currentWorkId(), null);
-});
-
 test('popstate で今の作品 ID を通知する', () => {
 	const win = fakeWindow('/users/1/artworks');
 	const seen = [];

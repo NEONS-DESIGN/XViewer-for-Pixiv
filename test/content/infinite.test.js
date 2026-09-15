@@ -4,10 +4,9 @@ import {
 	attachInfiniteScroll, SENTINEL_TEXT, SENTINEL_STYLE_ID, PAGER_STYLE_ID, PAGER_HIDE_CSS,
 } from '../../src/content/infinite.js';
 import {
-	INFINITE_SCROLL, GV_CARD_ATTR, SENTINEL_ATTR, SENTINEL_MARGIN_PX,
+	INFINITE_SCROLL, GV_CARD_ATTR, GV_BOOKMARK_ID_ATTR, SENTINEL_ATTR, SENTINEL_MARGIN_PX,
 	BOOKMARK_BUTTON_SELECTOR, BOOKMARKED_FILL, PAGER_SELECTOR,
 } from '../../src/common/constants.js';
-import { GV_BOOKMARK_ID_ATTR } from '../../src/content/card-clone.js';
 import { makeCard, makeGrid, el, fakeComputedStyle } from '../helpers/card.js';
 
 /**
@@ -36,7 +35,8 @@ function fakeObserver() {
 /**
  * 1 ページ 2 件のページ供給の偽物。
  * @param {number} pages ページ数
- * @param {{bookmarked?: boolean}} [options] 作品の状態
+ * @param {{bookmarked?: boolean, claimedPages?: number}} [options] 作品の状態。
+ *   claimedPages を渡すと pageCount はその値を名乗る (実際より多い総ページ数の再現)
  * @returns {{source: object, loaded: number[]}} 供給と読んだページ番号
  */
 function fakeSource(pages, options = {}) {
@@ -44,7 +44,7 @@ function fakeSource(pages, options = {}) {
 	return {
 		loaded,
 		source: {
-			async pageCount() { return pages; },
+			async pageCount() { return options.claimedPages ?? pages; },
 			async loadPage(page) {
 				loaded.push(page);
 				if (page > pages) return [];
@@ -103,14 +103,29 @@ function retryButton(wrap) {
  */
 function fakeDoc(wrap) {
 	const doc = el('#document');
-	doc.createElement = (tag) => el(tag);
-	// readSession() が引く。__NEXT_DATA__ は無い = 未ログイン扱い (トークンは空)
-	doc.getElementById = () => null;
+	doc.createElement = (tag) => withIdProperty(el(tag));
 	doc.head = el('head');
+	// style-injector は id で二重注入を見る。head の中だけを引く。
+	// readSession() が引く __NEXT_DATA__ は head に無い = 未ログイン扱い (トークンは空)
+	doc.getElementById = (id) => doc.head.querySelector(`[id="${id}"]`);
 	doc.body = wrap;
 	// 出来事が wrap から doc まで上がれるようにする
 	wrap.ownerDocument = doc;
 	return doc;
+}
+
+/**
+ * 本物と同じく `node.id = 'x'` が id 属性へ届くようにする。
+ * style-injector は id をプロパティで書き、テストは属性で読むため。
+ * @param {object} node 要素の代わり
+ * @returns {object} 同じ要素
+ */
+function withIdProperty(node) {
+	Object.defineProperty(node, 'id', {
+		get() { return node.getAttribute('id') ?? ''; },
+		set(value) { node.setAttribute('id', value); },
+	});
+	return node;
 }
 
 /**
@@ -126,8 +141,8 @@ function stylesIn(doc, id) {
 
 /**
  * 継ぎ足しを組み立てる。
- * @param {{pages?: number, mode?: string, startPage?: number, trailing?: boolean,
- *   bookmarked?: boolean, actions?: object, onPageChange?: Function}} [options] 上書き
+ * @param {{pages?: number, claimedPages?: number, mode?: string, startPage?: number, trailing?: boolean,
+ *   bookmarked?: boolean, loggedIn?: boolean, actions?: object, onPageChange?: Function}} [options] 上書き
  * @returns {{ul: object, wrap: object, doc: object, handle: object, loaded: number[],
  *   observer: object, trailing: object|null}} 材料一式
  */
@@ -135,14 +150,16 @@ function setup(options = {}) {
 	const { ul, wrap } = makeGrid([makeCard({ id: '1' }), makeCard({ id: '2', pages: 2 })]);
 	// pixiv は ul の後ろにページャを置く。sentinel はそれより前 (= ul の直後) に入らないといけない
 	const trailing = options.trailing ? wrap.appendChild(el('nav')) : null;
-	const { source, loaded } = fakeSource(options.pages ?? 3, { bookmarked: options.bookmarked === true });
+	const { source, loaded } = fakeSource(options.pages ?? 3, {
+		bookmarked: options.bookmarked === true, claimedPages: options.claimedPages,
+	});
 	const observer = fakeObserver();
 	const doc = fakeDoc(wrap);
 	const handle = attachInfiniteScroll(doc, {
 		ul,
 		source,
 		mode: options.mode ?? INFINITE_SCROLL.ON_REACH,
-		loggedIn: true,
+		loggedIn: options.loggedIn ?? true,
 		startPage: options.startPage ?? 1,
 		onPageChange: options.onPageChange,
 		deps: { createObserver: observer.create, computedStyle: fakeComputedStyle, actions: options.actions },
@@ -198,7 +215,7 @@ test('状態が変わっても sentinel 自身は置き換えない', async () =
 	assert.equal(before.getAttribute('role'), 'status');
 });
 
-test('sentinel のスタイルは 1 度だけ入る', () => {
+test('sentinel のスタイルは同じ doc に 1 枚しか入らない', () => {
 	const { ul, wrap } = makeGrid([makeCard({ id: '1' })]);
 	const doc = fakeDoc(wrap);
 	const observer = fakeObserver();
@@ -207,9 +224,17 @@ test('sentinel のスタイルは 1 度だけ入る', () => {
 		ul, source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
 		deps: { createObserver: observer.create, computedStyle: fakeComputedStyle },
 	});
-	attach().dispose();
-	attach().dispose();
+	attach();
+	attach();
 	assert.equal(stylesIn(doc, SENTINEL_STYLE_ID).length, 1);
+});
+
+test('dispose で sentinel のスタイルも外れる', () => {
+	// 「オフにしたら元へ戻す」をページャ隠しと揃える (SPEC §6.7)
+	const { doc, handle } = setup();
+	assert.equal(stylesIn(doc, SENTINEL_STYLE_ID).length, 1);
+	handle.dispose();
+	assert.equal(stylesIn(doc, SENTINEL_STYLE_ID).length, 0, 'sentinel のスタイルが残っている');
 });
 
 test('下まで来たら次のページを継ぎ足す', async () => {
@@ -272,12 +297,48 @@ test('読み切った後に見えても読みに行かない', async () => {
 	assert.deepEqual(loaded, [2]);
 });
 
+test('最終ページを越えていたら読まずに終わる', async () => {
+	// /users/1/illustrations?p=3 を直接開いて、それが最終ページだった場合。
+	// 総ページ数は先に見るので、無い 4 ページ目を読みに行かない
+	const { observer, loaded, wrap } = setup({ startPage: 3, pages: 3 });
+	await observer.trigger();
+	assert.deepEqual(loaded, [], '最終ページの先を読みに行っている');
+	assert.equal(observer.state.disconnected, 1);
+	assert.equal(sentinelMessage(wrap), SENTINEL_TEXT.DONE);
+});
+
 test('空のページが返ったらそこで終わる', async () => {
 	// pageCount が実際より多い場合の保険
-	const { observer, loaded } = setup({ startPage: 3, pages: 3 });
+	const { observer, loaded } = setup({ startPage: 3, pages: 3, claimedPages: 5 });
 	await observer.trigger();
 	assert.deepEqual(loaded, [4]);
 	assert.equal(observer.state.disconnected, 1);
+});
+
+test('総ページ数が取れなかったら何も並べずに失敗として出す', async () => {
+	// 並べてから失敗を出すと「描いたのに失敗表示」になり、lastPage も ?p= も進んでしまう
+	const { ul, wrap } = makeGrid([makeCard({ id: '1' })]);
+	const observer = fakeObserver();
+	const pages = [];
+	const loaded = [];
+	const source = {
+		async pageCount() { throw new Error('boom'); },
+		async loadPage(page) {
+			loaded.push(page);
+			return [{ id: '99', title: '作品', pageCount: 1, userId: '9', url: 'https://i.pximg.net/99.jpg', alt: '作品', bookmarkData: null }];
+		},
+	};
+	attachInfiniteScroll(fakeDoc(wrap), {
+		ul, source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
+		onPageChange: (page) => pages.push(page),
+		deps: { createObserver: observer.create, computedStyle: fakeComputedStyle },
+	});
+	await observer.trigger();
+	assert.deepEqual(loaded, [], '総ページ数が分からないのに読みに行っている');
+	assert.equal(addedCards(ul).length, 0);
+	assert.deepEqual(pages, []);
+	assert.equal(sentinelMessage(wrap), SENTINEL_TEXT.ERROR);
+	assert.ok(retryButton(wrap));
 });
 
 /**
@@ -373,12 +434,73 @@ function setupUnbuildable(options = {}) {
 
 test('作品が返っても 1 枚も組めなかったら黙って止まらず、失敗として出す', async () => {
 	// カードが増えないと sentinel も動かない。IntersectionObserver は交差が変わったときに
-	// しか鳴らないので、idle のままにすると二度と先へ進めなくなる
+	// しか鳴らないので、idle のままにすると二度と先へ進めなくなる。
+	// 通信は成功しているので、文言は「読み込めなかった」ではなく「表示できなかった」
 	const { ul, wrap, observer } = setupUnbuildable();
 	await observer.trigger();
 	assert.equal(addedCards(ul).length, 0, '組めないはずのカードが並んでいる');
-	assert.equal(sentinelMessage(wrap), SENTINEL_TEXT.ERROR, '何も出ないまま止まっている');
+	assert.equal(sentinelMessage(wrap), SENTINEL_TEXT.BUILD_FAILED, '何も出ないまま止まっている');
+	assert.notEqual(SENTINEL_TEXT.BUILD_FAILED, SENTINEL_TEXT.ERROR, '通信の失敗と同じ文言になっている');
+	assert.equal(sentinelOf(wrap).getAttribute('aria-live'), 'assertive');
 	assert.ok(retryButton(wrap), '再試行ボタンが出ていない');
+});
+
+/**
+ * 1 ページ目の作品 (ID 1 と 2) をもう一度返す供給で継ぎ足しを組み立てる。
+ * pixiv がグリッドを描き直したときに基準ページの記憶がずれた場合の再現。
+ * @param {{pages?: number, duplicatePages?: number[]}} [options] 総ページ数と、重複だけを返すページ
+ * @returns {{ul: object, wrap: object, loaded: number[], observer: object, pages: number[]}} 材料一式
+ */
+function setupDuplicating(options = {}) {
+	const { ul, wrap } = makeGrid([makeCard({ id: '1' }), makeCard({ id: '2', pages: 2 })]);
+	const observer = fakeObserver();
+	const loaded = [];
+	const pages = [];
+	const duplicatePages = options.duplicatePages ?? [2];
+	const source = {
+		async pageCount() { return options.pages ?? 4; },
+		async loadPage(page) {
+			loaded.push(page);
+			const ids = duplicatePages.includes(page) ? ['1', '2'] : [`${page}1`, '2'];
+			return ids.map((id) => ({
+				id, title: `作品${id}`, pageCount: 1, userId: '9',
+				url: `https://i.pximg.net/${id}.jpg`, alt: `作品${id}`, bookmarkData: null,
+			}));
+		},
+	};
+	attachInfiniteScroll(fakeDoc(wrap), {
+		ul, source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
+		onPageChange: (page) => pages.push(page),
+		deps: { createObserver: observer.create, computedStyle: fakeComputedStyle },
+	});
+	return { ul, wrap, loaded, observer, pages };
+}
+
+test('既に並んでいる作品は継ぎ足さない', async () => {
+	// 基準ページの記憶がずれても同じ作品が二重に並ばないための保険 (GV_CARD_ATTR の役割)
+	const { ul, observer } = setupDuplicating({ duplicatePages: [] });
+	await observer.trigger();
+	const added = addedCards(ul);
+	assert.deepEqual(added.map((li) => li.getAttribute(GV_CARD_ATTR)), ['21'], 'ID 2 が二重に並んでいる');
+});
+
+test('全件が既に並んでいたページは失敗にせず、ページを進めて次を読む', async () => {
+	// カードが増えないと sentinel が動かず IntersectionObserver が鳴らないので、続けて次を読む
+	const { ul, wrap, loaded, observer, pages } = setupDuplicating({ duplicatePages: [2] });
+	await observer.trigger();
+	assert.deepEqual(loaded, [2, 3], '重複だけのページで止まっている');
+	assert.deepEqual(pages, [2, 3], '重複だけのページを進んだ扱いにしていない');
+	assert.deepEqual(addedCards(ul).map((li) => li.getAttribute(GV_CARD_ATTR)), ['31']);
+	assert.equal(retryButton(wrap), null, '重複を失敗として出している');
+	assert.equal(sentinelMessage(wrap), '');
+});
+
+test('重複だけのページが最終ページなら読み終わりとして出す', async () => {
+	const { wrap, observer, pages } = setupDuplicating({ pages: 2, duplicatePages: [2] });
+	await observer.trigger();
+	assert.deepEqual(pages, [2]);
+	assert.equal(sentinelMessage(wrap), SENTINEL_TEXT.DONE);
+	assert.equal(observer.state.disconnected, 1);
 });
 
 test('1 枚も組めなかったらページを進めない', async () => {
@@ -418,17 +540,23 @@ test('読み込み中は読み込み中と出る', async () => {
 	assert.equal(sentinelMessage(wrap), '', '終わったのに表示が残っている');
 });
 
-test('先読みの途中でモードを変えても読み込み中の表示が残らない', async () => {
-	// 先読みの待ちから早く抜けたときに表示を戻し損ねると、スピナーが回り続ける
+/**
+ * 3 ページ目の先読みだけを止められる供給で prefetch の継ぎ足しを組み立てる。
+ * @returns {{ul: object, wrap: object, handle: object, observer: object, loaded: number[],
+ *   reached: Promise<void>, release: () => void}} 材料一式と、先読みが始まった合図・先読みを進める操作
+ */
+function setupSlowPrefetch() {
 	let release = () => {};
 	const gate = new Promise((resolve) => { release = resolve; });
 	let entered = () => {};
 	const reached = new Promise((resolve) => { entered = resolve; });
 	const { ul, wrap } = makeGrid([makeCard({ id: '1' })]);
 	const observer = fakeObserver();
+	const loaded = [];
 	const source = {
 		async pageCount() { return 5; },
 		async loadPage(page) {
+			loaded.push(page);
 			// 先読み (3 ページ目) だけ待たせる
 			if (page === 3) {
 				entered();
@@ -441,13 +569,65 @@ test('先読みの途中でモードを変えても読み込み中の表示が�
 		ul, source, mode: INFINITE_SCROLL.PREFETCH, loggedIn: true, startPage: 1,
 		deps: { createObserver: observer.create, computedStyle: fakeComputedStyle },
 	});
+	return { ul, wrap, handle, observer, loaded, reached, release };
+}
+
+test('先読みの間は読み込み中を出さず、並べ終えた時点で表示を戻す', async () => {
+	// 先読みは黙って読む (SPEC §6.8)。手元の作品を並べるだけのときにスピナーと
+	// 「作品を読み込んでいます」の読み上げを出さない
+	const { wrap, observer, reached, release } = setupSlowPrefetch();
 	const pending = observer.trigger();
 	await reached;
-	assert.equal(sentinelMessage(wrap), SENTINEL_TEXT.LOADING);
+	await pending;
+	assert.equal(sentinelMessage(wrap), '', '先読みの間も読み込み中が出ている');
+	release();
+});
+
+test('先読みが終わる前に下まで来ても継ぎ足しは止まらない', async () => {
+	// 先読みを「読み込み中」に含めると、その間の advance() が弾かれる。
+	// 描画で sentinel が画面内に留まると IntersectionObserver は二度と鳴らず、
+	// 先読みした作品を持ったまま並ばなくなる
+	const { ul, observer, loaded, reached, release } = setupSlowPrefetch();
+	await observer.trigger();
+	await reached;
+	// 先読み中に再び下端へ着いた。読み直さず、先読みの終わりを待って並べる
+	const second = observer.trigger();
+	assert.deepEqual(loaded, [2, 3], '先読み中の同じページを読み直している');
+	release();
+	await second;
+	assert.equal(addedCards(ul).length, 2, '先読みした 3 ページ目が並んでいない');
+	assert.deepEqual(loaded, [2, 3, 4], '3 ページ目を並べた後の先読みが走っていない');
+});
+
+test('先読みの途中でモードを変えたら、その先読みは持ち分にしない', async () => {
+	const { handle, observer, loaded, reached, release } = setupSlowPrefetch();
+	await observer.trigger();
+	await reached;
 	handle.setMode(INFINITE_SCROLL.ON_REACH);
 	release();
-	await pending;
-	assert.equal(sentinelMessage(wrap), '', 'モードが変わったせいで読み込み中の表示が残っている');
+	// 捨てた先読みが終わるのを待ってから、下端へ着く
+	await new Promise((resolve) => setTimeout(resolve, 0));
+	await observer.trigger();
+	assert.deepEqual(loaded, [2, 3, 3], '捨てたはずの先読みを使っている');
+});
+
+test('dispose 後に終わった先読みは捨てる', async () => {
+	const { ul, handle, observer, reached, release } = setupSlowPrefetch();
+	await observer.trigger();
+	await reached;
+	handle.dispose();
+	release();
+	await new Promise((resolve) => setTimeout(resolve, 0));
+	assert.equal(addedCards(ul).length, 0);
+	assert.equal(handle.currentPage(), 2);
+});
+
+test('currentPage は今並んでいる最後のページを返す', async () => {
+	// 呼び出し側が ?p= を合わせ直すときに読む
+	const { handle, observer } = setup({ startPage: 3, pages: 5 });
+	assert.equal(handle.currentPage(), 3);
+	await observer.trigger();
+	assert.equal(handle.currentPage(), 4);
 });
 
 test('表示の組み立てが途中で失敗しても中途半端な中身を残さない', async () => {
@@ -515,6 +695,7 @@ test('雛形が採れなければ何もしない', () => {
 	assert.equal([...wrap.querySelectorAll(`[${SENTINEL_ATTR}]`)].length, 0, 'sentinel を置いてはいけない');
 	assert.doesNotThrow(() => handle.dispose());
 	assert.doesNotThrow(() => handle.setMode(INFINITE_SCROLL.PREFETCH));
+	assert.equal(handle.currentPage(), null, '何も並べていないのにページを名乗っている');
 });
 
 test('雛形が採れていれば動いている', () => {
@@ -608,8 +789,9 @@ test('読み切る最後のページも知らせる', async () => {
 test('空のページで終わったときは知らせない', async () => {
 	// 1 枚も並んでいないのに ?p= を進めると、リロードで空のページが開く
 	const pages = [];
-	const { observer } = setup({ startPage: 3, pages: 3, onPageChange: (page) => pages.push(page) });
+	const { observer, loaded } = setup({ startPage: 3, pages: 3, claimedPages: 5, onPageChange: (page) => pages.push(page) });
 	await observer.trigger();
+	assert.deepEqual(loaded, [4]);
 	assert.deepEqual(pages, []);
 });
 
@@ -845,7 +1027,8 @@ test('失敗したらハートの色を戻す', async () => {
 	const card = ul.querySelectorAll('li').find((li) => li.getAttribute(GV_CARD_ATTR) === '21');
 	const button = card.querySelector('button');
 	await button.dispatch('click', { target: button, shiftKey: false, preventDefault() {}, stopPropagation() {} });
-	assert.equal(card.querySelectorAll('path')[0].style.values.fill, 'rgb(31, 31, 31)');
+	// 未ブックマークの色は inline を外して本体の CSS に任せる (paintHeart の決まり)
+	assert.equal(card.querySelectorAll('path')[0].style.values.fill, '');
 	assert.equal(card.getAttribute('data-gv-bookmark-id'), null);
 });
 
@@ -860,6 +1043,21 @@ test('本体のカードのハートには触らない', async () => {
 	await button.dispatch('click', { target: button, shiftKey: false, preventDefault() { prevented += 1; }, stopPropagation() {} });
 	assert.deepEqual(calls, [], '本体のカードのハートを自前で処理している');
 	assert.equal(prevented, 0, '本体のハートの本来の動作を止めている');
+});
+
+test('未ログインならハートの購読を張らない', () => {
+	// buildCard が未ログインではボタンごと外すので、購読は全クリックで空振りするだけになる
+	const { ul, wrap } = makeGrid([makeCard({ id: '1' })]);
+	const doc = fakeDoc(wrap);
+	const bound = [];
+	const original = doc.addEventListener;
+	doc.addEventListener = (type, handler, capture) => { bound.push(type); original.call(doc, type, handler, capture); };
+	const handle = attachInfiniteScroll(doc, {
+		ul, source: fakeSource(3).source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: false, startPage: 1,
+		deps: { createObserver: fakeObserver().create, computedStyle: fakeComputedStyle },
+	});
+	assert.equal(handle.isActive(), true);
+	assert.deepEqual(bound, [], '未ログインなのに doc へ購読を張っている');
 });
 
 test('dispose でハートの購読も外れる', async () => {

@@ -15,15 +15,40 @@ import { ugoiraMetaUrl, safeCdnUrl } from '../../pixiv/endpoints.js';
 import { parseStoredZip } from '../../pixiv/ugoira-zip.js';
 import { createIcon } from '../../common/icons.js';
 import { IMAGE_QUALITY } from '../../common/constants.js';
+import { warn } from '../../common/log.js';
 
-/** delay が読めなかったときに使う待ち時間 (ミリ秒)。 */
 /** 再生ボタンの表示。キーは今の再生状態、値は「押すと何になるか」。 */
 const TOGGLE = Object.freeze({
 	PLAYING: Object.freeze({ icon: 'pause', label: '一時停止' }),
 	PAUSED: Object.freeze({ icon: 'play', label: '再生' }),
 });
 
+/** 画面に出す文言。 */
+const MESSAGES = Object.freeze({
+	PLAY_FAILED: 'うごイラを再生できませんでした',
+});
+
+/** 開発者向けの失敗理由。画面には出さず warn に渡す。 */
+const REASONS = Object.freeze({
+	ZIP_NOT_CDN: 'zip の URL が pixiv の CDN ではありません',
+	ZIP_FETCH: 'zip の取得に失敗しました',
+	NO_FRAMES: 'フレームがありません',
+	DECODE: 'フレームの画像をデコードできませんでした',
+});
+
+/** delay が読めなかったときに使う待ち時間 (ミリ秒)。 */
 const FALLBACK_DELAY = 100;
+
+/**
+ * 遅れを取り戻すときに一気に進めてよい上限 (ミリ秒)。
+ * タブが非可視の間は requestAnimationFrame が止まる (SITE_SPEC §8)。戻ってきたときに
+ * 止まっていた時間ぶんを全部コマ送りすると一瞬で数十フレーム飛ぶので、
+ * これを超える遅れは捨てて今の時刻から数え直す。
+ */
+const MAX_CATCHUP_MS = 500;
+
+/** zip 内の画像の形式が meta に無いときの既定値。SITE_SPEC §4 の実測では常に image/jpeg。 */
+const DEFAULT_FRAME_MIME = 'image/jpeg';
 
 /**
  * 設定に応じて使う zip を選ぶ。
@@ -55,11 +80,45 @@ export function buildFrames(entries, metaFrames) {
 }
 
 /**
+ * 今のフレームの開始時刻を進め、何コマ進めるかを決める。
+ *
+ * 開始時刻は「前のフレームの開始 + delay」で繰り越す。requestAnimationFrame の
+ * 時刻に丸めると 1 コマごとに最大 1 刻み (約 16.7ms) ずつ遅れが積み上がる。
+ * 遅れが大きいときは複数コマ進めるが、MAX_CATCHUP_MS を超える遅れは捨てる。
+ * @param {object} state 今の状態
+ * @param {number} state.now requestAnimationFrame の時刻
+ * @param {number} state.startedAt 今のフレームの開始時刻
+ * @param {number} state.index 今のフレーム番号
+ * @param {Array<{delay: number}>} state.timings 各フレームの待ち時間
+ * @returns {{index: number, startedAt: number, advanced: number}} 次のフレーム番号・開始時刻・進めたコマ数
+ */
+export function advanceFrame({ now, startedAt, index, timings }) {
+	let elapsed = now - startedAt;
+	let nextIndex = index;
+	let advanced = 0;
+	while (elapsed >= timings[nextIndex].delay) {
+		elapsed -= timings[nextIndex].delay;
+		nextIndex = (nextIndex + 1) % timings.length;
+		advanced += 1;
+		if (elapsed > MAX_CATCHUP_MS) {
+			elapsed = 0;
+			break;
+		}
+	}
+	return { index: nextIndex, startedAt: now - elapsed, advanced };
+}
+
+/**
  * @typedef {object} UgoiraDeps
  * @property {Document} doc
  * @property {HTMLElement} container 描画先 (.stage)
  * @property {object} settings 設定
- * @property {(message: string) => void} onError 失敗を伝える
+ * @property {(message: string) => void} [onError] 使わない。失敗はペインの中の .pane-error に出す (image-pane と同じ)。
+ *   呼び出し側の配線が残っている間だけ受け取る
+ * @property {typeof fetch} [fetchImpl] 通信 (meta と zip) の差し替え。テストから pixiv を叩かないために使う
+ * @property {() => HTMLImageElement} [createImage] フレーム用 Image の差し替え。Node には Image が無い
+ * @property {(callback: FrameRequestCallback) => number} [requestAnimationFrame] コマ送りの差し替え
+ * @property {(id: number) => void} [cancelAnimationFrame] コマ送りの停止の差し替え
  */
 
 /**
@@ -69,6 +128,10 @@ export function buildFrames(entries, metaFrames) {
  */
 export function createUgoiraPlayer(deps) {
 	const { doc, container } = deps;
+	const fetchImpl = deps.fetchImpl ?? ((url, init) => fetch(url, init));
+	const createImage = deps.createImage ?? (() => new Image());
+	const raf = deps.requestAnimationFrame ?? ((callback) => requestAnimationFrame(callback));
+	const caf = deps.cancelAnimationFrame ?? ((id) => cancelAnimationFrame(id));
 
 	/** @type {string[]} 作った Blob URL。dispose で必ず revoke する */
 	let objectUrls = [];
@@ -92,6 +155,8 @@ export function createUgoiraPlayer(deps) {
 	let disposed = false;
 	/** @type {HTMLElement|null} 自分が作った要素。dispose で外す */
 	let root = null;
+	/** zip の取得を途中で止めるためのもの。dispose で abort する */
+	const aborter = new AbortController();
 
 	/**
 	 * 1 コマ描いて次へ進める。
@@ -101,13 +166,11 @@ export function createUgoiraPlayer(deps) {
 	function tick(now) {
 		if (!playing || disposed) return;
 		if (frameStartedAt === 0) frameStartedAt = now;
-		const elapsed = now - frameStartedAt;
-		if (elapsed >= timings[frameIndex].delay) {
-			frameIndex = (frameIndex + 1) % images.length;
-			frameStartedAt = now;
-			draw();
-		}
-		rafId = requestAnimationFrame(tick);
+		const next = advanceFrame({ now, startedAt: frameStartedAt, index: frameIndex, timings });
+		frameIndex = next.index;
+		frameStartedAt = next.startedAt;
+		if (next.advanced > 0) draw();
+		rafId = raf(tick);
 	}
 
 	/**
@@ -127,7 +190,7 @@ export function createUgoiraPlayer(deps) {
 		if (playing || images.length === 0) return;
 		playing = true;
 		frameStartedAt = 0;
-		rafId = requestAnimationFrame(tick);
+		rafId = raf(tick);
 	}
 
 	/**
@@ -136,22 +199,40 @@ export function createUgoiraPlayer(deps) {
 	 */
 	function pause() {
 		playing = false;
-		cancelAnimationFrame(rafId);
+		caf(rafId);
 		rafId = 0;
 	}
 
 	/**
+	 * ペインの中にエラー行を出す。
+	 * 静止画 (poster) は出ているので、共有の状態表示で消さずに枠の中へ重ねる。
+	 * @param {string} message 文言
+	 * @returns {void}
+	 */
+	function showPaneError(message) {
+		if (disposed || !root) return;
+		root.querySelector('.pane-error')?.remove();
+		const line = doc.createElement('p');
+		line.className = 'pane-error';
+		line.setAttribute('role', 'alert');
+		line.textContent = message;
+		root.appendChild(line);
+	}
+
+	/**
 	 * フレームの画像を読み込む。
+	 * 結果は戻り値で返す。モジュールの状態には入れない (待っている間に dispose されたときに
+	 * 空にしたはずの images を埋め直さないため)
 	 * @param {Array<{bytes: Uint8Array, delay: number}>} frames フレーム
 	 * @param {string} mimeType zip 内の画像の形式
-	 * @returns {Promise<void>}
+	 * @returns {Promise<HTMLImageElement[]>} フレーム順の画像。壊れたものも含む
 	 */
-	async function loadImages(frames, mimeType) {
+	function loadImages(frames, mimeType) {
 		const loaders = frames.map((frame) => {
 			const url = URL.createObjectURL(new Blob([frame.bytes], { type: mimeType }));
 			objectUrls.push(url);
 			return new Promise((resolve) => {
-				const image = new Image();
+				const image = createImage();
 				// decode() は使わない。DOM に繋がっていない Image では
 				// 画像が読めていても解決しないことがあり (実機で確認)、
 				// そうなると Promise.all が永久に待って再生が始まらないまま静止画で止まる。
@@ -162,20 +243,17 @@ export function createUgoiraPlayer(deps) {
 				image.src = url;
 			});
 		});
-		images = await Promise.all(loaders);
-		timings = frames.map((frame) => ({ delay: frame.delay }));
+		return Promise.all(loaders);
 	}
 
 	return {
 		/**
 		 * うごイラを描画して再生を始める。
+		 * ビュワーの状態表示 (.status) は呼び出し側が消してから呼ぶ。
 		 * @param {object} detail 正規化した作品詳細
 		 * @returns {Promise<void>}
 		 */
 		async render(detail) {
-			// 他のペインは自分の dispose() で片付ける。ここで消すのはビュワーの状態表示だけ
-			container.querySelectorAll('.status').forEach((node) => node.remove());
-
 			const wrapper = doc.createElement('div');
 			wrapper.className = 'ugoira';
 			root = wrapper;
@@ -184,10 +262,13 @@ export function createUgoiraPlayer(deps) {
 			const poster = doc.createElement('img');
 			poster.className = 'ugoira-poster';
 			poster.alt = detail.title;
-			poster.src = detail.urls.regular ?? '';
+			poster.src = detail.urls[IMAGE_QUALITY.REGULAR] ?? '';
 
 			canvas = doc.createElement('canvas');
 			canvas.className = 'ugoira-canvas';
+			// 再生が始まると poster は隠れる。canvas にも読み上げ用の名前を持たせる (UI_DESIGN_KIT §6)
+			canvas.setAttribute('role', 'img');
+			canvas.setAttribute('aria-label', detail.title);
 			canvas.hidden = true;
 
 			const toggle = doc.createElement('button');
@@ -216,30 +297,40 @@ export function createUgoiraPlayer(deps) {
 			container.appendChild(wrapper);
 
 			try {
-				const meta = await getJson(ugoiraMetaUrl(detail.id));
+				const meta = await getJson(ugoiraMetaUrl(detail.id), { fetchImpl });
 				if (disposed) return;
 
 				// API が返した値をそのまま外部オリジンへ投げない
 				const zipUrl = safeCdnUrl(pickZipUrl(meta, deps.settings.imageQuality));
-				if (!zipUrl) throw new Error('zip の URL が pixiv の CDN ではありません');
-				const response = await fetch(zipUrl, { mode: 'cors' });
-				if (!response.ok) throw new Error(`zip の取得に失敗しました: ${response.status}`);
+				if (!zipUrl) throw new Error(REASONS.ZIP_NOT_CDN);
+				// 作品を送られたら途中でも転送を止める。zip は最大 12.7MB あり、
+				// 見ていない作品の分が流れ続けると今見ている作品の取得が遅れる
+				const response = await fetchImpl(zipUrl, { mode: 'cors', signal: aborter.signal });
+				if (!response.ok) throw new Error(`${REASONS.ZIP_FETCH}: ${response.status}`);
 				const buffer = await response.arrayBuffer();
 				if (disposed) return;
 
 				const frames = buildFrames(parseStoredZip(buffer), meta.frames);
-				if (frames.length === 0) throw new Error('フレームがありません');
+				if (frames.length === 0) throw new Error(REASONS.NO_FRAMES);
 
-				await loadImages(frames, meta.mime_type ?? 'image/jpeg');
+				const loaded = await loadImages(frames, meta.mime_type ?? DEFAULT_FRAME_MIME);
 				if (disposed) return;
 
-				// デコードに失敗すると 0 になる。0x0 の canvas に描いても無言で何も出ないので、
-				// 静止画のまま catch へ落として理由を出す
-				const width = images[0].naturalWidth;
-				const height = images[0].naturalHeight;
-				if (!width || !height) throw new Error('フレームの画像をデコードできませんでした');
-				canvas.width = width;
-				canvas.height = height;
+				// デコードに失敗したフレームは naturalWidth が 0 になる。そのまま drawImage に渡すと
+				// 例外で tick が止まり、ボタンが「一時停止」のまま動かなくなる。
+				// 壊れたコマだけを待ち時間ごと落とし、残りで再生する
+				images = [];
+				timings = [];
+				loaded.forEach((image, at) => {
+					if (!image.naturalWidth || !image.naturalHeight) return;
+					images.push(image);
+					timings.push({ delay: frames[at].delay });
+				});
+				// 全部落ちたら 0x0 の canvas に描いても無言で何も出ないので、静止画のまま理由を出す
+				if (images.length === 0) throw new Error(REASONS.DECODE);
+
+				canvas.width = images[0].naturalWidth;
+				canvas.height = images[0].naturalHeight;
 				context = canvas.getContext('2d');
 				canvas.hidden = false;
 				poster.hidden = true;
@@ -248,10 +339,11 @@ export function createUgoiraPlayer(deps) {
 				draw();
 				play();
 			} catch (error) {
+				// 破棄後の失敗 (abort を含む) は伝えない。枠ごと消えている
 				if (disposed) return;
 				// 静止画は出ているので、動かないことだけを伝える
-				deps.onError('うごイラを再生できませんでした');
-				console.warn('[GridViewer] failed to play ugoira', detail.id, error);
+				showPaneError(MESSAGES.PLAY_FAILED);
+				warn('failed to play ugoira', detail.id, error);
 			}
 		},
 
@@ -261,6 +353,7 @@ export function createUgoiraPlayer(deps) {
 		 */
 		dispose() {
 			disposed = true;
+			aborter.abort();
 			// 自分が作った DOM は自分で片付ける。
 			// これを外すと、次に開いた作品の画像と横に並んで両方潰れる
 			root?.remove();

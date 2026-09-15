@@ -9,6 +9,7 @@
  * どのパスで効かせるかは呼び出し側 (main.js) が isProfileHome で決める。
  */
 import { PICKUP_SECTION_SELECTOR } from '../common/constants.js';
+import { createStyleHandle } from '../common/style-injector.js';
 
 /** 差し込む style 要素の id。二重注入を防ぐ目印も兼ねる。 */
 export const PICKUP_STYLE_ID = 'gridviewer-hide-pickup';
@@ -27,57 +28,23 @@ ${PICKUP_SECTION_SELECTOR} {
 /**
  * ピックアップ欄を隠す CSS の出し入れを受け持つ。
  * 作った時点では何もせず、setActive(true) で初めて差し込む。
+ * 失敗しても欄が隠れないだけでページは読めるので、投げずに戻る (style-injector が受ける)。
  * @param {Document} doc 対象のドキュメント
  * @returns {{setActive: (active: boolean) => void, isActive: () => boolean, dispose: () => void}} 出し入れ
  */
 export function attachPickupHider(doc) {
-	/** @type {Element|null} 差し込んだ style。出していなければ null */
-	let style = null;
-
-	/**
-	 * CSS を差し込む。既にあれば足さない。
-	 * @returns {void}
-	 */
-	function show() {
-		try {
-			if (!doc.head) return;
-			style = doc.getElementById(PICKUP_STYLE_ID);
-			if (style) return;
-			style = doc.createElement('style');
-			style.id = PICKUP_STYLE_ID;
-			// innerHTML は使わない (SPEC §13)。CSS は textContent で入る
-			style.textContent = PICKUP_HIDE_CSS;
-			doc.head.appendChild(style);
-		} catch (error) {
-			// 欄が隠れないだけでページは読める。ここで落ちて content script ごと巻き込まない
-			console.warn('[GridViewer] pickup hide failed', error);
-			style = null;
-		}
-	}
-
-	/**
-	 * 差し込んだ CSS を取り除く。
-	 * @returns {void}
-	 */
-	function hide() {
-		try {
-			style?.remove();
-		} catch (error) {
-			console.warn('[GridViewer] pickup hide removal failed', error);
-		}
-		style = null;
-	}
-
+	const style = createStyleHandle(doc, PICKUP_STYLE_ID, PICKUP_HIDE_CSS, 'pickup hide');
 	return {
+		/**
+		 * 隠すかどうかを切り替える。
+		 * @param {boolean} active true で差し込み、false で外す
+		 * @returns {void}
+		 */
 		setActive(active) {
-			if (active) show();
-			else hide();
+			if (active) style.show();
+			else style.hide();
 		},
-		isActive() {
-			return style !== null;
-		},
-		dispose() {
-			hide();
-		},
+		isActive: style.isActive,
+		dispose: style.dispose,
 	};
 }
