@@ -170,12 +170,12 @@ export const SECTIONS = Object.freeze([
 					Object.freeze({
 						value: INFINITE_SCROLL.ON_REACH,
 						label: '下まで来たら読み込む',
-						description: '一番下に着いてから次のページを読みます。通信は少なめです。',
+						description: '一番下に着いてから次のページを読みます。通信は少なめですが、そのぶん少し待ちます。',
 					}),
 					Object.freeze({
 						value: INFINITE_SCROLL.PREFETCH,
 						label: '常に 1 ページ先を読んでおく',
-						description: '下に着く前に次のページを用意しておくので、待たずに読み進められます。',
+						description: '下に着く 1 画面ぶん手前で次のページを並べます。待たずに読み進められます。',
 					}),
 				]),
 			}),
