@@ -18,7 +18,7 @@ import {
 	GV_CARD_ATTR,
 	GV_BOOKMARK_ID_ATTR,
 	SENTINEL_ATTR,
-	SENTINEL_MARGIN_PX,
+	SENTINEL_MARGIN,
 	BOOKMARK_BUTTON_SELECTOR,
 	ARTWORK_LINK_SELECTOR,
 	PAGER_SELECTOR,
@@ -292,8 +292,10 @@ export function attachInfiniteScroll(doc, options) {
 	/**
 	 * sentinel を見張り始める。既に見張っていれば切ってから作り直す。
 	 *
+	 * 見張る範囲 (rootMargin) はモードごとに SENTINEL_MARGIN が持つ。
+	 * onReach は 0 で下端に着いてから読み、prefetch は 1 画面ぶん手前で並べ終える。
 	 * rootMargin は IntersectionObserver を作るときにしか決められないので、
-	 * モードを変えたら作り直すしかない (onReach は手前から読み始め、prefetch は手元にあるので 0)。
+	 * モードを変えたら作り直すしかない。
 	 * observe() は初回に必ず今の交差状態を通知するので、sentinel が見えている状態で
 	 * 作り直すとその場で 1 ページ読む (下端に留まって止まっていた人にはむしろ都合がよい)。
 	 * @returns {void}
@@ -304,7 +306,10 @@ export function attachInfiniteScroll(doc, options) {
 			if (!entries.some((entry) => entry.isIntersecting)) return undefined;
 			// 本物の IntersectionObserver は戻り値を捨てる。テストから完了を待てるように Promise を返す
 			return advance();
-		}, { rootMargin: `${mode === INFINITE_SCROLL.PREFETCH ? 0 : SENTINEL_MARGIN_PX}px` });
+		}, {
+			// 表に無いモードで observe を止めないよう、読めなければ下端で読む側へ倒す
+			rootMargin: SENTINEL_MARGIN[mode] ?? SENTINEL_MARGIN[INFINITE_SCROLL.ON_REACH],
+		});
 		// observe() が投げても dispose() で切れるように、先に印を付ける
 		observing = true;
 		observer.observe(sentinel);
@@ -703,7 +708,7 @@ export function attachInfiniteScroll(doc, options) {
 		sentinel.setAttribute('aria-live', 'polite');
 		// ul の中に入れると flex アイテムとしてカード 1 枚分の隙間になる。
 		// 親の末尾ではなく ul の直後に入れる。親が ul の後ろにページャ等を持つと、
-		// 末尾では sentinel がその下に落ち、rootMargin が 0 の prefetch で発火が遅れる
+		// 末尾では sentinel がその下に落ち、そのぶん発火が遅れる
 		const host = ul.parentElement;
 		if (!host) throw new Error('grid has no parent');
 		host.insertBefore(sentinel, ul.nextSibling ?? null);

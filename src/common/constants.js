@@ -190,7 +190,7 @@ export const INFINITE_SCROLL = Object.freeze({
 	OFF: 'off',
 	/** 一番下まで来たら次のページを読む */
 	ON_REACH: 'onReach',
-	/** 常に 1 ページ先を読み込んでおき、下まで来たら即座に並べる */
+	/** 常に 1 ページ先を読み込んでおき、下に着く前に並べ終える */
 	PREFETCH: 'prefetch',
 });
 
@@ -198,11 +198,24 @@ export const INFINITE_SCROLL = Object.freeze({
 export const SENTINEL_ATTR = 'data-gv-sentinel';
 
 /**
- * onReach で sentinel を先読みする距離 (px)。
- * 画面に入る手前で読み始め、下端に着いたときには並び終えている状態を狙う。
- * prefetch では作品を手元に持っているので 0 で足りる。
+ * モードごとの sentinel の見張り範囲 (IntersectionObserver の rootMargin)。
+ *
+ * 2 つのモードの差はここだけで決まるので、値は 1 か所にまとめて取り違えを防ぐ
+ * (0.22.1 までは割り当てが逆で、「下まで来たら」のほうが早く読み始めていた)。
+ *
+ * - onReach は 0。「一番下に着いてから読む」と案内している以上、手前から読み始めない。
+ *   下端でスピナーが出て少し待つのがこのモードの正しい見え方 (通信は最小で済む)
+ * - prefetch は 1 画面ぶん (100%)。作品は既に手元にあるので、下端が見えるより前に
+ *   並べ終えられる。% は root (ビューポート) の高さに対する割合なので、
+ *   ウィンドウの高さが変わっても「1 画面ぶん手前」を保てる
+ *
+ * 値は rootMargin にそのまま渡せる文字列。
+ * @type {Readonly<Record<string, string>>}
  */
-export const SENTINEL_MARGIN_PX = 200;
+export const SENTINEL_MARGIN = Object.freeze({
+	[INFINITE_SCROLL.ON_REACH]: '0px',
+	[INFINITE_SCROLL.PREFETCH]: '100%',
+});
 
 /**
  * pixiv 本体のページャ (1 2 3 ... 次へ)。ページ番号のリンクを含む nav で掴む。

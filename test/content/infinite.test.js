@@ -5,7 +5,7 @@ import {
 	CARD_STYLE_ID, CARD_SHOW_CSS,
 } from '../../src/content/infinite.js';
 import {
-	INFINITE_SCROLL, GV_CARD_ATTR, GV_BOOKMARK_ID_ATTR, SENTINEL_ATTR, SENTINEL_MARGIN_PX,
+	INFINITE_SCROLL, GV_CARD_ATTR, GV_BOOKMARK_ID_ATTR, SENTINEL_ATTR, SENTINEL_MARGIN,
 	BOOKMARK_BUTTON_SELECTOR, BOOKMARKED_FILL, PAGER_SELECTOR,
 } from '../../src/common/constants.js';
 import { makeCard, makeGrid, el, fakeComputedStyle } from '../helpers/card.js';
@@ -184,7 +184,7 @@ test('sentinel は ul の直後に置かれ、監視される', () => {
 });
 
 test('ul の後ろにページャがあっても sentinel はその前 (ul の直後) に入る', () => {
-	// 親の末尾に置くとページャの下に落ち、rootMargin が 0 の prefetch で発火が遅れる
+	// 親の末尾に置くとページャの下に落ち、その高さのぶんだけ発火が遅れる
 	const { ul, wrap, trailing } = setup({ trailing: true, mode: INFINITE_SCROLL.PREFETCH });
 	const sentinel = sentinelOf(wrap);
 	assert.equal(ul.nextSibling, sentinel, 'sentinel が ul の直後に無い');
@@ -888,14 +888,28 @@ test('dispose は本体のカードを消さない', async () => {
 	assert.equal([...ul.querySelectorAll('li')].length, 2, '本体の 2 枚まで消している');
 });
 
-test('onReach は sentinel を手前から見張る', () => {
+test('onReach は sentinel が見えてから動く', () => {
+	// 「一番下に着いてから読む」と案内している。手前から読み始めたら先読みとの差が無くなる
 	const { observer } = setup({ mode: INFINITE_SCROLL.ON_REACH });
-	assert.equal(observer.state.init.rootMargin, `${SENTINEL_MARGIN_PX}px`);
+	assert.equal(observer.state.init.rootMargin, SENTINEL_MARGIN[INFINITE_SCROLL.ON_REACH]);
+	assert.equal(observer.state.init.rootMargin, '0px');
 });
 
-test('prefetch は手元にあるので sentinel が見えてから動く', () => {
+test('prefetch は sentinel を 1 画面ぶん手前から見張る', () => {
+	// 作品は手元にあるので、下端が見えるより前に並べ終えられる
 	const { observer } = setup({ mode: INFINITE_SCROLL.PREFETCH });
-	assert.equal(observer.state.init.rootMargin, '0px');
+	assert.equal(observer.state.init.rootMargin, SENTINEL_MARGIN[INFINITE_SCROLL.PREFETCH]);
+	assert.equal(observer.state.init.rootMargin, '100%');
+});
+
+test('先読みのほうが手前で発火する', () => {
+	// 2 つの値を取り違えると「下まで来たら」のほうが早く読み始めてしまい、
+	// 設定画面の説明と逆になる (0.22.1 までの不具合)
+	const onReach = setup({ mode: INFINITE_SCROLL.ON_REACH }).observer.state.init.rootMargin;
+	const prefetch = setup({ mode: INFINITE_SCROLL.PREFETCH }).observer.state.init.rootMargin;
+	const distance = (margin) => Number.parseFloat(margin);
+	assert.equal(distance(onReach), 0, 'onReach が下端より手前で発火している');
+	assert.ok(distance(prefetch) > 0, 'prefetch が下端に着くまで発火しない');
 });
 
 test('setMode でモードを変えたら rootMargin を変えて監視し直す', () => {
@@ -903,7 +917,7 @@ test('setMode でモードを変えたら rootMargin を変えて監視し直す
 	handle.setMode(INFINITE_SCROLL.PREFETCH);
 	assert.equal(observer.state.created, 2, 'observer を作り直していない');
 	assert.equal(observer.state.disconnected, 1, '前の observer を切っていない');
-	assert.deepEqual(observer.state.inits.map((init) => init.rootMargin), [`${SENTINEL_MARGIN_PX}px`, '0px']);
+	assert.deepEqual(observer.state.inits.map((init) => init.rootMargin), [SENTINEL_MARGIN[INFINITE_SCROLL.ON_REACH], SENTINEL_MARGIN[INFINITE_SCROLL.PREFETCH]]);
 	const sentinels = [...wrap.querySelectorAll(`[${SENTINEL_ATTR}]`)];
 	assert.deepEqual(observer.state.observed, sentinels, 'sentinel を監視し直していない');
 });
