@@ -91,6 +91,11 @@ h1 {
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
+}
+
+/* 区切り線はセクションとセクションの間だけ。先頭のセクションには付けない。
+   すぐ上のタブ行が border-bottom を持っているので、付けると線が 2 本並んで見える */
+.section + .section {
 	padding-top: 10px;
 	border-top: 1px solid var(--divider);
 }
