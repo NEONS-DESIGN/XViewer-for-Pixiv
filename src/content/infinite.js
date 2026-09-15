@@ -84,6 +84,27 @@ ${PAGER_SELECTOR} {
 }
 `;
 
+/** 継ぎ足したカードの表示を取り戻す style の id。二重注入を防ぐ目印も兼ねる。 */
+export const CARD_STYLE_ID = 'gridviewer-show-cards';
+
+/**
+ * 継ぎ足したカードの display を取り戻す CSS。
+ *
+ * pixiv のグリッドは li 自身に「ページ 1 枚ぶんより先は出さない」規則を持っている
+ * (`li:nth-child(n+61) { display: none }`。閾値は幅で変わる。SITE_SPEC §3)。
+ * ここは同じ ul へ 48 枚ずつ足すので、この規則に当たったカードは DOM にだけ積み上がり、
+ * 画面には 1 枚も出ない。グリッドの高さも増えないので sentinel が画面内に居座り、
+ * 少しスクロールし直すたびに ?p= だけが進む。
+ * 打ち消す対象は自分が足したカードだけなので、目印 (GV_CARD_ATTR) で選ぶ。
+ * pixiv 側は :nth-child() 付きで詳細度が高いため !important で競り勝つ。
+ * 戻す値は li の既定 (list-item)。本体の可視カードの computed 値と同じ。
+ */
+export const CARD_SHOW_CSS = `
+[${GV_CARD_ATTR}] {
+	display: list-item !important;
+}
+`;
+
 /**
  * sentinel の中の表示の CSS。
  *
@@ -245,6 +266,11 @@ export function attachInfiniteScroll(doc, options) {
 	 * 先に隠すと、継ぎ足せないページでページ送りの手段まで消えてしまう
 	 */
 	const pagerStyle = createStyleHandle(doc, PAGER_STYLE_ID, PAGER_HIDE_CSS, 'pager hide');
+	/**
+	 * 継ぎ足したカードを本体の display:none から取り戻す CSS。
+	 * pagerStyle と同じ扱い (継ぎ足しを始められると決まってから入れ、dispose() で外す)
+	 */
+	const cardStyle = createStyleHandle(doc, CARD_STYLE_ID, CARD_SHOW_CSS, 'card show');
 	/** @type {WeakSet<object>} 送信中のカード。二度押しで 2 回送らないための印 */
 	const sending = new WeakSet();
 
@@ -695,8 +721,10 @@ export function attachInfiniteScroll(doc, options) {
 	}
 
 	// ここまで来て初めて「継ぎ足しを始められる」と決まる。本体のページャはもう要らない。
-	// これより前に隠すと、継ぎ足せないページでページ送りの手段まで消えてしまう
+	// これより前に隠すと、継ぎ足せないページでページ送りの手段まで消えてしまう。
+	// 継ぎ足したカードを出す CSS も同じ時点で入れる (1 枚目を足すより前であればよい)
 	pagerStyle.show();
+	cardStyle.show();
 
 	return {
 		/**
@@ -745,6 +773,7 @@ export function attachInfiniteScroll(doc, options) {
 			// 隠したページャを戻す。継ぎ足しをやめた以上、ページ送りの手段が要る。
 			// sentinel の見た目も外して、置いたものを全て元へ戻す
 			pagerStyle.hide();
+			cardStyle.hide();
 			sentinelStyle.hide();
 			// 撤去は別々に包む。片方が投げても、もう片方はページに残さない。
 			// 継ぎ足したカードが残るのは「拡張をオフにしたのに元へ戻らない」状態なので先に消す
