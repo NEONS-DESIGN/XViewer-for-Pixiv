@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
 	attachInfiniteScroll, SENTINEL_TEXT, SENTINEL_STYLE_ID, PAGER_STYLE_ID, PAGER_HIDE_CSS,
+	CARD_STYLE_ID, CARD_SHOW_CSS,
 } from '../../src/content/infinite.js';
 import {
 	INFINITE_SCROLL, GV_CARD_ATTR, GV_BOOKMARK_ID_ATTR, SENTINEL_ATTR, SENTINEL_MARGIN_PX,
@@ -738,6 +739,34 @@ test('sentinel を置けなければページャを隠さない', () => {
 	});
 	assert.equal(handle.isActive(), false);
 	assert.equal(stylesIn(doc, PAGER_STYLE_ID).length, 0, '継ぎ足せないのにページャを隠している');
+});
+
+test('雛形が採れたら継ぎ足したカードの display を取り戻す CSS が入る', () => {
+	// pixiv のグリッドは 1 ページぶんより先の li を display:none にする (SITE_SPEC §3)。
+	// 打ち消さないと、継ぎ足したカードが DOM にだけ積み上がって画面に出ない
+	const { doc } = setup();
+	const styles = stylesIn(doc, CARD_STYLE_ID);
+	assert.equal(styles.length, 1, 'カードを出す style が入っていない');
+	assert.equal(styles[0].textContent, CARD_SHOW_CSS);
+	assert.ok(styles[0].textContent.includes(GV_CARD_ATTR), '継ぎ足したカードの目印で選んでいない');
+	assert.ok(/display:[^;]*!important/.test(styles[0].textContent), 'pixiv 側の display:none に競り勝てない');
+});
+
+test('雛形が採れなければカードの CSS も入らない', () => {
+	const { ul, wrap } = makeGrid([makeCard({ id: '1', loaded: false })]);
+	const doc = fakeDoc(wrap);
+	attachInfiniteScroll(doc, {
+		ul, source: fakeSource(3).source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
+		deps: { createObserver: fakeObserver().create, computedStyle: fakeComputedStyle },
+	});
+	assert.equal(stylesIn(doc, CARD_STYLE_ID).length, 0, '継ぎ足せないのにカードの style を入れている');
+});
+
+test('dispose でカードの CSS も外れる', () => {
+	const { doc, handle } = setup();
+	assert.equal(stylesIn(doc, CARD_STYLE_ID).length, 1);
+	handle.dispose();
+	assert.equal(stylesIn(doc, CARD_STYLE_ID).length, 0, 'カードの style が残っている');
 });
 
 test('dispose でページャの CSS も外れる', () => {
