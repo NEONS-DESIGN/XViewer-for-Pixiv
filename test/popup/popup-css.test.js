@@ -185,6 +185,12 @@ test('タブの選択は aria-selected で描き、固定値のパネル高さ�
 	assert.ok(declarations(block(popup, '.panel')).includes('min-height: 0'), 'flex の子は min-height: 0 が無いと縮まない');
 });
 
+test('セクションの区切り線はセクション同士の間だけに出す', () => {
+	// 先頭のセクションの上にはタブ行の border-bottom が既にあり、線が 2 本並んで見える
+	assert.ok(!declarations(block(popup, '.section')).some((one) => one.startsWith('border-top')), '先頭のセクションにも線が出る');
+	assert.ok(declarations(block(popup, '.section + .section')).includes('border-top: 1px solid var(--divider)'), 'セクション同士の区切りが無い');
+});
+
 test('popup.html は tokens.css を popup.css より先に読む', async () => {
 	// popup.css は tokens.css の変数を参照する。順が逆でも CSS 変数は解決されるが、
 	// 読み込みの順が入れ替わると tokens.css の ::-webkit-scrollbar 等の普通の規則を popup.css が上書きできなくなる
