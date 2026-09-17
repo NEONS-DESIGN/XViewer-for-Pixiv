@@ -10,13 +10,19 @@ import { getArtwork } from '../../scripts/icon-svg.mjs';
  */
 
 /**
- * CSS を読んでコメントを落とす。宣言の比較にコメントの差を持ち込まないため。
+ * CSS を読んで改行を LF に揃え、コメントを落とす。
+ *
+ * **改行を揃えるのは必須。** このリポジトリは `.gitattributes` を持たず、Windows の
+ * `core.autocrlf=true` では作業ツリーの CSS が CRLF になる。`block()` は選択子を
+ * 改行込みの文字列 (`:root,` の次の行が `:host {`) で探すので、CRLF のままだと
+ * 1 つも見つからず、チェックアウト直後だけテストが落ちる (実際に踏んだ)。
+ * 見張りたいのは宣言の中身であって改行の種類ではないので、読み込みの時点で潰す。
  * @param {string} relative このファイルから見た CSS の場所
- * @returns {Promise<string>} コメントを落とした CSS
+ * @returns {Promise<string>} LF に揃えてコメントを落とした CSS
  */
 async function readStripped(relative) {
 	const css = await readFile(new URL(relative, import.meta.url), 'utf8');
-	return css.replace(/\/\*[\s\S]*?\*\//g, '');
+	return css.replace(/\r\n?/g, '\n').replace(/\/\*[\s\S]*?\*\//g, '');
 }
 
 /** 配色トークン。ビュワーと設定画面の両方が読む。 */
@@ -25,6 +31,14 @@ const tokens = await readStripped('../../src/common/tokens.css');
 const popup = await readStripped('../../src/popup/popup.css');
 /** ビュワーの Shadow DOM の規則。 */
 const viewer = await readStripped('../../src/content/viewer/viewer.css');
+
+test('読み込んだ CSS の改行は LF に揃っている', () => {
+	// CRLF のまま比べると、改行込みの選択子 (`:root,` の次の行が `:host`) が見つからず
+	// チェックアウト直後だけ落ちる。readStripped が潰していることを固定する
+	for (const [label, css] of [['tokens.css', tokens], ['popup.css', popup], ['viewer.css', viewer]]) {
+		assert.ok(!css.includes('\r'), `${label} に CR が残っている`);
+	}
+});
 
 /**
  * 選択子の直後の宣言ブロックの中身を取り出す。
