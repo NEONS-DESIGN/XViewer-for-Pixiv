@@ -170,14 +170,15 @@ function matches(node, selector) {
 /**
  * 作品カード 1 枚を組む。
  * @param {{id?: string, userId?: string, title?: string, pages?: number, loaded?: boolean,
- *   bookmarked?: boolean, tabSkipped?: boolean, heart?: boolean}} [options] カードの内容。
- *   heart: false でブックマークボタンごと落とす (自分のユーザーページ。SITE_SPEC §4)
+ *   bookmarked?: boolean, tabSkipped?: boolean, heart?: boolean, label?: string|null}} [options] カードの内容。
+ *   heart: false でブックマークボタンごと落とす (自分のユーザーページ。SITE_SPEC §4)。
+ *   label で公開範囲・年齢制限のラベル ('R-18' / '非公開') をオーバーレイ層に足す (SITE_SPEC §3)
  * @returns {object} li の代わり
  */
 export function makeCard(options = {}) {
 	const {
 		id = '100', userId = '9', title = '作品', pages = 1,
-		loaded = true, bookmarked = false, tabSkipped = true, heart = true,
+		loaded = true, bookmarked = false, tabSkipped = true, heart = true, label = null,
 	} = options;
 	const li = el('li');
 	const outer = li.appendChild(el('div'));
@@ -198,6 +199,11 @@ export function makeCard(options = {}) {
 
 	const overlay = thumb.appendChild(el('div'));
 	overlay.appendChild(el('div'));
+	// ラベルは複数枚バッジと同じ層に、バッジより前に入る (SITE_SPEC §3 実測)
+	if (label) {
+		const box = overlay.appendChild(el('div'));
+		box.appendChild(el('div')).textContent = label;
+	}
 	if (pages > 1) {
 		const badge = overlay.appendChild(el('div'));
 		const inner = badge.appendChild(el('div'));

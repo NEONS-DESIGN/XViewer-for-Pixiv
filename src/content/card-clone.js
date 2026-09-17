@@ -126,6 +126,34 @@ function pickTemplates(cards, accept) {
 }
 
 /**
+ * サムネのオーバーレイ層にある、雛形の作品に紐づいたラベルを集める。
+ *
+ * 「R-18」「非公開」のような表示で、**複数枚バッジと同じ層に、バッジより前に並ぶ**
+ * (SITE_SPEC §3 で実測)。雛形を cloneNode するとこれも付いてくるので、
+ * 組み立てのときに落とす。残すと別の作品に他人のラベルが付く。
+ *
+ * 掴み方は findBadge と同じく「祖先の祖先が thumb」。そこから画像の入れ物 (文字を持たない) と
+ * バッジ (数字だけ) を除いたものがラベルになる。クラス名は読まない (SPEC §2-2)。
+ * @param {object} card カード (li)
+ * @returns {object[]} ラベルのノード
+ */
+export function findOverlayLabels(card) {
+	const thumb = card.querySelector(THUMB_LINK_SELECTOR);
+	if (!thumb) return [];
+	const badge = findBadge(card);
+	const labels = [];
+	for (const node of [...thumb.querySelectorAll('div')]) {
+		if (node === badge) continue;
+		if (node.parentElement?.parentElement !== thumb) continue;
+		const text = (node.textContent ?? '').trim();
+		// 文字を持たない層は画像の入れ物。数字だけのものは findBadge が拾えなかったバッジ
+		if (text === '' || /^\d+$/.test(text)) continue;
+		labels.push(node);
+	}
+	return labels;
+}
+
+/**
  * ページ上のカードから雛形を採る。
  *
  * 自分が継ぎ足したカード (GV_CARD_ATTR 付き) と、画像が読み込まれていないカード (figure のまま) は
@@ -213,6 +241,10 @@ export function buildCard(templates, work, deps) {
 
 		const titleLink = links.find((link) => !link.querySelector('img'));
 		if (titleLink) titleLink.textContent = String(work.title ?? '');
+
+		// 雛形の作品に紐づくラベル (R-18 / 非公開) を落とす。作品ごとに付け直す手当てが無いので、
+		// 残すと別の作品に他人のラベルが付く。出さないほうを選ぶ (SPEC §16)
+		for (const label of findOverlayLabels(card)) label.remove();
 
 		const badge = findBadge(card);
 		if (badge && !wantsBadge) badge.remove();

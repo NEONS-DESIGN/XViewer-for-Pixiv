@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-	captureTemplates, findBadge, buildCard, paintHeart, heartPaths, hexToRgb, isBookmarkedFill,
+	captureTemplates, findBadge, findOverlayLabels, buildCard, paintHeart, heartPaths, hexToRgb, isBookmarkedFill,
 } from '../../src/content/card-clone.js';
 import {
 	GV_CARD_ATTR, GV_BOOKMARK_ID_ATTR, BOOKMARKED_FILL, TAB_SKIP_MARK_ATTR, TAB_SKIP_LABEL_ATTR,
@@ -347,4 +347,29 @@ test('paintHeart は色の控えが無くても落ちない', () => {
 	assert.deepEqual(heartPaths(card).map((path) => path.style.values.fill), [BOOKMARKED_FILL, BOOKMARKED_FILL]);
 	assert.doesNotThrow(() => paintHeart(card, false));
 	assert.deepEqual(heartPaths(card).map((path) => path.style.values.fill), ['', '']);
+});
+
+test('雛形のラベルは継ぎ足したカードに引き継がない', () => {
+	// R-18 / 非公開 は雛形になった作品のもの。残すと別の作品に他人のラベルが付く。
+	// 作品ごとに付け直す手当ては無いので、出さないほうを選ぶ (SPEC §16)
+	const { ul } = makeGrid([makeCard({ id: '1', label: '非公開' })]);
+	const templates = captureTemplates(ul, { computedStyle: fakeComputedStyle });
+	const card = buildCard(templates, work(), { loggedIn: true });
+	assert.equal(card.textContent.includes('非公開'), false);
+});
+
+test('ラベルを落としても複数枚バッジは残る', () => {
+	// ラベルとバッジは同じ層に並ぶ。まとめて消すとページ数まで消える
+	const { ul } = makeGrid([makeCard({ id: '1', pages: 4, label: 'R-18' })]);
+	const templates = captureTemplates(ul, { computedStyle: fakeComputedStyle });
+	const card = buildCard(templates, work({ pageCount: 3 }), { loggedIn: true });
+	assert.equal(card.textContent.includes('R-18'), false);
+	assert.equal(findBadge(card).querySelector('span').textContent, '3');
+});
+
+test('findOverlayLabels はバッジも画像もラベルとして拾わない', () => {
+	const withAll = makeCard({ id: '1', pages: 2, label: 'R-18' });
+	assert.deepEqual(findOverlayLabels(withAll).map((node) => node.textContent), ['R-18']);
+	// ラベルの無いカードでは 1 つも拾わない (空のオーバーレイ層や img を掴まない)
+	assert.deepEqual(findOverlayLabels(makeCard({ id: '2', pages: 2 })), []);
 });
