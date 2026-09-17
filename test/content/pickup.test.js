@@ -97,6 +97,17 @@ test('head が無くても投げない', () => {
 	assert.doesNotThrow(() => hider.dispose());
 });
 
+test('appendChild が投げても投げず、isActive は false のまま', (t) => {
+	// 欄が隠れないだけでページは読める。content script ごと巻き込まない
+	const warn = t.mock.method(console, 'warn', () => {});
+	const doc = fakeDoc();
+	doc.head.appendChild = () => { throw new Error('head is sealed'); };
+	const hider = attachPickupHider(doc);
+	assert.doesNotThrow(() => hider.setActive(true));
+	assert.equal(hider.isActive(), false);
+	assert.equal(warn.mock.callCount(), 1);
+});
+
 test('隠すのは作品リンクを持つ section だけ', () => {
 	// クラス名は掴まない (SPEC §2)。作品と無関係な section を巻き込まないため作品リンクまで求める
 	assert.equal(PICKUP_SECTION_SELECTOR, `section:has(${ARTWORK_LINK_SELECTOR})`);

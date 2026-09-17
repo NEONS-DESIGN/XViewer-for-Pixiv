@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { toManifestVersion, applyVersion } from '../../scripts/manifest-version.mjs';
+import { toManifestVersion, applyVersion, applyMinimumChromeVersion } from '../../scripts/manifest-version.mjs';
 
 test('通常の version はそのまま通す', () => {
 	assert.equal(toManifestVersion('0.1.0'), '0.1.0');
@@ -78,7 +78,24 @@ test('applyVersion は落とすものが無ければ version_name を付けな�
 	assert.equal('version_name' in applied, false);
 });
 
-test('applyVersion は雛形に version が残っていても上書きする', () => {
-	const applied = applyVersion({ version: '9.9.9' }, '0.3.0');
-	assert.equal(applied.version, '0.3.0');
+test('applyVersion は雛形に version が残っていたら止める', () => {
+	// 出どころは package.json 1 か所 (CLAUDE.md)。黙って上書きすると書き戻した人が気づけない
+	assert.throws(() => applyVersion({ version: '9.9.9' }, '0.3.0'), /version を書かないでください/);
+	assert.throws(() => applyVersion({ version_name: '9.9.9-beta' }, '0.3.0'), /version_name を書かないでください/);
+});
+
+test('applyMinimumChromeVersion は minimum_chrome_version を差し込み、元は書き換えない', () => {
+	const manifest = { name: 'GridViewer for Pixiv' };
+	const applied = applyMinimumChromeVersion(manifest, '120');
+	assert.equal(applied.minimum_chrome_version, '120');
+	assert.equal('minimum_chrome_version' in manifest, false);
+});
+
+test('applyMinimumChromeVersion は雛形に値が残っていたら止める', () => {
+	assert.throws(() => applyMinimumChromeVersion({ minimum_chrome_version: '100' }, '120'), /minimum_chrome_version を書かないでください/);
+});
+
+test('applyMinimumChromeVersion はメジャーバージョンの整数以外を受け付けない', () => {
+	assert.throws(() => applyMinimumChromeVersion({}, 'chrome120'), /整数/);
+	assert.throws(() => applyMinimumChromeVersion({}, ''), /整数/);
 });

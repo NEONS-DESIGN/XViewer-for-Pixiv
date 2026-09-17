@@ -1,201 +1,21 @@
 /**
  * 設定画面の描画。
- * 画面の中身はすべて下の定義表から組み立てる。項目を足すときは表へ 1 行足すだけで済む。
+ * 画面の中身はすべて sections.js の定義表から組み立てる。項目を足すときは表へ 1 行足すだけで済む。
  *
- * 保存ボタンは作らず、変更のたびに保存する (UI_DESIGN_KIT §9)。
+ * 保存ボタンは作らず、変更のたびに保存する (UI_DESIGN_KIT §4.4)。
  * 見た目の反映は保存の完了を待たない。待つと押した手応えが遅れるため。
  */
 import { createIcon } from '../common/icons.js';
 import { supportsRichOptions } from '../common/rich-select.js';
-import { DISCLAIMER, PROJECT_LICENSE, THIRD_PARTY } from '../common/licenses.js';
-import {
-	IMAGE_QUALITY,
-	PREFETCH_CHOICES,
-	GRID_TAB_SKIP,
-	SIDEBAR_SCROLL,
-	POPUP_THEMES,
-	THEME_TOGGLE,
-	SETTINGS_DEFAULTS,
-	KEYS,
-} from '../common/constants.js';
-
-/** 画面の題名。拡張の名前をそのまま出す。 */
-const TITLE = 'GridViewer for Pixiv';
-
-/**
- * タブの定義。順番がそのまま画面の並びと左右キーの順になる。
- * 設定は 1 枚のまま。分けるのは「操作する画面」と「読む画面」であって、設定項目同士ではない。
- */
-const TABS = Object.freeze([
-	Object.freeze({ id: 'settings', label: '設定' }),
-	Object.freeze({ id: 'license', label: 'ライセンス' }),
-]);
-
-/** タブの並び自体の読み上げ名。個々のタブ名だけでは何の切り替えか分からないため。 */
-const TABS_LABEL = '表示するものの切り替え';
-
-/** タブの選択を動かすキー。ここに無いキーは握りつぶさない。 */
-const TAB_KEYS = Object.freeze({
-	PREV: 'ArrowLeft',
-	NEXT: 'ArrowRight',
-	FIRST: 'Home',
-	LAST: 'End',
-});
-
-/** ライセンスタブの見出し。 */
-const LICENSE_HEADINGS = Object.freeze({
-	disclaimer: '免責事項',
-	project: 'この拡張機能のライセンス',
-	thirdParty: '同梱している第三者の成果物',
-});
+import { renderTabs } from '../common/tabs.js';
+import { renderConfirmRow } from '../common/confirm-row.js';
+import { POPUP_THEMES, THEME_TOGGLE, SETTINGS_DEFAULTS } from '../common/constants.js';
+import { createDescription } from './description.js';
+import { renderLicensePanel, renderBriefDisclaimer } from './license-panel.js';
+import { TITLE, TABS, TABS_LABEL, RESET_FIELD, SECTIONS } from './sections.js';
 
 /** OS の配色を尋ねるメディアクエリ。 */
 const LIGHT_QUERY = '(prefers-color-scheme: light)';
-
-/** 「設定を初期化」の文言。確認の行では「やめる」を左、「初期化する」を右に並べる。 */
-const RESET_FIELD = Object.freeze({
-	label: '設定を初期化',
-	description: '配色を含むすべての設定を既定に戻します。',
-	cancel: 'やめる',
-	confirm: '初期化する',
-});
-
-/**
- * 画面の中身。見出しごとに関連する項目をまとめる。
- *
- * kind が 'toggle' ならチェックボックス、'choice' なら選択肢。
- * choice の numeric は「保存は数値で持つ」という印。select の値は常に文字列なので、
- * これが無いと次に読み込んだときに型が合わず既定へ落ちる。
- */
-const SECTIONS = Object.freeze([
-	Object.freeze({
-		heading: 'ビュワー',
-		fields: Object.freeze([
-			Object.freeze({
-				kind: 'toggle',
-				key: 'enabled',
-				label: 'ビュワーを使う',
-				description: 'オフにすると pixiv 標準の動作に戻ります。',
-			}),
-			Object.freeze({
-				kind: 'toggle',
-				key: 'showSidebar',
-				label: 'サイドバーを表示する',
-				description: '投稿文・タグ・いいね数・コメントを画像の横に出します。',
-			}),
-			Object.freeze({
-				kind: 'choice',
-				key: 'sidebarScroll',
-				label: 'サイドバーのスクロール',
-				description: 'サイドバーを縦に送るときの動き方です。',
-				options: Object.freeze([
-					Object.freeze({
-						value: SIDEBAR_SCROLL.COMMENTS,
-						label: 'コメントだけを送る',
-						description: '投稿文とタグは固定したまま、コメント一覧だけを送ります。',
-					}),
-					Object.freeze({
-						value: SIDEBAR_SCROLL.WHOLE,
-						label: 'サイドバーごと送る',
-						description: '投稿文からコメントまでを 1 つにつなげて送ります。主文が長い作品でも、そのまま読み進めてコメントまで辿り着けます。',
-					}),
-				]),
-			}),
-		]),
-	}),
-	Object.freeze({
-		heading: '画像',
-		fields: Object.freeze([
-			Object.freeze({
-				kind: 'choice',
-				key: 'imageQuality',
-				label: '画像の解像度',
-				description: 'ビュワーで読み込む画像の大きさです。',
-				options: Object.freeze([
-					Object.freeze({
-						value: IMAGE_QUALITY.REGULAR,
-						label: '標準 (長辺 1200px)',
-						description: '読み込みが軽く、普段の閲覧に向きます。',
-					}),
-					Object.freeze({
-						value: IMAGE_QUALITY.ORIGINAL,
-						label: '原寸',
-						description: '鮮明ですが、読み込みが重くなります。',
-					}),
-				]),
-			}),
-			Object.freeze({
-				kind: 'choice',
-				key: 'prefetch',
-				numeric: true,
-				label: '先読み',
-				description: '次に見る画像を先に読み込んでおくと、切り替えが速くなります。',
-				options: Object.freeze([
-					Object.freeze({
-						value: String(PREFETCH_CHOICES[0]),
-						label: 'しない',
-						description: '切り替えるたびに読み込みます。通信量を抑えられます。',
-					}),
-					Object.freeze({
-						value: String(PREFETCH_CHOICES[1]),
-						label: '前後 1 枚',
-						description: '隣の 1 枚だけ先に読み込みます。',
-					}),
-					Object.freeze({
-						value: String(PREFETCH_CHOICES[2]),
-						label: '前後 3 枚',
-						description: '3 枚先まで読み込みます。続けて見るときに滑らかです。',
-					}),
-				]),
-			}),
-		]),
-	}),
-	Object.freeze({
-		heading: 'ユーザーページ',
-		fields: Object.freeze([
-			Object.freeze({
-				kind: 'toggle',
-				key: 'hidePickup',
-				label: 'ピックアップ欄を隠す',
-				description: 'プロフィールのホームに出る「ピックアップ」を隠します。作品一覧がすぐ目に入ります。',
-			}),
-		]),
-	}),
-	Object.freeze({
-		heading: '操作',
-		fields: Object.freeze([
-			Object.freeze({
-				kind: 'toggle',
-				key: 'closeOnBackdrop',
-				label: '背景クリックで閉じる',
-				description: '画像の外側を押すと閉じます。誤って閉じるならオフに。',
-			}),
-			Object.freeze({
-				kind: 'choice',
-				key: 'gridTabSkip',
-				label: 'グリッドの Tab 移動',
-				description: 'Tab で次の作品へ移るときの飛ばし方です。',
-				options: Object.freeze([
-					Object.freeze({
-						value: GRID_TAB_SKIP.BOTH,
-						label: 'ブックマークとタイトルを飛ばす',
-						description: 'カードは「サムネ → ブックマーク → タイトル」の 3 つを順に辿ります。飛ばすと Tab 1 回で次の作品へ移れ、飛ばした操作はビュワーの中で行えます。',
-					}),
-					Object.freeze({
-						value: GRID_TAB_SKIP.TITLE,
-						label: 'タイトルだけ飛ばす',
-						description: 'ブックマークはグリッドのまま押せます。',
-					}),
-					Object.freeze({
-						value: GRID_TAB_SKIP.NONE,
-						label: '飛ばさない',
-						description: 'pixiv 標準の順序のままにします。',
-					}),
-				]),
-			}),
-		]),
-	}),
-]);
 
 /**
  * 保存値と OS の設定から、実際に描く配色を決める。
@@ -222,6 +42,15 @@ export function resolveTheme(stored, win) {
  */
 function applyTheme(doc, theme) {
 	doc.documentElement.dataset.theme = theme;
+}
+
+/**
+ * 説明文の id。フォーム部品の aria-describedby から参照する。
+ * @param {string} key 設定キー
+ * @returns {string} id
+ */
+function descriptionId(key) {
+	return `${key}-description`;
 }
 
 /**
@@ -271,7 +100,7 @@ function renderHeader(doc, initial, onChange) {
 }
 
 /**
- * チェックボックスの項目を組み立てる。
+ * スイッチの項目を組み立てる。
  * @param {Document} doc 対象のドキュメント
  * @param {object} field 項目の定義
  * @param {object} settings 現在の設定
@@ -293,6 +122,7 @@ function renderToggle(doc, field, settings, onChange) {
 	input.setAttribute('role', 'switch');
 	input.checked = Boolean(settings[field.key]);
 	input.dataset.role = field.key;
+	input.setAttribute('aria-describedby', descriptionId(field.key));
 	input.addEventListener('change', () => onChange({ [field.key]: input.checked }));
 
 	const text = doc.createElement('span');
@@ -300,13 +130,7 @@ function renderToggle(doc, field, settings, onChange) {
 	text.textContent = field.label;
 
 	label.append(input, text);
-
-	const description = doc.createElement('p');
-	description.className = 'description';
-	description.dataset.role = `${field.key}-description`;
-	description.textContent = field.description;
-
-	wrapper.append(label, description);
+	wrapper.append(label, createDescription(doc, field.description, descriptionId(field.key)));
 	return wrapper;
 }
 
@@ -346,30 +170,32 @@ function createChoiceOption(doc, option, rich) {
  * @param {object} field 項目の定義
  * @param {object} settings 現在の設定
  * @param {(patch: object) => void} onChange 変更時の処理
+ * @param {boolean} rich 選択肢の中に説明を入れられるか (appearance: base-select の対応)
  * @returns {HTMLElement} 項目
  */
-function renderChoice(doc, field, settings, onChange) {
+function renderChoice(doc, field, settings, onChange, rich) {
 	const values = field.options.map((option) => option.value);
 	const saved = String(settings[field.key]);
 	const current = values.includes(saved) ? saved : String(SETTINGS_DEFAULTS[field.key]);
-	const rich = supportsRichOptions(doc.defaultView);
+	// select の値は常に文字列。保存の型は既定値から導く。手で印を付ける方式だと
+	// 数値の項目を足したときに付け忘れ、次の読み込みで型が合わず既定へ落ちる
+	const numeric = typeof SETTINGS_DEFAULTS[field.key] === 'number';
 
 	const wrapper = doc.createElement('div');
 	wrapper.className = 'field choice';
 
+	const labelId = `${field.key}-label`;
 	const title = doc.createElement('h3');
 	title.className = 'label';
+	title.setAttribute('id', labelId);
 	title.textContent = field.label;
 
-	const lead = doc.createElement('p');
-	lead.className = 'description';
-	lead.dataset.role = `${field.key}-description`;
-	lead.textContent = field.description;
+	const lead = createDescription(doc, field.description, descriptionId(field.key));
 
 	const select = doc.createElement('select');
 	select.dataset.role = field.key;
-	// 見出しは h3 であってラベルではないため、読み上げ環境にはこの名前が要る
-	select.setAttribute('aria-label', field.label);
+	// 見出しは h3 であってラベルではないため、読み上げ環境にはこの結び付けが要る
+	select.setAttribute('aria-labelledby', labelId);
 
 	if (rich) {
 		// 閉じた状態の見た目を受け持つ要素。中の selectedcontent へ、選んでいる
@@ -382,23 +208,11 @@ function renderChoice(doc, field, settings, onChange) {
 	for (const option of field.options) select.append(createChoiceOption(doc, option, rich));
 	select.value = current;
 
-	select.addEventListener('change', () => {
-		const value = field.numeric ? Number(select.value) : select.value;
-		onChange({ [field.key]: value });
-	});
-
-	wrapper.append(title, lead, select);
-
-	if (rich) {
-		// 選択肢ごとの説明は選択肢の中にある。外にも出すと同じ文が二度出る
-		return wrapper;
-	}
-
 	// 素の select は選んでいない項目の説明を出せない。説明を固定にすると、選び直した
-	// ときに手元の説明と実際の挙動が食い違うため、選択に追従させる
-	const hint = doc.createElement('p');
-	hint.className = 'description';
-	hint.dataset.role = `${field.key}-hint`;
+	// ときに手元の説明と実際の挙動が食い違うため、選択に追従させる。
+	// 対応環境では選択肢の中に説明があるので、外にも出すと同じ文が二度出る
+	const hintId = `${field.key}-hint`;
+	const hint = rich ? null : createDescription(doc, '', hintId);
 
 	/**
 	 * 選んでいる項目の説明を出す。
@@ -406,180 +220,24 @@ function renderChoice(doc, field, settings, onChange) {
 	 * @returns {void}
 	 */
 	function showHint(value) {
+		if (!hint) return;
 		hint.textContent = field.options.find((option) => option.value === value)?.description ?? '';
 	}
 
-	showHint(current);
-	select.addEventListener('change', () => showHint(select.value));
-	wrapper.append(hint);
+	select.addEventListener('change', () => {
+		onChange({ [field.key]: numeric ? Number(select.value) : select.value });
+		showHint(select.value);
+	});
+
+	wrapper.append(title, lead, select);
+	if (hint) {
+		showHint(current);
+		select.setAttribute('aria-describedby', `${descriptionId(field.key)} ${hintId}`);
+		wrapper.append(hint);
+	} else {
+		select.setAttribute('aria-describedby', descriptionId(field.key));
+	}
 	return wrapper;
-}
-
-/**
- * 「設定を初期化」のボタンと、押した後の確認の行を組み立てる。
- * 確認は popup の中に出す。window.confirm はネイティブのダイアログが popup の上に浮き、
- * 環境によっては popup が閉じて操作が途切れる (UI_DESIGN_KIT §10)。
- * @param {Document} doc 対象のドキュメント
- * @param {() => void} onReset 初期化を確定したときの処理
- * @returns {HTMLElement} 置き場 (ボタンと確認の行を入れ替える)
- */
-function renderResetField(doc, onReset) {
-	const holder = doc.createElement('div');
-	holder.className = 'reset';
-
-	const reset = doc.createElement('button');
-	reset.type = 'button';
-	reset.textContent = RESET_FIELD.label;
-	reset.dataset.role = 'reset';
-
-	/**
-	 * 確認の行を片付けて元のボタンへ戻す。
-	 * フォーカスも戻すのは、確認の行ごとフォーカスの当たっていた要素が消えると
-	 * キーボード操作の現在地が失われるため。
-	 * @returns {void}
-	 */
-	function showButton() {
-		holder.replaceChildren(reset);
-		reset.focus();
-	}
-
-	/**
-	 * ボタンを確認の行に置き換える。
-	 * 「やめる」を左 (元のボタンと同じ位置) に置き、フォーカスもそこへ移す。
-	 * 連打で 2 回目の入力が「初期化する」に落ちないようにするため。
-	 * @returns {void}
-	 */
-	function showConfirmation() {
-		const row = doc.createElement('div');
-		row.className = 'reset-confirmation';
-		row.dataset.role = 'reset-confirmation';
-		row.setAttribute('role', 'group');
-		row.setAttribute('aria-label', RESET_FIELD.description);
-
-		const text = doc.createElement('p');
-		text.className = 'description';
-		text.textContent = RESET_FIELD.description;
-
-		const buttons = doc.createElement('div');
-		buttons.className = 'reset-buttons';
-
-		const cancel = doc.createElement('button');
-		cancel.type = 'button';
-		cancel.textContent = RESET_FIELD.cancel;
-		cancel.dataset.role = 'reset-cancel';
-		cancel.addEventListener('click', showButton);
-
-		const confirm = doc.createElement('button');
-		confirm.type = 'button';
-		confirm.textContent = RESET_FIELD.confirm;
-		confirm.dataset.role = 'reset-confirm';
-		confirm.addEventListener('click', () => onReset());
-
-		row.addEventListener('keydown', (event) => {
-			if (event.key !== KEYS.CLOSE) return;
-			event.preventDefault();
-			showButton();
-		});
-
-		buttons.append(cancel, confirm);
-		row.append(text, buttons);
-		holder.replaceChildren(row);
-		cancel.focus();
-	}
-
-	reset.addEventListener('click', showConfirmation);
-	holder.append(reset);
-	return holder;
-}
-
-/**
- * 外部サイトへのリンクを組み立てる。
- * popup から開くので必ず新しいタブにし、参照元を渡さない (SPEC §13-3)。
- * @param {Document} doc 対象のドキュメント
- * @param {string} url 行き先
- * @returns {HTMLAnchorElement} リンク
- */
-function createExternalLink(doc, url) {
-	const link = doc.createElement('a');
-	link.href = url;
-	link.textContent = url;
-	link.setAttribute('target', '_blank');
-	link.setAttribute('rel', 'noopener noreferrer');
-	return link;
-}
-
-/**
- * 設定タブの末尾に残す 1 行を組み立てる。
- * 本文はライセンスタブにあるが、タブを切り替えない利用者にも
- * 非公式であることだけは届かせる。
- * @param {Document} doc 対象のドキュメント
- * @returns {HTMLElement} 1 行
- */
-function renderBriefDisclaimer(doc) {
-	const note = doc.createElement('p');
-	note.className = 'disclaimer-brief';
-	note.dataset.role = 'disclaimer-brief';
-	note.textContent = DISCLAIMER.brief;
-	return note;
-}
-
-/**
- * ライセンスタブの中身を組み立てる。
- * 文言の出どころは `common/licenses.js`。ここでは並べるだけにする。
- * @param {Document} doc 対象のドキュメント
- * @returns {HTMLElement} パネル
- */
-function renderLicensePanel(doc) {
-	const panel = doc.createElement('div');
-	panel.className = 'panel license';
-
-	const disclaimerTitle = doc.createElement('h2');
-	disclaimerTitle.textContent = LICENSE_HEADINGS.disclaimer;
-
-	const disclaimer = doc.createElement('div');
-	disclaimer.className = 'disclaimer';
-	disclaimer.dataset.role = 'disclaimer';
-	for (const line of DISCLAIMER.body) {
-		const paragraph = doc.createElement('p');
-		paragraph.textContent = line;
-		disclaimer.append(paragraph);
-	}
-
-	const projectTitle = doc.createElement('h2');
-	projectTitle.textContent = LICENSE_HEADINGS.project;
-
-	const project = doc.createElement('p');
-	project.className = 'license-item';
-	project.textContent = `${PROJECT_LICENSE.name} / ${PROJECT_LICENSE.copyright}`;
-
-	const thirdPartyTitle = doc.createElement('h2');
-	thirdPartyTitle.textContent = LICENSE_HEADINGS.thirdParty;
-
-	panel.append(disclaimerTitle, disclaimer, projectTitle, project, thirdPartyTitle);
-
-	for (const item of THIRD_PARTY) {
-		const entry = doc.createElement('div');
-		entry.className = 'license-item';
-
-		const name = doc.createElement('h3');
-		name.textContent = item.name;
-
-		const terms = doc.createElement('p');
-		terms.textContent = `${item.license} / ${item.copyright}`;
-
-		const note = doc.createElement('p');
-		note.className = 'description';
-		note.textContent = item.note;
-
-		const source = doc.createElement('p');
-		source.className = 'license-url';
-		source.append(createExternalLink(doc, item.url));
-
-		entry.append(name, terms, note, source);
-		panel.append(entry);
-	}
-
-	return panel;
 }
 
 /**
@@ -593,6 +251,8 @@ function renderLicensePanel(doc) {
 function renderSettingsPanel(doc, settings, onChange, onReset) {
 	const panel = doc.createElement('div');
 	panel.className = 'panel settings';
+	// 判定の結果は環境で決まり項目ごとに変わらないので 1 回だけ尋ねる
+	const rich = supportsRichOptions(doc.defaultView);
 
 	for (const { heading, fields } of SECTIONS) {
 		const section = doc.createElement('section');
@@ -605,96 +265,16 @@ function renderSettingsPanel(doc, settings, onChange, onReset) {
 		for (const field of fields) {
 			section.append(field.kind === 'toggle'
 				? renderToggle(doc, field, settings, onChange)
-				: renderChoice(doc, field, settings, onChange));
+				: renderChoice(doc, field, settings, onChange, rich));
 		}
 		panel.append(section);
 	}
 
-	panel.append(renderResetField(doc, onReset), renderBriefDisclaimer(doc));
+	const reset = renderConfirmRow(doc, RESET_FIELD, onReset);
+	// 設定項目との区切り。置き場所に依る見た目なので、汎用の確認の行ではなくここで付ける
+	reset.classList.add('reset');
+	panel.append(reset, renderBriefDisclaimer(doc));
 	return panel;
-}
-
-/**
- * タブの並びを組み立て、パネルの表示と結び付ける。
- *
- * 切り替えは `hidden` の付け外しだけで行い、パネルを描き直さない。
- * 描き直すとチェックボックスの状態や「設定を初期化」の確認の行が消える。
- * @param {Document} doc 対象のドキュメント
- * @param {{id: string, label: string, panel: HTMLElement}[]} entries タブとパネルの組
- * @returns {HTMLElement} タブの並び
- */
-function renderTabs(doc, entries) {
-	const list = doc.createElement('div');
-	list.className = 'tabs';
-	list.dataset.role = 'tabs';
-	list.setAttribute('role', 'tablist');
-	list.setAttribute('aria-label', TABS_LABEL);
-
-	const buttons = entries.map(({ id, label, panel }) => {
-		const button = doc.createElement('button');
-		button.type = 'button';
-		button.dataset.role = `tab-${id}`;
-		button.textContent = label;
-		button.setAttribute('role', 'tab');
-		button.setAttribute('id', `tab-${id}`);
-		button.setAttribute('aria-controls', `panel-${id}`);
-
-		panel.dataset.role = `panel-${id}`;
-		panel.setAttribute('id', `panel-${id}`);
-		panel.setAttribute('role', 'tabpanel');
-		panel.setAttribute('aria-labelledby', `tab-${id}`);
-		// パネル自体を Tab で掴めるようにする。ライセンスタブは中に操作部品が無いため、
-		// 掴めないとキーボードだけではスクロールして読み進められない
-		panel.setAttribute('tabindex', '0');
-		return button;
-	});
-
-	let current = 0;
-
-	/**
-	 * index のタブを選ぶ。
-	 * @param {number} index 選ぶタブの位置
-	 * @param {boolean} moveFocus フォーカスも動かすか (キー操作のときだけ true)
-	 * @returns {void}
-	 */
-	function select(index, moveFocus) {
-		current = index;
-		entries.forEach(({ panel }, i) => {
-			const on = i === index;
-			buttons[i].className = on ? 'tab is-on' : 'tab';
-			buttons[i].setAttribute('aria-selected', String(on));
-			// 選択中のタブだけ Tab で止める。全部止めると、タブの数だけ Tab を
-			// 押さないとパネル本体へ入れない
-			buttons[i].setAttribute('tabindex', on ? '0' : '-1');
-			panel.hidden = !on;
-		});
-		if (moveFocus) buttons[index].focus();
-	}
-
-	/** キーから次に選ぶタブの位置を出す。対応しないキーは undefined。 */
-	const MOVES = {
-		[TAB_KEYS.PREV]: (i) => (i - 1 + entries.length) % entries.length,
-		[TAB_KEYS.NEXT]: (i) => (i + 1) % entries.length,
-		[TAB_KEYS.FIRST]: () => 0,
-		[TAB_KEYS.LAST]: () => entries.length - 1,
-	};
-
-	list.addEventListener('keydown', (event) => {
-		const move = MOVES[event.key];
-		// 関係ないキーは通す。ここで握りつぶすと popup 全体のキー操作を奪う
-		if (!move) return;
-		event.preventDefault();
-		select(move(current), true);
-	});
-
-	buttons.forEach((button, index) => {
-		// クリックではフォーカスを動かさない。押した時点で既にそこにある
-		button.addEventListener('click', () => select(index, false));
-		list.append(button);
-	});
-
-	select(0, false);
-	return list;
 }
 
 /**
@@ -706,9 +286,10 @@ function renderTabs(doc, entries) {
  * @param {(patch: object) => void} deps.onChange 設定を変えたときの処理
  * @param {() => void} deps.onReset 初期化を確定したときの処理
  * @param {string|null} [deps.notice] 画面の先頭に出す一言 (保存の失敗など)
- * @returns {void}
+ * @param {string|null} [deps.initialTab] 最初に開くタブの id。描き直しで現在地を保つために渡す
+ * @returns {{currentTab: () => string}} 今開いているタブの id を返す関数
  */
-export function renderPopup({ doc, root, settings, onChange, onReset, notice = null }) {
+export function renderPopup({ doc, root, settings, onChange, onReset, notice = null, initialTab = null }) {
 	const theme = resolveTheme(settings.popupTheme, doc.defaultView);
 	applyTheme(doc, theme);
 
@@ -730,7 +311,9 @@ export function renderPopup({ doc, root, settings, onChange, onReset, notice = n
 		license: renderLicensePanel(doc),
 	};
 	const entries = TABS.map(({ id, label }) => ({ id, label, panel: panels[id] }));
+	const tabs = renderTabs(doc, entries, { label: TABS_LABEL, initialId: initialTab });
 
-	parts.push(renderTabs(doc, entries), ...entries.map(({ panel }) => panel));
+	parts.push(tabs.list, ...entries.map(({ panel }) => panel));
 	root.replaceChildren(...parts);
+	return { currentTab: tabs.currentId };
 }

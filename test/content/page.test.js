@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { WORK_CATEGORY } from '../../src/common/constants.js';
-import { parseUserPage, parseArtworkPath, isViewerTarget, isProfileHome, pageKey } from '../../src/content/page.js';
+import { parseUserPage, parseArtworkPath, isViewerTarget, isProfileHome, pageKey, isInfiniteScrollTarget, parsePageParam } from '../../src/content/page.js';
 
 test('ユーザーページの各タブを認識する', () => {
 	const works = { userId: '54734418', isWorksGrid: true, isTagFiltered: false, category: null };
@@ -109,4 +109,66 @@ test('isProfileHome はプロフィールのホームだけを true にする', 
 	assert.equal(isProfileHome('/users/54734418/bookmarks/artworks'), false);
 	assert.equal(isProfileHome('/artworks/149425016'), false);
 	assert.equal(isProfileHome('/'), false);
+});
+
+test('無限スクロールの対象は作品グリッドの 3 タブだけ', () => {
+	// ページャ (?p=) が出るのはこの 3 つだけ (SITE_SPEC §3)
+	assert.equal(isInfiniteScrollTarget('/users/123/artworks'), true);
+	assert.equal(isInfiniteScrollTarget('/users/123/illustrations'), true);
+	assert.equal(isInfiniteScrollTarget('/users/123/manga'), true);
+	assert.equal(isInfiniteScrollTarget('/users/123/artworks/'), true);
+});
+
+test('無限スクロールはプロフィールホームを対象にしない', () => {
+	// ホームは最新数件のダイジェストでページャが無い
+	assert.equal(isInfiniteScrollTarget('/users/123'), false);
+	assert.equal(isInfiniteScrollTarget('/users/123/'), false);
+});
+
+test('無限スクロールはタグ絞り込みとブックマークを対象にしない', () => {
+	// タグ絞り込みは profile/all と並びが一致しない。ブックマークは他人の作品が並ぶ
+	assert.equal(isInfiniteScrollTarget('/users/123/artworks/%E3%82%BF%E3%82%B0'), false);
+	assert.equal(isInfiniteScrollTarget('/users/123/bookmarks/artworks'), false);
+	assert.equal(isInfiniteScrollTarget('/users/123/request'), false);
+	assert.equal(isInfiniteScrollTarget('/artworks/123'), false);
+});
+
+test('parsePageParam は ?p= を正の整数として読む', () => {
+	assert.equal(parsePageParam('?p=1'), 1);
+	assert.equal(parsePageParam('?p=3'), 3);
+	assert.equal(parsePageParam('?p=48'), 48);
+	// 他のクエリが混ざっていても読める
+	assert.equal(parsePageParam('?p=5&foo=bar'), 5);
+	assert.equal(parsePageParam('?foo=bar&p=5'), 5);
+	// 先頭の ? が無くても読める
+	assert.equal(parsePageParam('p=7'), 7);
+});
+
+test('parsePageParam は ?p= が無ければ 1 を返す', () => {
+	assert.equal(parsePageParam(''), 1);
+	assert.equal(parsePageParam('?'), 1);
+	assert.equal(parsePageParam('?foo=bar'), 1);
+	assert.equal(parsePageParam(undefined), 1);
+});
+
+test('parsePageParam は数として読めない ?p= を 1 に倒す', () => {
+	// ページ指定なしと同じ扱いにする。ここで弾いておかないと継ぎ足しの開始位置が壊れる
+	assert.equal(parsePageParam('?p='), 1);
+	assert.equal(parsePageParam('?p=abc'), 1);
+	assert.equal(parsePageParam('?p=0'), 1);
+	assert.equal(parsePageParam('?p=-1'), 1);
+	assert.equal(parsePageParam('?p=1.5'), 1);
+	assert.equal(parsePageParam('?p=NaN'), 1);
+	assert.equal(parsePageParam('?p=Infinity'), 1);
+	assert.equal(parsePageParam('?p=%20'), 1);
+});
+
+test('parsePageParam は 10 進の数字以外を 1 に倒す', () => {
+	// Number() は '1e2' や '0x10' も整数として読むが、pixiv が同じ解釈をする保証は無い
+	assert.equal(parsePageParam('?p=1e2'), 1);
+	assert.equal(parsePageParam('?p=0x10'), 1);
+	assert.equal(parsePageParam('?p=+3'), 1);
+	assert.equal(parsePageParam('?p=%203'), 1);
+	assert.equal(parsePageParam('?p=3%20'), 1);
+	assert.equal(parsePageParam('?p=1_000'), 1);
 });

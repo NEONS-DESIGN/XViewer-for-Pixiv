@@ -2,11 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createNavigation } from '../../../src/content/viewer/navigation.js';
 import { KEYS } from '../../../src/common/constants.js';
+import { flush } from '../../helpers/dom.js';
 
 /**
  * ID の配列から並びの代わりを作る。
  * @param {string[]} ids 作品 ID
- * @returns {{next: (id: string) => string|null, prev: (id: string) => string|null}} 並びの代わり
+ * @returns {{next: (id: string) => string|null, prev: (id: string) => string|null, has: (id: string) => boolean}} 並びの代わり
  */
 function fakeSequence(ids) {
 	const at = (id, offset) => {
@@ -17,6 +18,7 @@ function fakeSequence(ids) {
 	return {
 		next: (id) => at(id, 1),
 		prev: (id) => at(id, -1),
+		has: (id) => ids.includes(id),
 	};
 }
 
@@ -50,10 +52,36 @@ function fakeDeps(overrides = {}) {
 /**
  * キーイベントの代わりを作る。
  * @param {string} key 押されたキー
+ * @param {object} [init] repeat や修飾キーなどの上書き
  * @returns {object} event の代わり
  */
-function fakeEvent(key) {
-	return { key, prevented: 0, preventDefault() { this.prevented += 1; } };
+function fakeEvent(key, init = {}) {
+	return {
+		key,
+		repeat: false,
+		altKey: false,
+		ctrlKey: false,
+		metaKey: false,
+		shiftKey: false,
+		isComposing: false,
+		prevented: 0,
+		preventDefault() { this.prevented += 1; },
+		...init,
+	};
+}
+
+/**
+ * 並びを渡して作品を開いた状態の navigation を作る。
+ * @param {object} deps fakeDeps の戻り値
+ * @param {string[]} ids 並び
+ * @param {string} current 今開いている作品
+ * @returns {object} navigation
+ */
+function openedNavigation(deps, ids, current) {
+	const nav = createNavigation(deps);
+	nav.setSequence(fakeSequence(ids));
+	nav.setCurrentWorkId(current);
+	return nav;
 }
 
 test('下キーで次の作品へ移り、URL の差し替えを頼む', async () => {
@@ -123,6 +151,150 @@ test('広げている間に別の作品へ移ったら勝手に進めない', as
 	resolveExtend(fakeSequence(['1', '2', '3']));
 	await moving;
 	assert.deepEqual(deps.opened, []);
+});
+
+test('広げ済みの並びでも端なら、もう一度は取りに行かない', async () => {
+	// 全作品の最後で下キーを押すたびに profile/all を取り直さないため
+	let extended = 0;
+	const deps = fakeDeps({
+		canExtendSequence: () => true,
+		extendSequence: async () => { extended += 1; return fakeSequence(['1', '2', '3']); },
+	});
+	const nav = openedNavigation(deps, ['1', '2'], '2');
+
+	await nav.moveWork(1);
+	assert.deepEqual(deps.opened, ['3']);
+	nav.setCurrentWorkId('3');
+	await nav.moveWork(1);
+	await nav.moveWork(1);
+	assert.equal(extended, 1, '広げ済みなのに取り直している');
+	assert.deepEqual(deps.opened, ['3']);
+});
+
+test('setSequence で並びを差し替えたら、また広げられる', async () => {
+	let extended = 0;
+	const deps = fakeDeps({
+		canExtendSequence: () => true,
+		extendSequence: async () => { extended += 1; return fakeSequence(['1', '2', '3']); },
+	});
+	const nav = openedNavigation(deps, ['1', '2'], '2');
+	await nav.moveWork(1);
+	assert.equal(extended, 1);
+
+	// 別のグリッドから開き直した
+	nav.setSequence(fakeSequence(['8', '9']));
+	nav.setCurrentWorkId('9');
+	await nav.moveWork(1);
+	assert.equal(extended, 2);
+});
+
+test('広げた並びに今の作品が無ければ、元の並びを保つ', async () => {
+	// ピックアップ欄から開いた作品が種別の絞り込みで落ちる、非公開化直後など。
+	// 差し替えると next も prev も null になり、元の並びで戻れたはずの上キーまで効かなくなる
+	const deps = fakeDeps({
+		canExtendSequence: () => true,
+		extendSequence: async () => fakeSequence(['5', '6']),
+	});
+	const nav = openedNavigation(deps, ['1', '2'], '2');
+
+	await nav.moveWork(1);
+	assert.deepEqual(deps.opened, [], '含まれていない並びへ進んでしまった');
+	await nav.moveWork(-1);
+	assert.deepEqual(deps.opened, ['1'], '元の並びで戻れなくなっている');
+});
+
+test('reset の後に広がった並びは捨てる', async () => {
+	// モーダルを閉じた後に extend が解決しても、次の open() が渡す並びより前に残さない
+	let resolveExtend;
+	const deps = fakeDeps({
+		canExtendSequence: () => true,
+		extendSequence: () => new Promise((resolve) => { resolveExtend = resolve; }),
+	});
+	const nav = openedNavigation(deps, ['1', '2'], '2');
+
+	const moving = nav.moveWork(1);
+	nav.reset();
+	resolveExtend(fakeSequence(['1', '2', '3']));
+	await moving;
+	assert.deepEqual(deps.opened, []);
+
+	// 並びを渡さずに作品だけ記録しても、捨てた並びで動いてはいけない
+	nav.setCurrentWorkId('2');
+	await nav.moveWork(1);
+	assert.deepEqual(deps.opened, []);
+});
+
+test('reset で広げ済みの印も戻る', async () => {
+	let extended = 0;
+	const deps = fakeDeps({
+		canExtendSequence: () => true,
+		extendSequence: async () => { extended += 1; return fakeSequence(['1', '2', '3']); },
+	});
+	const nav = openedNavigation(deps, ['1', '2'], '2');
+	await nav.moveWork(1);
+	nav.reset();
+	nav.setSequence(fakeSequence(['1', '2']));
+	nav.setCurrentWorkId('2');
+	await nav.moveWork(1);
+	assert.equal(extended, 2);
+});
+
+test('下キーの押しっぱなし (キーリピート) では作品を移動しない', async () => {
+	// リピートごとに openWork (通信) と replaceState が走り、1 秒で 30 作品ぶん進んでしまう
+	const deps = fakeDeps();
+	const nav = openedNavigation(deps, ['1', '2', '3', '4'], '1');
+
+	nav.onKeyDown(fakeEvent(KEYS.NEXT_WORK));
+	const repeated = fakeEvent(KEYS.NEXT_WORK, { repeat: true });
+	nav.onKeyDown(repeated);
+	nav.onKeyDown(fakeEvent(KEYS.PREV_WORK, { repeat: true }));
+	await flush();
+	assert.deepEqual(deps.opened, ['2']);
+	// ページのスクロールは起こさない
+	assert.equal(repeated.prevented, 1);
+});
+
+test('修飾キー付きの矢印キーは奪わない', () => {
+	// Alt+← はブラウザの「戻る」、Ctrl+← は OS の操作。ビュワーが潰してはいけない
+	for (const modifier of ['altKey', 'ctrlKey', 'metaKey']) {
+		const deps = fakeDeps();
+		const nav = openedNavigation(deps, ['1', '2'], '1');
+		for (const key of [KEYS.NEXT_PAGE, KEYS.PREV_PAGE, KEYS.NEXT_WORK, KEYS.PREV_WORK]) {
+			const event = fakeEvent(key, { [modifier]: true });
+			nav.onKeyDown(event);
+			assert.equal(event.prevented, 0, `${modifier} + ${key} を奪っている`);
+		}
+		assert.deepEqual(deps.pages, []);
+		assert.deepEqual(deps.opened, []);
+	}
+});
+
+test('IME の変換中はキーを奪わない', () => {
+	// 変換中の矢印は候補の選択、Escape は変換の取り消し
+	const deps = fakeDeps();
+	const nav = openedNavigation(deps, ['1', '2'], '1');
+	for (const key of [KEYS.NEXT_PAGE, KEYS.NEXT_WORK, KEYS.CLOSE]) {
+		const event = fakeEvent(key, { isComposing: true });
+		nav.onKeyDown(event);
+		assert.equal(event.prevented, 0, `変換中の ${key} を奪っている`);
+	}
+	assert.deepEqual(deps.pages, []);
+	assert.equal(deps.closed, 0);
+});
+
+test('Escape は修飾キーが付いていても閉じる', () => {
+	// 閉じる操作は奪っても失うものが無い
+	const deps = fakeDeps();
+	const nav = openedNavigation(deps, ['1', '2'], '1');
+	nav.onKeyDown(fakeEvent(KEYS.CLOSE, { ctrlKey: true }));
+	assert.equal(deps.closed, 1);
+});
+
+test('Shift+Tab はフォーカスの巡回へ渡す', () => {
+	const deps = fakeDeps();
+	const nav = openedNavigation(deps, ['1', '2'], '1');
+	nav.onKeyDown(fakeEvent(KEYS.FOCUS_NEXT, { shiftKey: true }));
+	assert.equal(deps.focused, 1);
 });
 
 test('キー操作を割り振る', () => {

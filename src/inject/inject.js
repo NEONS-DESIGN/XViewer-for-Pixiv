@@ -53,13 +53,19 @@ function hook() {
 /**
  * 包みを外して pixiv 標準の動作へ戻す。
  * 設定でオフにしたときに「pixiv 標準の動作に戻ります」を字義どおり成立させるため。
+ * 退避した値が History.prototype のものなら own property を消して戻す。
+ * 代入で戻すと動作は同じでも own property として残り、完全に元へ戻らない。
  * @returns {void}
  */
 function unhook() {
 	const originals = window[NAV_HOOK_FLAG];
 	if (!originals) return;
+	const proto = Object.getPrototypeOf(history);
 	for (const method of PATCHED_METHODS) {
-		if (typeof originals[method] === 'function') history[method] = originals[method];
+		const original = originals[method];
+		if (typeof original !== 'function') continue;
+		if (proto && proto[method] === original) delete history[method];
+		else history[method] = original;
 	}
 	delete window[NAV_HOOK_FLAG];
 }

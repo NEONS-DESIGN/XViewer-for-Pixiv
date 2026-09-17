@@ -6,6 +6,36 @@
 /** 作品リンクを拾うためのセレクタ。pixiv の CSS クラス名は当てにならないのでこれだけを使う。 */
 export const ARTWORK_LINK_SELECTOR = 'a[href^="/artworks/"]';
 
+/** カードのサムネリンク。pixiv の計測用属性で、クラス名より寿命が長い (SITE_SPEC §3 実測)。 */
+export const THUMB_LINK_SELECTOR = 'a[data-ga4-label="thumbnail_link"]';
+
+/** カードのブックマークボタンの入れ物。 */
+export const BOOKMARK_BUTTON_SELECTOR = '[data-ga4-label="bookmark_button"]';
+
+/** ブックマーク済みのハートの色 (SITE_SPEC §3 実測)。未ブックマーク側はテーマで変わるので雛形から採る。 */
+export const BOOKMARKED_FILL = '#ff4060';
+
+/** 自分が継ぎ足したカードの目印。撤去と重複判定とクリック判定に使う。 */
+export const GV_CARD_ATTR = 'data-gv-card';
+
+/** 継ぎ足したカードが持つブックマーク ID。取り消しに使う。無ければ未ブックマーク。 */
+export const GV_BOOKMARK_ID_ATTR = 'data-gv-bookmark-id';
+
+/**
+ * グリッドのカード 1 枚を指す要素と、その中のブックマークボタン。
+ * pixiv のグリッドは ul > li で、ボタンは li の中の button 1 つだけ (SITE_SPEC §3 実測)。
+ * 構造の前提なので、散らさずここで持つ。
+ */
+export const CARD_SELECTOR = 'li';
+export const CARD_BUTTON_SELECTOR = 'button';
+
+/**
+ * tab-skip がフォーカス順から外した要素と、読み上げ名を補ったサムネリンクの目印。
+ * dispose で元へ戻すときと、継ぎ足したカードから雛形由来の印を落とすときに使う。
+ */
+export const TAB_SKIP_MARK_ATTR = 'data-gv-tabskip';
+export const TAB_SKIP_LABEL_ATTR = 'data-gv-label';
+
 /**
  * プロフィールのホームに出る「ピックアップ」欄を指すセレクタ。
  * 実測ではホームの `section` はこの 1 個だけで、作品グリッドは `div` なので掛からない
@@ -51,6 +81,14 @@ export const USER_WORKS_CATEGORY_PATTERN = /^\/users\/\d+\/(illustrations|manga)
 export const PROFILE_HOME_PATH_PATTERN = /^\/users\/\d+\/?$/;
 
 /**
+ * 作品グリッドのタブ (イラスト・マンガ・すべて) のパス。
+ * pixiv のページャ (?p=) が出るのはこの 3 つだけ。
+ * プロフィールホーム (/users/{id}) はダイジェストでページャが無いので含めない。
+ * タグ絞り込み (/artworks/{タグ}) は末尾を許さないことで外れる。
+ */
+export const USER_WORKS_TAB_PATH_PATTERN = /^\/users\/\d+\/(?:artworks|illustrations|manga)\/?$/;
+
+/**
  * 作品の種別。値は profile/all の応答キー (SITE_SPEC §3) と合わせてある。
  * タブのパス名 (illustrations / manga) とは綴りが違うので WORK_CATEGORY_BY_TAB で引く。
  */
@@ -64,6 +102,18 @@ export const WORK_CATEGORY_BY_TAB = Object.freeze({
 	illustrations: WORK_CATEGORY.ILLUST,
 	manga: WORK_CATEGORY.MANGA,
 });
+
+/**
+ * 作品の種別から profile/illusts の work_category クエリの値を引く (SITE_SPEC §3)。
+ * profile/all の応答キー (illusts) とは綴りが違うので、そのまま送らずここで変換する。
+ */
+export const WORK_CATEGORY_QUERY = Object.freeze({
+	[WORK_CATEGORY.ILLUST]: 'illust',
+	[WORK_CATEGORY.MANGA]: 'manga',
+});
+
+/** 種別で絞らないとき (/users/{id}/artworks タブ) の work_category。 */
+export const WORK_CATEGORY_QUERY_BOTH = 'illustManga';
 
 /** モーダルを載せるホスト要素の id。 */
 export const HOST_ELEMENT_ID = 'gridviewer-root';
@@ -90,14 +140,28 @@ export const NAV_HOOK_FLAG = '__gridviewerNavHooked';
  */
 export const LOCATION_CHECK_DELAY_MS = 200;
 
+/**
+ * ログイン情報が読めないときの閲覧設定 (R-18 を出さない)。
+ * SITE_SPEC §6 の xRestrict の値と同じ尺度で、0 は全年齢のみ。
+ */
+export const DEFAULT_X_RESTRICT = 0;
+
 /** 画像の解像度。urls のキー名と合わせてある。 */
 export const IMAGE_QUALITY = Object.freeze({
 	REGULAR: 'regular',
 	ORIGINAL: 'original',
 });
 
-/** 先読みする枚数の選択肢。 */
+/** 先読みする枚数の選択肢。昇順に並べる (設定画面はこの並びで選択肢を出す)。 */
 export const PREFETCH_CHOICES = Object.freeze([0, 1, 3]);
+
+/**
+ * 先読みの既定値。前後 1 枚。
+ * 切り替えの速さより、端末と回線への負担の少なさを既定に置く
+ * (高解像度の作品を 3 枚先まで取ると、送るだけで通信量が膨らむ)。
+ * 値は PREFETCH_CHOICES から引く (選択肢に無い既定を書けないようにするため)。
+ */
+export const DEFAULT_PREFETCH = PREFETCH_CHOICES[PREFETCH_CHOICES.indexOf(1)];
 
 /** コメントを 1 回に読む件数。 */
 export const COMMENT_PAGE_SIZE = 30;
@@ -115,18 +179,70 @@ export const GRID_TAB_SKIP = Object.freeze({
 	BOTH: 'both',
 	/** タイトルリンクだけ */
 	TITLE: 'title',
-	/** 何も外さない (pixiv 標準のまま) */
+	/** 何も外さない (既定。pixiv 標準のまま) */
 	NONE: 'none',
 });
+
+/** 1 ページに並ぶ作品の数。pixiv 本体のページャと同じ数 (SITE_SPEC §3 実測)。 */
+export const WORKS_PER_PAGE = 48;
+
+/**
+ * ユーザーページの作品グリッドを無限スクロールにするか。
+ * 既定はオフ。pixiv 本体のページャをそのまま使う人の見え方を変えないため。
+ */
+export const INFINITE_SCROLL = Object.freeze({
+	/** 使わない (pixiv 標準のページャのまま) */
+	OFF: 'off',
+	/** 一番下まで来たら次のページを読む */
+	ON_REACH: 'onReach',
+	/** 常に 1 ページ先を読み込んでおき、下に着く前に並べ終える */
+	PREFETCH: 'prefetch',
+});
+
+/** sentinel の目印。ul の直後に置き、見えたら次のページを読む。 */
+export const SENTINEL_ATTR = 'data-gv-sentinel';
+
+/**
+ * モードごとの sentinel の見張り範囲 (IntersectionObserver の rootMargin)。
+ *
+ * 2 つのモードの差はここだけで決まるので、値は 1 か所にまとめて取り違えを防ぐ
+ * (0.22.1 までは割り当てが逆で、「下まで来たら」のほうが早く読み始めていた)。
+ *
+ * - onReach は 0。「一番下に着いてから読む」と案内している以上、手前から読み始めない。
+ *   下端でスピナーが出て少し待つのがこのモードの正しい見え方 (通信は最小で済む)
+ * - prefetch は 1 画面ぶん (100%)。作品は既に手元にあるので、下端が見えるより前に
+ *   並べ終えられる。% は root (ビューポート) の高さに対する割合なので、
+ *   ウィンドウの高さが変わっても「1 画面ぶん手前」を保てる
+ *
+ * 値は rootMargin にそのまま渡せる文字列。
+ * @type {Readonly<Record<string, string>>}
+ */
+export const SENTINEL_MARGIN = Object.freeze({
+	[INFINITE_SCROLL.ON_REACH]: '0px',
+	[INFINITE_SCROLL.PREFETCH]: '100%',
+});
+
+/**
+ * pixiv 本体のページャ (1 2 3 ... 次へ)。ページ番号のリンクを含む nav で掴む。
+ * ページ内の nav はタブ行とページャの 2 つだけで、?p= を持つのはページャだけ
+ * (SITE_SPEC §3「ページャ」実測)。クラス名 (sc-xxxx) は版ごとに変わるので掴まない。
+ * 作品が 1 ページに収まるページャは描かれないが、その場合は当たる nav が無いだけで害は無い。
+ *
+ * 探すのは "p=" ではなく "?p=" (クエリの先頭)。実機のページャのリンクは
+ * /users/{id}/illustrations?p=2 の形なので同じものに当たるが、"p=" だけで探すと
+ * p を含むパス (/users/{id}/bookmarks/artworks 等) やクエリ付きのタブ行にも当たり、
+ * 将来 pixiv がタブ行のリンクにクエリを足した版でタブ行ごと消してしまう。
+ */
+export const PAGER_SELECTOR = 'nav:has(a[href*="?p="])';
 
 /**
  * サイドバーを縦に送るときの動き方。
  * 主文がとても長い作品では、コメントまで一気に読めたほうが楽なこともある。
  */
 export const SIDEBAR_SCROLL = Object.freeze({
-	/** 投稿文とタグは固定したまま、コメント一覧だけを送る (既定。X.com の見え方) */
+	/** 投稿文とタグは固定したまま、コメント一覧だけを送る (X.com の見え方) */
 	COMMENTS: 'comments',
-	/** 投稿文からコメントまでを 1 つにつなげて送る */
+	/** 投稿文からコメントまでを 1 つにつなげて送る (既定) */
 	WHOLE: 'whole',
 });
 
@@ -165,12 +281,13 @@ export const THEME_TOGGLE = Object.freeze({
 export const SETTINGS_DEFAULTS = Object.freeze({
 	enabled: true,
 	imageQuality: IMAGE_QUALITY.REGULAR,
-	prefetch: 3,
+	prefetch: DEFAULT_PREFETCH,
 	showSidebar: true,
-	sidebarScroll: SIDEBAR_SCROLL.COMMENTS,
+	sidebarScroll: SIDEBAR_SCROLL.WHOLE,
 	closeOnBackdrop: true,
-	gridTabSkip: GRID_TAB_SKIP.BOTH,
+	gridTabSkip: GRID_TAB_SKIP.NONE,
 	hidePickup: false,
+	infiniteScroll: INFINITE_SCROLL.OFF,
 	popupTheme: POPUP_THEMES.SYSTEM,
 });
 
@@ -196,6 +313,15 @@ export const FOCUSABLE_SELECTOR = [
 	'textarea:not([disabled])',
 	'[tabindex]:not([tabindex="-1"])',
 ].join(',');
+
+/**
+ * 状態表示 (role="status" / "alert") の種別。文言の横に出す見た目の区別に使う。
+ * viewer の showStatus と actions-bar の announce が同じ語彙で書く。
+ */
+export const STATUS_KINDS = Object.freeze({
+	INFO: 'info',
+	ERROR: 'error',
+});
 
 /** 隠れている要素。フォーカスの巡回から外すために使う。 */
 export const HIDDEN_SELECTOR = '[hidden]';

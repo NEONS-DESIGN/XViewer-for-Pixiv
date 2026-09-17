@@ -7,6 +7,7 @@
  * 外側に暗い縁、内側にアクセント色の二重にして、明るい絵でも暗い絵でも輪郭が出るようにする。
  */
 import { ARTWORK_LINK_SELECTOR } from '../common/constants.js';
+import { createStyleHandle } from '../common/style-injector.js';
 
 /** 差し込む style 要素の id。二重注入を防ぐ目印も兼ねる。 */
 export const FOCUS_STYLE_ID = 'gridviewer-grid-focus';
@@ -51,34 +52,12 @@ ${ARTWORK_LINK_SELECTOR}:focus-visible:has(img)::after {
 
 /**
  * フォーカス枠の CSS を差し込む。既にあれば足さない。
+ * 失敗しても枠が出ないだけで操作はできるので、投げずに戻る (style-injector が受ける)。
  * @param {Document} doc 対象のドキュメント
  * @returns {{dispose: () => void}} 差し込んだ style の取り外し
  */
 export function ensureFocusStyle(doc) {
-	let style = null;
-	try {
-		if (doc.head) {
-			style = doc.getElementById(FOCUS_STYLE_ID);
-			if (!style) {
-				style = doc.createElement('style');
-				style.id = FOCUS_STYLE_ID;
-				// innerHTML は使わない (§13)。CSS は textContent で入る
-				style.textContent = GRID_FOCUS_CSS;
-				doc.head.appendChild(style);
-			}
-		}
-	} catch (error) {
-		// 枠が出ないだけで操作はできる。ここで落ちてグリッドの購読ごと巻き込まないようにする
-		console.warn('[GridViewer] focus style failed', error);
-	}
-	return {
-		dispose() {
-			try {
-				style?.remove();
-			} catch (error) {
-				console.warn('[GridViewer] focus style removal failed', error);
-			}
-			style = null;
-		},
-	};
+	const style = createStyleHandle(doc, FOCUS_STYLE_ID, GRID_FOCUS_CSS, 'focus');
+	style.show();
+	return { dispose: style.dispose };
 }

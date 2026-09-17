@@ -1,18 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatCount, formatDate, splitComment, createSidebar } from '../../src/content/viewer/sidebar.js';
+import { formatDate, splitComment, createSidebar } from '../../src/content/viewer/sidebar.js';
+import { createAvatar, showAvatar } from '../../src/content/viewer/avatar.js';
 import { fakeElement, fakeDoc, iconName, flush } from '../helpers/dom.js';
-
-test('formatCount は 3 桁区切りにする', () => {
-	assert.equal(formatCount(2740), '2,740');
-	assert.equal(formatCount(0), '0');
-	assert.equal(formatCount(42852), '42,852');
-});
-
-test('formatCount は数値でない値を 0 として扱う', () => {
-	assert.equal(formatCount(undefined), '0');
-	assert.equal(formatCount(null), '0');
-});
 
 test('formatDate は日本語の日時にする', () => {
 	// createDate は ISO 8601。タイムゾーンの表記が 2 種類あることを SITE_SPEC で確認済み
@@ -71,6 +61,20 @@ test('splitComment は相対リンクを pixiv の絶対 URL にして残す', (
 
 test('splitComment は実体参照を戻す', () => {
 	assert.deepEqual(splitComment('a&amp;b&lt;c&gt;d&quot;e&#39;f'), [[{ type: 'text', value: 'a&b<c>d"e\'f' }]]);
+});
+
+test('splitComment は数値参照を 10 進でも 16 進でも戻す', () => {
+	// pixiv が返す範囲を実測で固定できていないので、&#39; 以外の数値参照も生のまま出さない
+	assert.deepEqual(splitComment('&#x27;a&#8217;b&#X1F600;'), [[{ type: 'text', value: '\'a’b\u{1F600}' }]]);
+});
+
+test('splitComment は二重に符号化された参照を 1 段だけ戻す', () => {
+	// &amp;#39; は「&#39; という文字列」の意味。名前付きを先に戻すともう一度戻ってしまう
+	assert.deepEqual(splitComment('&amp;#39;'), [[{ type: 'text', value: '&#39;' }]]);
+});
+
+test('splitComment は符号位置として不正な数値参照をそのまま残す', () => {
+	assert.deepEqual(splitComment('&#1114112;'), [[{ type: 'text', value: '&#1114112;' }]]);
 });
 
 test('splitComment は空文字で空配列を返す', () => {
@@ -142,7 +146,8 @@ test('作者行はアイコン・名前・ユーザー ID・フォロー用の�
 	assert.deepEqual(row.children.map((child) => child.className), ['author', 'follow-slot']);
 	const author = row.children[0];
 	assert.equal(author.href, '/users/54734418');
-	assert.deepEqual(author.children.map((child) => child.className), ['author-avatar', 'author-identity']);
+	// アイコンは取れるまで is-pending 付き (枠だけ)
+	assert.deepEqual(author.children.map((child) => child.className), ['author-avatar is-pending', 'author-identity']);
 	assert.deepEqual(
 		author.children[1].children.map((child) => [child.className, child.textContent]),
 		[['author-name', '作者'], ['author-id', 'ID: 54734418']],
@@ -160,13 +165,50 @@ test('作者のアイコンは /ajax/user の image を CDN の関門に通し�
 	assert.equal(avatarOf(container).attributes.alt, '');
 });
 
+test('作者のアイコンは取れるまで is-pending で枠だけにする', async () => {
+	// 見た目の切り替えはインライン style ではなくクラスで持つ (他の状態と同じ流儀)
+	const { container, sidebar } = build({ fetchUser: () => new Promise(() => {}) });
+	sidebar.render(DETAIL);
+	assert.equal(avatarOf(container).classList.contains('is-pending'), true);
+	assert.equal(avatarOf(container).style.visibility, undefined);
+});
+
+test('作者のアイコンが取れたら is-pending を外す', async () => {
+	const { container, sidebar } = build({
+		fetchUser: async () => ({ image: 'https://i.pximg.net/user-profile/img/x_170.jpg' }),
+	});
+	sidebar.render(DETAIL);
+	await flush();
+	assert.equal(avatarOf(container).classList.contains('is-pending'), false);
+});
+
 test('CDN 以外を指すアイコンは読み込まず枠だけ残す', async () => {
 	// 応答の値をそのまま外部オリジンへのリクエストにしない
 	const { container, sidebar } = build({ fetchUser: async () => ({ image: 'https://example.com/a.png' }) });
 	sidebar.render(DETAIL);
 	await flush();
 	assert.equal(avatarOf(container).src, '');
-	assert.equal(avatarOf(container).style.visibility, 'hidden');
+	assert.equal(avatarOf(container).classList.contains('is-pending'), true);
+});
+
+test('createAvatar は装飾扱いの img を is-pending 付きで作り、読み込み失敗でも枠だけ残す', async () => {
+	// コメント一覧の投稿者アイコンも同じ形なので、共有できるよう外に出してある
+	const avatar = createAvatar(fakeDoc(), 'comment-avatar');
+	assert.equal(avatar.tag, 'img');
+	assert.equal(avatar.className, 'comment-avatar is-pending');
+	assert.equal(avatar.attributes.alt, '');
+	assert.equal(showAvatar(avatar, 'https://i.pximg.net/user-profile/img/y_170.jpg'), true);
+	assert.equal(avatar.classList.contains('is-pending'), false);
+	await avatar.dispatch('error');
+	assert.equal(avatar.classList.contains('is-pending'), true);
+});
+
+test('showAvatar は CDN 以外の URL を入れない', () => {
+	const avatar = createAvatar(fakeDoc(), 'comment-avatar');
+	assert.equal(showAvatar(avatar, 'https://example.com/a.png'), false);
+	assert.equal(showAvatar(avatar, null), false);
+	assert.equal(avatar.src, '');
+	assert.equal(avatar.classList.contains('is-pending'), true);
 });
 
 test('取得を待っている間に描き直したら、前の作者のアイコンを入れない', async () => {
@@ -186,7 +228,7 @@ test('取得に失敗してもサイドバーは壊れない', async () => {
 	const { container, sidebar } = build({ fetchUser: async () => { throw new Error('落ちた'); } });
 	sidebar.render(DETAIL);
 	await flush();
-	assert.equal(avatarOf(container).style.visibility, 'hidden');
+	assert.equal(avatarOf(container).classList.contains('is-pending'), true);
 });
 
 test('リンク行は作品ページへのリンクとシェアボタンを並べる', () => {
@@ -212,6 +254,21 @@ test('consumeEscape はシェアメニューが開いているときだけ食い
 	assert.equal(sidebar.consumeEscape(), false);
 });
 
+test('consumeKey はシェアメニューが開いているときだけ上下キーと Escape を食い止める', () => {
+	// 開いたメニューで下キーを押して、本体が次の作品へ移ってはいけない
+	const { container, sidebar } = build();
+	sidebar.render(DETAIL);
+	const down = { key: 'ArrowDown', preventDefault() {} };
+	assert.equal(sidebar.consumeKey(down), false);
+	const row = container.children[0].children.find((child) => child.className === 'link-row');
+	row.children[1].children[0].click();
+	assert.equal(sidebar.consumeKey(down), true);
+	// 左右キーはメニューが使わないので本体へ渡す
+	assert.equal(sidebar.consumeKey({ key: 'ArrowLeft', preventDefault() {} }), false);
+	assert.equal(sidebar.consumeKey({ key: 'Escape', preventDefault() {} }), true);
+	assert.equal(sidebar.consumeKey(down), false);
+});
+
 test('カウンタはいいねを顔、ブックマークをハートで示す', () => {
 	// pixiv 本体と同じ対応にする。逆にすると意味が入れ替わって見える
 	const { container, sidebar } = build();
@@ -221,6 +278,24 @@ test('カウンタはいいねを顔、ブックマークをハートで示す',
 		counts.children.map((count) => iconName(count.children[0])),
 		['like', 'favorite', 'visibility', 'comment'],
 	);
+});
+
+test('押せないカウンタは何の数字かを隠し文字で持ち、aria-label に頼らない', () => {
+	// role の無い span の aria-label は読み上げに届かない (ARIA 1.2)。
+	// 「いいね 2,740」と読まれるよう、名前を視覚的に隠した文字として置く
+	const { sidebar } = build();
+	sidebar.render(DETAIL);
+	const counts = sidebar.countsSlot().children;
+	assert.deepEqual(
+		counts.map((count) => count.children.map((child) => child.className)),
+		Array(4).fill(['', 'visually-hidden', '']),
+	);
+	assert.deepEqual(
+		counts.map((count) => count.textContent),
+		['いいね 1', 'ブックマーク 2', '閲覧数 3', 'コメント 4'],
+	);
+	assert.equal(counts[2].title, '閲覧数 3');
+	assert.equal(counts[2].getAttribute('aria-label'), null);
 });
 
 test('いいねとブックマークのカウンタには差し替え用の印が付く', () => {

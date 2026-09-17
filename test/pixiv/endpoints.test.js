@@ -13,6 +13,7 @@ import {
 	emojiUrl,
 	stampUrl,
 } from '../../src/pixiv/endpoints.js';
+import { WORK_CATEGORY } from '../../src/common/constants.js';
 
 test('作品まわりの URL を組み立てる', () => {
 	assert.equal(illustUrl('149425016'), '/ajax/illust/149425016?lang=ja');
@@ -50,6 +51,36 @@ test('profile/illusts は ids[] を URL エンコードして並べる', () => {
 		userProfileIllustsUrl('54734418', ['1', '2'], true),
 		'/ajax/user/54734418/profile/illusts?ids%5B%5D=1&ids%5B%5D=2'
 			+ '&work_category=illustManga&is_first_page=1&lang=ja',
+	);
+});
+
+test('profile/illusts の work_category はタブの種別に合わせる', () => {
+	// SITE_SPEC 実測: pixiv 本体はイラストタブで illust を送る。
+	// WORK_CATEGORY.ILLUST は profile/all の応答キー (illusts) なので、そのままでは送れない
+	assert.ok(
+		userProfileIllustsUrl('54734418', ['1'], true, WORK_CATEGORY.ILLUST)
+			.includes('&work_category=illust&'),
+	);
+	assert.ok(
+		userProfileIllustsUrl('54734418', ['1'], true, WORK_CATEGORY.MANGA)
+			.includes('&work_category=manga&'),
+	);
+	// null は /users/{id}/artworks タブ (イラストと漫画の両方)
+	assert.ok(
+		userProfileIllustsUrl('54734418', ['1'], true, null)
+			.includes('&work_category=illustManga&'),
+	);
+});
+
+test('profile/illusts は知らない種別を両方 (illustManga) に倒す', () => {
+	// 値は WORK_CATEGORY_BY_TAB 経由でしか来ないが、来ても pixiv に知らない値を送らない
+	assert.ok(
+		userProfileIllustsUrl('54734418', ['1'], true, 'novels')
+			.includes('&work_category=illustManga&'),
+	);
+	assert.ok(
+		userProfileIllustsUrl('54734418', ['1'], true, undefined)
+			.includes('&work_category=illustManga&'),
 	);
 });
 

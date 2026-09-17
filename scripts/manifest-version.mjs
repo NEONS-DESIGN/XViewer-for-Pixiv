@@ -27,6 +27,9 @@ const VERSION_PART_MAX = 65535;
 /** semver の prerelease / build metadata。version には書けないので落とす。 */
 const SEMVER_SUFFIX_PATTERN = /[-+].*$/;
 
+/** 雛形 (src/manifest.json) に書いてはいけないキー。出どころが 2 つに割れるのを防ぐ。 */
+const VERSION_KEYS = ['version', 'version_name'];
+
 /**
  * package.json の version を manifest の version へ変換する。
  * @param {string} version package.json の version
@@ -64,12 +67,19 @@ export function toManifestVersion(version) {
 /**
  * manifest の内容に version を差し込む。
  * 渡された manifest は書き換えず、新しいオブジェクトを返す。
+ * 雛形に version / version_name が残っていたら止める。黙って上書きすると、
+ * 書き戻した人が「出どころは 1 か所」の規約 (CLAUDE.md) に気づけない。
  * @param {object} manifest src/manifest.json の内容 (version を持たない)
  * @param {string} packageVersion package.json の version
  * @returns {object} version を差し込んだ manifest
- * @throws {Error} version が manifest の規則に合わないとき
+ * @throws {Error} 雛形に version があるとき、version が manifest の規則に合わないとき
  */
 export function applyVersion(manifest, packageVersion) {
+	for (const key of VERSION_KEYS) {
+		if (key in manifest) {
+			throw new Error(`src/manifest.json に ${key} を書かないでください (出どころは package.json の version)`);
+		}
+	}
 	const version = toManifestVersion(packageVersion);
 	const applied = { ...manifest, version };
 	// prerelease を落としたときだけ、元の文字列を表示用に残す。
@@ -77,4 +87,22 @@ export function applyVersion(manifest, packageVersion) {
 	const original = packageVersion.trim();
 	if (original !== version) applied.version_name = original;
 	return applied;
+}
+
+/**
+ * manifest の内容に minimum_chrome_version を差し込む。
+ * 出どころは scripts/targets.mjs (esbuild の target と同じ値)。雛形に書いてあったら止める。
+ * @param {object} manifest manifest の内容 (minimum_chrome_version を持たない)
+ * @param {string} minimumChromeVersion 差し込む値 ("120" のようなメジャーバージョン)
+ * @returns {object} 差し込んだ manifest
+ * @throws {Error} 雛形に minimum_chrome_version があるとき、値がメジャーバージョンの形でないとき
+ */
+export function applyMinimumChromeVersion(manifest, minimumChromeVersion) {
+	if ('minimum_chrome_version' in manifest) {
+		throw new Error('src/manifest.json に minimum_chrome_version を書かないでください (出どころは scripts/targets.mjs)');
+	}
+	if (!VERSION_PART_PATTERN.test(String(minimumChromeVersion))) {
+		throw new Error(`minimum_chrome_version はメジャーバージョンの整数にしてください: ${minimumChromeVersion}`);
+	}
+	return { ...manifest, minimum_chrome_version: String(minimumChromeVersion) };
 }

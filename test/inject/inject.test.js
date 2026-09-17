@@ -88,3 +88,20 @@ test('unhook のあと rehook で張り直せる', () => {
 	globalThis.history.pushState({}, '', '/users/4');
 	assert.equal(navigateCount, 1);
 });
+
+test('プロトタイプのメソッドを包んでいたら、unhook は own property を残さない', () => {
+	// 実ページの history.pushState は History.prototype のもの。代入で戻すと
+	// own property として残り、Object.hasOwn(history, 'pushState') が真のままになる
+	page.window.dispatchEvent(new CustomEvent(NAV_EVENTS.UNHOOK));
+	const proto = { pushState() { return 'proto-push'; }, replaceState() { return 'proto-replace'; } };
+	const hist = Object.create(proto);
+	page.window.history = hist;
+	globalThis.history = hist;
+	page.window.dispatchEvent(new CustomEvent(NAV_EVENTS.REHOOK));
+	assert.equal(Object.hasOwn(hist, 'pushState'), true, '包めていない');
+	page.window.dispatchEvent(new CustomEvent(NAV_EVENTS.UNHOOK));
+	assert.equal(Object.hasOwn(hist, 'pushState'), false, 'own property として残っている');
+	assert.equal(Object.hasOwn(hist, 'replaceState'), false, 'own property として残っている');
+	assert.equal(hist.pushState(), 'proto-push');
+	assert.equal(page.window[NAV_HOOK_FLAG], undefined);
+});

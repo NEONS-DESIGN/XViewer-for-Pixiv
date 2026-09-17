@@ -1,7 +1,8 @@
-import { test } from 'node:test';
+import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { createIcon } from '../../src/common/icons.js';
 import { ICON_SHAPES } from '../../src/common/icon-shapes.js';
+import { LOG_PREFIX } from '../../src/common/log.js';
 
 /**
  * createElementNS だけを持つ最小の Document の代わり。
@@ -34,10 +35,29 @@ test('createIcon は viewBox をそのまま使う', () => {
 	assert.equal(svg.attributes.focusable, 'false');
 });
 
-test('createIcon は未知の名前でも空の svg を返す', () => {
-	const svg = createIcon(fakeDoc(), 'no-such-icon');
-	assert.equal(svg.attributes.viewBox, '0 0 24 24');
-	assert.equal(svg.innerHTML, '');
+test('createIcon は未知の名前でも空の svg を返し、warn で名前を残す', () => {
+	// 文字列参照のタイプミスに気づけるよう警告だけ出す。UI 構築は止めない
+	const warn = mock.method(console, 'warn', () => {});
+	try {
+		const svg = createIcon(fakeDoc(), 'no-such-icon');
+		assert.equal(svg.attributes.viewBox, '0 0 24 24');
+		assert.equal(svg.innerHTML, '');
+		assert.equal(warn.mock.callCount(), 1);
+		assert.ok(String(warn.mock.calls[0].arguments[0]).startsWith(LOG_PREFIX));
+		assert.equal(warn.mock.calls[0].arguments[1], 'no-such-icon');
+	} finally {
+		warn.mock.restore();
+	}
+});
+
+test('createIcon は知っている名前では warn を出さない', () => {
+	const warn = mock.method(console, 'warn', () => {});
+	try {
+		createIcon(fakeDoc(), 'close');
+		assert.equal(warn.mock.callCount(), 0);
+	} finally {
+		warn.mock.restore();
+	}
 });
 
 test('createIcon は innerHTML が投げても落ちない', () => {
