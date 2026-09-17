@@ -6,7 +6,7 @@
  * 途中で終わっているときに空白ができて地続きにならない。
  * React は外から append した li を消さない前提で組む (SITE_SPEC §3 の tabindex の扱いと同じ)。
  */
-import { captureTemplates, buildCard, paintHeart } from './card-clone.js';
+import { captureTemplates, buildCard, paintHeart, heartPaths } from './card-clone.js';
 import { readSession, clearSessionCache } from './session.js';
 import { parseArtworkPath } from './page.js';
 import { addBookmark, deleteBookmark } from '../pixiv/actions.js';
@@ -692,8 +692,10 @@ export function attachInfiniteScroll(doc, options) {
 		sentinelStyle.show();
 		// 継ぎ足したカードのハートを受ける。カードごとに張ると 48 枚ぶん増えるので doc で 1 本。
 		// React より先に受けたいので capture で張る。
-		// 未ログインなら buildCard がボタンごと外すので、購読も張らない (全クリックで空振りするだけ)
-		if (loggedIn) {
+		// 押せるハートが無いなら購読も張らない (全クリックで空振りするだけ)。
+		// 未ログインでは buildCard がボタンごと外し、自分のユーザーページでは
+		// そもそも雛形にハートが無い (pixiv が自分の作品に描かない。SITE_SPEC §4)
+		if (loggedIn && heartPaths(templates.single).length > 0) {
 			heartBound = true;
 			doc.addEventListener('click', onHeartClick, true);
 		}

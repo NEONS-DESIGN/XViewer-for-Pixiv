@@ -138,10 +138,40 @@ test('雛形は元のカードから切り離されている', () => {
 	assert.equal(card.getAttribute('data-touched'), null);
 });
 
-test('ハートが見つからないカードは雛形にしない', () => {
-	// bookmark_button が無いとハートの色を採れず、未ブックマーク判定ができない
-	const { ul } = makeGrid([makeCardWithoutHeart('1')]);
-	assert.equal(captureTemplates(ul, { computedStyle: fakeComputedStyle }), null);
+test('ハートを持つカードがあれば、ハート無しのカードは雛形にしない', () => {
+	// bookmark_button が無いとハートの色を採れず、未ブックマーク判定ができない。
+	// 読み込み途中などで 1 枚だけ欠けたカードを掴むと、継ぎ足し分だけブックマークできなくなる
+	const { ul } = makeGrid([makeCardWithoutHeart('1'), makeCard({ id: '2' })]);
+	const templates = captureTemplates(ul, { computedStyle: fakeComputedStyle });
+	assert.equal(templates.single.querySelector('[data-ga4-label="bookmark_button"]') === null, false);
+});
+
+test('どのカードにもハートが無ければ、ハート無しのまま雛形にする', () => {
+	// 自分のユーザーページ。pixiv が自分の作品にブックマークボタンを描かない (SITE_SPEC §4)。
+	// ここで諦めると自分のページだけ無限スクロールが起動しない
+	const { ul } = makeGrid([makeCardWithoutHeart('1'), makeCardWithoutHeart('2')]);
+	const templates = captureTemplates(ul, { computedStyle: fakeComputedStyle });
+	assert.notEqual(templates, null);
+	assert.equal(templates.single.querySelector('[data-ga4-label="bookmark_button"]'), null);
+	assert.equal(templates.multi, null);
+});
+
+test('ハート無しでも複数枚のカードは multi に採る', () => {
+	const { ul } = makeGrid([makeCard({ id: '1', heart: false }), makeCard({ id: '2', pages: 3, heart: false })]);
+	const templates = captureTemplates(ul, { computedStyle: fakeComputedStyle });
+	assert.equal(templates.multi.querySelector('span').textContent, '3');
+	assert.equal(templates.single.querySelector('span'), null);
+});
+
+test('ハート無しのカードを雛形にしても組み立てられる', () => {
+	// ログイン済みでブックマーク済みの作品でも、塗る先が無いだけで落ちてはいけない
+	const { ul } = makeGrid([makeCard({ id: '1', heart: false })]);
+	const templates = captureTemplates(ul, { computedStyle: fakeComputedStyle });
+	const card = buildCard(templates, work({ bookmarkData: { id: '5' } }), { loggedIn: true });
+	assert.notEqual(card, null);
+	assert.equal(card.querySelector('[data-ga4-label="bookmark_button"]'), null);
+	// 塗れないので ID も書かない。押せるハートが無い以上、持っていても使い道がない
+	assert.equal(card.getAttribute(GV_BOOKMARK_ID_ATTR), null);
 });
 
 test('自分が継ぎ足したカードしか無ければ null', () => {

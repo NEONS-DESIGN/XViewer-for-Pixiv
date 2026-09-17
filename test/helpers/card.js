@@ -170,13 +170,14 @@ function matches(node, selector) {
 /**
  * 作品カード 1 枚を組む。
  * @param {{id?: string, userId?: string, title?: string, pages?: number, loaded?: boolean,
- *   bookmarked?: boolean, tabSkipped?: boolean}} [options] カードの内容
+ *   bookmarked?: boolean, tabSkipped?: boolean, heart?: boolean}} [options] カードの内容。
+ *   heart: false でブックマークボタンごと落とす (自分のユーザーページ。SITE_SPEC §4)
  * @returns {object} li の代わり
  */
 export function makeCard(options = {}) {
 	const {
 		id = '100', userId = '9', title = '作品', pages = 1,
-		loaded = true, bookmarked = false, tabSkipped = true,
+		loaded = true, bookmarked = false, tabSkipped = true, heart = true,
 	} = options;
 	const li = el('li');
 	const outer = li.appendChild(el('div'));
@@ -206,14 +207,17 @@ export function makeCard(options = {}) {
 		count.textContent = String(pages);
 	}
 
-	const heartBox = thumbBox.appendChild(el('div')).appendChild(el('div', { 'data-ga4-label': 'bookmark_button' }));
-	const button = heartBox.appendChild(el('button', {
-		type: 'button',
-		...(tabSkipped ? { tabindex: '-1', [TAB_SKIP_MARK_ATTR]: '' } : {}),
-	}));
-	const svg = button.appendChild(el('svg'));
-	const fills = bookmarked ? ['rgb(255, 64, 96)', 'rgb(255, 64, 96)'] : ['rgb(31, 31, 31)', 'rgb(245, 245, 245)'];
-	for (const fill of fills) svg.appendChild(el('path', { 'data-fill': fill }));
+	// 自分の作品には pixiv がブックマークボタンを描かない (SITE_SPEC §4)
+	if (heart) {
+		const heartBox = thumbBox.appendChild(el('div')).appendChild(el('div', { 'data-ga4-label': 'bookmark_button' }));
+		const button = heartBox.appendChild(el('button', {
+			type: 'button',
+			...(tabSkipped ? { tabindex: '-1', [TAB_SKIP_MARK_ATTR]: '' } : {}),
+		}));
+		const svg = button.appendChild(el('svg'));
+		const fills = bookmarked ? ['rgb(255, 64, 96)', 'rgb(255, 64, 96)'] : ['rgb(31, 31, 31)', 'rgb(245, 245, 245)'];
+		for (const fill of fills) svg.appendChild(el('path', { 'data-fill': fill }));
+	}
 
 	const titleLink = outer.appendChild(el('div')).appendChild(el('a', { href: `/artworks/${id}` }));
 	titleLink.textContent = title;
