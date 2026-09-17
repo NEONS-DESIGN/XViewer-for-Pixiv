@@ -74,6 +74,7 @@ export function normalizeSettings(raw) {
 		showSidebar: asBoolean(source.showSidebar, d.showSidebar),
 		sidebarScroll: oneOf(source.sidebarScroll, Object.values(SIDEBAR_SCROLL), d.sidebarScroll),
 		closeOnBackdrop: asBoolean(source.closeOnBackdrop, d.closeOnBackdrop),
+		clickZoom: asBoolean(source.clickZoom, d.clickZoom),
 		gridTabSkip: oneOf(source.gridTabSkip, Object.values(GRID_TAB_SKIP), d.gridTabSkip),
 		hidePickup: asBoolean(source.hidePickup, d.hidePickup),
 		infiniteScroll: oneOf(source.infiniteScroll, Object.values(INFINITE_SCROLL), d.infiniteScroll),

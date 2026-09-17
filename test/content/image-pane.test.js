@@ -72,19 +72,31 @@ const PAGES = [
 ];
 
 /**
+ * 原寸レイヤの代わり。開かれた指定を覚えるだけ。
+ * @returns {{opened: object[], open: (pages: object) => void}} レイヤの代わり
+ */
+function fakeZoom() {
+	const opened = [];
+	return { opened, open: (pages) => { opened.push(pages); } };
+}
+
+/**
  * 画像ペインを組み立てる。
  * @param {object} [options] 差し替え
  * @param {Function} [options.fetchImpl] 通信の代わり
  * @param {number} [options.prefetch] 先読みの枚数
- * @returns {{container: object, pane: object, created: object[]}} 描画先・ペイン・作った先読み Image
+ * @param {boolean} [options.clickZoom] クリックで原寸表示するか
+ * @param {object} [options.zoom] 原寸レイヤの代わり
+ * @returns {{container: object, pane: object, created: object[], zoom: object}} 描画先・ペイン・作った先読み Image・原寸レイヤ
  */
-function build({ fetchImpl, prefetch = 0 } = {}) {
+function build({ fetchImpl, prefetch = 0, clickZoom = false, zoom = fakeZoom() } = {}) {
 	const container = fakeElement('div');
 	const created = [];
 	const pane = createImagePane({
 		doc: fakeDoc(),
 		container,
-		settings: { imageQuality: 'regular', prefetch },
+		settings: { imageQuality: 'regular', prefetch, clickZoom },
+		zoom,
 		fetchImpl,
 		createImage: () => {
 			const img = fakeElement('img');
@@ -92,7 +104,7 @@ function build({ fetchImpl, prefetch = 0 } = {}) {
 			return img;
 		},
 	});
-	return { container, pane, created };
+	return { container, pane, created, zoom };
 }
 
 test('render は 1 枚目を /pages を待たずに出し、届いたら矢印とカウンタを揃える', async () => {
@@ -217,4 +229,59 @@ test('dispose で先読みの Image を手放し、画像の error を外す', a
 	assert.equal(image.src, '');
 	assert.equal((image.listeners.error ?? []).length, 0);
 	await flush();
+});
+
+test('クリックで原寸表示がオンなら、画像を押して原寸の並びを渡す', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { container, pane, zoom } = build({ fetchImpl: impl, clickZoom: true });
+	await pane.render(DETAIL);
+	pane.next();
+	const image = find(container, 'img');
+	assert.ok(image.className.includes('zoomable'), '押せることが分かる見た目にする');
+	await image.dispatch('click', {});
+	assert.equal(zoom.opened.length, 1);
+	// 設定の解像度が標準でも、原寸表示では原寸を出す
+	assert.deepEqual(zoom.opened[0].urls, [cdn('o0'), cdn('o1'), cdn('o2')]);
+	assert.equal(zoom.opened[0].index, 1);
+	assert.equal(zoom.opened[0].alt, 'タイトル');
+});
+
+test('クリックで原寸表示がオフなら、画像を押しても開かない', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { container, pane, zoom } = build({ fetchImpl: impl, clickZoom: false });
+	await pane.render(DETAIL);
+	const image = find(container, 'img');
+	assert.ok(!image.className.includes('zoomable'));
+	await image.dispatch('click', {});
+	assert.equal(zoom.opened.length, 0);
+});
+
+test('/pages が届く前でも詳細の原寸 URL で開ける', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { container, pane, zoom } = build({ fetchImpl: impl, clickZoom: true });
+	const rendering = pane.render(DETAIL);
+	await find(container, 'img').dispatch('click', {});
+	assert.deepEqual(zoom.opened[0].urls, [cdn('o0')]);
+	await rendering;
+});
+
+test('原寸が無い作品では標準の画像で開く', async () => {
+	// 未ログインでは urls.original が落ちる (SITE_SPEC §未ログイン)
+	const pages = PAGES.map((page) => ({ urls: { regular: page.urls.regular } }));
+	const { impl } = fakeApiFetch(pages);
+	const { container, pane, zoom } = build({ fetchImpl: impl, clickZoom: true });
+	await pane.render({ ...DETAIL, urls: { regular: cdn('r0') } });
+	await find(container, 'img').dispatch('click', {});
+	assert.deepEqual(zoom.opened[0].urls, [cdn('r0'), cdn('r1'), cdn('r2')]);
+});
+
+test('原寸表示でページを送るとペインも追従する', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { container, pane, zoom } = build({ fetchImpl: impl, clickZoom: true });
+	await pane.render(DETAIL);
+	await find(container, 'img').dispatch('click', {});
+	zoom.opened[0].onIndexChange(2);
+	// 閉じたときに同じページが出ていないと、見ていた場所を見失う
+	assert.equal(find(container, 'img').src, cdn('r2'));
+	assert.equal(find(container, '.counter').textContent, '3/3');
 });

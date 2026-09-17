@@ -61,6 +61,7 @@ export function prefetchTargets(index, total, count) {
  * @property {Document} doc
  * @property {HTMLElement} container 描画先 (.stage)
  * @property {object} settings 設定
+ * @property {{open: (pages: object) => void}} [zoom] 原寸表示のレイヤ (zoom.js)。設定がオンのときだけ使う
  * @property {typeof fetch} [fetchImpl] 通信の差し替え。テストから pixiv を叩かないために使う
  * @property {() => HTMLImageElement} [createImage] 先読み用 Image の差し替え。Node には Image が無い
  */
@@ -77,6 +78,12 @@ export function createImagePane(deps) {
 
 	/** @type {string[]} 表示するページの URL */
 	let urls = [];
+	/**
+	 * @type {string[]} 原寸表示に渡すページの URL。
+	 * 設定の解像度が標準でも原寸を出すので、表示用の urls とは別に持つ。
+	 * 出どころは同じ /pages の応答なので、これを持っても通信は増えない
+	 */
+	let originalUrls = [];
 	/** 今見ているページ番号 */
 	let index = 0;
 	/**
@@ -98,6 +105,8 @@ export function createImagePane(deps) {
 	let frame = null;
 	/** 画像の読み込み失敗ハンドラ。dispose で外すため参照を持つ */
 	let onImageError = null;
+	/** 画像を押したときのハンドラ (原寸表示)。設定がオフなら付けない。dispose で外すため参照を持つ */
+	let onImageClick = null;
 	/** 破棄済みか。応答を待っている間に捨てられたときに DOM を触らないようにする */
 	let disposed = false;
 
@@ -178,6 +187,25 @@ export function createImagePane(deps) {
 	}
 
 	/**
+	 * 原寸表示を開く。
+	 * 開いた先でページを送られたら、こちらの表示も合わせる
+	 * (閉じたときに違うページが出ていると、見ていた場所を見失う)。
+	 * @param {string} alt 画像の代替文言 (作品名)
+	 * @returns {void}
+	 */
+	function openZoom(alt) {
+		deps.zoom?.open({
+			urls: originalUrls,
+			index,
+			alt,
+			onIndexChange: (next) => {
+				index = next;
+				paint();
+			},
+		});
+	}
+
+	/**
 	 * ページ番号を動かす。
 	 * @param {number} offset 相対位置
 	 * @returns {void}
@@ -204,6 +232,13 @@ export function createImagePane(deps) {
 			image.alt = detail.title;
 			onImageError = () => showPaneError(MESSAGES.IMAGE_FAILED);
 			image.addEventListener('error', onImageError);
+			// クリックで原寸表示。設定がオフのときはリスナも付けず、カーソルも変えない
+			// (押せそうに見えて何も起きないのが一番まずい)
+			if (deps.settings.clickZoom === true) {
+				image.className = 'zoomable';
+				onImageClick = () => openZoom(detail.title);
+				image.addEventListener('click', onImageClick);
+			}
 
 			counter = doc.createElement('p');
 			counter.className = 'counter';
@@ -216,6 +251,8 @@ export function createImagePane(deps) {
 
 			// 1 枚目は詳細に入っている URL で即座に出し、待たせない
 			urls = [detail.urls[deps.settings.imageQuality] ?? detail.urls[IMAGE_QUALITY.REGULAR] ?? ''];
+			// 原寸が無い作品 (未ログインでは urls.original が落ちる) は標準へ倒す
+			originalUrls = [detail.urls[IMAGE_QUALITY.ORIGINAL] ?? detail.urls[IMAGE_QUALITY.REGULAR] ?? ''];
 			index = 0;
 			paint();
 
@@ -225,6 +262,7 @@ export function createImagePane(deps) {
 				const pages = await getJson(illustPagesUrl(detail.id), { fetchImpl });
 				if (disposed) return;
 				urls = pickPageUrls(pages, deps.settings.imageQuality);
+				originalUrls = pickPageUrls(pages, IMAGE_QUALITY.ORIGINAL);
 				paint();
 			} catch (error) {
 				if (disposed) return;
@@ -242,6 +280,7 @@ export function createImagePane(deps) {
 			// 破棄したあとに古い画像の error が発火して、
 			// 新しく描いた画面にエラーを出すのを防ぐ
 			if (image && onImageError) image.removeEventListener('error', onImageError);
+			if (image && onImageClick) image.removeEventListener('click', onImageClick);
 			if (image) image.src = '';
 			// 自分が作った DOM は自分で片付ける。
 			// これを外すと、読み込み中に前の作品の矢印とカウンタが残る
@@ -250,6 +289,8 @@ export function createImagePane(deps) {
 			image = null;
 			shownUrl = null;
 			onImageError = null;
+			onImageClick = null;
+			originalUrls = [];
 			counter = null;
 			prevButton = null;
 			nextButton = null;

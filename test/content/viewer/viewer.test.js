@@ -405,3 +405,64 @@ test('開いたシェアメニューでは上下キーと Escape をメニュー
 	await doc.dispatch('keydown', key(KEYS.CLOSE));
 	assert.equal(closed(), 1);
 });
+
+test('クリックで原寸表示がオンなら、画像を押すと overlay の直下に原寸レイヤが出る', async () => {
+	// ステージの中ではなく overlay の直下。サイドバーの上も覆う
+	const { viewer, shadow, stage } = setup({ settings: settings({ clickZoom: true }) });
+	await viewer.open('1');
+	await find(stage(), 'img').dispatch('click', {});
+	const zoom = find(shadow(), '.zoom');
+	assert.ok(zoom, '原寸レイヤが出る');
+	assert.equal(zoom.parent.className, 'overlay');
+	assert.equal(find(zoom, '.zoom-image').src, REGULAR_URL);
+});
+
+test('クリックで原寸表示がオフなら、画像を押しても何も出ない', async () => {
+	const { viewer, shadow, stage } = setup();
+	await viewer.open('1');
+	await find(stage(), 'img').dispatch('click', {});
+	assert.equal(find(shadow(), '.zoom'), null);
+});
+
+test('原寸表示中の Escape はレイヤだけを閉じ、モーダルは閉じない', async () => {
+	const { viewer, doc, shadow, stage, closed } = setup({ settings: settings({ clickZoom: true }) });
+	await viewer.open('1');
+	await find(stage(), 'img').dispatch('click', {});
+	await doc.dispatch('keydown', { key: KEYS.CLOSE, preventDefault() {}, stopPropagation() {} });
+	assert.equal(find(shadow(), '.zoom'), null);
+	assert.equal(closed(), 0, 'モーダルは開いたまま');
+});
+
+test('作品を移ると原寸表示は閉じる', async () => {
+	// 原寸のまま次の作品へ進むと、開くたびに巨大な画像を読むことになる
+	const { viewer, shadow, stage } = setup({ settings: settings({ clickZoom: true }) });
+	await viewer.open('1');
+	await find(stage(), 'img').dispatch('click', {});
+	await viewer.open('2');
+	assert.equal(find(shadow(), '.zoom'), null);
+});
+
+test('設定を変えて描き直すと原寸表示は閉じる', async () => {
+	const { viewer, shadow, stage } = setup({ settings: settings({ clickZoom: true }) });
+	await viewer.open('1');
+	await find(stage(), 'img').dispatch('click', {});
+	viewer.setSettings(settings({ clickZoom: false }));
+	await flush();
+	assert.equal(find(shadow(), '.zoom'), null);
+});
+
+test('Tab は inert を付けた背後の部品を巡回しない', async () => {
+	// 原寸表示中はステージとサイドバーに inert が付く。
+	// inert の中の要素は focus() が無言で失敗するので、巡回の対象から外す
+	const { viewer, doc, shadow } = setup();
+	await viewer.open('1');
+	const behind = enrich(doc.createElement('button'));
+	behind.closest = (selector) => (selector.includes('inert') ? doc.createElement('div') : null);
+	const front = enrich(doc.createElement('button'));
+	front.closest = () => null;
+	shadow().querySelectorAll = () => [behind, front];
+	shadow().activeElement = null;
+	await doc.dispatch('keydown', { key: KEYS.FOCUS_NEXT, shiftKey: false, preventDefault() {} });
+	assert.equal(behind.focused, false);
+	assert.equal(front.focused, true);
+});
