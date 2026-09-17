@@ -76,6 +76,18 @@
 	background: var(--backdrop);
 }
 
+/*
+ * ダイアログ本体は開いたときのフォーカスの受け皿 (tabindex="-1")。輪郭は出さない。
+ * ここだけは outline: none を書いてよい唯一の場所 (UI_DESIGN_KIT §6):
+ * Tab の巡回先ではないので「今どこを操作しているか」を示す意味が無く、
+ * 画面いっぱいの要素なので既定の輪郭が画面の縁を 1 周する。
+ * 操作できる部品の輪郭は今までどおり各部品の :focus-visible が出す。
+ */
+.overlay:focus,
+.overlay:focus-visible {
+	outline: none;
+}
+
 /* 画像側。ここの余白部分を押すと閉じる */
 .stage {
 	position: relative;

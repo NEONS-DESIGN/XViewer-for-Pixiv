@@ -166,6 +166,11 @@ export function createViewer(deps) {
 		overlay.setAttribute('role', 'dialog');
 		overlay.setAttribute('aria-modal', 'true');
 		overlay.setAttribute('aria-label', MESSAGES.DIALOG_LABEL);
+		// 開いたときのフォーカスの受け皿。ダイアログを名乗る以上、開いたら中へフォーカスを
+		// 入れないと読み上げが文脈を失う。中のボタンではなく本体で受けるので、
+		// 十字キーを押したときにどのボタンにも輪郭が出ない (§10.4)。
+		// tabindex="-1" なので FOCUSABLE_SELECTOR には入らず、Tab の巡回先にはならない
+		overlay.setAttribute('tabindex', '-1');
 
 		stage = doc.createElement('div');
 		stage.className = 'stage';
@@ -400,8 +405,10 @@ export function createViewer(deps) {
 		disposeAll();
 		// 開いた直後のキー操作がモーダルへ届くようにする。
 		// 作品を送ったときは押していたボタンがペインごと消えてフォーカスが body へ落ちるので、
-		// 中に無くなっていたら閉じるボタンへ戻す (読み上げが文脈を失わないように)
-		if (!shadow.activeElement) closeButton?.focus();
+		// 中に無くなっていたらダイアログ本体へ戻す (読み上げが文脈を失わないように)。
+		// 閉じるボタンなど中の部品へ当てないこと。次にキーを押した瞬間に :focus-visible が立ち、
+		// 十字キーでフォーカスが動いたように見える (§10.4)
+		if (!shadow.activeElement) overlay?.focus();
 		sidebar.hidden = !settings.showSidebar;
 		showStatus(MESSAGES.LOADING, STATUS_KINDS.INFO);
 

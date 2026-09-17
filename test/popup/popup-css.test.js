@@ -172,6 +172,14 @@ test('フォーカスの輪郭は --focus-ring の 1 本だけ', () => {
 	for (const outline of outlines) assert.equal(outline, 'outline: var(--focus-ring);');
 });
 
+test('viewer.css の outline: none はダイアログ本体だけ', () => {
+	// outline: none は「今どこを操作しているか」を消す。操作できる部品には書かない (UI_DESIGN_KIT §6)。
+	// ダイアログ本体 (.overlay) だけが例外で、Tab の巡回先ではなく画面いっぱいなので輪郭が縁を 1 周する
+	const none = [...viewer.matchAll(/([^{}]+)\{([^{}]*outline:\s*none[^{}]*)\}/g)]
+		.map((match) => match[1].replace(/\s+/g, ' ').trim());
+	assert.deepEqual(none, ['.overlay:focus, .overlay:focus-visible']);
+});
+
 test('保存の失敗の通知に --danger を使わない', () => {
 	// --danger は取り消せない操作専用 (UI_DESIGN_KIT §2)。保存の失敗はやり直せる
 	assert.ok(!block(popup, '.notice').includes('--danger'));
