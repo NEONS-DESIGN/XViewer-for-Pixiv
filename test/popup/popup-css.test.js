@@ -172,12 +172,23 @@ test('フォーカスの輪郭は --focus-ring の 1 本だけ', () => {
 	for (const outline of outlines) assert.equal(outline, 'outline: var(--focus-ring);');
 });
 
-test('viewer.css の outline: none はダイアログ本体だけ', () => {
-	// outline: none は「今どこを操作しているか」を消す。操作できる部品には書かない (UI_DESIGN_KIT §6)。
-	// ダイアログ本体 (.overlay) だけが例外で、Tab の巡回先ではなく画面いっぱいなので輪郭が縁を 1 周する
-	const none = [...viewer.matchAll(/([^{}]+)\{([^{}]*outline:\s*none[^{}]*)\}/g)]
+test('ビュワーのフォーカスの輪郭は 1 本にまとめる', () => {
+	// 部品ごとに :focus-visible を書くと、新しく足したリンクやボタンだけ輪郭が抜け、
+	// ブラウザ既定の白っぽい 1px が出る (作者リンク・タグ・作品ページへのリンクで実際に起きた)。
+	// 共通の 1 本にしておけば、部品が増えても自動で揃う
+	const selectors = [...viewer.matchAll(/([^{}]*:focus-visible[^{}]*)\{/g)]
 		.map((match) => match[1].replace(/\s+/g, ' ').trim());
-	assert.deepEqual(none, ['.overlay:focus, .overlay:focus-visible']);
+	assert.deepEqual(selectors.sort(), [
+		// 輪郭を出さない唯一の例外 (Tab の巡回先ではないダイアログ本体)
+		'.overlay:focus, .overlay:focus-visible',
+		// 内側に出す例外 (項目の縁が隣と接しているメニュー)
+		'.share-item:focus-visible',
+		// 共通
+		':focus-visible',
+	]);
+	// 値は --focus-ring から引く。none はダイアログ本体だけ
+	const outlines = [...new Set(viewer.match(/outline:[^;]+;/g) ?? [])].sort();
+	assert.deepEqual(outlines, ['outline: none;', 'outline: var(--focus-ring);']);
 });
 
 test('保存の失敗の通知に --danger を使わない', () => {
