@@ -10,7 +10,7 @@ import { ARTWORK_LINK_SELECTOR } from '../common/constants.js';
 import { createStyleHandle } from '../common/style-injector.js';
 
 /** 差し込む style 要素の id。二重注入を防ぐ目印も兼ねる。 */
-export const FOCUS_STYLE_ID = 'gridviewer-grid-focus';
+export const FOCUS_STYLE_ID = 'xviewer-grid-focus';
 
 /** 枠の色。UI_DESIGN_KIT の --accent (ダーク側)。絵の上に乗るのでテーマでは変えない。 */
 const FOCUS_COLOR = '#4ea3d6';

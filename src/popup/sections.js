@@ -13,7 +13,7 @@ import {
 } from '../common/constants.js';
 
 /** 画面の題名。拡張の名前をそのまま出す。 */
-export const TITLE = 'GridViewer for Pixiv';
+export const TITLE = 'XViewer for Pixiv';
 
 /**
  * タブの定義。順番がそのまま画面の並びと左右キーの順になる。

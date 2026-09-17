@@ -5,7 +5,7 @@
  */
 
 /** 拡張のログに付ける接頭辞。DevTools で自分の出力だけを絞り込むために使う。 */
-export const LOG_PREFIX = '[GridViewer]';
+export const LOG_PREFIX = '[XViewer]';
 
 /**
  * 警告を出す。握りつぶした例外の詳細を残すときに使う (SPEC §12)。

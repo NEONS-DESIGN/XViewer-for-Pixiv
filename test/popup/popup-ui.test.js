@@ -93,7 +93,7 @@ test('設定タブの見出しは ビュワー / 画像 / ユーザーページ 
 
 test('ビュワーの見出しにはタイトルとテーマの切り替えボタンが並ぶ', () => {
 	const { root } = build();
-	assert.equal(collect(root, 'h1')[0].textContent, 'GridViewer for Pixiv');
+	assert.equal(collect(root, 'h1')[0].textContent, 'XViewer for Pixiv');
 	assert.ok(find(root, 'theme-toggle'));
 });
 

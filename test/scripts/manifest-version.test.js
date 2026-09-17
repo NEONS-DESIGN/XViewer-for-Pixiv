@@ -53,15 +53,15 @@ test('全ての成分が 0 なら例外', () => {
 });
 
 test('applyVersion は manifest に version を差し込む', () => {
-	const manifest = { name: 'GridViewer for Pixiv', permissions: ['storage'] };
+	const manifest = { name: 'XViewer for Pixiv', permissions: ['storage'] };
 	const applied = applyVersion(manifest, '0.3.1');
 	assert.equal(applied.version, '0.3.1');
-	assert.equal(applied.name, 'GridViewer for Pixiv');
+	assert.equal(applied.name, 'XViewer for Pixiv');
 	assert.deepEqual(applied.permissions, ['storage']);
 });
 
 test('applyVersion は渡された manifest を書き換えない', () => {
-	const manifest = { name: 'GridViewer for Pixiv' };
+	const manifest = { name: 'XViewer for Pixiv' };
 	applyVersion(manifest, '0.3.1');
 	assert.equal('version' in manifest, false);
 });
@@ -85,7 +85,7 @@ test('applyVersion は雛形に version が残っていたら止める', () => {
 });
 
 test('applyMinimumChromeVersion は minimum_chrome_version を差し込み、元は書き換えない', () => {
-	const manifest = { name: 'GridViewer for Pixiv' };
+	const manifest = { name: 'XViewer for Pixiv' };
 	const applied = applyMinimumChromeVersion(manifest, '120');
 	assert.equal(applied.minimum_chrome_version, '120');
 	assert.equal('minimum_chrome_version' in manifest, false);
