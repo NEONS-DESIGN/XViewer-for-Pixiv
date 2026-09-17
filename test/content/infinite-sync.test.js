@@ -144,3 +144,23 @@ test('設定の変更は張ったままモードの差し替えで追従する',
 	const decision = decide({ wanted: INFINITE_SCROLL.PREFETCH });
 	assert.equal(decision.action, SYNC_ACTIONS.KEEP);
 });
+
+test('一番上まで戻って ?p= が基準ページへ下がっていても張り直さない', () => {
+	// スクロールで上へ戻ると自分の書いた値が基準ページと同じになる。
+	// pixiv が動かしたわけではないので、継ぎ足したものを撤去してはいけない
+	const decision = decideInfiniteSync({
+		wanted: INFINITE_SCROLL.ON_REACH,
+		key: 'user:1:illust',
+		gridKey: 'user:1:illust',
+		attachedKey: 'user:1:illust',
+		active: true,
+		detached: false,
+		listChanged: false,
+		param: 1,
+		ownPage: 1,
+		basePage: 1,
+	});
+	assert.equal(decision.action, SYNC_ACTIONS.KEEP);
+	assert.equal(decision.basePage, 1);
+	assert.equal(decision.ownPage, 1);
+});

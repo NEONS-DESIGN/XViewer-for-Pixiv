@@ -9,6 +9,7 @@
 import { captureTemplates, buildCard, paintHeart, heartPaths } from './card-clone.js';
 import { readSession, clearSessionCache } from './session.js';
 import { parseArtworkPath } from './page.js';
+import { pickVisiblePage } from './infinite-page.js';
 import { addBookmark, deleteBookmark } from '../pixiv/actions.js';
 import { PIXIV_ERROR_KINDS } from '../pixiv/errors.js';
 import { warn } from '../common/log.js';
@@ -177,7 +178,7 @@ const SENTINEL_CSS = `
  * @typedef {object} InfiniteHandle
  * @property {() => boolean} isActive 継ぎ足しが動いているか (雛形が採れて sentinel を置けて、まだ dispose() されていない)
  * @property {(mode: string) => void} setMode モードを切り替える。継ぎ足したカードには触らない
- * @property {() => number|null} currentPage 今グリッドに並んでいる最後のページ番号。動いていなければ null
+ * @property {() => number|null} currentPage 今画面に出ているページ番号。動いていなければ null
  * @property {() => void} dispose 継ぎ足しをやめ、置いたものを全て撤去してページを元へ戻す
  */
 
@@ -199,7 +200,7 @@ function inactiveHandle() {
 		 */
 		setMode() {},
 		/**
-		 * 並んでいる最後のページ。何も継ぎ足していないので分からない。
+		 * 今出ているページ。何も継ぎ足していないので分からない。
 		 * @returns {null} 常に null
 		 */
 		currentPage: () => null,
@@ -224,6 +225,15 @@ export function attachInfiniteScroll(doc, options) {
 	const deps = options.deps ?? {};
 	const createObserver = deps.createObserver
 		?? ((callback, init) => new globalThis.IntersectionObserver(callback, init));
+	/** 画面。スクロールと大きさの変化はここで受ける。取れなければ ?p= の追従だけを諦める */
+	const view = doc.defaultView ?? null;
+	// 要素の上端 (ビューポート基準) を読む。測れない要素は 0 (= 上端の上) として扱う
+	const rectTop = deps.rectTop ?? ((node) => node.getBoundingClientRect?.().top ?? 0);
+	// 見直しを次のフレームまで遅らせる。rAF が無い環境ではマクロタスクへ回す
+	const schedule = deps.schedule ?? ((fn) => {
+		if (typeof view?.requestAnimationFrame === 'function') view.requestAnimationFrame(fn);
+		else setTimeout(fn, 0);
+	});
 	// 更新系は差し替えられるようにしておく (テストから本物の pixiv を叩かないため)
 	const actions = { addBookmark, deleteBookmark, ...deps.actions };
 
@@ -235,6 +245,17 @@ export function attachInfiniteScroll(doc, options) {
 	// ?p= の途中から開かれていることがある。次に読むのは「今出ているページ」の次
 	const start = Number(options.startPage);
 	let lastPage = Number.isFinite(start) && start >= 1 ? Math.floor(start) : 1;
+	/**
+	 * @type {import('./infinite-page.js').PageMark[]} 各ページの先頭に並んだカードの印。page の昇順。
+	 * `?p=` はこの印と画面の位置から決める (読み込んだ最後のページではない。SPEC §6.8.5)
+	 */
+	const pageMarks = [];
+	/** 最後に知らせたページ。同じ値を何度も知らせない (replaceState を呼び過ぎるとブラウザに絞られる) */
+	let notifiedPage = lastPage;
+	/** 次のフレームでの見直しを予約したか。scroll は連続で鳴るので 1 フレーム 1 回に束ねる */
+	let checkQueued = false;
+	/** view にスクロールの購読を張ったか。dispose() で外すときの目印 */
+	let scrollBound = false;
 	let loading = false;
 	let done = false;
 	let disposed = false;
@@ -435,11 +456,14 @@ export function attachInfiniteScroll(doc, options) {
 
 	/**
 	 * 作品を並べる。既に並んでいる作品は飛ばし、組めなかった作品も飛ばす。
+	 * そのページで最初に並べたカードは `?p=` を決める印として覚える。
+	 * 1 枚も並ばなかったページは印を持たない (画面に出ていないので `?p=` にも現れない)。
 	 * @param {object[]} works 作品サマリ
+	 * @param {number} page ページ番号 (1 始まり)
 	 * @returns {{added: number, skipped: number}} 並べた数と、既にあったので飛ばした数。
 	 *   added が 0 で skipped が works の数に満たなければ、組めなかった作品がある
 	 */
-	function render(works) {
+	function render(works, page) {
 		const existing = existingWorkIds();
 		let added = 0;
 		let skipped = 0;
@@ -452,6 +476,7 @@ export function attachInfiniteScroll(doc, options) {
 			const card = buildCard(templates, work, { loggedIn });
 			if (!card) continue;
 			ul.appendChild(card);
+			if (added === 0) pageMarks.push({ page, el: card });
 			if (id) existing.add(id);
 			added += 1;
 		}
@@ -494,18 +519,76 @@ export function attachInfiniteScroll(doc, options) {
 	}
 
 	/**
-	 * 今どこまで読んだかを呼び出し側へ知らせる。
+	 * 今どのページを見ているかを呼び出し側へ知らせる。
 	 *
+	 * 知らせるのは「読み込んだ最後のページ」ではなく「画面に出ているページ」。
+	 * 上へ戻れば戻ったぶんだけ小さくなる。値が前回と同じなら黙る
+	 * (知らせるたびに replaceState が走るため)。
 	 * URL (?p=) は router.js の持ち物なので、ここでは history を触らない。
 	 * ビュワーのモーダルが開いている間は書かない、といった判断も呼び出し側が持つ。
 	 * @returns {void}
 	 */
 	function notifyPage() {
 		try {
-			options.onPageChange?.(lastPage);
+			const page = pickVisiblePage(pageMarks, rectTop);
+			if (page === null || page === notifiedPage) return;
+			notifiedPage = page;
+			options.onPageChange?.(page);
 		} catch (error) {
 			// 知らせに失敗しても継ぎ足しは続ける。URL が追いつかないだけ
 			warn('page change notification failed', error);
+		}
+	}
+
+	/**
+	 * 見えているページを見直す。scroll は連続して鳴るので 1 フレームに 1 回へ束ねる。
+	 * @returns {void}
+	 */
+	function requestPageCheck() {
+		if (disposed || checkQueued) return;
+		checkQueued = true;
+		try {
+			schedule(() => {
+				checkQueued = false;
+				if (disposed) return;
+				notifyPage();
+			});
+		} catch (error) {
+			// 予約できなければ次の scroll で取り直す。継ぎ足し自体は動く
+			checkQueued = false;
+			warn('infinite scroll page check scheduling failed', error);
+		}
+	}
+
+	/**
+	 * スクロールと画面の大きさの変化を見張り始める。
+	 * 見張れなくても継ぎ足しは動く (`?p=` が画面に追いつかなくなるだけ)。
+	 * @returns {void}
+	 */
+	function bindScroll() {
+		if (scrollBound || typeof view?.addEventListener !== 'function') return;
+		try {
+			// 読むだけで既定の動作は止めないので passive で張る (スクロールを重くしない)
+			view.addEventListener('scroll', requestPageCheck, { passive: true });
+			view.addEventListener('resize', requestPageCheck, { passive: true });
+			scrollBound = true;
+		} catch (error) {
+			warn('infinite scroll scroll watch failed', error);
+		}
+	}
+
+	/**
+	 * スクロールの見張りをやめる。二度呼んでも 1 回しか外さない。
+	 * @returns {void}
+	 */
+	function unbindScroll() {
+		if (!scrollBound) return;
+		scrollBound = false;
+		try {
+			view.removeEventListener('scroll', requestPageCheck);
+			view.removeEventListener('resize', requestPageCheck);
+		} catch (error) {
+			warn('infinite scroll scroll unwatch failed', error);
 		}
 	}
 
@@ -552,7 +635,7 @@ export function attachInfiniteScroll(doc, options) {
 					finish();
 					return;
 				}
-				const { added, skipped } = render(works);
+				const { added, skipped } = render(works, next);
 				// 作品は返ってきたのに 1 枚も組めなかった (画像 URL が全て safeCdnUrl を
 				// 通らない等)。カードが増えないと sentinel も動かず、IntersectionObserver は
 				// 交差が変わったときにしか鳴らないので、放っておくと idle のまま黙って止まる。
@@ -732,6 +815,10 @@ export function attachInfiniteScroll(doc, options) {
 	// 継ぎ足したカードを出す CSS も同じ時点で入れる (1 枚目を足すより前であればよい)
 	pagerStyle.show();
 	cardStyle.show();
+	// 本体が並べたぶんの先頭カードも印にする。これが基準ページ (?p= の下限) になる
+	const firstCard = ul.querySelector('li');
+	if (firstCard) pageMarks.push({ page: lastPage, el: firstCard });
+	bindScroll();
 
 	return {
 		/**
@@ -761,11 +848,19 @@ export function attachInfiniteScroll(doc, options) {
 			}
 		},
 		/**
-		 * 今グリッドに並んでいる最後のページ番号。
+		 * 今画面に出ているページ番号。
 		 * 呼び出し側が URL の ?p= を合わせ直すときに読む (pixiv が ?p= を戻したあと等)。
+		 * 測れなければ最後に知らせた値を返す。
 		 * @returns {number} ページ番号 (1 以上)
 		 */
-		currentPage: () => lastPage,
+		currentPage() {
+			try {
+				return pickVisiblePage(pageMarks, rectTop) ?? notifiedPage;
+			} catch (error) {
+				warn('infinite scroll current page read failed', error);
+				return notifiedPage;
+			}
+		},
 		/**
 		 * 継ぎ足しをやめ、置いたものを全て撤去してページを元へ戻す。
 		 * 二度呼んでも 1 回しか効かない。
@@ -776,7 +871,10 @@ export function attachInfiniteScroll(doc, options) {
 			disposed = true;
 			dropPrefetch();
 			stopObserving();
+			unbindScroll();
 			unbindHeart();
+			// 撤去したカードの印は残さない。外れたノードの rect は当てにならない
+			pageMarks.length = 0;
 			// 隠したページャを戻す。継ぎ足しをやめた以上、ページ送りの手段が要る。
 			// sentinel の見た目も外して、置いたものを全て元へ戻す
 			pagerStyle.hide();
