@@ -253,3 +253,12 @@ test('原寸表示のクリック領域は左右で同じ幅', () => {
 		assert.ok(!block(viewer, selector).includes('width:'), `${selector} が自前の幅を持っている`);
 	}
 });
+
+test('原寸表示の幕は透けない', () => {
+	// --backdrop (92%) をそのまま使うと、背後のサイドバーの文字が読めてしまう
+	// (0.24.0 の実機確認で判明)。原寸表示は画像だけを見るための画面なので不透明にする
+	assert.ok(block(viewer, '.zoom').includes('background: var(--zoom-backdrop)'), '専用の幕を使っていない');
+	const value = variable(block(viewer, ':host'), '--zoom-backdrop');
+	assert.ok(value, '--zoom-backdrop が無い');
+	assert.ok(!/rgba|hsla|transparent/.test(value), `--zoom-backdrop が透ける値 (${value})`);
+});
