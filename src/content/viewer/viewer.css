@@ -13,7 +13,7 @@
  * ブラウザ既定の白っぽい 1px が出る (作者リンク・タグ・作品ページへのリンクで実際に起きた)。
  * 値は tokens.css の --focus-ring。例外は 2 つだけで、どちらも下に選択子付きで置く:
  *   .share-item  ... 縁が隣と接しているので内側に出す
- *   .overlay     ... Tab の巡回先ではないので出さない
+ *   .overlay / .zoom ... どちらもダイアログ本体で、Tab の巡回先ではないので出さない
  */
 :focus-visible {
 	outline: var(--focus-ring);
@@ -97,7 +97,9 @@
  * 操作できる部品の輪郭は上の共通規則が出す。
  */
 .overlay:focus,
-.overlay:focus-visible {
+.overlay:focus-visible,
+.zoom:focus,
+.zoom:focus-visible {
 	outline: none;
 }
 
@@ -261,6 +263,110 @@
 
 .counter {
 	position: absolute;
+	right: 12px;
+	top: 12px;
+	margin: 0;
+	padding: 2px 8px;
+	border-radius: 10px;
+	background: var(--surface);
+	color: var(--muted);
+	font-size: 12px;
+}
+
+/* 画像を押すと原寸表示に入れることを、カーソルで示す (設定がオンのときだけ付く class) */
+.stage img.zoomable {
+	cursor: zoom-in;
+}
+
+/*
+ * 原寸表示 (zoom.js)。overlay の直下に敷き、サイドバーの上も覆う。
+ * 画像は縮めずに置き、はみ出す分はこの層自身をスクロールさせる (pixiv 本体と同じ)。
+ */
+.zoom {
+	/* 左右のクリック領域の幅。pixiv 本体は上下 (前 20% / 次 40%) だが、この拡張では左右に置く。
+	   前後で同じ幅にして、どちらの端も同じ押し心地にする */
+	--zoom-zone-width: 25%;
+	/* クリック領域のカーソル。pixiv の .cur は拡張から使えないので同じ形を SVG で持つ。
+	   白い画像の上でも消えないよう、黒い縁取りの上に白い矢印を重ねる */
+	--zoom-cursor-prev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M18 4 L8 14 L18 24' fill='none' stroke='%23000' stroke-opacity='.5' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M18 4 L8 14 L18 24' fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 14 14;
+	--zoom-cursor-next: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M10 4 L20 14 L10 24' fill='none' stroke='%23000' stroke-opacity='.5' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M10 4 L20 14 L10 24' fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 14 14;
+
+	position: absolute;
+	inset: 0;
+	/* 閉じるボタン (z-index: 1) とサイドバーより上。overlay の中だけの順序 */
+	z-index: 2;
+	overflow: auto;
+	background: var(--backdrop);
+	/* safe を付けると、画面に収まらないときだけ中央揃えをやめて先頭から並べる。
+	   中央のままだとはみ出した上端と左端がスクロールしても出てこない */
+	display: grid;
+	place-items: safe center;
+}
+
+/* 画像の入れ物。原寸のまま置き、ステージ側の縮小 (max-width) を打ち消す */
+.zoom-canvas {
+	display: block;
+}
+
+.zoom-image {
+	display: block;
+	max-width: none;
+	max-height: none;
+	/* 画像の上を押すと原寸表示から戻る (pixiv 本体と同じ) */
+	cursor: zoom-out;
+}
+
+/*
+ * ページを送るクリック領域。透明のまま左右の端に置く。
+ * 画面に貼り付けるので position: fixed。絶対位置だと画像と一緒にスクロールして
+ * 縦長の作品で下端へ行ったときに押せなくなる。
+ */
+.zoom-zone {
+	position: fixed;
+	top: 0;
+	bottom: 0;
+	width: var(--zoom-zone-width);
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--fg);
+}
+
+.zoom-zone-prev {
+	left: 0;
+	cursor: var(--zoom-cursor-prev), pointer;
+}
+
+.zoom-zone-next {
+	right: 0;
+	cursor: var(--zoom-cursor-next), pointer;
+}
+
+/* 端では押せない。カーソルも矢印に変えない (押せそうに見せない) */
+.zoom-zone:disabled {
+	cursor: default;
+}
+
+/*
+ * 矢印はホバーしたときだけ薄く出す。透かすのはボタンではなく中の図形だけにすること。
+ * ボタンごと opacity: 0 にすると、Tab で来たときにフォーカスの輪郭まで消える
+ */
+.zoom-zone svg {
+	width: 48px;
+	height: 48px;
+	opacity: 0;
+	transition: opacity 120ms ease;
+	/* 白い画像の上でも沈まないように、影で縁を付ける */
+	filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.6));
+}
+
+.zoom-zone:hover:not(:disabled) svg {
+	opacity: 0.75;
+}
+
+/* ページ番号。pixiv 本体と同じく右上に小さく出す */
+.zoom-counter {
+	position: fixed;
 	right: 12px;
 	top: 12px;
 	margin: 0;

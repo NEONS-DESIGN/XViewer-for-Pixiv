@@ -71,6 +71,7 @@ export function planPanes(detail, session, settings) {
  * @property {Document} doc 対象のドキュメント
  * @property {HTMLElement} stage 主役の描画先 (.stage)
  * @property {HTMLElement} sidebar サイドバーの描画先 (.sidebar)
+ * @property {{open: (pages: object) => void}} [zoom] 原寸表示のレイヤ (zoom.js)。画像ペインだけが使う
  * @property {(userId: string) => Promise<object>} [fetchUser] 作者情報の取得 (サイドバーとアクションの両方へ渡す)。テストから通信させないために使う
  */
 
@@ -133,7 +134,8 @@ export async function renderWork(detail, session, settings, targets) {
 		ugoiraPane = createUgoiraPlayer({ doc, container: stage, settings });
 		await ugoiraPane.render(detail);
 	} else {
-		imagePane = createImagePane({ doc, container: stage, settings });
+		// 原寸表示を開けるのは静止画だけ。うごイラ (canvas) と見られない作品には渡さない
+		imagePane = createImagePane({ doc, container: stage, settings, zoom: targets.zoom });
 		await imagePane.render(detail);
 	}
 }

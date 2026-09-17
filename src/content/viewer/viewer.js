@@ -15,6 +15,7 @@ import {
 	POPUP_THEMES,
 	SIDEBAR_SCROLL,
 	STATUS_KINDS,
+	INERT_SELECTOR,
 } from '../../common/constants.js';
 import { createIcon } from '../../common/icons.js';
 import { warn } from '../../common/log.js';
@@ -23,6 +24,7 @@ import { illustUrl } from '../../pixiv/endpoints.js';
 import { normalizeDetail } from '../../pixiv/normalize.js';
 import { readSession } from '../session.js';
 import { renderWork, disposeAll, movePage, consumeKey } from './panes.js';
+import { createZoomLayer } from './zoom.js';
 import { createNavigation } from './navigation.js';
 
 /** ホストページのスクロールを止めるために body へ付ける style。 */
@@ -32,7 +34,7 @@ const BODY_LOCK_STYLE = 'overflow:hidden';
  * 設定のうち、変わったら今開いている作品を描き直す必要があるもの。
  * closeOnBackdrop は押されたときに読むので入れない。popupTheme はビュワーに関係ない
  */
-const RERENDER_SETTING_KEYS = Object.freeze(['imageQuality', 'prefetch', 'showSidebar']);
+const RERENDER_SETTING_KEYS = Object.freeze(['imageQuality', 'prefetch', 'showSidebar', 'clickZoom']);
 
 /**
  * ステージの中で押しても閉じない要素。
@@ -122,6 +124,8 @@ export function createViewer(deps) {
 	let sidebar = null;
 	/** @type {HTMLButtonElement|null} 閉じるボタン。開いた直後のフォーカス先 */
 	let closeButton = null;
+	/** @type {ReturnType<typeof createZoomLayer>|null} 原寸表示のレイヤ。ホストと一緒に作る */
+	let zoomLayer = null;
 	/** 開く要求の世代。await をまたいで古い応答を捨てるために使う */
 	let requestToken = 0;
 	/** @type {object|null} 最後に描いた作品詳細。設定が変わったときに通信なしで描き直すために持つ */
@@ -204,6 +208,10 @@ export function createViewer(deps) {
 			if (keepsOpen(event.target) || keepsOpen(pressed)) return;
 			deps.onRequestClose();
 		});
+
+		// 原寸表示は overlay の直下に敷く。ステージの中に入れるとサイドバーが上に残る。
+		// 閉じたらフォーカスはダイアログ本体へ戻す (レイヤの中の部品ごと消えるため)
+		zoomLayer = createZoomLayer({ doc, container: overlay, restoreFocus: () => overlay?.focus() });
 
 		doc.body.appendChild(host);
 	}
@@ -289,14 +297,17 @@ export function createViewer(deps) {
 
 	/**
 	 * Tab のフォーカスを Shadow DOM の中だけで巡回させる。
-	 * FOCUSABLE_SELECTOR が disabled を除いているので、ここでは隠れているものだけを外す。
+	 * FOCUSABLE_SELECTOR が disabled を除いているので、ここでは
+	 * 隠れているものと inert の中のもの (原寸表示中の背後) だけを外す。
 	 * @param {KeyboardEvent} event キー
 	 * @returns {void}
 	 */
 	function trapFocus(event) {
 		if (!shadow) return;
 		const focusable = Array.from(shadow.querySelectorAll(FOCUSABLE_SELECTOR))
-			.filter((element) => !element.closest(HIDDEN_SELECTOR) && isRendered(element));
+			.filter((element) => !element.closest(HIDDEN_SELECTOR)
+				&& !element.closest(INERT_SELECTOR)
+				&& isRendered(element));
 		if (focusable.length === 0) return;
 		event.preventDefault();
 		const step = event.shiftKey ? -1 : 1;
@@ -336,13 +347,19 @@ export function createViewer(deps) {
 	/**
 	 * キーボード操作。
 	 *
-	 * キーはサイドバーの部品 (シェアメニュー) に先に使わせる。
+	 * キーは手前に出ているものから順に使わせる。
+	 * 原寸表示 (画面全体を覆う) が最優先で、次がサイドバーの部品 (シェアメニュー)。
 	 * 開いているメニューを閉じたつもりでモーダルごと閉じる、メニューの項目を
 	 * 下キーで送ったつもりで次の作品へ移る、を防ぐ。
 	 * @param {KeyboardEvent} event キー
 	 * @returns {void}
 	 */
 	function onKeyDown(event) {
+		if (zoomLayer?.consumeKey(event)) {
+			event.preventDefault();
+			event.stopPropagation();
+			return;
+		}
 		if (consumeKey(event)) {
 			event.preventDefault();
 			event.stopPropagation();
@@ -367,10 +384,12 @@ export function createViewer(deps) {
 				doc,
 				stage,
 				sidebar,
+				zoom: zoomLayer,
 				fetchUser: deps.fetchUser,
 			});
 		} catch (error) {
 			if (token !== requestToken) return;
+			zoomLayer?.close();
 			disposeAll();
 			showStatus(MESSAGES.LOAD_FAILED, STATUS_KINDS.ERROR);
 			warn('failed to render', detail.id, error);
@@ -401,7 +420,9 @@ export function createViewer(deps) {
 		}
 
 		// 古いペインは取得を待つ前に必ず捨てる。
-		// 読み込み中のサイドバーの見え方も設定どおりにしておく (renderWork でも改めて設定する)
+		// 読み込み中のサイドバーの見え方も設定どおりにしておく (renderWork でも改めて設定する)。
+		// 原寸表示も一緒に閉じる。開いたまま作品を移ると、次の作品の原寸画像を毎回読むことになる
+		zoomLayer?.close();
 		disposeAll();
 		// 開いた直後のキー操作がモーダルへ届くようにする。
 		// 作品を送ったときは押していたボタンがペインごと消えてフォーカスが body へ落ちるので、
@@ -445,6 +466,8 @@ export function createViewer(deps) {
 		doc.removeEventListener('keydown', onKeyDown, true);
 		unlockBody();
 		unlockBackground();
+		zoomLayer?.dispose();
+		zoomLayer = null;
 		disposeAll();
 		host.remove();
 		host = null;
@@ -498,6 +521,7 @@ export function createViewer(deps) {
 				return;
 			}
 			const token = ++requestToken;
+			zoomLayer?.close();
 			disposeAll();
 			void renderDetail(lastDetail, token);
 		},

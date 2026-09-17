@@ -285,6 +285,7 @@ export const SETTINGS_DEFAULTS = Object.freeze({
 	showSidebar: true,
 	sidebarScroll: SIDEBAR_SCROLL.WHOLE,
 	closeOnBackdrop: true,
+	clickZoom: false,
 	gridTabSkip: GRID_TAB_SKIP.NONE,
 	hidePickup: false,
 	infiniteScroll: INFINITE_SCROLL.OFF,
@@ -328,3 +329,10 @@ export const HIDDEN_SELECTOR = '[hidden]';
 
 /** モーダルの背後を Tab と読み上げから外すための属性。 */
 export const INERT_ATTRIBUTE = 'inert';
+
+/**
+ * inert が付いている要素。フォーカスの巡回から外すために使う。
+ * inert の中の要素は focus() が無言で失敗するので、巡回の対象に残すと
+ * そこで Tab が止まったように見える (原寸表示中のステージとサイドバーがこれに当たる)。
+ */
+export const INERT_SELECTOR = `[${INERT_ATTRIBUTE}]`;

@@ -29,6 +29,7 @@ test('既定値は「初めて入れた人がそのまま使える」側に寄�
 	assert.equal(SETTINGS_DEFAULTS.sidebarScroll, SIDEBAR_SCROLL.WHOLE, 'サイドバーは丸ごと送る');
 	assert.equal(SETTINGS_DEFAULTS.prefetch, 1, '先読みは前後 1 枚 (通信量と端末の負荷を抑える)');
 	assert.equal(SETTINGS_DEFAULTS.gridTabSkip, GRID_TAB_SKIP.NONE, 'Tab 順は pixiv 標準のまま');
+	assert.equal(SETTINGS_DEFAULTS.clickZoom, false, 'クリックで原寸表示は既定でオフ');
 	assert.ok(PREFETCH_CHOICES.includes(SETTINGS_DEFAULTS.prefetch), '既定が選択肢に無い');
 });
 
@@ -40,6 +41,7 @@ test('normalizeSettings は正しい値をそのまま通す', () => {
 		showSidebar: false,
 		sidebarScroll: SIDEBAR_SCROLL.WHOLE,
 		closeOnBackdrop: false,
+		clickZoom: true,
 		gridTabSkip: GRID_TAB_SKIP.TITLE,
 		hidePickup: true,
 		infiniteScroll: INFINITE_SCROLL.ON_REACH,
@@ -54,6 +56,14 @@ test('normalizeSettings はピックアップ非表示を真偽値へ丸める',
 	assert.equal(normalizeSettings({ hidePickup: 'yes' }).hidePickup, false);
 	assert.equal(normalizeSettings({ hidePickup: 1 }).hidePickup, false);
 	assert.equal(normalizeSettings({ hidePickup: true }).hidePickup, true);
+});
+
+test('normalizeSettings はクリックで原寸表示を真偽値へ丸める', () => {
+	// 既定はオフ。壊れた保存値で勝手に開くと、画像を押しただけで全画面になる
+	assert.equal(normalizeSettings({}).clickZoom, false);
+	assert.equal(normalizeSettings({ clickZoom: 'on' }).clickZoom, false);
+	assert.equal(normalizeSettings({ clickZoom: 1 }).clickZoom, false);
+	assert.equal(normalizeSettings({ clickZoom: true }).clickZoom, true);
 });
 
 test('normalizeSettings は知らないサイドバーの送り方を既定へ倒す', () => {

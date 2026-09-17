@@ -145,6 +145,12 @@ export const SECTIONS = Object.freeze([
 				description: '次に見る画像を先に読み込んでおくと、切り替えが速くなります。',
 				options: Object.freeze(PREFETCH_CHOICES.map(prefetchOption)),
 			}),
+			Object.freeze({
+				kind: 'toggle',
+				key: 'clickZoom',
+				label: 'クリックで原寸表示',
+				description: '画像を押すと、原寸のまま画面いっぱいに開きます (pixiv の作品ページと同じ)。左右の端を押すか ← → でページを送り、もう一度押すか Esc で戻ります。上の解像度の指定にかかわらず原寸の画像を読み込みます。',
+			}),
 		]),
 	}),
 	Object.freeze({
