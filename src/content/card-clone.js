@@ -100,39 +100,59 @@ export function findBadge(card) {
 }
 
 /**
+ * カードの並びから single / multi の 2 枚を選ぶ。
+ * accept を満たすカードだけを見て、単枚とバッジ付きが揃った時点で切り上げる
+ * (getComputedStyle を並び全部に呼ばないため)。
+ * @param {object[]} cards 候補のカード (li)
+ * @param {(card: object) => boolean} accept 雛形にしてよいか
+ * @returns {{single: object, multi: object|null}|null} 雛形。採れなければ null
+ */
+function pickTemplates(cards, accept) {
+	let single = null;
+	let multi = null;
+	for (const card of cards) {
+		if (!accept(card)) continue;
+		const badge = findBadge(card);
+		if (badge && !multi) multi = card.cloneNode(true);
+		if (!badge && !single) single = card.cloneNode(true);
+		if (single && multi) break;
+	}
+	// 全作品が複数枚の作者では single が採れない。multi からバッジを外して使う
+	if (!single && multi) {
+		single = multi.cloneNode(true);
+		findBadge(single)?.remove();
+	}
+	return single ? { single, multi } : null;
+}
+
+/**
  * ページ上のカードから雛形を採る。
  *
- * 自分が継ぎ足したカード (GV_CARD_ATTR 付き)、画像が読み込まれていないカード (figure のまま)、
- * ハートが見つからないカード、ブックマーク済みのカードは雛形にしない。
- * 1 番目は劣化コピーの連鎖、2 番目は img ごと欠ける、3・4 番目はハートが未ブックマークの見た目にならない。
+ * 自分が継ぎ足したカード (GV_CARD_ATTR 付き) と、画像が読み込まれていないカード (figure のまま) は
+ * 最初に落とす。前者は劣化コピーが連鎖し、後者は img ごと欠ける。
+ *
+ * 残りからは **未ブックマークのハートを持つカードを優先する**。ブックマーク済みのカードは
+ * ハートが塗られた見た目になるので雛形にしない。
+ *
+ * **1 枚もハートが無ければ、ハート無しのカードで組む。** 自分のユーザーページでは pixiv が
+ * 自分の作品にブックマークボタンを描かない (SITE_SPEC §4) ので、ここで諦めると
+ * 自分のページだけ無限スクロールが起動しなくなる。
+ * 優先順位を付けるのは混在への備え — 読み込み途中などで 1 枚だけハートが欠けたカードを掴むと、
+ * 継ぎ足したカードだけブックマークできなくなる。
  * @param {object} ul グリッドの ul
  * @param {{computedStyle?: Function}} [deps] テスト用の依存
  * @returns {{single: object, multi: object|null}|null} 雛形。採れなければ null
  */
 export function captureTemplates(ul, deps = {}) {
 	const computed = deps.computedStyle ?? ((node) => globalThis.getComputedStyle(node));
-	let single = null;
-	let multi = null;
 	try {
-		for (const card of [...ul.querySelectorAll(CARD_SELECTOR)]) {
-			// 自分が継ぎ足したカードを雛形にすると、劣化コピーが連鎖する (原因が分かりにくい事故)
-			if (card.hasAttribute(GV_CARD_ATTR)) continue;
-			if (!card.querySelector('img')) continue;
+		const cards = [...ul.querySelectorAll(CARD_SELECTOR)]
+			.filter((card) => !card.hasAttribute(GV_CARD_ATTR) && card.querySelector('img'));
+		const plain = pickTemplates(cards, (card) => {
 			const paths = heartPaths(card);
-			// ハートが見つからないカードは未ブックマークの見た目を確かめられないので雛形にしない
-			if (paths.length === 0) continue;
-			if (paths.some((path) => isBookmarkedFill(computed(path).fill))) continue;
-			const badge = findBadge(card);
-			if (badge && !multi) multi = card.cloneNode(true);
-			if (!badge && !single) single = card.cloneNode(true);
-			if (single && multi) break;
-		}
-		// 全作品が複数枚の作者では single が採れない。multi からバッジを外して使う
-		if (!single && multi) {
-			single = multi.cloneNode(true);
-			findBadge(single)?.remove();
-		}
-		return single ? { single, multi } : null;
+			return paths.length > 0 && !paths.some((path) => isBookmarkedFill(computed(path).fill));
+		});
+		return plain ?? pickTemplates(cards, (card) => heartPaths(card).length === 0);
 	} catch (error) {
 		// 雛形が採れないだけ。継ぎ足しを諦めてページャを残す
 		warn('card template capture failed', error);
@@ -201,6 +221,8 @@ export function buildCard(templates, work, deps) {
 			if (count) count.textContent = String(work.pageCount);
 		}
 
+		// 自分のユーザーページでは雛形にハートが無い (SITE_SPEC §4)。塗る先も外す先も無いだけで、
+		// カードは組める。ブックマーク ID も書かない (押せるハートが無いので使い道がない)
 		const heartBox = card.querySelector(BOOKMARK_BUTTON_SELECTOR);
 		if (!deps.loggedIn) heartBox?.remove();
 		else if (heartBox && work.bookmarkData) {

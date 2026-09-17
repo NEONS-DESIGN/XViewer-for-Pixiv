@@ -1103,6 +1103,23 @@ test('未ログインならハートの購読を張らない', () => {
 	assert.deepEqual(bound, [], '未ログインなのに doc へ購読を張っている');
 });
 
+test('雛形にハートが無ければ購読を張らない', () => {
+	// 自分のユーザーページ。pixiv が自分の作品にブックマークボタンを描かないので (SITE_SPEC §4)、
+	// 継ぎ足したカードにも押せるハートは無い。購読は全クリックで空振りするだけになる
+	const { ul, wrap } = makeGrid([makeCard({ id: '1', heart: false })]);
+	const doc = fakeDoc(wrap);
+	const bound = [];
+	const original = doc.addEventListener;
+	doc.addEventListener = (type, handler, capture) => { bound.push(type); original.call(doc, type, handler, capture); };
+	const handle = attachInfiniteScroll(doc, {
+		ul, source: fakeSource(3).source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
+		deps: { createObserver: fakeObserver().create, computedStyle: fakeComputedStyle },
+	});
+	// 継ぎ足し自体は動く。ハートが無いだけで、無限スクロールを諦める理由にはならない
+	assert.equal(handle.isActive(), true);
+	assert.deepEqual(bound, [], '押せるハートが無いのに doc へ購読を張っている');
+});
+
 test('dispose でハートの購読も外れる', async () => {
 	const calls = [];
 	const { ul, handle, observer } = setup({ actions: fakeActions(calls) });
