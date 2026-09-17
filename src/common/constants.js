@@ -155,8 +155,13 @@ export const IMAGE_QUALITY = Object.freeze({
 /** 先読みする枚数の選択肢。昇順に並べる (設定画面はこの並びで選択肢を出す)。 */
 export const PREFETCH_CHOICES = Object.freeze([0, 1, 3]);
 
-/** 先読みの既定値。選択肢の一番大きいもの (値の出どころを PREFETCH_CHOICES 1 つにする)。 */
-export const DEFAULT_PREFETCH = PREFETCH_CHOICES[PREFETCH_CHOICES.length - 1];
+/**
+ * 先読みの既定値。前後 1 枚。
+ * 切り替えの速さより、端末と回線への負担の少なさを既定に置く
+ * (高解像度の作品を 3 枚先まで取ると、送るだけで通信量が膨らむ)。
+ * 値は PREFETCH_CHOICES から引く (選択肢に無い既定を書けないようにするため)。
+ */
+export const DEFAULT_PREFETCH = PREFETCH_CHOICES[PREFETCH_CHOICES.indexOf(1)];
 
 /** コメントを 1 回に読む件数。 */
 export const COMMENT_PAGE_SIZE = 30;
@@ -174,7 +179,7 @@ export const GRID_TAB_SKIP = Object.freeze({
 	BOTH: 'both',
 	/** タイトルリンクだけ */
 	TITLE: 'title',
-	/** 何も外さない (pixiv 標準のまま) */
+	/** 何も外さない (既定。pixiv 標準のまま) */
 	NONE: 'none',
 });
 
@@ -235,9 +240,9 @@ export const PAGER_SELECTOR = 'nav:has(a[href*="?p="])';
  * 主文がとても長い作品では、コメントまで一気に読めたほうが楽なこともある。
  */
 export const SIDEBAR_SCROLL = Object.freeze({
-	/** 投稿文とタグは固定したまま、コメント一覧だけを送る (既定。X.com の見え方) */
+	/** 投稿文とタグは固定したまま、コメント一覧だけを送る (X.com の見え方) */
 	COMMENTS: 'comments',
-	/** 投稿文からコメントまでを 1 つにつなげて送る */
+	/** 投稿文からコメントまでを 1 つにつなげて送る (既定) */
 	WHOLE: 'whole',
 });
 
@@ -278,9 +283,9 @@ export const SETTINGS_DEFAULTS = Object.freeze({
 	imageQuality: IMAGE_QUALITY.REGULAR,
 	prefetch: DEFAULT_PREFETCH,
 	showSidebar: true,
-	sidebarScroll: SIDEBAR_SCROLL.COMMENTS,
+	sidebarScroll: SIDEBAR_SCROLL.WHOLE,
 	closeOnBackdrop: true,
-	gridTabSkip: GRID_TAB_SKIP.BOTH,
+	gridTabSkip: GRID_TAB_SKIP.NONE,
 	hidePickup: false,
 	infiniteScroll: INFINITE_SCROLL.OFF,
 	popupTheme: POPUP_THEMES.SYSTEM,

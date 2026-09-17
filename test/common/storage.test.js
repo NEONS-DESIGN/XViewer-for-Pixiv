@@ -2,7 +2,7 @@ import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeSettings, loadSettings, saveSetting, resetSettings, watchSettings } from '../../src/common/storage.js';
 import { LOG_PREFIX } from '../../src/common/log.js';
-import { SETTINGS_DEFAULTS, GRID_TAB_SKIP, POPUP_THEMES, SIDEBAR_SCROLL, INFINITE_SCROLL } from '../../src/common/constants.js';
+import { SETTINGS_DEFAULTS, GRID_TAB_SKIP, POPUP_THEMES, SIDEBAR_SCROLL, INFINITE_SCROLL, PREFETCH_CHOICES } from '../../src/common/constants.js';
 
 /**
  * chrome.storage.sync の偽物を作る。
@@ -21,6 +21,15 @@ function fakeArea(stored = {}) {
 test('normalizeSettings は空の入力を既定へ倒す', () => {
 	assert.deepEqual(normalizeSettings({}), SETTINGS_DEFAULTS);
 	assert.deepEqual(normalizeSettings(null), SETTINGS_DEFAULTS);
+});
+
+test('既定値は「初めて入れた人がそのまま使える」側に寄せる', () => {
+	// 初期化ボタンも SETTINGS_DEFAULTS をそのまま書くので、ここが唯一の出どころ。
+	// 3 つとも「拡張が勝手に変える度合いを下げる」向きに倒してある
+	assert.equal(SETTINGS_DEFAULTS.sidebarScroll, SIDEBAR_SCROLL.WHOLE, 'サイドバーは丸ごと送る');
+	assert.equal(SETTINGS_DEFAULTS.prefetch, 1, '先読みは前後 1 枚 (通信量と端末の負荷を抑える)');
+	assert.equal(SETTINGS_DEFAULTS.gridTabSkip, GRID_TAB_SKIP.NONE, 'Tab 順は pixiv 標準のまま');
+	assert.ok(PREFETCH_CHOICES.includes(SETTINGS_DEFAULTS.prefetch), '既定が選択肢に無い');
 });
 
 test('normalizeSettings は正しい値をそのまま通す', () => {
@@ -48,8 +57,8 @@ test('normalizeSettings はピックアップ非表示を真偽値へ丸める',
 });
 
 test('normalizeSettings は知らないサイドバーの送り方を既定へ倒す', () => {
-	assert.equal(normalizeSettings({ sidebarScroll: 'both' }).sidebarScroll, SIDEBAR_SCROLL.COMMENTS);
-	assert.equal(normalizeSettings({ sidebarScroll: 42 }).sidebarScroll, SIDEBAR_SCROLL.COMMENTS);
+	assert.equal(normalizeSettings({ sidebarScroll: 'both' }).sidebarScroll, SIDEBAR_SCROLL.WHOLE);
+	assert.equal(normalizeSettings({ sidebarScroll: 42 }).sidebarScroll, SIDEBAR_SCROLL.WHOLE);
 });
 
 test('normalizeSettings は知らない解像度を既定へ倒す', () => {
@@ -57,17 +66,17 @@ test('normalizeSettings は知らない解像度を既定へ倒す', () => {
 });
 
 test('normalizeSettings は選択肢に無い先読み数を既定へ倒す', () => {
-	assert.equal(normalizeSettings({ prefetch: 99 }).prefetch, 3);
-	assert.equal(normalizeSettings({ prefetch: '3' }).prefetch, 3);
+	assert.equal(normalizeSettings({ prefetch: 99 }).prefetch, 1);
+	assert.equal(normalizeSettings({ prefetch: '3' }).prefetch, 1);
 });
 
 test('normalizeSettings は選択肢に無い Tab スキップの指定を既定へ倒す', () => {
-	assert.equal(normalizeSettings({ gridTabSkip: 'everything' }).gridTabSkip, GRID_TAB_SKIP.BOTH);
-	assert.equal(normalizeSettings({ gridTabSkip: 3 }).gridTabSkip, GRID_TAB_SKIP.BOTH);
+	assert.equal(normalizeSettings({ gridTabSkip: 'everything' }).gridTabSkip, GRID_TAB_SKIP.NONE);
+	assert.equal(normalizeSettings({ gridTabSkip: 3 }).gridTabSkip, GRID_TAB_SKIP.NONE);
 });
 
 test('normalizeSettings は Tab スキップの選択肢をそのまま通す', () => {
-	assert.equal(normalizeSettings({ gridTabSkip: GRID_TAB_SKIP.NONE }).gridTabSkip, GRID_TAB_SKIP.NONE);
+	assert.equal(normalizeSettings({ gridTabSkip: GRID_TAB_SKIP.BOTH }).gridTabSkip, GRID_TAB_SKIP.BOTH);
 });
 
 test('normalizeSettings は真偽値でない値を既定へ倒す', () => {
@@ -78,7 +87,7 @@ test('loadSettings は保存値と既定を混ぜて返す', async () => {
 	const { area } = fakeArea({ imageQuality: 'original' });
 	const settings = await loadSettings({ area });
 	assert.equal(settings.imageQuality, 'original');
-	assert.equal(settings.prefetch, 3);
+	assert.equal(settings.prefetch, SETTINGS_DEFAULTS.prefetch);
 });
 
 test('loadSettings は storage が失敗しても既定を返す', async () => {
