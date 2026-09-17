@@ -352,3 +352,54 @@ test('ログインが切れていたら (401) 再読み込みまで案内する'
 	assert.equal(status.getAttribute('data-kind'), 'error');
 	bar.dispose();
 });
+
+test('自分の作品ではカウンタを差し替えずフォローも出さない', () => {
+	// 自分にはいいね・ブックマーク・フォローのどれもできない。
+	// pixiv 本体も自分の作品では 3 つとも描かない (SITE_SPEC §4)。
+	// 押せば必ず失敗するボタンを出さないのが正しい
+	clearSessionCache();
+	const container = fakeCounts();
+	const followContainer = fakeElement('div');
+	const calls = [];
+	const bar = createActionsBar({
+		doc: fakeDocWith({
+			nextData: buildNextData({ token: 'csrf-token', self: { id: DETAIL.userId, xRestrict: 1 } }),
+		}),
+		container,
+		followContainer,
+		// 呼ばれたら「自分かどうか」を見ずにフォロー状態を引きに行っている
+		fetchUser: async (userId) => { calls.push(userId); return { isFollowed: false }; },
+	});
+	bar.render(DETAIL);
+	// 件数は読めるままにする (未ログインのときと同じ扱い)
+	assert.equal(container.querySelector('.count-like').tag, 'span');
+	assert.equal(container.querySelector('.count-bookmark').tag, 'span');
+	assert.equal(followContainer.children.length, 0);
+	// 押せるものが無いので、結果を読み上げる領域も作らない
+	assert.equal(find(container, '.action-status'), null);
+	// 自分の作品なら /ajax/user も引かない
+	assert.deepEqual(calls, []);
+	bar.dispose();
+	clearSessionCache();
+});
+
+test('他人の作品なら self.id があってもボタンを出す', () => {
+	// 判定は ID の一致だけ。ログイン済みなら他人の作品はこれまでどおり押せる
+	clearSessionCache();
+	const container = fakeCounts();
+	const followContainer = fakeElement('div');
+	const bar = createActionsBar({
+		doc: fakeDocWith({
+			nextData: buildNextData({ token: 'csrf-token', self: { id: '16343044', xRestrict: 1 } }),
+		}),
+		container,
+		followContainer,
+		fetchUser: async () => ({ isFollowed: false }),
+		patchUser: () => {},
+	});
+	bar.render(DETAIL);
+	assert.equal(container.querySelector('.count-like').tag, 'button');
+	assert.equal(followContainer.children.length, 1);
+	bar.dispose();
+	clearSessionCache();
+});

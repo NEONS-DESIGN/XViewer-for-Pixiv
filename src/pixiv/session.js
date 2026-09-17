@@ -13,6 +13,8 @@ const EMPTY_SESSION = Object.freeze({ isLoggedIn: false, self: null, csrfToken: 
 
 /**
  * @typedef {object} SessionSelf
+ * @property {string|null} id 自分のユーザー ID。作品の userId と比べて「自分の作品か」を決める
+ *   (SITE_SPEC §6)。読めなければ null で、その場合は「自分ではない」に倒す
  * @property {number} xRestrict 表示設定 0=全年齢のみ 1=R-18まで 2=R-18Gまで
  * @property {boolean} hideAiWorks AI 作品を隠す設定。未使用。SPEC §16 のとおり AI 生成の表示は未実装で、
  *   サーバー側フィルタなので拡張側で判定に使う場面も無い (SITE_SPEC §6)。読めるように残してある
@@ -58,7 +60,10 @@ export function parseNextData(text) {
 		session.csrfToken = preloaded?.api?.token ?? null;
 		const self = preloaded?.userData?.self;
 		if (self) {
+			// 作品詳細の userId は文字列なので型をそろえる。空文字は「読めなかった」と同じ扱い
+			const id = self.id === null || self.id === undefined ? '' : String(self.id);
 			session.self = {
+				id: id === '' ? null : id,
 				xRestrict: typeof self.xRestrict === 'number' ? self.xRestrict : DEFAULT_X_RESTRICT,
 				hideAiWorks: self.hideAiWorks === true,
 			};

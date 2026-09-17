@@ -90,6 +90,25 @@ export function canView(work, self) {
 }
 
 /**
+ * その作品が今ログインしているユーザー自身のものか。
+ *
+ * 自分の作品にはいいね・ブックマーク・フォローのどれもできない。pixiv 本体もこの 3 つを
+ * 描かず、代わりに「作品を編集」を出す (SITE_SPEC §4)。押せば必ず失敗するボタンは出さない。
+ *
+ * 判定材料は ID の一致だけ。どちらかが読めなければ「自分ではない」に倒す
+ * (空同士を一致とみなすと、他人の作品まで操作できなくなる)。
+ * @param {{userId: string}|null|undefined} work 対象の作品
+ * @param {{id: string|null}|null|undefined} self ログイン中のユーザー。未ログインなら null
+ * @returns {boolean} 自分の作品なら true
+ */
+export function isOwnWork(work, self) {
+	const selfId = self?.id;
+	const userId = work?.userId;
+	if (!selfId || !userId) return false;
+	return String(userId) === String(selfId);
+}
+
+/**
  * 作品詳細を WorkDetail へ揃える。
  * 詳細 API は id と illustId のように同じ値を 2 つの名前で返すので、片方だけを使う。
  * 数値カウンタは欠けていれば 0、タグは null 要素を落として返す。
