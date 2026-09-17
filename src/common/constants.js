@@ -16,10 +16,10 @@ export const BOOKMARK_BUTTON_SELECTOR = '[data-ga4-label="bookmark_button"]';
 export const BOOKMARKED_FILL = '#ff4060';
 
 /** 自分が継ぎ足したカードの目印。撤去と重複判定とクリック判定に使う。 */
-export const GV_CARD_ATTR = 'data-gv-card';
+export const XV_CARD_ATTR = 'data-xv-card';
 
 /** 継ぎ足したカードが持つブックマーク ID。取り消しに使う。無ければ未ブックマーク。 */
-export const GV_BOOKMARK_ID_ATTR = 'data-gv-bookmark-id';
+export const XV_BOOKMARK_ID_ATTR = 'data-xv-bookmark-id';
 
 /**
  * グリッドのカード 1 枚を指す要素と、その中のブックマークボタン。
@@ -33,8 +33,8 @@ export const CARD_BUTTON_SELECTOR = 'button';
  * tab-skip がフォーカス順から外した要素と、読み上げ名を補ったサムネリンクの目印。
  * dispose で元へ戻すときと、継ぎ足したカードから雛形由来の印を落とすときに使う。
  */
-export const TAB_SKIP_MARK_ATTR = 'data-gv-tabskip';
-export const TAB_SKIP_LABEL_ATTR = 'data-gv-label';
+export const TAB_SKIP_MARK_ATTR = 'data-xv-tabskip';
+export const TAB_SKIP_LABEL_ATTR = 'data-xv-label';
 
 /**
  * プロフィールのホームに出る「ピックアップ」欄を指すセレクタ。
@@ -116,7 +116,7 @@ export const WORK_CATEGORY_QUERY = Object.freeze({
 export const WORK_CATEGORY_QUERY_BOTH = 'illustManga';
 
 /** モーダルを載せるホスト要素の id。 */
-export const HOST_ELEMENT_ID = 'gridviewer-root';
+export const HOST_ELEMENT_ID = 'xviewer-root';
 
 /**
  * page world の注入スクリプトと content script の間でやり取りするイベント名。
@@ -124,15 +124,15 @@ export const HOST_ELEMENT_ID = 'gridviewer-root';
  */
 export const NAV_EVENTS = Object.freeze({
 	/** 注入側 -> content script。history が呼ばれた */
-	NAVIGATE: 'gridviewer:navigate',
+	NAVIGATE: 'xviewer:navigate',
 	/** content script -> 注入側。history のフックを外して pixiv 標準に戻す */
-	UNHOOK: 'gridviewer:unhook',
+	UNHOOK: 'xviewer:unhook',
 	/** content script -> 注入側。外したフックを張り直す */
-	REHOOK: 'gridviewer:rehook',
+	REHOOK: 'xviewer:rehook',
 });
 
 /** history をフック済みであることを示す window のプロパティ名。二重注入の防止に使う。 */
-export const NAV_HOOK_FLAG = '__gridviewerNavHooked';
+export const NAV_HOOK_FLAG = '__xviewerNavHooked';
 
 /**
  * MutationObserver から location を確かめるまでの待ち時間 (ミリ秒)。
@@ -200,7 +200,7 @@ export const INFINITE_SCROLL = Object.freeze({
 });
 
 /** sentinel の目印。ul の直後に置き、見えたら次のページを読む。 */
-export const SENTINEL_ATTR = 'data-gv-sentinel';
+export const SENTINEL_ATTR = 'data-xv-sentinel';
 
 /**
  * モードごとの sentinel の見張り範囲 (IntersectionObserver の rootMargin)。

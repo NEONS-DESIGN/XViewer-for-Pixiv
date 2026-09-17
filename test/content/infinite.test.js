@@ -5,7 +5,7 @@ import {
 	CARD_STYLE_ID, CARD_SHOW_CSS,
 } from '../../src/content/infinite.js';
 import {
-	INFINITE_SCROLL, GV_CARD_ATTR, GV_BOOKMARK_ID_ATTR, SENTINEL_ATTR, SENTINEL_MARGIN,
+	INFINITE_SCROLL, XV_CARD_ATTR, XV_BOOKMARK_ID_ATTR, SENTINEL_ATTR, SENTINEL_MARGIN,
 	BOOKMARK_BUTTON_SELECTOR, BOOKMARKED_FILL, PAGER_SELECTOR,
 } from '../../src/common/constants.js';
 import { makeCard, makeGrid, el, fakeComputedStyle } from '../helpers/card.js';
@@ -66,7 +66,7 @@ function fakeSource(pages, options = {}) {
  * @returns {object[]} カード (li)
  */
 function addedCards(ul) {
-	return [...ul.querySelectorAll('li')].filter((li) => li.getAttribute(GV_CARD_ATTR));
+	return [...ul.querySelectorAll('li')].filter((li) => li.getAttribute(XV_CARD_ATTR));
 }
 
 /**
@@ -244,7 +244,7 @@ test('下まで来たら次のページを継ぎ足す', async () => {
 	assert.deepEqual(loaded, [2], '2 ページ目を読んでいない');
 	const added = addedCards(ul);
 	assert.equal(added.length, 2);
-	assert.equal(added[0].getAttribute(GV_CARD_ATTR), '21');
+	assert.equal(added[0].getAttribute(XV_CARD_ATTR), '21');
 });
 
 test('読み込み中に下まで来ても二重に読まない', async () => {
@@ -478,11 +478,11 @@ function setupDuplicating(options = {}) {
 }
 
 test('既に並んでいる作品は継ぎ足さない', async () => {
-	// 基準ページの記憶がずれても同じ作品が二重に並ばないための保険 (GV_CARD_ATTR の役割)
+	// 基準ページの記憶がずれても同じ作品が二重に並ばないための保険 (XV_CARD_ATTR の役割)
 	const { ul, observer } = setupDuplicating({ duplicatePages: [] });
 	await observer.trigger();
 	const added = addedCards(ul);
-	assert.deepEqual(added.map((li) => li.getAttribute(GV_CARD_ATTR)), ['21'], 'ID 2 が二重に並んでいる');
+	assert.deepEqual(added.map((li) => li.getAttribute(XV_CARD_ATTR)), ['21'], 'ID 2 が二重に並んでいる');
 });
 
 test('全件が既に並んでいたページは失敗にせず、ページを進めて次を読む', async () => {
@@ -492,7 +492,7 @@ test('全件が既に並んでいたページは失敗にせず、ページを�
 	assert.deepEqual(loaded, [2, 3], '重複だけのページで止まっている');
 	// 1 枚も並ばなかったページは画面に出ていないので ?p= にも現れない (印を持たない)
 	assert.deepEqual(pages, [3], '画面に出ていないページを知らせている');
-	assert.deepEqual(addedCards(ul).map((li) => li.getAttribute(GV_CARD_ATTR)), ['31']);
+	assert.deepEqual(addedCards(ul).map((li) => li.getAttribute(XV_CARD_ATTR)), ['31']);
 	assert.equal(retryButton(wrap), null, '重複を失敗として出している');
 	assert.equal(sentinelMessage(wrap), '');
 });
@@ -750,7 +750,7 @@ test('雛形が採れたら継ぎ足したカードの display を取り戻す C
 	const styles = stylesIn(doc, CARD_STYLE_ID);
 	assert.equal(styles.length, 1, 'カードを出す style が入っていない');
 	assert.equal(styles[0].textContent, CARD_SHOW_CSS);
-	assert.ok(styles[0].textContent.includes(GV_CARD_ATTR), '継ぎ足したカードの目印で選んでいない');
+	assert.ok(styles[0].textContent.includes(XV_CARD_ATTR), '継ぎ足したカードの目印で選んでいない');
 	assert.ok(/display:[^;]*!important/.test(styles[0].textContent), 'pixiv 側の display:none に競り勝てない');
 });
 
@@ -984,7 +984,7 @@ test('setMode で先読みの持ち分を捨てる', async () => {
  * @returns {object} カード (li)
  */
 function addedCard(ul, id) {
-	return [...ul.querySelectorAll('li')].find((li) => li.getAttribute(GV_CARD_ATTR) === id);
+	return [...ul.querySelectorAll('li')].find((li) => li.getAttribute(XV_CARD_ATTR) === id);
 }
 
 /**
@@ -1031,11 +1031,11 @@ test('継ぎ足したカードのハートを押すとブックマークされ�
 		},
 	});
 	await observer.trigger();
-	const card = ul.querySelectorAll('li').find((li) => li.getAttribute(GV_CARD_ATTR) === '21');
+	const card = ul.querySelectorAll('li').find((li) => li.getAttribute(XV_CARD_ATTR) === '21');
 	await card.querySelector('button').dispatch('click', { target: card.querySelector('button'), shiftKey: false, preventDefault() {}, stopPropagation() {} });
 	assert.deepEqual(calls, [['add', '21', false]]);
 	assert.equal(card.querySelectorAll('path')[0].style.values.fill, '#ff4060');
-	assert.equal(card.getAttribute('data-gv-bookmark-id'), '999');
+	assert.equal(card.getAttribute('data-xv-bookmark-id'), '999');
 });
 
 test('Shift を押しながらだと非公開ブックマークになる', async () => {
@@ -1044,7 +1044,7 @@ test('Shift を押しながらだと非公開ブックマークになる', async
 		actions: { async addBookmark(id, isPrivate) { calls.push(isPrivate); return '999'; }, async deleteBookmark() {} },
 	});
 	await observer.trigger();
-	const card = ul.querySelectorAll('li').find((li) => li.getAttribute(GV_CARD_ATTR) === '21');
+	const card = ul.querySelectorAll('li').find((li) => li.getAttribute(XV_CARD_ATTR) === '21');
 	const button = card.querySelector('button');
 	await button.dispatch('click', { target: button, shiftKey: true, preventDefault() {}, stopPropagation() {} });
 	assert.deepEqual(calls, [true]);
@@ -1057,11 +1057,11 @@ test('ブックマーク済みをもう一度押すと外れる', async () => {
 		actions: { async addBookmark() { return '1'; }, async deleteBookmark(id) { calls.push(id); } },
 	});
 	await observer.trigger();
-	const card = ul.querySelectorAll('li').find((li) => li.getAttribute(GV_CARD_ATTR) === '21');
+	const card = ul.querySelectorAll('li').find((li) => li.getAttribute(XV_CARD_ATTR) === '21');
 	const button = card.querySelector('button');
 	await button.dispatch('click', { target: button, shiftKey: false, preventDefault() {}, stopPropagation() {} });
 	assert.deepEqual(calls, ['b21'], 'bookmarkData.id で消していない');
-	assert.equal(card.getAttribute('data-gv-bookmark-id'), null);
+	assert.equal(card.getAttribute('data-xv-bookmark-id'), null);
 });
 
 test('失敗したらハートの色を戻す', async () => {
@@ -1069,12 +1069,12 @@ test('失敗したらハートの色を戻す', async () => {
 		actions: { async addBookmark() { throw new Error('boom'); }, async deleteBookmark() {} },
 	});
 	await observer.trigger();
-	const card = ul.querySelectorAll('li').find((li) => li.getAttribute(GV_CARD_ATTR) === '21');
+	const card = ul.querySelectorAll('li').find((li) => li.getAttribute(XV_CARD_ATTR) === '21');
 	const button = card.querySelector('button');
 	await button.dispatch('click', { target: button, shiftKey: false, preventDefault() {}, stopPropagation() {} });
 	// 未ブックマークの色は inline を外して本体の CSS に任せる (paintHeart の決まり)
 	assert.equal(card.querySelectorAll('path')[0].style.values.fill, '');
-	assert.equal(card.getAttribute('data-gv-bookmark-id'), null);
+	assert.equal(card.getAttribute('data-xv-bookmark-id'), null);
 });
 
 test('本体のカードのハートには触らない', async () => {
@@ -1083,7 +1083,7 @@ test('本体のカードのハートには触らない', async () => {
 	let prevented = 0;
 	const { ul, observer } = setup({ actions: fakeActions(calls) });
 	await observer.trigger();
-	const original = ul.querySelectorAll('li').find((li) => !li.getAttribute(GV_CARD_ATTR));
+	const original = ul.querySelectorAll('li').find((li) => !li.getAttribute(XV_CARD_ATTR));
 	const button = original.querySelector('button');
 	await button.dispatch('click', { target: button, shiftKey: false, preventDefault() { prevented += 1; }, stopPropagation() {} });
 	assert.deepEqual(calls, [], '本体のカードのハートを自前で処理している');
@@ -1126,7 +1126,7 @@ test('dispose でハートの購読も外れる', async () => {
 	const calls = [];
 	const { ul, handle, observer } = setup({ actions: fakeActions(calls) });
 	await observer.trigger();
-	const card = ul.querySelectorAll('li').find((li) => li.getAttribute(GV_CARD_ATTR) === '21');
+	const card = ul.querySelectorAll('li').find((li) => li.getAttribute(XV_CARD_ATTR) === '21');
 	handle.dispose();
 	// 撤去済みのカードでも、購読が残っていれば押下を拾ってしまう。戻して確かめる
 	ul.appendChild(card);
@@ -1148,11 +1148,11 @@ test('削除に失敗したら赤とブックマーク ID を戻す', async () =
 	const card = addedCard(ul, '21');
 	await pressHeart(card);
 	assert.deepEqual(heartFillsOf(card), [BOOKMARKED_FILL, BOOKMARKED_FILL], '外れたままの色で残っている');
-	assert.equal(card.getAttribute('data-gv-bookmark-id'), 'b21', '消せていないのにブックマーク ID を落としている');
+	assert.equal(card.getAttribute('data-xv-bookmark-id'), 'b21', '消せていないのにブックマーク ID を落としている');
 });
 
 test('返事を待っている間の二度押しは捨てる', async () => {
-	// data-gv-bookmark-id は返事が返るまで付かない。素直に書くと連打で余分なブックマークが残る
+	// data-xv-bookmark-id は返事が返るまで付かない。素直に書くと連打で余分なブックマークが残る
 	let release = () => {};
 	const gate = new Promise((resolve) => { release = resolve; });
 	const calls = [];
@@ -1170,7 +1170,7 @@ test('返事を待っている間の二度押しは捨てる', async () => {
 	await first;
 	await second;
 	assert.deepEqual(calls, ['21'], '連打で 2 回送っている');
-	assert.equal(card.getAttribute('data-gv-bookmark-id'), '999');
+	assert.equal(card.getAttribute('data-xv-bookmark-id'), '999');
 });
 
 test('カードの属性が読めなくても押せなくなったままにならない', async () => {
@@ -1182,7 +1182,7 @@ test('カードの属性が読めなくても押せなくなったままにな�
 	const original = card.getAttribute;
 	let failed = false;
 	card.getAttribute = (name) => {
-		if (!failed && name === GV_BOOKMARK_ID_ATTR) {
+		if (!failed && name === XV_BOOKMARK_ID_ATTR) {
 			failed = true;
 			throw new Error('boom');
 		}

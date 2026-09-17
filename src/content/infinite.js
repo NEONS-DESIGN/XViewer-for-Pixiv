@@ -16,8 +16,8 @@ import { warn } from '../common/log.js';
 import { createStyleHandle } from '../common/style-injector.js';
 import {
 	INFINITE_SCROLL,
-	GV_CARD_ATTR,
-	GV_BOOKMARK_ID_ATTR,
+	XV_CARD_ATTR,
+	XV_BOOKMARK_ID_ATTR,
 	SENTINEL_ATTR,
 	SENTINEL_MARGIN,
 	BOOKMARK_BUTTON_SELECTOR,
@@ -58,19 +58,19 @@ const FAILURE_TEXT = Object.freeze({
 	[SENTINEL_STATE.BUILD_FAILED]: SENTINEL_TEXT.BUILD_FAILED,
 });
 
-/** sentinel の中の部品のクラス名。pixiv 側と衝突しないよう gv- を付ける (UI_DESIGN_KIT §10)。 */
+/** sentinel の中の部品のクラス名。pixiv 側と衝突しないよう xv- を付ける (UI_DESIGN_KIT §10)。 */
 const SENTINEL_CLASS = Object.freeze({
-	TEXT: 'gv-sentinel-text',
-	ERROR: 'gv-sentinel-error',
-	RETRY: 'gv-sentinel-retry',
-	SPINNER: 'gv-sentinel-spinner',
+	TEXT: 'xv-sentinel-text',
+	ERROR: 'xv-sentinel-error',
+	RETRY: 'xv-sentinel-retry',
+	SPINNER: 'xv-sentinel-spinner',
 });
 
 /** sentinel 用のスタイルを 1 枚だけ入れるための目印。 */
-export const SENTINEL_STYLE_ID = 'gridviewer-sentinel-style';
+export const SENTINEL_STYLE_ID = 'xviewer-sentinel-style';
 
 /** 本体のページャを隠す style の id。二重注入を防ぐ目印も兼ねる。 */
-export const PAGER_STYLE_ID = 'gridviewer-hide-pager';
+export const PAGER_STYLE_ID = 'xviewer-hide-pager';
 
 /**
  * 本体のページャを隠す CSS。
@@ -86,7 +86,7 @@ ${PAGER_SELECTOR} {
 `;
 
 /** 継ぎ足したカードの表示を取り戻す style の id。二重注入を防ぐ目印も兼ねる。 */
-export const CARD_STYLE_ID = 'gridviewer-show-cards';
+export const CARD_STYLE_ID = 'xviewer-show-cards';
 
 /**
  * 継ぎ足したカードの display を取り戻す CSS。
@@ -96,12 +96,12 @@ export const CARD_STYLE_ID = 'gridviewer-show-cards';
  * ここは同じ ul へ 48 枚ずつ足すので、この規則に当たったカードは DOM にだけ積み上がり、
  * 画面には 1 枚も出ない。グリッドの高さも増えないので sentinel が画面内に居座り、
  * 少しスクロールし直すたびに ?p= だけが進む。
- * 打ち消す対象は自分が足したカードだけなので、目印 (GV_CARD_ATTR) で選ぶ。
+ * 打ち消す対象は自分が足したカードだけなので、目印 (XV_CARD_ATTR) で選ぶ。
  * pixiv 側は :nth-child() 付きで詳細度が高いため !important で競り勝つ。
  * 戻す値は li の既定 (list-item)。本体の可視カードの computed 値と同じ。
  */
 export const CARD_SHOW_CSS = `
-[${GV_CARD_ATTR}] {
+[${XV_CARD_ATTR}] {
 	display: list-item !important;
 }
 `;
@@ -113,7 +113,7 @@ export const CARD_SHOW_CSS = `
  * - 色は pixiv の charcoal トークンから引き、取れなければ currentColor へ倒す。
  *   こうすると本体のテーマ切り替えに自動で追従し、地の色から浮かない (§2 の「守ること」)
  * - 外部リソース (フォント・画像) は読まない
- * - セレクタは全て [data-gv-sentinel] の中に閉じ、クラス名には gv- を付ける
+ * - セレクタは全て [data-xv-sentinel] の中に閉じ、クラス名には xv- を付ける
  */
 const SENTINEL_CSS = `
 [${SENTINEL_ATTR}] {
@@ -146,7 +146,7 @@ const SENTINEL_CSS = `
 	border: 2px solid color-mix(in srgb, currentColor 25%, transparent);
 	border-top-color: currentColor;
 	border-radius: 50%;
-	animation: gv-sentinel-spin 0.8s linear infinite;
+	animation: xv-sentinel-spin 0.8s linear infinite;
 }
 [${SENTINEL_ATTR}] .${SENTINEL_CLASS.RETRY} {
 	height: 30px;
@@ -166,7 +166,7 @@ const SENTINEL_CSS = `
 	outline: 2px solid currentColor;
 	outline-offset: -2px;
 }
-@keyframes gv-sentinel-spin {
+@keyframes xv-sentinel-spin {
 	to { transform: rotate(360deg); }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -686,7 +686,7 @@ export function attachInfiniteScroll(doc, options) {
 			const button = event.target?.closest?.('button');
 			if (!button?.closest(BOOKMARK_BUTTON_SELECTOR)) return undefined;
 			// 継ぎ足したカードだけが対象。本体のカードはここで抜ける
-			card = button.closest(`[${GV_CARD_ATTR}]`);
+			card = button.closest(`[${XV_CARD_ATTR}]`);
 			if (!card) return undefined;
 		} catch (error) {
 			// 押された場所が読めないなら本体の動作に任せる
@@ -711,8 +711,8 @@ export function attachInfiniteScroll(doc, options) {
 	function restoreHeart(card, bookmarkId) {
 		try {
 			paintHeart(card, Boolean(bookmarkId));
-			if (bookmarkId) card.setAttribute(GV_BOOKMARK_ID_ATTR, bookmarkId);
-			else card.removeAttribute(GV_BOOKMARK_ID_ATTR);
+			if (bookmarkId) card.setAttribute(XV_BOOKMARK_ID_ATTR, bookmarkId);
+			else card.removeAttribute(XV_BOOKMARK_ID_ATTR);
 		} catch (error) {
 			warn('bookmark rollback failed', error);
 		}
@@ -730,8 +730,8 @@ export function attachInfiniteScroll(doc, options) {
 		try {
 			// 属性の読み取りも塗りも try の中に入れる。外に出すと、投げたときに
 			// finally を通らず sending にカードが残り、そのカードが二度と押せなくなる
-			const workId = card.getAttribute(GV_CARD_ATTR);
-			bookmarkId = card.getAttribute(GV_BOOKMARK_ID_ATTR);
+			const workId = card.getAttribute(XV_CARD_ATTR);
+			bookmarkId = card.getAttribute(XV_BOOKMARK_ID_ATTR);
 			// 押した結果を先に見せる。通信を待たせない
 			paintHeart(card, !bookmarkId);
 			// トークンは押された時点で読む。組み立て時の値を閉じ込めない
@@ -739,11 +739,11 @@ export function attachInfiniteScroll(doc, options) {
 			if (bookmarkId) {
 				await actions.deleteBookmark(bookmarkId, token);
 				if (disposed) return;
-				card.removeAttribute(GV_BOOKMARK_ID_ATTR);
+				card.removeAttribute(XV_BOOKMARK_ID_ATTR);
 			} else {
 				const id = await actions.addBookmark(workId, isPrivate, token);
 				if (disposed) return;
-				card.setAttribute(GV_BOOKMARK_ID_ATTR, String(id));
+				card.setAttribute(XV_BOOKMARK_ID_ATTR, String(id));
 			}
 		} catch (error) {
 			if (disposed) return;
@@ -883,7 +883,7 @@ export function attachInfiniteScroll(doc, options) {
 			// 撤去は別々に包む。片方が投げても、もう片方はページに残さない。
 			// 継ぎ足したカードが残るのは「拡張をオフにしたのに元へ戻らない」状態なので先に消す
 			try {
-				for (const card of [...ul.querySelectorAll(`[${GV_CARD_ATTR}]`)]) card.remove();
+				for (const card of [...ul.querySelectorAll(`[${XV_CARD_ATTR}]`)]) card.remove();
 			} catch (error) {
 				warn('infinite scroll card removal failed', error);
 			}

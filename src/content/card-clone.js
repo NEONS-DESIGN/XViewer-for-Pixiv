@@ -10,8 +10,8 @@ import {
 	THUMB_LINK_SELECTOR,
 	BOOKMARK_BUTTON_SELECTOR,
 	BOOKMARKED_FILL,
-	GV_CARD_ATTR,
-	GV_BOOKMARK_ID_ATTR,
+	XV_CARD_ATTR,
+	XV_BOOKMARK_ID_ATTR,
 	CARD_SELECTOR,
 	TAB_SKIP_MARK_ATTR,
 	TAB_SKIP_LABEL_ATTR,
@@ -156,7 +156,7 @@ export function findOverlayLabels(card) {
 /**
  * ページ上のカードから雛形を採る。
  *
- * 自分が継ぎ足したカード (GV_CARD_ATTR 付き) と、画像が読み込まれていないカード (figure のまま) は
+ * 自分が継ぎ足したカード (XV_CARD_ATTR 付き) と、画像が読み込まれていないカード (figure のまま) は
  * 最初に落とす。前者は劣化コピーが連鎖し、後者は img ごと欠ける。
  *
  * 残りからは **未ブックマークのハートを持つカードを優先する**。ブックマーク済みのカードは
@@ -175,7 +175,7 @@ export function captureTemplates(ul, deps = {}) {
 	const computed = deps.computedStyle ?? ((node) => globalThis.getComputedStyle(node));
 	try {
 		const cards = [...ul.querySelectorAll(CARD_SELECTOR)]
-			.filter((card) => !card.hasAttribute(GV_CARD_ATTR) && card.querySelector('img'));
+			.filter((card) => !card.hasAttribute(XV_CARD_ATTR) && card.querySelector('img'));
 		const plain = pickTemplates(cards, (card) => {
 			const paths = heartPaths(card);
 			return paths.length > 0 && !paths.some((path) => isBookmarkedFill(computed(path).fill));
@@ -260,10 +260,10 @@ export function buildCard(templates, work, deps) {
 		else if (heartBox && work.bookmarkData) {
 			// 未ブックマークのときは何も書かない。雛形は未ブックマークのカードなので本体の CSS がそのまま効く
 			paintHeart(card, true);
-			card.setAttribute(GV_BOOKMARK_ID_ATTR, String(work.bookmarkData.id));
+			card.setAttribute(XV_BOOKMARK_ID_ATTR, String(work.bookmarkData.id));
 		}
 
-		card.setAttribute(GV_CARD_ATTR, String(work.id));
+		card.setAttribute(XV_CARD_ATTR, String(work.id));
 		return card;
 	} catch (error) {
 		// 1 枚作れなくても他のカードは出す

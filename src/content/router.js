@@ -12,7 +12,7 @@ import { parseArtworkPath } from './page.js';
 import { artworkPath } from '../pixiv/endpoints.js';
 
 /** 自分が積んだ履歴だと分かるようにする目印。 */
-const HISTORY_STATE_KEY = 'gridviewer';
+const HISTORY_STATE_KEY = 'xviewer';
 
 /**
  * 今の履歴エントリが自分の積んだものか。

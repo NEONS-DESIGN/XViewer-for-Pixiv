@@ -12,7 +12,7 @@ import { PICKUP_SECTION_SELECTOR } from '../common/constants.js';
 import { createStyleHandle } from '../common/style-injector.js';
 
 /** 差し込む style 要素の id。二重注入を防ぐ目印も兼ねる。 */
-export const PICKUP_STYLE_ID = 'gridviewer-hide-pickup';
+export const PICKUP_STYLE_ID = 'xviewer-hide-pickup';
 
 /**
  * light DOM へ差し込む CSS。

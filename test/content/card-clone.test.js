@@ -4,7 +4,7 @@ import {
 	captureTemplates, findBadge, findOverlayLabels, buildCard, paintHeart, heartPaths, hexToRgb, isBookmarkedFill,
 } from '../../src/content/card-clone.js';
 import {
-	GV_CARD_ATTR, GV_BOOKMARK_ID_ATTR, BOOKMARKED_FILL, TAB_SKIP_MARK_ATTR, TAB_SKIP_LABEL_ATTR,
+	XV_CARD_ATTR, XV_BOOKMARK_ID_ATTR, BOOKMARKED_FILL, TAB_SKIP_MARK_ATTR, TAB_SKIP_LABEL_ATTR,
 } from '../../src/common/constants.js';
 import { el, makeCard, makeGrid, fakeComputedStyle } from '../helpers/card.js';
 
@@ -80,7 +80,7 @@ test('画像が読み込まれたカードだけを雛形にする', () => {
 	// figure のままのカードを雛形にすると、継ぎ足したカードに img が無くなる
 	const templates = capture([makeCard({ id: '1', loaded: false }), makeCard({ id: '2', loaded: true })]);
 	assert.notEqual(templates, null);
-	assert.equal(templates.single.querySelector('img').getAttribute('data-gv-src-id'), null);
+	assert.equal(templates.single.querySelector('img').getAttribute('data-xv-src-id'), null);
 	assert.equal(templates.single.querySelector('a[data-ga4-label="thumbnail_link"]').getAttribute('data-gtm-value'), '2');
 });
 
@@ -171,13 +171,13 @@ test('ハート無しのカードを雛形にしても組み立てられる', ()
 	assert.notEqual(card, null);
 	assert.equal(card.querySelector('[data-ga4-label="bookmark_button"]'), null);
 	// 塗れないので ID も書かない。押せるハートが無い以上、持っていても使い道がない
-	assert.equal(card.getAttribute(GV_BOOKMARK_ID_ATTR), null);
+	assert.equal(card.getAttribute(XV_BOOKMARK_ID_ATTR), null);
 });
 
 test('自分が継ぎ足したカードしか無ければ null', () => {
-	// GV_CARD_ATTR 付きのカードを雛形にすると、劣化コピーが連鎖する事故になる
+	// XV_CARD_ATTR 付きのカードを雛形にすると、劣化コピーが連鎖する事故になる
 	const card = makeCard({ id: '1' });
-	card.setAttribute(GV_CARD_ATTR, '1');
+	card.setAttribute(XV_CARD_ATTR, '1');
 	assert.equal(capture([card]), null);
 });
 
@@ -298,7 +298,7 @@ test('ブックマーク済みならハートを ff4060 にする', () => {
 	const templates = capture([makeCard({ id: '1' })]);
 	const card = buildCard(templates, work({ bookmarkData: { id: '555', private: false } }), { loggedIn: true });
 	assert.deepEqual(inlineHeartFills(card), [BOOKMARKED_FILL, BOOKMARKED_FILL]);
-	assert.equal(card.getAttribute(GV_BOOKMARK_ID_ATTR), '555');
+	assert.equal(card.getAttribute(XV_BOOKMARK_ID_ATTR), '555');
 });
 
 test('未ブックマークならハートに色を書かない (本体の CSS に任せる)', () => {
@@ -307,7 +307,7 @@ test('未ブックマークならハートに色を書かない (本体の CSS �
 	const templates = capture([makeCard({ id: '1' })]);
 	const card = buildCard(templates, work(), { loggedIn: true });
 	assert.deepEqual(inlineHeartFills(card), [undefined, undefined]);
-	assert.equal(card.getAttribute(GV_BOOKMARK_ID_ATTR), null);
+	assert.equal(card.getAttribute(XV_BOOKMARK_ID_ATTR), null);
 });
 
 test('ブックマーク済みの色は paintHeart(card, false) で外れて本体の CSS に戻る', () => {
@@ -337,7 +337,7 @@ test('未ログインならハートごと消す', () => {
 test('自分が作ったカードには目印が付く', () => {
 	const templates = capture([makeCard({ id: '1' })]);
 	const card = buildCard(templates, work(), { loggedIn: true });
-	assert.equal(card.getAttribute(GV_CARD_ATTR), '777');
+	assert.equal(card.getAttribute(XV_CARD_ATTR), '777');
 });
 
 test('paintHeart は色の控えが無くても落ちない', () => {

@@ -1,13 +1,13 @@
 <div align="center">
 
-<img src="src/icons/icon-128.png" width="96" alt="GridViewer for Pixiv のアイコン" />
+<img src="src/icons/icon-128.png" width="96" alt="XViewer for Pixiv のアイコン" />
 
-# GridViewer for Pixiv
+# XViewer for Pixiv
 
 **pixiv のユーザーページに、X.com のメディア閲覧に近い画像ビュワーを追加する Chrome 拡張機能**
 
-[![version](https://img.shields.io/github/package-json/v/NEONS-DESIGN/GridViewer-for-Pixiv?color=4ea3d6)](package.json)
-[![license](https://img.shields.io/github/license/NEONS-DESIGN/GridViewer-for-Pixiv?color=4ea3d6)](LICENSE)
+[![version](https://img.shields.io/github/package-json/v/NEONS-DESIGN/XViewer-for-Pixiv?color=4ea3d6)](package.json)
+[![license](https://img.shields.io/github/license/NEONS-DESIGN/XViewer-for-Pixiv?color=4ea3d6)](LICENSE)
 ![manifest](https://img.shields.io/badge/manifest-v3-4ea3d6)
 ![tests](https://img.shields.io/badge/tests-786%20passing-4ea3d6)
 
@@ -64,8 +64,8 @@ Firefox / Safari には対応していません。
 現在ストアでは配布していません。ビルドして読み込んでください。
 
 ```bash
-git clone https://github.com/NEONS-DESIGN/GridViewer-for-Pixiv.git
-cd GridViewer-for-Pixiv
+git clone https://github.com/NEONS-DESIGN/XViewer-for-Pixiv.git
+cd XViewer-for-Pixiv
 npm install
 npm run build
 ```
