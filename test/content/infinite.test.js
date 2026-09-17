@@ -490,7 +490,8 @@ test('全件が既に並んでいたページは失敗にせず、ページを�
 	const { ul, wrap, loaded, observer, pages } = setupDuplicating({ duplicatePages: [2] });
 	await observer.trigger();
 	assert.deepEqual(loaded, [2, 3], '重複だけのページで止まっている');
-	assert.deepEqual(pages, [2, 3], '重複だけのページを進んだ扱いにしていない');
+	// 1 枚も並ばなかったページは画面に出ていないので ?p= にも現れない (印を持たない)
+	assert.deepEqual(pages, [3], '画面に出ていないページを知らせている');
 	assert.deepEqual(addedCards(ul).map((li) => li.getAttribute(GV_CARD_ATTR)), ['31']);
 	assert.equal(retryButton(wrap), null, '重複を失敗として出している');
 	assert.equal(sentinelMessage(wrap), '');
@@ -499,7 +500,8 @@ test('全件が既に並んでいたページは失敗にせず、ページを�
 test('重複だけのページが最終ページなら読み終わりとして出す', async () => {
 	const { wrap, observer, pages } = setupDuplicating({ pages: 2, duplicatePages: [2] });
 	await observer.trigger();
-	assert.deepEqual(pages, [2]);
+	// 並んだカードは 1 ページ目のぶんだけ。?p= は動かさない
+	assert.deepEqual(pages, []);
 	assert.equal(sentinelMessage(wrap), SENTINEL_TEXT.DONE);
 	assert.equal(observer.state.disconnected, 1);
 });
@@ -623,8 +625,8 @@ test('dispose 後に終わった先読みは捨てる', async () => {
 	assert.equal(handle.currentPage(), 2);
 });
 
-test('currentPage は今並んでいる最後のページを返す', async () => {
-	// 呼び出し側が ?p= を合わせ直すときに読む
+test('rect が測れない環境では、並んでいる最後のページを見ているものとして扱う', async () => {
+	// 上端が読めないカードは全て「上端の上」に倒れる。一番後ろの印 = 最後に並べたページ
 	const { handle, observer } = setup({ startPage: 3, pages: 5 });
 	assert.equal(handle.currentPage(), 3);
 	await observer.trigger();
@@ -1203,4 +1205,123 @@ test('複数枚バッジのアイコンまで塗らない', async () => {
 	await pressHeart(card);
 	assert.deepEqual(heartFillsOf(card), [BOOKMARKED_FILL, BOOKMARKED_FILL]);
 	assert.notEqual(others[0].style.values.fill, BOOKMARKED_FILL, 'バッジのアイコンまで塗っている');
+});
+
+/** テストの中でカード 1 枚が占める高さ (px)。実寸ではなく、印の上下関係を作るためだけの値 */
+const TEST_CARD_HEIGHT = 100;
+
+/**
+ * スクロールに合わせた ?p= の追従を見るための組み立て。
+ *
+ * 本物の rect は測れないので、「カードは ul の中で上から順に TEST_CARD_HEIGHT ずつ積まれる」
+ * と決めて上端を計算する。scrollTo() で画面を動かし、scroll を起こす。
+ * @param {{pages?: number}} [options] 上書き
+ * @returns {{ul: object, handle: object, observer: object, view: object, pages: number[],
+ *   scrollTo: (y: number) => void, loaded: number[]}} 材料一式
+ */
+function setupScroll(options = {}) {
+	const { ul, wrap } = makeGrid([makeCard({ id: '1' }), makeCard({ id: '2', pages: 2 })]);
+	const { source, loaded } = fakeSource(options.pages ?? 4);
+	const observer = fakeObserver();
+	const doc = fakeDoc(wrap);
+	const view = el('#window');
+	doc.defaultView = view;
+	const pages = [];
+	let scrollY = 0;
+	const handle = attachInfiniteScroll(doc, {
+		ul,
+		source,
+		mode: INFINITE_SCROLL.ON_REACH,
+		loggedIn: true,
+		startPage: 1,
+		onPageChange: (page) => pages.push(page),
+		deps: {
+			createObserver: observer.create,
+			computedStyle: fakeComputedStyle,
+			rectTop: (node) => ul.children.indexOf(node) * TEST_CARD_HEIGHT - scrollY,
+			// 1 フレーム待たずにその場で判定させる
+			schedule: (fn) => fn(),
+		},
+	});
+	/**
+	 * 画面を動かす。
+	 * @param {number} y 一番上からの移動量 (px)
+	 * @returns {void}
+	 */
+	const scrollTo = (y) => {
+		scrollY = y;
+		view.dispatchEvent({ type: 'scroll' });
+	};
+	return { ul, handle, observer, view, pages, scrollTo, loaded };
+}
+
+test('上へ戻ると ?p= が見えているページまで下がる', async () => {
+	// 継ぎ足した後に一番上まで戻ったのに ?p= が下がらないと、再読み込みで別の場所へ飛ぶ
+	const { observer, scrollTo, pages } = setupScroll();
+	await observer.trigger();
+	await observer.trigger();
+	// 3 ページ目の先頭カード (上から 5 枚目 = 400px) が画面の上へ流れた
+	scrollTo(450);
+	assert.equal(pages.at(-1), 3);
+	// 2 ページ目の先頭カード (200px) まで戻る
+	scrollTo(250);
+	assert.equal(pages.at(-1), 2, '上へ戻ったのにページが下がっていない');
+	scrollTo(0);
+	assert.equal(pages.at(-1), 1, '一番上まで戻ったのに 1 ページ目に戻っていない');
+});
+
+test('見えているページが変わらなければ知らせない', async () => {
+	// 知らせるたびに replaceState が走る。呼び過ぎるとブラウザに絞られる
+	const { observer, scrollTo, pages } = setupScroll();
+	await observer.trigger();
+	await observer.trigger();
+	scrollTo(450);
+	scrollTo(460);
+	scrollTo(470);
+	assert.deepEqual(pages, [3], '同じページを何度も知らせている');
+});
+
+test('上にいるまま継ぎ足しても ?p= は進まない', async () => {
+	// 先読みや下端での読み込みで ?p= だけ進むと、URL と画面の見えている場所がずれる
+	const { observer, pages } = setupScroll();
+	await observer.trigger();
+	await observer.trigger();
+	assert.deepEqual(pages, [], '画面は 1 ページ目のままなのにページを知らせている');
+});
+
+test('下端に留まったまま継ぎ足したら、そのぶん ?p= が進む', async () => {
+	const { observer, scrollTo, pages } = setupScroll();
+	scrollTo(1000);
+	assert.deepEqual(pages, [], 'まだ 1 ページ目しか無いのに知らせている');
+	await observer.trigger();
+	assert.equal(pages.at(-1), 2, '継ぎ足したページに追いついていない');
+});
+
+test('画面の大きさが変わっても見直す', async () => {
+	// 折り返しが変わるとカードの位置が動く。スクロールしていなくても見えているページは変わる
+	const { observer, view, pages } = setupScroll();
+	await observer.trigger();
+	view.dispatchEvent({ type: 'resize' });
+	assert.deepEqual(pages, [], '動いていないのに知らせている');
+});
+
+test('dispose するとスクロールを見なくなる', async () => {
+	const { handle, observer, scrollTo, pages } = setupScroll();
+	await observer.trigger();
+	await observer.trigger();
+	scrollTo(450);
+	handle.dispose();
+	scrollTo(0);
+	assert.deepEqual(pages, [3], 'dispose した後も知らせている');
+});
+
+test('currentPage は今見えているページを返す', async () => {
+	// 呼び出し側がモーダルを閉じた後に ?p= を書き直すときに読む
+	const { handle, observer, scrollTo } = setupScroll();
+	await observer.trigger();
+	await observer.trigger();
+	scrollTo(450);
+	assert.equal(handle.currentPage(), 3);
+	scrollTo(0);
+	assert.equal(handle.currentPage(), 1);
 });
