@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { canView, normalizeDetail, ILLUST_TYPES } from '../../src/pixiv/normalize.js';
+import { canView, isOwnWork, normalizeDetail, ILLUST_TYPES } from '../../src/pixiv/normalize.js';
 
 test('canView は作品の xRestrict とユーザー設定を比べる', () => {
 	// SITE_SPEC 実測: 設定 OFF (self.xRestrict=0) では R-18 の /pages が 404 になる
@@ -124,4 +124,19 @@ test('normalizeDetail は CDN 以外の urls を落とす', () => {
 	});
 	assert.deepEqual(Object.keys(detail.urls), ['original']);
 	assert.equal(detail.thumbUrl, null);
+});
+
+test('isOwnWork は作者 ID と自分の ID を比べる', () => {
+	// 自分の作品には更新系のボタンを出さない (pixiv 本体も出さない)
+	assert.equal(isOwnWork({ userId: '16343044' }, { id: '16343044' }), true);
+	assert.equal(isOwnWork({ userId: '54734418' }, { id: '16343044' }), false);
+});
+
+test('isOwnWork は判定できないときは false に倒す', () => {
+	// 未ログイン・ID が読めない __NEXT_DATA__ では「自分ではない」扱い。
+	// 空同士を一致とみなすと、他人の作品まで押せなくなる
+	assert.equal(isOwnWork({ userId: '16343044' }, null), false);
+	assert.equal(isOwnWork({ userId: '16343044' }, { id: null }), false);
+	assert.equal(isOwnWork({ userId: null }, { id: '16343044' }), false);
+	assert.equal(isOwnWork(null, { id: '16343044' }), false);
 });

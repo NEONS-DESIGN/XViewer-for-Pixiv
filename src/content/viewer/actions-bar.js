@@ -8,6 +8,10 @@
  * アイコンの対応は pixiv 本体に合わせる。いいねは顔 (like)、ブックマークはハート (favorite)。
  * 逆にすると意味が入れ替わって見える。
  *
+ * **自分の作品には 3 つとも出さない。** pixiv は自分にいいね・ブックマーク・フォローをさせず、
+ * 本体の UI もこの 3 つを描かない (SITE_SPEC §4)。押せば必ず失敗するので、そもそも出さない。
+ * 判定は `isOwnWork(detail, session.self)` = 作者 ID と `userData.self.id` の一致だけ。
+ *
  * **いいねとブックマークは独立したボタンを持たない。** サイドバーのカウンタ
  * (.count-like / .count-bookmark) をボタンへ差し替え、数字そのものを押させる (X.com と同じ形)。
  * 押す対象と結果が同じ場所にあるので、押した後に数字が動くのが分かる。
@@ -27,6 +31,7 @@ import { formatCount } from '../../common/format.js';
 import { warn } from '../../common/log.js';
 import { readSession, clearSessionCache } from '../session.js';
 import { fetchUserProfile, patchUserProfile } from '../../pixiv/user.js';
+import { isOwnWork } from '../../pixiv/normalize.js';
 import { PIXIV_ERROR_KINDS } from '../../pixiv/errors.js';
 import { likeIllust, addBookmark, deleteBookmark, followUser, unfollowUser } from '../../pixiv/actions.js';
 
@@ -337,6 +342,12 @@ export function createActionsBar(deps) {
 				container.appendChild(notice);
 				return;
 			}
+
+			// 自分の作品には、いいね・ブックマーク・フォローのどれもできない。
+			// pixiv 本体もこの 3 つを描かない (SITE_SPEC §4)。押せば必ず失敗するボタンを出さない。
+			// カウンタは押せない表示のまま残るので件数は読めるし、作者は自分の名前なので
+			// なぜ押せないかは画面から分かる (案内の文言は足さない)
+			if (isOwnWork(detail, session.self)) return;
 
 			statusLine = doc.createElement('p');
 			statusLine.className = 'action-status';
