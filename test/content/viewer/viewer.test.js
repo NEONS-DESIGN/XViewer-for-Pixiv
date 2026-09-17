@@ -246,21 +246,32 @@ test('closeOnBackdrop が偽なら余白を押しても閉じない', async () =
 	assert.equal(closed(), 0);
 });
 
-test('作品を送ってフォーカスが中から消えたら閉じるボタンへ戻す', async () => {
+test('開いたときのフォーカスはダイアログ本体に置く', async () => {
+	// 中のボタンへ当てると、次にキーを押した瞬間に :focus-visible が立って
+	// そのボタンに輪郭が出る。十字キーでフォーカスが動いたように見えてしまう。
+	// ダイアログ本体 (tabindex="-1") なら読み上げの起点になり、輪郭も出ない
+	const { viewer, shadow } = setup();
+	await viewer.open('1');
+	const overlay = find(shadow(), '.overlay');
+	assert.equal(overlay.getAttribute('tabindex'), '-1');
+	assert.equal(overlay.focused, true);
+	assert.equal(find(shadow(), '.close').focused, false);
+});
+
+test('作品を送ってフォーカスが中から消えたらダイアログ本体へ戻す', async () => {
 	// 押していたボタンがペインごと消えると、フォーカスは inert な body へ落ちて読み上げが文脈を失う
 	const { viewer, shadow } = setup();
 	await viewer.open('1');
-	const closeButton = find(shadow(), '.close');
-	assert.equal(closeButton.focused, true);
+	const overlay = find(shadow(), '.overlay');
 	// 中の別の部品にフォーカスがある間は動かさない
-	closeButton.focused = false;
+	overlay.focused = false;
 	shadow().activeElement = find(shadow(), '.frame');
 	await viewer.open('2');
-	assert.equal(closeButton.focused, false);
-	// 送った先でフォーカスが無くなっていたら閉じるボタンへ
+	assert.equal(overlay.focused, false);
+	// 送った先でフォーカスが無くなっていたらダイアログ本体へ
 	shadow().activeElement = null;
 	await viewer.open('3');
-	assert.equal(closeButton.focused, true);
+	assert.equal(overlay.focused, true);
 });
 
 test('Tab は描画されている要素だけを巡回する', async () => {
