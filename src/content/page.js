@@ -8,6 +8,7 @@ import {
 	USER_TAG_PATH_PATTERN,
 	USER_WORKS_PATH_PATTERN,
 	USER_WORKS_CATEGORY_PATTERN,
+	USER_WORKS_TAB_PATH_PATTERN,
 	WORK_CATEGORY_BY_TAB,
 	ARTWORK_PATH_PATTERN,
 	PAGE_KEY_SEPARATOR,
@@ -88,4 +89,33 @@ export function isViewerTarget(pathname) {
  */
 export function isProfileHome(pathname) {
 	return PROFILE_HOME_PATH_PATTERN.test(pathname);
+}
+
+/**
+ * 無限スクロールを効かせるページか。
+ * 作品グリッドの 3 タブだけが対象。ホーム・タグ絞り込み・ブックマーク・リクエストは外す。
+ * @param {string} pathname location.pathname
+ * @returns {boolean} 対象なら true
+ */
+export function isInfiniteScrollTarget(pathname) {
+	return USER_WORKS_TAB_PATH_PATTERN.test(pathname);
+}
+
+/** ページ番号として受ける形。10 進の数字だけ。 */
+const PAGE_PARAM_PATTERN = /^\d+$/;
+
+/**
+ * URL のクエリから ?p= のページ番号を読む。
+ * 数として読めない値 (数でない / 0 以下 / 小数) は、ページ指定なしと同じ 1 として扱う。
+ * pixiv のページャは 1 始まりなので、下限は 1 になる (SITE_SPEC §3)。
+ * 受けるのは 10 進の数字だけ。Number() は '1e2' や '0x10' も整数に読むが、
+ * pixiv 側が同じ解釈をする保証は無く、URL と基準ページが食い違う入口になる。
+ * @param {string} search location.search ('?p=3' の形。先頭の ? は有っても無くてもよい)
+ * @returns {number} ページ番号 (1 以上の整数)
+ */
+export function parsePageParam(search) {
+	const raw = new URLSearchParams(search ?? '').get('p') ?? '';
+	if (!PAGE_PARAM_PATTERN.test(raw)) return 1;
+	const page = Number(raw);
+	return Number.isSafeInteger(page) && page > 0 ? page : 1;
 }

@@ -2,12 +2,17 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createImagePane } from '../../src/content/viewer/image-pane.js';
 import { createSidebar } from '../../src/content/viewer/sidebar.js';
-import { renderWork, disposeAll, consumeEscape } from '../../src/content/viewer/panes.js';
+import { renderWork, disposeAll, consumeEscape, consumeKey } from '../../src/content/viewer/panes.js';
+import { clearSessionCache } from '../../src/content/session.js';
 // fakeDoc は nextData を渡さない = __NEXT_DATA__ が無い = actions-bar から見て未ログイン
-import { fakeElement, fakeDoc } from '../helpers/dom.js';
+import { fakeElement, fakeDoc, flush } from '../helpers/dom.js';
+import { buildNextData } from '../helpers/pixiv.js';
 
 /** 未ログインのセッション。全年齢作品はこれでも見られる。 */
 const ANONYMOUS = Object.freeze({ isLoggedIn: false, self: null });
+
+/** ログイン済みで R-18 まで見られるセッション。 */
+const LOGGED_IN = Object.freeze({ isLoggedIn: true, self: { xRestrict: 1, hideAiWorks: false } });
 
 /** サイドバーへ渡す作品詳細の代わり。 */
 const DETAIL = Object.freeze({
@@ -72,15 +77,35 @@ test('サイドバーは dispose で中身を空にする', () => {
 
 test('renderWork はサイドバーにコメント区画とアクションを作る', async () => {
 	const { stage, sidebar, fetchUser } = fakeTargets();
-	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc: fakeDoc(), stage, sidebar, onError: () => {}, fetchUser });
+	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc: fakeDoc(), stage, sidebar, fetchUser });
 
 	assert.equal(sidebar.hidden, false);
 	assert.ok(sidebar.querySelectorAll('.comments')[0].children.length > 0);
 	// アクションはカウンタの行へ入る。未ログインなので差し替えは起きず、案内が足される
 	const counts = sidebar.querySelectorAll('.counts')[0];
-	assert.equal(counts.children.length, 6);
+	assert.equal(counts.children.length, 5);
 	assert.ok(counts.children.some((child) => child.className === 'status'));
 	disposeAll();
+});
+
+test('renderWork は fetchUser をサイドバーとアクションの両方へ渡す', async () => {
+	// ログイン済みだとアクションがフォロー状態を引く。差し替え口が渡っていないと
+	// 既定の fetchUserProfile が本物の /ajax/user を叩きに行く (node では TypeError で失敗する)
+	const { stage, sidebar } = fakeTargets();
+	const asked = [];
+	const fetchUser = async (userId) => { asked.push(userId); return { isFollowed: true }; };
+	const doc = fakeDoc({
+		nextData: buildNextData({ token: 'csrf-token', self: { xRestrict: 1, hideAiWorks: false } }),
+	});
+	// 前のテストが覚えた未ログインのセッションを捨て、この doc から読み直させる
+	clearSessionCache();
+	await renderWork(DETAIL, LOGGED_IN, SETTINGS, { doc, stage, sidebar, fetchUser });
+	await flush();
+	// サイドバー (作者アイコン) とアクション (フォロー状態) の両方から同じ差し替え口が呼ばれる
+	assert.deepEqual(asked, ['54734418', '54734418']);
+	assert.equal(sidebar.querySelectorAll('.action-follow')[0].title, 'フォロー中');
+	disposeAll();
+	clearSessionCache();
 });
 
 test('サイドバーを OFF から ON へ戻すと hidden が下りる', async () => {
@@ -91,11 +116,11 @@ test('サイドバーを OFF から ON へ戻すと hidden が下りる', async 
 	const doc = fakeDoc();
 	const off = { ...SETTINGS, showSidebar: false };
 
-	await renderWork(DETAIL, ANONYMOUS, off, { doc, stage, sidebar, onError: () => {}, fetchUser });
+	await renderWork(DETAIL, ANONYMOUS, off, { doc, stage, sidebar, fetchUser });
 	assert.equal(sidebar.hidden, true);
 
 	disposeAll();
-	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc, stage, sidebar, onError: () => {}, fetchUser });
+	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc, stage, sidebar, fetchUser });
 	assert.equal(sidebar.hidden, false);
 	disposeAll();
 });
@@ -109,7 +134,6 @@ test('コメントとアクションは主役の描画を待たずに作る', as
 		doc: fakeDoc(),
 		stage,
 		sidebar,
-		onError: () => {},
 		fetchUser,
 	});
 	// まだ主役の await を抜けていない時点で、コメント区画と案内が入っている
@@ -125,7 +149,7 @@ test('consumeEscape はシェアメニューが開いているときだけ true 
 	// ビュワー本体の Escape (モーダルを閉じる) より先に呼ばれる。
 	// 開いていないのに true を返すと、Escape でモーダルが閉じられなくなる
 	const { stage, sidebar, fetchUser } = fakeTargets();
-	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc: fakeDoc(), stage, sidebar, onError: () => {}, fetchUser });
+	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc: fakeDoc(), stage, sidebar, fetchUser });
 	assert.equal(consumeEscape(), false);
 
 	sidebar.querySelectorAll('.share-button')[0].click();
@@ -134,9 +158,21 @@ test('consumeEscape はシェアメニューが開いているときだけ true 
 	disposeAll();
 });
 
+test('consumeKey はシェアメニューが開いているときだけ上下キーを食い止める', async () => {
+	// 本体は上下キーを作品の移動に使う。開いたメニューの項目送りを横取りされないように先に聞く
+	const { stage, sidebar, fetchUser } = fakeTargets();
+	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc: fakeDoc(), stage, sidebar, fetchUser });
+	const down = { key: 'ArrowDown', preventDefault() {} };
+	assert.equal(consumeKey(down), false);
+	sidebar.querySelectorAll('.share-button')[0].click();
+	assert.equal(consumeKey(down), true);
+	disposeAll();
+	assert.equal(consumeKey(down), false);
+});
+
 test('ペインを捨てた後の consumeEscape は false を返す', async () => {
 	const { stage, sidebar, fetchUser } = fakeTargets();
-	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc: fakeDoc(), stage, sidebar, onError: () => {}, fetchUser });
+	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc: fakeDoc(), stage, sidebar, fetchUser });
 	sidebar.querySelectorAll('.share-button')[0].click();
 	disposeAll();
 	assert.equal(consumeEscape(), false);

@@ -3,7 +3,8 @@
  * 保存ボタンは作らず変更のたびに書くので、書き込みは 1 項目ずつ。
  * 保存値が壊れていても既定へ倒して必ず描けるようにする (UI_DESIGN_KIT §9)。
  */
-import { SETTINGS_DEFAULTS, IMAGE_QUALITY, PREFETCH_CHOICES, GRID_TAB_SKIP, POPUP_THEMES, SIDEBAR_SCROLL } from './constants.js';
+import { SETTINGS_DEFAULTS, IMAGE_QUALITY, PREFETCH_CHOICES, GRID_TAB_SKIP, POPUP_THEMES, SIDEBAR_SCROLL, INFINITE_SCROLL } from './constants.js';
+import { warn } from './log.js';
 
 /** 設定を置く保存領域の名前。onChanged の areaName と比べる。 */
 const SYNC_AREA_NAME = 'sync';
@@ -75,6 +76,7 @@ export function normalizeSettings(raw) {
 		closeOnBackdrop: asBoolean(source.closeOnBackdrop, d.closeOnBackdrop),
 		gridTabSkip: oneOf(source.gridTabSkip, Object.values(GRID_TAB_SKIP), d.gridTabSkip),
 		hidePickup: asBoolean(source.hidePickup, d.hidePickup),
+		infiniteScroll: oneOf(source.infiniteScroll, Object.values(INFINITE_SCROLL), d.infiniteScroll),
 		popupTheme: oneOf(source.popupTheme, Object.values(POPUP_THEMES), d.popupTheme),
 	};
 }
@@ -95,17 +97,23 @@ export function loadSettings(deps = {}) {
 /**
  * 設定を 1 項目書く。失敗しても投げない (見た目の反映は保存を待たない)。
  * 呼び出し側が結果を伝えられるよう、成否は戻り値で返す。
+ * SETTINGS_DEFAULTS に無いキーは書かない。読み出しが捨てる値で sync 領域の容量を食わないため。
  * @param {string} key 設定キー
  * @param {unknown} value 値
  * @param {{area?: object}} [deps] 保存領域の差し替え
- * @returns {Promise<boolean>} 保存できたら true
+ * @returns {Promise<boolean>} 保存できたら true。知らないキーなら false
  */
 export function saveSetting(key, value, deps = {}) {
+	if (!Object.hasOwn(SETTINGS_DEFAULTS, key)) {
+		warn('知らない設定キーです', key);
+		return Promise.resolve(false);
+	}
 	return withArea(deps, async (area) => { await area.set({ [key]: value }); return true; }, false);
 }
 
 /**
  * 設定の変更を購読する。popup で変えた値を開いているページへ即座に届けるために使う。
+ * コールバックが投げても unhandled rejection にせず warn に残す (SPEC §12)。
  * @param {(settings: typeof SETTINGS_DEFAULTS) => void} callback 変更後の設定を受け取る
  * @param {{storage?: object}} [deps] chrome.storage の差し替え
  * @returns {{dispose: () => void}} 購読の解除
@@ -117,7 +125,9 @@ export function watchSettings(callback, deps = {}) {
 	const listener = (_changes, areaName) => {
 		if (areaName !== SYNC_AREA_NAME) return;
 		// 差し替えた storage があればその sync 領域から読む。既定の chrome.storage.sync へ戻さない
-		void loadSettings({ area: storage.sync ?? undefined }).then(callback);
+		loadSettings({ area: storage.sync ?? undefined })
+			.then(callback)
+			.catch((error) => warn('設定の変更を反映できませんでした', error));
 	};
 	storage.onChanged.addListener(listener);
 	return {

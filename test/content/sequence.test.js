@@ -1,7 +1,11 @@
-import { test } from 'node:test';
+import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { WORK_CATEGORY } from '../../src/common/constants.js';
-import { createDomSequence, sortIdsDesc, extendWithAllWorks } from '../../src/content/sequence.js';
+import { createDomSequence, extendWithAllWorks } from '../../src/content/sequence.js';
+import { sortIdsDesc, clearPageSourceCache } from '../../src/pixiv/pages.js';
+
+// profile/all の応答は pixiv/pages.js がユーザー単位で覚えるので、テストごとに捨てる
+beforeEach(() => { clearPageSourceCache(); });
 
 test('DOM 順の列は前後を返す', () => {
 	const sequence = createDomSequence(['3', '2', '1']);
@@ -19,6 +23,8 @@ test('列に無い ID は null を返す', () => {
 	const sequence = createDomSequence(['3', '2']);
 	assert.equal(sequence.next('99'), null);
 	assert.equal(sequence.prev('99'), null);
+	assert.equal(sequence.has('99'), false);
+	assert.equal(sequence.has('3'), true);
 });
 
 test('sortIdsDesc は数値として降順に並べる', () => {

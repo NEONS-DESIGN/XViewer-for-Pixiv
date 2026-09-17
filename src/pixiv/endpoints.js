@@ -4,10 +4,16 @@
  * 仕様の根拠は SITE_SPEC.md。
  */
 
+import { WORK_CATEGORY_QUERY, WORK_CATEGORY_QUERY_BOTH } from '../common/constants.js';
+
 /** API の共通接頭辞。 */
 const AJAX = '/ajax';
 
-/** 応答の言語。日本語固定。 */
+/**
+ * 応答の言語。日本語固定。
+ * pageProps.lang にページの言語はあるが、この拡張は UI の文言が日本語のみなので
+ * タグの翻訳や日付文言もそれに揃える。
+ */
 const LANG = 'lang=ja';
 
 /** pixiv 本体のオリジン。投稿文の相対リンクを解決する基準に使う。 */
@@ -184,14 +190,19 @@ export function userProfileAllUrl(userId) {
 /**
  * ID を並べて作品サマリを一括取得する。
  * sensitiveFilterMode は userSetting 以外を受け付けず、省略しても結果が同じなので付けない。
+ * work_category は pixiv 本体と同じ値を送る。イラスト / 漫画タブなら illust / manga、
+ * 両方を並べる artworks タブなら illustManga (SITE_SPEC §3 実測)。
  * @param {string} userId ユーザー ID
  * @param {string[]} ids 作品 ID の配列
  * @param {boolean} isFirstPage 一覧の 1 ページ目か
+ * @param {string|null} [category] 絞り込む種別 (WORK_CATEGORY)。null なら両方
  * @returns {string} URL
  */
-export function userProfileIllustsUrl(userId, ids, isFirstPage) {
+export function userProfileIllustsUrl(userId, ids, isFirstPage, category = null) {
 	const query = ids.map((id) => `ids%5B%5D=${id}`).join('&');
 	const firstPage = isFirstPage ? 1 : 0;
+	// 知らない値 (null / undefined を含む) は両方扱いへ倒す。値は WORK_CATEGORY_BY_TAB 経由でしか来ない
+	const workCategory = WORK_CATEGORY_QUERY[category] ?? WORK_CATEGORY_QUERY_BOTH;
 	return `${AJAX}/user/${userId}/profile/illusts?${query}`
-		+ `&work_category=illustManga&is_first_page=${firstPage}&${LANG}`;
+		+ `&work_category=${workCategory}&is_first_page=${firstPage}&${LANG}`;
 }

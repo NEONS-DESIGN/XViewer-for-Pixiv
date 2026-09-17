@@ -17,7 +17,7 @@ const OFFSET_NAME_LENGTH = 26;
 const OFFSET_EXTRA_LENGTH = 28;
 
 /** 無圧縮を表す圧縮方式の番号。 */
-export const ZIP_METHOD_STORE = 0;
+const ZIP_METHOD_STORE = 0;
 
 /**
  * @typedef {object} ZipEntry

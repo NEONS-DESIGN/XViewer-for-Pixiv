@@ -6,7 +6,7 @@ import {
 	followLabel,
 	countLabel,
 	createActionsBar,
-	clearFollowCache,
+	BOOKMARK_PRIVATE_HINT,
 } from '../../src/content/viewer/actions-bar.js';
 import { clearSessionCache } from '../../src/content/session.js';
 import { PixivError, PIXIV_ERROR_KINDS } from '../../src/pixiv/errors.js';
@@ -73,24 +73,27 @@ function fakeCounts() {
 
 /**
  * 描画先ひとそろいとアクションバーを用意する。
- * @param {object} [overrides] fetchUser と actions の差し替え
- * @returns {{container: object, followContainer: object, bar: object, like: () => object, bookmark: () => object}} 一式
+ * patchUser は既定で記録だけする (pixiv/user.js のキャッシュへ書かない)。
+ * @param {object} [overrides] fetchUser / patchUser / actions の差し替え
+ * @returns {{container: object, followContainer: object, bar: object, patched: object[], like: () => object, bookmark: () => object}} 一式
  */
 function setup(overrides = {}) {
-	clearFollowCache();
 	const container = fakeCounts();
 	const followContainer = fakeElement('div');
+	const patched = [];
 	const bar = createActionsBar({
 		doc: fakeDoc(),
 		container,
 		followContainer,
 		fetchUser: overrides.fetchUser ?? (async () => ({ isFollowed: false })),
+		patchUser: overrides.patchUser ?? ((userId, patch) => { patched.push([userId, patch]); }),
 		actions: overrides.actions,
 	});
 	return {
 		container,
 		followContainer,
 		bar,
+		patched,
 		like: () => container.querySelector('.count-like'),
 		bookmark: () => container.querySelector('.count-bookmark'),
 	};
@@ -121,8 +124,27 @@ test('押せるカウンタは差し替えた時点の件数を出す', () => {
 	bar.render(DETAIL);
 	assert.equal(like().children[1].textContent, '2,299');
 	assert.equal(like().title, 'いいね (取り消せません) 2,299 件');
+	assert.equal(like().getAttribute('aria-label'), 'いいね (取り消せません) 2,299 件');
 	assert.equal(bookmark().children[1].textContent, '2,740');
-	assert.equal(bookmark().title, 'ブックマークに追加 2,740 件');
+	assert.equal(bookmark().getAttribute('aria-label'), 'ブックマークに追加 2,740 件');
+	bar.dispose();
+});
+
+test('未ブックマークのカウンタは title にだけ Shift で非公開になる手掛かりを添える', () => {
+	// 非公開の入れ方はコードと SPEC にしか無かった。操作の説明は title に持たせる (UI_DESIGN_KIT §6)。
+	// 読み上げ (aria-label) には足さない。件数の後ろに長い説明が付くと毎回読まれて邪魔になる
+	const { bar, bookmark } = setup();
+	bar.render(DETAIL);
+	assert.equal(bookmark().title, `ブックマークに追加 2,740 件 ${BOOKMARK_PRIVATE_HINT}`);
+	assert.equal(bookmark().getAttribute('aria-label'), 'ブックマークに追加 2,740 件');
+	bar.dispose();
+});
+
+test('ブックマーク済みのカウンタには非公開の手掛かりを付けない', () => {
+	// 押すと削除なので Shift の説明は嘘になる
+	const { bar, bookmark } = setup();
+	bar.render({ ...DETAIL, bookmarkId: '38764402172' });
+	assert.equal(bookmark().title, 'ブックマークから削除 2,740 件');
 	bar.dispose();
 });
 
@@ -161,8 +183,20 @@ test('ブックマークの追加と削除で件数が増減する', async () =>
 
 	await bookmark().dispatch('click', { shiftKey: false });
 	assert.equal(bookmark().children[1].textContent, '2,740');
-	assert.equal(bookmark().title, 'ブックマークに追加 2,740 件');
+	assert.equal(bookmark().title, `ブックマークに追加 2,740 件 ${BOOKMARK_PRIVATE_HINT}`);
 	assert.equal(bookmark().classList.contains('is-on'), false);
+	bar.dispose();
+});
+
+test('Shift を押しながらのブックマークは非公開で送る', async () => {
+	const sent = [];
+	const { bar, bookmark, container } = setup({
+		actions: { addBookmark: async (id, isPrivate) => { sent.push(isPrivate); return '38764402172'; } },
+	});
+	bar.render(DETAIL);
+	await bookmark().dispatch('click', { shiftKey: true });
+	assert.deepEqual(sent, [true]);
+	assert.equal(find(container, '.action-status').textContent, '非公開でブックマークしました');
 	bar.dispose();
 });
 
@@ -175,8 +209,24 @@ test('ブックマーク削除で件数は負の数にならない', async () =>
 	bar.dispose();
 });
 
+test('ブックマークの応答を待つ間に破棄されたら、外れたボタンを触らない', async () => {
+	// SPEC §10.12「すべての await の後に if (disposed) return」。
+	// 作品を送った直後に前の作品の応答が返っても、古いボタンの見た目と件数を書き換えない
+	let finish;
+	const { bar, bookmark } = setup({
+		actions: { addBookmark: () => new Promise((resolve) => { finish = resolve; }) },
+	});
+	bar.render(DETAIL);
+	const clicking = bookmark().dispatch('click', { shiftKey: false });
+	const button = bookmark();
+	bar.dispose();
+	finish('38764402172');
+	await clicking;
+	assert.equal(button.children[1].textContent, '2,740');
+	assert.equal(button.classList.contains('is-on'), false);
+});
+
 test('未ログインならカウンタを差し替えず案内だけ出す', () => {
-	clearFollowCache();
 	// 他のテストが覚えたログイン済みのセッションを捨てる
 	clearSessionCache();
 	const container = fakeCounts();
@@ -190,6 +240,8 @@ test('未ログインならカウンタを差し替えず案内だけ出す', ()
 	// 件数は読めるままにする
 	assert.equal(container.querySelector('.count-like').tag, 'span');
 	assert.ok(container.children.some((child) => child.textContent === 'ログインするといいねやブックマークができます'));
+	// 押せるものが無いので、結果を読み上げる領域も作らない
+	assert.equal(find(container, '.action-status'), null);
 	bar.dispose();
 	clearSessionCache();
 });
@@ -201,6 +253,17 @@ test('フォローボタンは作者行の枠へ描く', () => {
 	assert.equal(container.children.filter((child) => child.className.includes('action-follow')).length, 0);
 	assert.equal(followContainer.children.length, 1);
 	assert.equal(followContainer.children[0].className, 'action action-follow');
+	bar.dispose();
+});
+
+test('フォローボタンは文言が見えているので aria-label を重ねない', () => {
+	// 可視テキストと同じ aria-label は二度読まれるだけ。title は操作の説明として残す
+	const { followContainer, bar } = setup();
+	bar.render(DETAIL);
+	const button = followContainer.children[0];
+	assert.equal(button.getAttribute('aria-label'), null);
+	assert.equal(button.title, 'フォロー');
+	assert.equal(button.children[1].textContent, 'フォロー');
 	bar.dispose();
 });
 
@@ -226,23 +289,34 @@ test('フォロー済みなら「フォロー中」で描き直す', async () =>
 	bar.dispose();
 });
 
-test('フォロー状態は作者ごとに 1 回だけ取りに行く', async () => {
-	let calls = 0;
-	const fetchUser = async () => { calls += 1; return { isFollowed: true }; };
-	const first = setup({ fetchUser });
-	first.bar.render(DETAIL);
+test('フォローを切り替えたら覚えているユーザー情報へ書き戻す', async () => {
+	// フォロー状態を覚えるのは pixiv/user.js の 1 か所。ここに別のキャッシュは持たない。
+	// 書き戻さないと、次の作品で fetchUser が古い応答を返して「フォロー」に戻って見える
+	const { followContainer, bar, patched } = setup({
+		actions: { followUser: async () => {}, unfollowUser: async () => {} },
+	});
+	bar.render(DETAIL);
 	await settle();
-	first.bar.dispose();
+	const button = followContainer.children[0];
+	await button.dispatch('click');
+	assert.deepEqual(patched, [['54734418', { isFollowed: true }]]);
+	assert.equal(button.title, 'フォロー中');
+	await button.dispatch('click');
+	assert.deepEqual(patched[1], ['54734418', { isFollowed: false }]);
+	assert.equal(button.title, 'フォロー');
+	bar.dispose();
+});
 
-	// 同じ作者の別の作品へ移っても取り直さない。ユーザーページでは作者が変わらない
-	const container = fakeCounts();
-	const followContainer = fakeElement('div');
-	const second = createActionsBar({ doc: fakeDoc(), container, followContainer, fetchUser });
-	second.render({ ...DETAIL, id: '149425017' });
+test('フォローに失敗したら書き戻さない', async () => {
+	const { followContainer, bar, patched } = setup({
+		actions: { followUser: async () => { throw new Error('500'); } },
+	});
+	bar.render(DETAIL);
 	await settle();
-	assert.equal(calls, 1);
-	assert.equal(followContainer.children[0].title, 'フォロー中');
-	second.dispose();
+	await followContainer.children[0].dispatch('click');
+	assert.deepEqual(patched, []);
+	assert.equal(followContainer.children[0].title, 'フォロー');
+	bar.dispose();
 });
 
 test('フォロー状態を取れなくてもボタンは押せる状態に戻す', async () => {
@@ -266,13 +340,66 @@ test('既にいいね済みだったと返ってきたら件数を増やさな�
 	bar.dispose();
 });
 
-test('ログインが切れていたら (401) セッションを読み直させる文言にする', async () => {
+test('ログインが切れていたら (401) 再読み込みまで案内する', async () => {
+	// __NEXT_DATA__ は SPA 遷移で更新されない (SITE_SPEC §0)。
+	// 別タブでログインし直しても古い CSRF トークンを読むので、押し直しでは復帰できない
 	const unauthorized = new PixivError(PIXIV_ERROR_KINDS.UNAUTHORIZED, '401', 401);
 	const { bar, like, container } = setup({ actions: { likeIllust: async () => { throw unauthorized; } } });
 	bar.render(DETAIL);
 	await like().dispatch('click');
 	const status = find(container, '.action-status');
-	assert.match(status.textContent, /ログイン/);
+	assert.equal(status.textContent, 'ログインが切れています。pixiv にログインし直し、このページを再読み込みしてください');
 	assert.equal(status.getAttribute('data-kind'), 'error');
 	bar.dispose();
+});
+
+test('自分の作品ではカウンタを差し替えずフォローも出さない', () => {
+	// 自分にはいいね・ブックマーク・フォローのどれもできない。
+	// pixiv 本体も自分の作品では 3 つとも描かない (SITE_SPEC §4)。
+	// 押せば必ず失敗するボタンを出さないのが正しい
+	clearSessionCache();
+	const container = fakeCounts();
+	const followContainer = fakeElement('div');
+	const calls = [];
+	const bar = createActionsBar({
+		doc: fakeDocWith({
+			nextData: buildNextData({ token: 'csrf-token', self: { id: DETAIL.userId, xRestrict: 1 } }),
+		}),
+		container,
+		followContainer,
+		// 呼ばれたら「自分かどうか」を見ずにフォロー状態を引きに行っている
+		fetchUser: async (userId) => { calls.push(userId); return { isFollowed: false }; },
+	});
+	bar.render(DETAIL);
+	// 件数は読めるままにする (未ログインのときと同じ扱い)
+	assert.equal(container.querySelector('.count-like').tag, 'span');
+	assert.equal(container.querySelector('.count-bookmark').tag, 'span');
+	assert.equal(followContainer.children.length, 0);
+	// 押せるものが無いので、結果を読み上げる領域も作らない
+	assert.equal(find(container, '.action-status'), null);
+	// 自分の作品なら /ajax/user も引かない
+	assert.deepEqual(calls, []);
+	bar.dispose();
+	clearSessionCache();
+});
+
+test('他人の作品なら self.id があってもボタンを出す', () => {
+	// 判定は ID の一致だけ。ログイン済みなら他人の作品はこれまでどおり押せる
+	clearSessionCache();
+	const container = fakeCounts();
+	const followContainer = fakeElement('div');
+	const bar = createActionsBar({
+		doc: fakeDocWith({
+			nextData: buildNextData({ token: 'csrf-token', self: { id: '16343044', xRestrict: 1 } }),
+		}),
+		container,
+		followContainer,
+		fetchUser: async () => ({ isFollowed: false }),
+		patchUser: () => {},
+	});
+	bar.render(DETAIL);
+	assert.equal(container.querySelector('.count-like').tag, 'button');
+	assert.equal(followContainer.children.length, 1);
+	bar.dispose();
+	clearSessionCache();
 });

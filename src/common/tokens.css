@@ -1,0 +1,141 @@
+/* 配色トークン。ビュワー (viewer.css / Shadow DOM) と設定画面 (popup.css / 文書) の両方で読む。
+   配色はすべてここの変数で決める。個々の規則に色を直書きしないこと。
+   ダークが既定。ライトは data-theme='light' で変数だけを差し替える。
+
+   選択子は :root と :host を並べる。文書側では :host が当たらず、Shadow DOM の中では :root が
+   当たらないので、同じ 1 本の CSS を両方へそのまま読ませられる。
+   - 設定画面: popup.html が <link> で読む。data-theme は popup-ui.js が設定 (popupTheme) と
+     OS の設定から html 要素に付ける (SPEC.md §11.2)
+   - ビュワー: viewer.js が文字列として import し、viewer.css の前に <style> へ入れる。
+     data-theme は applyTheme() が pixiv 本体の html[data-theme] を写してホスト要素に付ける (SPEC.md §10.2)
+   画面ごとにしか使わないトークン (ビュワーのフォロー・幕・幅、設定画面のスイッチ) は
+   それぞれの CSS に残してある。ここに置くのは両方で同じ値になるものだけ。 */
+:root,
+:host {
+	/* ブラウザ標準の部品 (チェックボックス、セレクトのピッカー、スクロールバー) も
+	   配色に追従させる。これが無いとライトにしても白い枠の中に暗いピッカーが出る */
+	color-scheme: dark;
+	/* ダークの地の色は pixiv 本体 (charcoal) の実測値。
+	   --charcoal-background1 (#1f1f1f) = pixiv の body、つまり利用者が地として見ている色。
+	   --charcoal-background2 (#000000) は html 側で、実際にはほぼ body に覆われて見えないため使わない
+	   (popup では黒が強すぎた)。ビュワーは pixiv の上に重なるので、地の色がずれると本体から浮く (SITE_SPEC.md) */
+	--bg: #1f1f1f;
+	--surface: #1f1f1f;
+	--fg: #eff0f4;
+	--muted: #9aa0b4;
+	/* 枠と操作部品も pixiv の階調 (#333 / #3a3a3a) に合わせる。
+	   地だけ差し替えると青寄りの中間色が残って濁る */
+	--border: #333333;
+	--divider: rgba(255, 255, 255, 0.12);
+	--control-bg: #1f1f1f;
+	--control-border: #3a3a3a;
+	--control-hover: #333333;
+	--hover: rgba(255, 255, 255, 0.08);
+	/* 拡張機能のアイコン (scripts/icon-svg.mjs) の背景もこの値。
+	   食い違いは test/popup/popup-css.test.js が止める */
+	--accent: #4ea3d6;
+	/* 塗りつぶしボタンの文字色。背景 var(--accent) との組み合わせで決める値なので、
+	   テーマごとに必ず対で見直すこと。ダークは明るい水色の上の濃紺で約 6.8:1 */
+	--on-accent: #04121a;
+	/* 取り返しの付かない操作 (設定の初期化の確定など) の枠と文字。
+	   やり直せる失敗 (保存の失敗の通知) には使わない (UI_DESIGN_KIT §2) */
+	--danger: #e5737a;
+	/* スクロールバーの太さ */
+	--scrollbar-size: 6px;
+	/* スクロールバー。軌道は下地がうっすら分かる程度、つまみはその上で確実に読める濃さ */
+	--scrollbar-track: rgba(255, 255, 255, 0.07);
+	--scrollbar-thumb: rgba(255, 255, 255, 0.26);
+	--scrollbar-thumb-hover: rgba(255, 255, 255, 0.4);
+	/* フォーカスの輪郭。すべての操作部品で同じ 1 本にする (UI_DESIGN_KIT §6)。
+	   --accent を参照するのでテーマごとに書き直さなくてよい */
+	--focus-ring: 2px solid var(--accent);
+
+	/* 書体。Shadow DOM はホストページのフォントを継承しないので :host で明示する。
+	   設定画面も同じ並びにして、2 つの画面で字面を揃える。文字の大きさは画面ごとに決める */
+	font-family: system-ui, -apple-system, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+}
+
+/* ライトの値。下のメディアクエリの中にも同じ宣言がある。
+   片方だけ直さないこと (中身が同じであることは test/popup/popup-css.test.js が見張る)。
+   ライトも pixiv 本体 (charcoal) の実測値。地は --charcoal-background1 (#ffffff)。
+   線は pixiv が実際に引いている rgba(0,0,0,0.08) (ダーク側の rgba(255,255,255,0.12) と対) と、
+   それを白地で不透明にした #ebebeb。地との明暗差はダークの #1f1f1f/#333333 と同じ比に揃えてある。
+   枠 (--control-border) は --charcoal-surface1-press。ホバーの地 (#ebebeb) より濃いので、ホバー中も輪郭が残る。
+   --accent は白文字を載せる前提で暗くしてある。白との比は約 5.8:1 (#1f7fb8 は 4.4:1 で AA 未達だった) */
+:root[data-theme='light'],
+:host([data-theme='light']) {
+	color-scheme: light;
+	--bg: #ffffff;
+	--surface: #ffffff;
+	--fg: #1c1e26;
+	--muted: #5c6275;
+	--border: #ebebeb;
+	--divider: rgba(0, 0, 0, 0.08);
+	--control-bg: #ffffff;
+	--control-border: #d6d6d6;
+	--control-hover: #ebebeb;
+	--hover: rgba(0, 0, 0, 0.05);
+	--accent: #1a6b9e;
+	--on-accent: #ffffff;
+	--danger: #c0392b;
+	--scrollbar-track: rgba(0, 0, 0, 0.06);
+	--scrollbar-thumb: rgba(0, 0, 0, 0.26);
+	--scrollbar-thumb-hover: rgba(0, 0, 0, 0.4);
+}
+
+/* 設定画面だけの規則。data-theme は設定を読んだ後 (非同期) に付く。OS がライトのとき、付くまでの
+   最初の描画がダークだと開くたびに一瞬暗く光る。属性が付く前だけ OS の設定に従ってライトで描く。
+   明示の選択 (data-theme) が付けばこの規則は当たらなくなり、選択が OS より優先される。
+   宣言は上のライトのブロックと同じ内容にする (CSS では 2 つの条件を 1 つの選択子に
+   まとめられないため、やむを得ず 2 か所に書いている)。
+
+   :host は並べない。ビュワーは OS ではなく pixiv 本体の html[data-theme] に追従する (SPEC.md §10.2) ので、
+   OS がライトでも pixiv がダークならダークのままでなければならない。
+   :root は Shadow DOM の中では当たらないので、ビュワーにはこの規則が届かない */
+@media (prefers-color-scheme: light) {
+	:root:not([data-theme]) {
+		color-scheme: light;
+		--bg: #ffffff;
+		--surface: #ffffff;
+		--fg: #1c1e26;
+		--muted: #5c6275;
+		--border: #ebebeb;
+		--divider: rgba(0, 0, 0, 0.08);
+		--control-bg: #ffffff;
+		--control-border: #d6d6d6;
+		--control-hover: #ebebeb;
+		--hover: rgba(0, 0, 0, 0.05);
+		--accent: #1a6b9e;
+		--on-accent: #ffffff;
+		--danger: #c0392b;
+		--scrollbar-track: rgba(0, 0, 0, 0.06);
+		--scrollbar-thumb: rgba(0, 0, 0, 0.26);
+		--scrollbar-thumb-hover: rgba(0, 0, 0, 0.4);
+	}
+}
+
+/* スクロールバーは細く、軌道も見せる。どこからどこまで送れるのかが分かるほうが、
+   つまみの位置だけを見せるより読み進めた量が掴みやすい。
+   標準の scrollbar-width / scrollbar-color と混ぜて書くと Chromium は
+   ::-webkit-scrollbar を丸ごと無視するので、こちらだけに寄せる
+   (丸みと余白まで決めたいのでこちらを使う。Chromium 系専用の拡張)。
+   選択子を付けずに書き、その CSS が届く範囲 (文書 / Shadow DOM) のスクロールバーを
+   すべて同じ見た目にする。ビュワーのサイドバーとコメント一覧、設定画面のパネルが対象。
+   サイドバーだけ端から離す余白は viewer.css 側にある */
+::-webkit-scrollbar {
+	width: var(--scrollbar-size);
+}
+
+::-webkit-scrollbar-track {
+	border-radius: 999px;
+	background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+	border-radius: 999px;
+	background: var(--scrollbar-thumb);
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: var(--scrollbar-thumb-hover);
+}

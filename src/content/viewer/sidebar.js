@@ -6,7 +6,10 @@
  * ホストページが Trusted Types を強制していると innerHTML が例外になる事情もある。
  */
 import { createIcon } from '../../common/icons.js';
-import { PIXIV_ORIGIN, safeCdnUrl, artworkPath, userPath, tagWorksPath } from '../../pixiv/endpoints.js';
+import { formatCount } from '../../common/format.js';
+import { warn } from '../../common/log.js';
+import { PIXIV_ORIGIN, artworkPath, userPath, tagWorksPath } from '../../pixiv/endpoints.js';
+import { createAvatar, showAvatar } from './avatar.js';
 import { fetchUserProfile } from '../../pixiv/user.js';
 import { createShareMenu } from './share-menu.js';
 
@@ -15,6 +18,22 @@ const SAFE_SCHEMES = ['http:', 'https:'];
 
 /** ユーザー ID の見出し。数字だけだと何の番号か分からないので前に置く。 */
 const USER_ID_PREFIX = 'ID: ';
+
+/** 利用者に見せる文言。 */
+const MESSAGES = Object.freeze({
+	OPEN_ORIGINAL: '作品ページを開く',
+	LIKE: 'いいね',
+	BOOKMARK: 'ブックマーク',
+	VIEWS: '閲覧数',
+	COMMENTS: 'コメント',
+});
+
+/**
+ * アバターがまだ表示できない (取得前・取得失敗) ことを示すクラス。
+ * 見た目は viewer.css が持つ (枠だけ残して中身を隠す)。
+ */
+/** 読み上げにだけ渡す文字に付けるクラス。見た目は viewer.css の .visually-hidden。 */
+const VISUALLY_HIDDEN_CLASS = 'visually-hidden';
 
 /** 日時の表示に使うタイムゾーン。閲覧地に依らず pixiv 本体と同じ表示にするため固定する。 */
 const DISPLAY_TIME_ZONE = 'Asia/Tokyo';
@@ -30,24 +49,19 @@ const DATE_TIME_FORMAT = new Intl.DateTimeFormat('ja-JP', {
 	hourCycle: 'h23',
 });
 
-/** 実体参照の戻し表。pixiv が返すのはこの範囲。 */
+/** 名前付きの実体参照の戻し表。数値参照 (&#39; / &#x27;) は decodeEntities が汎用に戻す。 */
 const ENTITIES = Object.freeze({
 	'&amp;': '&',
 	'&lt;': '<',
 	'&gt;': '>',
 	'&quot;': '"',
-	'&#39;': "'",
 });
 
-/**
- * 数値を 3 桁区切りにする。
- * @param {number|null|undefined} value 数値
- * @returns {string} 区切った文字列
- */
-export function formatCount(value) {
-	const number = typeof value === 'number' && Number.isFinite(value) ? value : 0;
-	return number.toLocaleString('ja-JP');
-}
+/** 数値参照 (&#39; / &#x27;)。1 番目の捕捉が x 付きなら 16 進。 */
+const NUMERIC_ENTITY_PATTERN = /&#(x[0-9a-f]+|\d+);/gi;
+
+/** 名前付きの実体参照。ENTITIES のキーと同じ範囲。 */
+const NAMED_ENTITY_PATTERN = /&(?:amp|lt|gt|quot);/g;
 
 /**
  * ISO 8601 の日時を日本語表記にする。
@@ -65,12 +79,30 @@ export function formatDate(iso) {
 }
 
 /**
+ * 数値参照 1 つを文字に戻す。
+ * @param {string} code 捕捉した部分 (39 / x27 など)
+ * @returns {string|null} 戻した文字。符号位置として不正なら null
+ */
+function decodeNumericEntity(code) {
+	const hex = code[0] === 'x' || code[0] === 'X';
+	const codePoint = hex ? parseInt(code.slice(1), 16) : Number(code);
+	try {
+		return String.fromCodePoint(codePoint);
+	} catch {
+		return null;
+	}
+}
+
+/**
  * 実体参照を戻す。
+ * 数値参照を先に戻す。名前付きを先に戻すと &amp;#39; が &#39; になった後でもう一度戻されてしまう。
  * @param {string} text 対象
  * @returns {string} 戻した文字列
  */
 function decodeEntities(text) {
-	return text.replace(/&(?:amp|lt|gt|quot|#39);/g, (matched) => ENTITIES[matched] ?? matched);
+	return text
+		.replace(NUMERIC_ENTITY_PATTERN, (matched, code) => decodeNumericEntity(code) ?? matched)
+		.replace(NAMED_ENTITY_PATTERN, (matched) => ENTITIES[matched] ?? matched);
 }
 
 /**
@@ -161,12 +193,12 @@ export function commentToNodes(doc, html) {
 /**
  * サイドバーを作る。
  * @param {SidebarDeps} deps 依存
- * @returns {{render: (detail: object) => void, followSlot: () => HTMLElement, countsSlot: () => HTMLElement, commentsSlot: () => HTMLElement, consumeEscape: () => boolean, dispose: () => void}}
+ * @returns {{render: (detail: object) => void, followSlot: () => HTMLElement, countsSlot: () => HTMLElement, commentsSlot: () => HTMLElement, consumeEscape: () => boolean, consumeKey: (event: KeyboardEvent) => boolean, dispose: () => void}}
  */
 export function createSidebar(deps) {
 	const { doc, container } = deps;
 	// actions-bar (フォロー状態) と同じ応答を使う。既定は共有キャッシュ付きなので通信は 1 回で済む
-	const fetchUser = deps.fetchUser ?? ((userId) => fetchUserProfile(userId));
+	const fetchUser = deps.fetchUser ?? fetchUserProfile;
 	/** @type {HTMLElement|null} フォローボタンを後から差し込む場所 (作者行の右端) */
 	let follow = null;
 	/** @type {HTMLElement|null} カウンタの行。いいねとブックマークはここが押せるボタンに変わる */
@@ -184,6 +216,9 @@ export function createSidebar(deps) {
 	 * いいねとブックマークは actions-bar が押せるボタンへ差し替える。
 	 * 差し替え先を探せるように印 (marker) を付ける。差し替えられなかったとき
 	 * (未ログイン・見られない作品) はこのまま押せない表示として残る。
+	 *
+	 * 何の数字かは視覚的に隠した文字で持つ。role の無い span の aria-label は
+	 * 読み上げに届かない (ARIA 1.2 で generic には付けられない) ので使わない。
 	 * @param {string} iconName アイコン名
 	 * @param {string} label 読み上げ用のラベル
 	 * @param {number} value 値
@@ -194,11 +229,14 @@ export function createSidebar(deps) {
 		const item = doc.createElement('span');
 		item.className = marker ? `count ${marker}` : 'count';
 		item.appendChild(createIcon(doc, iconName));
+		const name = doc.createElement('span');
+		name.className = VISUALLY_HIDDEN_CLASS;
+		name.textContent = `${label} `;
+		item.appendChild(name);
 		const text = doc.createElement('span');
 		text.textContent = formatCount(value);
 		item.appendChild(text);
 		item.title = `${label} ${formatCount(value)}`;
-		item.setAttribute('aria-label', item.title);
 		return item;
 	}
 
@@ -218,13 +256,8 @@ export function createSidebar(deps) {
 		author.className = 'author';
 		author.href = userPath(detail.userId);
 
-		const avatar = doc.createElement('img');
-		avatar.className = 'author-avatar';
-		// 名前が隣にあるので読み上げでは重複する。装飾として扱う
-		avatar.setAttribute('alt', '');
 		// 取れるまでは枠だけ。読み込めなかったときと同じ見え方にしておく
-		avatar.style.visibility = 'hidden';
-		avatar.addEventListener('error', () => { avatar.style.visibility = 'hidden'; });
+		const avatar = createAvatar(doc, 'author-avatar');
 		author.appendChild(avatar);
 
 		const identity = doc.createElement('span');
@@ -251,13 +284,9 @@ export function createSidebar(deps) {
 			.then((user) => {
 				// 待っている間に別の作品へ移っていたら、前の作者の顔を入れない
 				if (mine !== generation) return;
-				// 応答の値をそのまま外部オリジンへのリクエストにしない
-				const url = safeCdnUrl(user?.image);
-				if (!url) return;
-				avatar.src = url;
-				avatar.style.visibility = '';
+				showAvatar(avatar, user?.image);
 			})
-			.catch((error) => { console.warn('[GridViewer] failed to load author icon', detail.userId, error); });
+			.catch((error) => { warn('failed to load author icon', detail.userId, error); });
 
 		follow = doc.createElement('div');
 		follow.className = 'follow-slot';
@@ -280,7 +309,7 @@ export function createSidebar(deps) {
 		original.setAttribute('target', '_blank');
 		original.setAttribute('rel', 'noopener noreferrer');
 		const label = doc.createElement('span');
-		label.textContent = '作品ページを開く';
+		label.textContent = MESSAGES.OPEN_ORIGINAL;
 		original.append(label, createIcon(doc, 'openInNew'));
 		row.appendChild(original);
 
@@ -348,10 +377,10 @@ export function createSidebar(deps) {
 			counts.className = 'counts';
 			// アイコンの対応は pixiv 本体に合わせる。いいねは顔、ブックマークはハート
 			counts.append(
-				createCount('like', 'いいね', detail.likeCount, 'count-like'),
-				createCount('favorite', 'ブックマーク', detail.bookmarkCount, 'count-bookmark'),
-				createCount('visibility', '閲覧数', detail.viewCount),
-				createCount('comment', 'コメント', detail.commentCount),
+				createCount('like', MESSAGES.LIKE, detail.likeCount, 'count-like'),
+				createCount('favorite', MESSAGES.BOOKMARK, detail.bookmarkCount, 'count-bookmark'),
+				createCount('visibility', MESSAGES.VIEWS, detail.viewCount),
+				createCount('comment', MESSAGES.COMMENTS, detail.commentCount),
 			);
 			info.appendChild(counts);
 
@@ -373,6 +402,16 @@ export function createSidebar(deps) {
 		 */
 		consumeEscape() {
 			return shareMenu?.consumeEscape() === true;
+		},
+
+		/**
+		 * キー操作をシェアメニューに先に使わせる (Escape / 上下 / Home / End)。
+		 * true なら本体は反応しない。開いたメニューで下キーを押して次の作品へ移らないように
+		 * @param {KeyboardEvent} event キー
+		 * @returns {boolean} 食い止めたなら true
+		 */
+		consumeKey(event) {
+			return shareMenu?.consumeKey(event) === true;
 		},
 
 		dispose() {

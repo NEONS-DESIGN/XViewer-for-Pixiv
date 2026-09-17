@@ -4,18 +4,33 @@
  * 中身 (どこへ何を渡すか) は pixiv/share.js が決める。ここは開閉と描画だけを持つ。
  * Shadow DOM の中に置かれるので、外側クリックの判定は composedPath() で見る
  * (シャドウ境界の外では event.target がホスト要素へ付け替えられるため)。
+ *
+ * role="menu" を名乗るので WAI-ARIA の menu パターンに従う: 開いたら最初の項目へフォーカスし、
+ * 上下キーで項目を移動、Home / End で端へ、Escape で閉じてボタンへ戻す。
+ * Tab で項目の外へ出たら閉じる (focusout)。
+ * キーは consumeKey() で受ける。ビュワー本体が document の捕捉フェーズで
+ * 上下キーを作品の移動に使っているため、要素側のリスナでは間に合わない (SPEC §10.5)。
  */
 import { createIcon } from '../../common/icons.js';
 import { buildShareTargets } from '../../pixiv/share.js';
+import { KEYS } from '../../common/constants.js';
+import { warn } from '../../common/log.js';
 
-/** ボタンとメニューの見出しに使う文言。 */
-const SHARE_LABEL = 'この作品をシェア';
+/** 画面に出す文言。 */
+const MESSAGES = Object.freeze({
+	/** ボタンとメニューの見出し */
+	SHARE: 'この作品をシェア',
+	COPY_FAILED: 'コピーできませんでした',
+	COPY_DONE: 'リンクをコピーしました',
+});
 
-/** コピーに失敗したときの文言。 */
-const COPY_FAILED = 'コピーできませんでした';
-
-/** コピーできたときの文言。 */
-const COPY_DONE = 'リンクをコピーしました';
+/** メニューの中で使うキー。項目の移動と端への移動。 */
+const MENU_KEYS = Object.freeze({
+	NEXT: 'ArrowDown',
+	PREV: 'ArrowUp',
+	FIRST: 'Home',
+	LAST: 'End',
+});
 
 /**
  * @typedef {object} ShareMenuDeps
@@ -28,7 +43,7 @@ const COPY_DONE = 'リンクをコピーしました';
  * シェアメニューを作る。
  * 呼んだ時点では element を返すだけで、どこへも差し込まない。
  * @param {ShareMenuDeps} deps 依存
- * @returns {{element: HTMLElement, isOpen: () => boolean, consumeEscape: () => boolean, dispose: () => void}}
+ * @returns {{element: HTMLElement, isOpen: () => boolean, consumeEscape: () => boolean, consumeKey: (event: KeyboardEvent) => boolean, dispose: () => void}}
  */
 export function createShareMenu(deps) {
 	const { doc, detail } = deps;
@@ -36,6 +51,8 @@ export function createShareMenu(deps) {
 		?? ((text) => navigator.clipboard.writeText(text));
 	/** 開いているか */
 	let open = false;
+	/** @type {HTMLElement[]} メニューの項目。矢印キーの移動先 */
+	const items = [];
 
 	const element = doc.createElement('div');
 	element.className = 'share-wrap';
@@ -43,23 +60,23 @@ export function createShareMenu(deps) {
 	const button = doc.createElement('button');
 	button.type = 'button';
 	button.className = 'share-button';
-	button.title = SHARE_LABEL;
 	button.setAttribute('aria-haspopup', 'true');
 	button.setAttribute('aria-expanded', 'false');
 	button.appendChild(createIcon(doc, 'share'));
+	// 文言が見えているので title は付けない (同じ文字が重なるだけ)
 	const buttonText = doc.createElement('span');
-	buttonText.textContent = SHARE_LABEL;
+	buttonText.textContent = MESSAGES.SHARE;
 	button.appendChild(buttonText);
 
 	const list = doc.createElement('div');
 	list.className = 'share-menu';
 	list.hidden = true;
 	list.setAttribute('role', 'menu');
-	list.setAttribute('aria-label', SHARE_LABEL);
+	list.setAttribute('aria-label', MESSAGES.SHARE);
 
 	const heading = doc.createElement('p');
 	heading.className = 'share-menu-heading';
-	heading.textContent = SHARE_LABEL;
+	heading.textContent = MESSAGES.SHARE;
 	list.appendChild(heading);
 
 	/** コピーの結果を伝える場所。読み上げにも渡す */
@@ -91,6 +108,34 @@ export function createShareMenu(deps) {
 	}
 
 	/**
+	 * 今フォーカスのある要素。Shadow DOM の中では document.activeElement がホストを返すので、
+	 * 自分の属する木 (shadowRoot) から引く。
+	 * @returns {Element|null} フォーカスのある要素
+	 */
+	function activeElement() {
+		const tree = typeof element.getRootNode === 'function' ? element.getRootNode() : null;
+		return tree?.activeElement ?? doc.activeElement ?? null;
+	}
+
+	/**
+	 * 項目の間でフォーカスを動かす。
+	 * @param {string} key 押されたキー
+	 * @returns {boolean} 動かしたなら true
+	 */
+	function moveFocus(key) {
+		if (items.length === 0) return false;
+		const current = items.indexOf(activeElement());
+		let target;
+		if (key === MENU_KEYS.FIRST) target = 0;
+		else if (key === MENU_KEYS.LAST) target = items.length - 1;
+		else if (key === MENU_KEYS.NEXT) target = current < 0 ? 0 : (current + 1) % items.length;
+		else if (key === MENU_KEYS.PREV) target = current < 0 ? items.length - 1 : (current - 1 + items.length) % items.length;
+		else return false;
+		items[target].focus();
+		return true;
+	}
+
+	/**
 	 * 項目 1 つの中身 (アイコンと文言) を入れる。
 	 * @param {HTMLElement} item 項目
 	 * @param {{icon: string, label: string}} target シェア先
@@ -103,6 +148,7 @@ export function createShareMenu(deps) {
 		const text = doc.createElement('span');
 		text.textContent = target.label;
 		item.appendChild(text);
+		items.push(item);
 	}
 
 	for (const target of buildShareTargets(detail)) {
@@ -113,7 +159,8 @@ export function createShareMenu(deps) {
 			// 外部サイトへ渡すので opener を持たせない
 			link.setAttribute('rel', 'noopener noreferrer');
 			fillItem(link, target);
-			link.addEventListener('click', () => { setOpen(false); });
+			// 押した a は hidden の中に入るので、ボタンへ戻さないとフォーカスが body へ落ちる
+			link.addEventListener('click', closeAndRefocus);
 			list.appendChild(link);
 			continue;
 		}
@@ -121,12 +168,13 @@ export function createShareMenu(deps) {
 		copy.type = 'button';
 		fillItem(copy, target);
 		copy.addEventListener('click', () => {
-			// クリップボードは権限や実行文脈で失敗しうる。落とさずに結果だけ伝える
-			writeText(target.copyText).then(
-				() => { status.textContent = COPY_DONE; },
+			// クリップボードは権限や実行文脈で失敗しうる。落とさずに結果だけ伝える。
+			// navigator.clipboard が無い環境では同期で TypeError が出るので、Promise の中で呼んで reject 側へ流す
+			Promise.resolve().then(() => writeText(target.copyText)).then(
+				() => { status.textContent = MESSAGES.COPY_DONE; },
 				(error) => {
-					status.textContent = COPY_FAILED;
-					console.warn('[GridViewer] failed to copy share url', error);
+					status.textContent = MESSAGES.COPY_FAILED;
+					warn('failed to copy share url', error);
 				},
 			);
 		});
@@ -134,8 +182,31 @@ export function createShareMenu(deps) {
 	}
 	list.appendChild(status);
 
-	button.addEventListener('click', () => { setOpen(!open); });
+	button.addEventListener('click', () => {
+		setOpen(!open);
+		// menu パターンでは開いたら最初の項目にフォーカスを置く。キーボードで開いた人が
+		// そのまま矢印で選べるようにする (マウスでも focus-visible は出ないので邪魔にならない)
+		if (open) items[0]?.focus();
+	});
 	element.append(button, list);
+
+	/**
+	 * フォーカスがメニューの外へ出たら閉じる (Tab で抜けたとき)。
+	 * relatedTarget が無い (見出しの文字を押した・窓が非アクティブになった) ときは閉じない。
+	 * 外側のクリックは pointerdown 側が受け持つ
+	 * @param {FocusEvent} event フォーカスの移動
+	 * @returns {void}
+	 */
+	function onFocusOut(event) {
+		if (!open) return;
+		const next = event.relatedTarget;
+		if (!next) return;
+		if (next === element || items.includes(next) || next === button) return;
+		if (typeof element.contains === 'function' && element.contains(next)) return;
+		setOpen(false);
+	}
+
+	element.addEventListener('focusout', onFocusOut);
 
 	/**
 	 * メニューの外が押されたら閉じる。
@@ -152,24 +223,44 @@ export function createShareMenu(deps) {
 	// 捕捉フェーズで受ける。pixiv 側が途中で止めても届くようにする
 	doc.addEventListener('pointerdown', onPointerDown, true);
 
+	/**
+	 * キーを食い止める。
+	 * ビュワー本体のキー操作 (Escape で閉じる・上下で作品を移動) より先に呼ばれ、
+	 * true を返したときは本体が反応してはいけない。
+	 * @param {KeyboardEvent} event キー
+	 * @returns {boolean} 食い止めたなら true
+	 */
+	function consumeKey(event) {
+		if (!open) return false;
+		if (event.key === KEYS.CLOSE) {
+			event.preventDefault?.();
+			closeAndRefocus();
+			return true;
+		}
+		if (moveFocus(event.key)) {
+			event.preventDefault?.();
+			return true;
+		}
+		return false;
+	}
+
 	return {
 		element,
 		isOpen() { return open; },
 
 		/**
-		 * Escape を食い止める。
-		 * ビュワー本体の Escape (モーダルを閉じる) より先に呼ばれ、
-		 * true を返したときは本体が反応してはいけない。
+		 * Escape を食い止める。consumeKey の Escape だけを呼ぶ形。
 		 * @returns {boolean} 食い止めたなら true
 		 */
 		consumeEscape() {
-			if (!open) return false;
-			closeAndRefocus();
-			return true;
+			return consumeKey({ key: KEYS.CLOSE });
 		},
+
+		consumeKey,
 
 		dispose() {
 			doc.removeEventListener('pointerdown', onPointerDown, true);
+			element.removeEventListener('focusout', onFocusOut);
 			setOpen(false);
 		},
 	};

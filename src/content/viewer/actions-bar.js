@@ -8,6 +8,10 @@
  * アイコンの対応は pixiv 本体に合わせる。いいねは顔 (like)、ブックマークはハート (favorite)。
  * 逆にすると意味が入れ替わって見える。
  *
+ * **自分の作品には 3 つとも出さない。** pixiv は自分にいいね・ブックマーク・フォローをさせず、
+ * 本体の UI もこの 3 つを描かない (SITE_SPEC §4)。押せば必ず失敗するので、そもそも出さない。
+ * 判定は `isOwnWork(detail, session.self)` = 作者 ID と `userData.self.id` の一致だけ。
+ *
  * **いいねとブックマークは独立したボタンを持たない。** サイドバーのカウンタ
  * (.count-like / .count-bookmark) をボタンへ差し替え、数字そのものを押させる (X.com と同じ形)。
  * 押す対象と結果が同じ場所にあるので、押した後に数字が動くのが分かる。
@@ -15,32 +19,40 @@
  *
  * フォローだけは作者行の右端に独立したボタンとして描く。
  * 描画先が 2 つに分かれるので container (カウンタの行) と followContainer を別々に受け取る。
+ *
+ * フォロー状態は作品詳細 (/ajax/illust/{id}) には入っておらず、
+ * /ajax/user/{id}?full=1 を別に引く (SITE_SPEC §4)。覚えるのは pixiv/user.js の 1 か所で、
+ * 自分でフォロー / 解除したときは patchUser で書き戻す。ここに別のキャッシュは持たない。
+ * pixiv 本体のヘッダで変えた場合はページを再読み込みするまで追従しない。
  */
+import { STATUS_KINDS } from '../../common/constants.js';
 import { createIcon } from '../../common/icons.js';
-import { formatCount } from './sidebar.js';
+import { formatCount } from '../../common/format.js';
+import { warn } from '../../common/log.js';
 import { readSession, clearSessionCache } from '../session.js';
-import { fetchUserProfile } from '../../pixiv/user.js';
+import { fetchUserProfile, patchUserProfile } from '../../pixiv/user.js';
+import { isOwnWork } from '../../pixiv/normalize.js';
 import { PIXIV_ERROR_KINDS } from '../../pixiv/errors.js';
 import { likeIllust, addBookmark, deleteBookmark, followUser, unfollowUser } from '../../pixiv/actions.js';
 
-/**
- * 作者ごとのフォロー状態。
- *
- * フォロー状態は作品詳細 (/ajax/illust/{id}) には入っておらず、
- * /ajax/user/{id}?full=1 を別に引く必要がある (SITE_SPEC §4)。
- * ユーザーページでは作者が変わらないので、作品を送るたびに引き直すのは無駄。
- * 自分で変えたときはここも更新するので、拡張の中では食い違わない。
- * @type {Map<string, boolean>}
- */
-const followCache = new Map();
+/** 利用者に見せる文言。 */
+const MESSAGES = Object.freeze({
+	LOGIN_TO_ACT: 'ログインするといいねやブックマークができます',
+	SESSION_EXPIRED: 'ログインが切れています。pixiv にログインし直し、このページを再読み込みしてください',
+	LIKED: 'いいねしました',
+	ALREADY_LIKED: '既にいいね済みでした',
+	LIKE_FAILED: 'いいねできませんでした',
+	BOOKMARKED: 'ブックマークしました',
+	BOOKMARKED_PRIVATE: '非公開でブックマークしました',
+	UNBOOKMARKED: 'ブックマークを外しました',
+	BOOKMARK_FAILED: 'ブックマークを変更できませんでした',
+	FOLLOWED: 'フォローしました',
+	UNFOLLOWED: 'フォローを解除しました',
+	FOLLOW_FAILED: 'フォローを変更できませんでした',
+});
 
-/**
- * 覚えたフォロー状態を捨てる。テストから使う。
- * @returns {void}
- */
-export function clearFollowCache() {
-	followCache.clear();
-}
+/** ブックマークを非公開で入れる操作の手掛かり。title にだけ添える (画面には出ない)。 */
+export const BOOKMARK_PRIVATE_HINT = '(Shift + クリックで非公開)';
 
 /**
  * ブックマークボタンのラベル。
@@ -86,6 +98,7 @@ export function countLabel(label, count) {
  * @property {HTMLElement} container カウンタの行 (.counts)。中の .count-like / .count-bookmark を差し替える
  * @property {HTMLElement} [followContainer] フォローの描画先 (.follow-slot)。無ければフォローを出さない
  * @property {(userId: string) => Promise<object>} [fetchUser] ユーザー情報の取得。既定は /ajax/user/{id}?full=1
+ * @property {(userId: string, patch: object) => void} [patchUser] 覚えているユーザー情報の書き換え。既定は pixiv/user.js
  * @property {object} [actions] 更新系の差し替え。テストから通信させないために使う
  */
 
@@ -97,7 +110,9 @@ export function countLabel(label, count) {
 export function createActionsBar(deps) {
 	const { doc, container, followContainer } = deps;
 	// サイドバー (作者アイコン) と同じ応答を使う。作品ごとに 2 本走らせない
-	const fetchUser = deps.fetchUser ?? ((userId) => fetchUserProfile(userId));
+	const fetchUser = deps.fetchUser ?? fetchUserProfile;
+	// 自分で変えたフォロー状態は覚えている応答へ書き戻す。次の作品で取り直さないため
+	const patchUser = deps.patchUser ?? patchUserProfile;
 	// 更新系はまとめて差し替えられるようにしておく。
 	// テストで本物の pixiv を叩かないためと、いいねが取り消せないため
 	const api = { likeIllust, addBookmark, deleteBookmark, followUser, unfollowUser, ...deps.actions };
@@ -114,10 +129,10 @@ export function createActionsBar(deps) {
 	 * 読み上げには渡したいので要素は残し、CSS で見えなくしている (viewer.css の .action-status)。
 	 * 失敗だけはボタンの見た目に出ないので、目にも見えるようにする。
 	 * @param {string} message 文言
-	 * @param {'info'|'error'} [kind] 種別。error だけ画面に出す
+	 * @param {string} [kind] 種別 (STATUS_KINDS)。error だけ画面に出す
 	 * @returns {void}
 	 */
-	function announce(message, kind = 'info') {
+	function announce(message, kind = STATUS_KINDS.INFO) {
 		if (!statusLine) return;
 		statusLine.textContent = message;
 		statusLine.setAttribute('data-kind', kind);
@@ -127,6 +142,8 @@ export function createActionsBar(deps) {
 	 * 更新系の失敗を伝える。
 	 * 401 はログインが切れている (別タブでログアウトした等)。
 	 * 覚えているセッションを捨て、通信失敗とは別の文言で知らせる。
+	 * __NEXT_DATA__ は初期 HTML のもので SPA 遷移では更新されないので (SITE_SPEC §0)、
+	 * ログインし直しただけでは新しい CSRF トークンを読めない。文言で再読み込みまで案内する
 	 * @param {string} message 通常の失敗文言
 	 * @param {unknown} error 投げられたエラー
 	 * @param {string} logLabel console に出す見出し
@@ -135,15 +152,16 @@ export function createActionsBar(deps) {
 	function announceFailure(message, error, logLabel) {
 		if (error?.kind === PIXIV_ERROR_KINDS.UNAUTHORIZED) {
 			clearSessionCache();
-			announce('ログインが切れています。pixiv にログインし直してください', 'error');
+			announce(MESSAGES.SESSION_EXPIRED, STATUS_KINDS.ERROR);
 		} else {
-			announce(message, 'error');
+			announce(message, STATUS_KINDS.ERROR);
 		}
-		console.warn(`[GridViewer] ${logLabel}`, error);
+		warn(logLabel, error);
 	}
 
 	/**
-	 * ボタンを作る。
+	 * 文言付きのボタンを作る。
+	 * 文言が見えているので aria-label は付けない (可視テキストと重複して二度読まれる)。
 	 * @param {string} iconName アイコン名
 	 * @param {string} label ラベル
 	 * @param {(event: MouseEvent) => void} onClick 押されたとき
@@ -153,7 +171,6 @@ export function createActionsBar(deps) {
 		const button = doc.createElement('button');
 		button.type = 'button';
 		button.className = 'action';
-		button.setAttribute('aria-label', label);
 		button.title = label;
 		button.appendChild(createIcon(doc, iconName));
 		const text = doc.createElement('span');
@@ -170,7 +187,6 @@ export function createActionsBar(deps) {
 	 * @returns {void}
 	 */
 	function relabel(button, label) {
-		button.setAttribute('aria-label', label);
 		button.title = label;
 		button.querySelector('span').textContent = label;
 	}
@@ -213,14 +229,27 @@ export function createActionsBar(deps) {
 	 * @param {HTMLButtonElement|null} button 対象。null なら何もしない
 	 * @param {string} label 操作の説明 (いいね済み など)
 	 * @param {number} count 件数
+	 * @param {string} [hint] title にだけ添える操作の手掛かり (Shift で非公開 など)
 	 * @returns {void}
 	 */
-	function describeCount(button, label, count) {
+	function describeCount(button, label, count, hint) {
 		if (!button) return;
 		const text = countLabel(label, count);
 		button.setAttribute('aria-label', text);
-		button.title = text;
+		button.title = hint ? `${text} ${hint}` : text;
 		button.querySelector('span').textContent = formatCount(count);
+	}
+
+	/**
+	 * ブックマークのカウンタの説明を状態に合わせて書き直す。
+	 * 未ブックマークのときだけ、非公開で入れる操作の手掛かりを title に添える。
+	 * @param {HTMLButtonElement|null} button 対象
+	 * @param {string|null} bookmarkId ブックマーク済みならその ID
+	 * @param {number} count 件数
+	 * @returns {void}
+	 */
+	function describeBookmark(button, bookmarkId, count) {
+		describeCount(button, bookmarkLabel(bookmarkId), count, bookmarkId ? undefined : BOOKMARK_PRIVATE_HINT);
 	}
 
 	/**
@@ -237,16 +266,13 @@ export function createActionsBar(deps) {
 	}
 
 	/**
-	 * フォロー状態を取り出す。作者ごとに 1 回だけ取りに行く。
+	 * フォロー状態を取り出す。同じ作者の応答は pixiv/user.js が覚えているので、ここでは覚えない。
 	 * @param {string} userId 作者の ID
 	 * @returns {Promise<boolean>} フォロー済みか
 	 */
 	async function resolveFollowing(userId) {
-		if (followCache.has(userId)) return followCache.get(userId);
 		const body = await fetchUser(userId);
-		const following = body?.isFollowed === true;
-		followCache.set(userId, following);
-		return following;
+		return body?.isFollowed === true;
 	}
 
 	/**
@@ -266,12 +292,13 @@ export function createActionsBar(deps) {
 				else await api.followUser(detail.userId, token);
 				if (disposed) return;
 				following = !following;
-				followCache.set(detail.userId, following);
+				// 覚えている応答へ書き戻す。次の作品でも取り直さずに今の状態が出る
+				patchUser(detail.userId, { isFollowed: following });
 				applyFollowState(button, following);
-				announce(following ? 'フォローしました' : 'フォローを解除しました');
+				announce(following ? MESSAGES.FOLLOWED : MESSAGES.UNFOLLOWED);
 			} catch (error) {
 				if (disposed) return;
-				announceFailure('フォローを変更できませんでした', error, 'follow failed');
+				announceFailure(MESSAGES.FOLLOW_FAILED, error, 'follow failed');
 			} finally {
 				button.disabled = false;
 			}
@@ -286,7 +313,7 @@ export function createActionsBar(deps) {
 				following = await resolveFollowing(detail.userId);
 			} catch (error) {
 				// 取れなくても押せる状態には戻す。押せばフォロー自体は効く
-				console.warn('[GridViewer] follow state failed', error);
+				warn('follow state failed', error);
 			}
 			if (disposed) return;
 			applyFollowState(button, following);
@@ -306,19 +333,26 @@ export function createActionsBar(deps) {
 			if (followContainer) followContainer.textContent = '';
 			const session = readSession(doc);
 
+			// 未ログインでは更新系が使えない。カウンタは押せない表示のまま残すので件数は読める。
+			// 押せるものが無いので、結果を読み上げる領域も要らない
+			if (!session.isLoggedIn || !session.csrfToken) {
+				const notice = doc.createElement('p');
+				notice.className = 'status';
+				notice.textContent = MESSAGES.LOGIN_TO_ACT;
+				container.appendChild(notice);
+				return;
+			}
+
+			// 自分の作品には、いいね・ブックマーク・フォローのどれもできない。
+			// pixiv 本体もこの 3 つを描かない (SITE_SPEC §4)。押せば必ず失敗するボタンを出さない。
+			// カウンタは押せない表示のまま残るので件数は読めるし、作者は自分の名前なので
+			// なぜ押せないかは画面から分かる (案内の文言は足さない)
+			if (isOwnWork(detail, session.self)) return;
+
 			statusLine = doc.createElement('p');
 			statusLine.className = 'action-status';
 			// 押した結果を読み上げさせる。alert ではないので操作を邪魔しない
 			statusLine.setAttribute('role', 'status');
-
-			// 未ログインでは更新系が使えない。カウンタは押せない表示のまま残すので件数は読める
-			if (!session.isLoggedIn || !session.csrfToken) {
-				const notice = doc.createElement('p');
-				notice.className = 'status';
-				notice.textContent = 'ログインするといいねやブックマークができます';
-				container.append(notice, statusLine);
-				return;
-			}
 
 			let liked = detail.likedByMe;
 			let bookmarkId = detail.bookmarkId;
@@ -339,11 +373,11 @@ export function createActionsBar(deps) {
 					if (alreadyLiked !== true) likeCount += 1;
 					likeButton.classList.add('is-on');
 					describeCount(likeButton, likeLabel(true), likeCount);
-					announce(alreadyLiked === true ? '既にいいね済みでした' : 'いいねしました');
+					announce(alreadyLiked === true ? MESSAGES.ALREADY_LIKED : MESSAGES.LIKED);
 				} catch (error) {
 					if (disposed) return;
 					likeButton.disabled = false;
-					announceFailure('いいねできませんでした', error, 'like failed');
+					announceFailure(MESSAGES.LIKE_FAILED, error, 'like failed');
 				}
 			});
 			describeCount(likeButton, likeLabel(liked), likeCount);
@@ -361,29 +395,32 @@ export function createActionsBar(deps) {
 				try {
 					if (wasBookmarked) {
 						await api.deleteBookmark(bookmarkId, token);
+						// 破棄済みのボタンを触らない。状態の書き換えも await の直後で止める
+						if (disposed) return;
 						bookmarkId = null;
 						// 表示が負の数になるのを防ぐ。pixiv 側の集計とずれていても画面は壊さない
 						bookmarkCount = Math.max(0, bookmarkCount - 1);
 						bookmarkButton.classList.remove('is-on');
-						announce('ブックマークを外しました');
+						announce(MESSAGES.UNBOOKMARKED);
 					} else {
 						// 非公開で入れたいときは Shift を押しながら
-						const isPrivate = event.shiftKey;
-						bookmarkId = await api.addBookmark(detail.id, isPrivate, token);
+						const isPrivate = event.shiftKey === true;
+						const added = await api.addBookmark(detail.id, isPrivate, token);
+						if (disposed) return;
+						bookmarkId = added;
 						bookmarkCount += 1;
 						bookmarkButton.classList.add('is-on');
-						announce(isPrivate ? '非公開でブックマークしました' : 'ブックマークしました');
+						announce(isPrivate ? MESSAGES.BOOKMARKED_PRIVATE : MESSAGES.BOOKMARKED);
 					}
-					if (disposed) return;
-					describeCount(bookmarkButton, bookmarkLabel(bookmarkId), bookmarkCount);
+					describeBookmark(bookmarkButton, bookmarkId, bookmarkCount);
 				} catch (error) {
 					if (disposed) return;
-					announceFailure('ブックマークを変更できませんでした', error, 'bookmark failed');
+					announceFailure(MESSAGES.BOOKMARK_FAILED, error, 'bookmark failed');
 				} finally {
 					bookmarkButton.disabled = false;
 				}
 			});
-			describeCount(bookmarkButton, bookmarkLabel(bookmarkId), bookmarkCount);
+			describeBookmark(bookmarkButton, bookmarkId, bookmarkCount);
 			if (bookmarkId) bookmarkButton?.classList.add('is-on');
 
 			container.appendChild(statusLine);

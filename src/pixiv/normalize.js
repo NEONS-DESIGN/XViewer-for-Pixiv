@@ -1,9 +1,10 @@
 /**
  * pixiv API の応答を、この拡張が扱いやすい形へ揃える。
- * pixiv 側の歪み (広告枠の混入・ID の欠落・null の URL) をここで吸収し、
+ * pixiv 側の歪み (広告枠の混入・ID の欠落・null の URL・欠けたカウンタ) をここで吸収し、
  * 上位の層が異常系を意識しなくて済むようにする。
  */
 
+import { DEFAULT_X_RESTRICT } from '../common/constants.js';
 import { safeCdnUrl } from './endpoints.js';
 
 /** 作品の種別。SITE_SPEC の実測値。 */
@@ -12,9 +13,6 @@ export const ILLUST_TYPES = Object.freeze({
 	MANGA: 1,
 	UGOIRA: 2,
 });
-
-/** 未ログインのときに使う表示上限。全年齢のみ。 */
-const DEFAULT_X_RESTRICT = 0;
 
 /**
  * urls の各値を CDN のものだけに絞る。
@@ -34,13 +32,34 @@ function sanitizeUrls(urls) {
 }
 
 /**
+ * 数値カウンタとして読む。欠けている・数値でない値は 0 に倒す。
+ * undefined のまま通すと、いいね押下の likeCount += 1 で画面に NaN が出る。
+ * @param {unknown} value 応答の値
+ * @returns {number} 数値。読めなければ 0
+ */
+function asCount(value) {
+	return Number(value) || 0;
+}
+
+/**
+ * tags.tags[] からタグ名だけを取り出す。null 要素や名前の無い要素は落とす。
+ * @param {Array<{tag?: unknown}|null>|undefined} tags raw.tags.tags
+ * @returns {string[]} タグ名
+ */
+function tagNames(tags) {
+	return (tags ?? [])
+		.map((tag) => tag?.tag)
+		.filter((name) => typeof name === 'string');
+}
+
+/**
  * @typedef {object} WorkDetail 作品詳細
  * @property {string} id
  * @property {string} title
  * @property {number} illustType ILLUST_TYPES のいずれか
  * @property {number} pageCount
  * @property {number} xRestrict 0=全年齢 1=R-18 2=R-18G
- * @property {number} aiType 1=非AI 2=AI生成
+ * @property {number} aiType 1=非AI 2=AI生成。未使用。SPEC §16 のとおり AI 生成の表示は未実装で、出せるように残してある
  * @property {string|null} thumbUrl
  * @property {string} userId
  * @property {string} userName
@@ -71,8 +90,28 @@ export function canView(work, self) {
 }
 
 /**
+ * その作品が今ログインしているユーザー自身のものか。
+ *
+ * 自分の作品にはいいね・ブックマーク・フォローのどれもできない。pixiv 本体もこの 3 つを
+ * 描かず、代わりに「作品を編集」を出す (SITE_SPEC §4)。押せば必ず失敗するボタンは出さない。
+ *
+ * 判定材料は ID の一致だけ。どちらかが読めなければ「自分ではない」に倒す
+ * (空同士を一致とみなすと、他人の作品まで操作できなくなる)。
+ * @param {{userId: string}|null|undefined} work 対象の作品
+ * @param {{id: string|null}|null|undefined} self ログイン中のユーザー。未ログインなら null
+ * @returns {boolean} 自分の作品なら true
+ */
+export function isOwnWork(work, self) {
+	const selfId = self?.id;
+	const userId = work?.userId;
+	if (!selfId || !userId) return false;
+	return String(userId) === String(selfId);
+}
+
+/**
  * 作品詳細を WorkDetail へ揃える。
  * 詳細 API は id と illustId のように同じ値を 2 つの名前で返すので、片方だけを使う。
+ * 数値カウンタは欠けていれば 0、タグは null 要素を落として返す。
  * @param {object} raw /ajax/illust/{id} の body
  * @returns {WorkDetail} 正規化した詳細
  */
@@ -90,11 +129,11 @@ export function normalizeDetail(raw) {
 		userName: raw.userName,
 		createDate: raw.createDate,
 		comment: raw.illustComment ?? '',
-		tags: (raw.tags?.tags ?? []).map((tag) => tag.tag),
-		likeCount: raw.likeCount,
-		bookmarkCount: raw.bookmarkCount,
-		viewCount: raw.viewCount,
-		commentCount: raw.commentCount,
+		tags: tagNames(raw.tags?.tags),
+		likeCount: asCount(raw.likeCount),
+		bookmarkCount: asCount(raw.bookmarkCount),
+		viewCount: asCount(raw.viewCount),
+		commentCount: asCount(raw.commentCount),
 		commentOff: raw.commentOff === 1,
 		likedByMe: raw.likeData === true,
 		bookmarkId: raw.bookmarkData?.id ?? null,

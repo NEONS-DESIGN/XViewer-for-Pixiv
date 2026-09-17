@@ -8,6 +8,21 @@ import { getJson } from '../../pixiv/client.js';
 import { illustPagesUrl, safeCdnUrl } from '../../pixiv/endpoints.js';
 import { createIcon } from '../../common/icons.js';
 import { IMAGE_QUALITY } from '../../common/constants.js';
+import { warn } from '../../common/log.js';
+
+/** 画面に出す文言。 */
+const MESSAGES = Object.freeze({
+	PREV_PAGE: '前のページ',
+	NEXT_PAGE: '次のページ',
+	IMAGE_FAILED: '画像を読み込めませんでした',
+	PAGES_FAILED: '2 枚目以降を読み込めませんでした',
+});
+
+/** 矢印ボタンの向きごとの定義。ツールチップにキー操作を添える。 */
+const ARROWS = Object.freeze({
+	prev: Object.freeze({ label: MESSAGES.PREV_PAGE, key: '←', icon: 'chevronLeft' }),
+	next: Object.freeze({ label: MESSAGES.NEXT_PAGE, key: '→', icon: 'chevronRight' }),
+});
 
 /**
  * ページ配列から表示に使う URL を並べる。
@@ -46,6 +61,8 @@ export function prefetchTargets(index, total, count) {
  * @property {Document} doc
  * @property {HTMLElement} container 描画先 (.stage)
  * @property {object} settings 設定
+ * @property {typeof fetch} [fetchImpl] 通信の差し替え。テストから pixiv を叩かないために使う
+ * @property {() => HTMLImageElement} [createImage] 先読み用 Image の差し替え。Node には Image が無い
  */
 
 /**
@@ -55,15 +72,22 @@ export function prefetchTargets(index, total, count) {
  */
 export function createImagePane(deps) {
 	const { doc, container } = deps;
+	const fetchImpl = deps.fetchImpl;
+	const createImage = deps.createImage ?? (() => new Image());
 
 	/** @type {string[]} 表示するページの URL */
 	let urls = [];
 	/** 今見ているページ番号 */
 	let index = 0;
-	/** 先読み用の Image。参照を持っておかないと解放されて意味がなくなる */
-	let prefetched = [];
+	/**
+	 * @type {Map<string, HTMLImageElement>} 先読み用の Image。URL ごとに 1 つだけ作る。
+	 * 参照を持っておかないと解放されて意味がなくなり、作り直すとページ送りのたびに無駄が出る
+	 */
+	const prefetched = new Map();
 	/** @type {HTMLImageElement|null} */
 	let image = null;
+	/** 今 img に入れている URL。同じ値を書き直して再デコードさせないために覚える */
+	let shownUrl = null;
 	/** @type {HTMLElement|null} */
 	let counter = null;
 	/** @type {HTMLButtonElement|null} */
@@ -74,6 +98,8 @@ export function createImagePane(deps) {
 	let frame = null;
 	/** 画像の読み込み失敗ハンドラ。dispose で外すため参照を持つ */
 	let onImageError = null;
+	/** 破棄済みか。応答を待っている間に捨てられたときに DOM を触らないようにする */
+	let disposed = false;
 
 	/**
 	 * 矢印ボタンを作る。
@@ -82,13 +108,13 @@ export function createImagePane(deps) {
 	 * @returns {HTMLButtonElement} ボタン
 	 */
 	function createArrow(direction, onClick) {
+		const arrow = ARROWS[direction];
 		const button = doc.createElement('button');
 		button.type = 'button';
 		button.className = `arrow arrow-${direction}`;
-		const label = direction === 'prev' ? '前のページ' : '次のページ';
-		button.setAttribute('aria-label', label);
-		button.title = `${label} (${direction === 'prev' ? '←' : '→'})`;
-		button.appendChild(createIcon(doc, direction === 'prev' ? 'chevronLeft' : 'chevronRight'));
+		button.setAttribute('aria-label', arrow.label);
+		button.title = `${arrow.label} (${arrow.key})`;
+		button.appendChild(createIcon(doc, arrow.icon));
 		button.addEventListener('click', onClick);
 		return button;
 	}
@@ -100,7 +126,7 @@ export function createImagePane(deps) {
 	 * @returns {void}
 	 */
 	function showPaneError(message) {
-		if (!frame) return;
+		if (disposed || !frame) return;
 		frame.querySelector('.pane-error')?.remove();
 		const line = doc.createElement('p');
 		line.className = 'pane-error';
@@ -114,10 +140,15 @@ export function createImagePane(deps) {
 	 * @returns {void}
 	 */
 	function paint() {
-		if (!image) return;
-		// ページを切り替えたら前のページのエラーは残さない
-		frame?.querySelector('.pane-error')?.remove();
-		image.src = urls[index] ?? '';
+		if (disposed || !image) return;
+		const next = urls[index] ?? '';
+		// 同じ URL を書き直すと img が読み込みをやり直す。/pages が届いたときの 1 枚目がこれに当たる。
+		// エラー行も、ページが変わったときだけ消す (1 枚目の失敗の理由を /pages の到着で消さない)
+		if (next !== shownUrl) {
+			shownUrl = next;
+			frame?.querySelector('.pane-error')?.remove();
+			image.src = next;
+		}
 		if (counter) counter.textContent = `${index + 1}/${urls.length}`;
 		const single = urls.length <= 1;
 		if (prevButton) {
@@ -133,15 +164,17 @@ export function createImagePane(deps) {
 
 	/**
 	 * 前後のページを先読みする。
+	 * 既に作った URL は作り直さない。CDN 以外を弾かれた空文字は読みに行かない
 	 * @returns {void}
 	 */
 	function prefetch() {
-		prefetched = prefetchTargets(index, urls.length, deps.settings.prefetch)
-			.map((target) => {
-				const img = new Image();
-				img.src = urls[target];
-				return img;
-			});
+		for (const target of prefetchTargets(index, urls.length, deps.settings.prefetch)) {
+			const url = urls[target];
+			if (!url || prefetched.has(url)) continue;
+			const img = createImage();
+			img.src = url;
+			prefetched.set(url, img);
+		}
 	}
 
 	/**
@@ -159,19 +192,17 @@ export function createImagePane(deps) {
 	return {
 		/**
 		 * 作品を描画する。
+		 * ビュワーの状態表示 (.status) は呼び出し側が消してから呼ぶ。
 		 * @param {object} detail 正規化した作品詳細
 		 * @returns {Promise<void>}
 		 */
 		async render(detail) {
-			// 他のペインは自分の dispose() で片付ける。ここで消すのはビュワーの状態表示だけ
-			container.querySelectorAll('.status').forEach((node) => node.remove());
-
 			frame = doc.createElement('div');
 			frame.className = 'frame';
 
 			image = doc.createElement('img');
 			image.alt = detail.title;
-			onImageError = () => showPaneError('画像を読み込めませんでした');
+			onImageError = () => showPaneError(MESSAGES.IMAGE_FAILED);
 			image.addEventListener('error', onImageError);
 
 			counter = doc.createElement('p');
@@ -184,20 +215,22 @@ export function createImagePane(deps) {
 			container.appendChild(frame);
 
 			// 1 枚目は詳細に入っている URL で即座に出し、待たせない
-			urls = [detail.urls[deps.settings.imageQuality] ?? detail.urls.regular ?? ''];
+			urls = [detail.urls[deps.settings.imageQuality] ?? detail.urls[IMAGE_QUALITY.REGULAR] ?? ''];
 			index = 0;
 			paint();
 
 			if (detail.pageCount <= 1) return;
 
 			try {
-				const pages = await getJson(illustPagesUrl(detail.id));
+				const pages = await getJson(illustPagesUrl(detail.id), { fetchImpl });
+				if (disposed) return;
 				urls = pickPageUrls(pages, deps.settings.imageQuality);
 				paint();
 			} catch (error) {
+				if (disposed) return;
 				// 1 枚目は出ているので、複数枚が開けないことだけを伝える
-				showPaneError('2 枚目以降を読み込めませんでした');
-				console.warn('[GridViewer] failed to load pages', detail.id, error);
+				showPaneError(MESSAGES.PAGES_FAILED);
+				warn('failed to load pages', detail.id, error);
 			}
 		},
 
@@ -205,6 +238,7 @@ export function createImagePane(deps) {
 		prev() { move(-1); },
 
 		dispose() {
+			disposed = true;
 			// 破棄したあとに古い画像の error が発火して、
 			// 新しく描いた画面にエラーを出すのを防ぐ
 			if (image && onImageError) image.removeEventListener('error', onImageError);
@@ -212,8 +246,9 @@ export function createImagePane(deps) {
 			// 自分が作った DOM は自分で片付ける。
 			// これを外すと、読み込み中に前の作品の矢印とカウンタが残る
 			frame?.remove();
-			prefetched = [];
+			prefetched.clear();
 			image = null;
+			shownUrl = null;
 			onImageError = null;
 			counter = null;
 			prevButton = null;
