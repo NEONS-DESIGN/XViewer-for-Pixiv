@@ -39,15 +39,16 @@ function parseJson(text) {
 }
 
 /**
- * 応答を読み、{error, body} を展開する。
- * 順序: 本文を読む → ステータス → JSON の形 → error フラグ → body。
+ * 応答を JSON として読む。見るのはステータスと「JSON のオブジェクトか」だけで、
+ * pixiv の {error, message, body} 形までは求めない。
+ * 順序: 本文を読む → ステータス → JSON の形。
  * ステータスを JSON 解析より先に見るのは、ログイン失効時のログインページ (HTML) や
  * ranking.php の 403 (HTML) を PARSE に化けさせないため (SITE_SPEC §6)。
  * @param {Response} response fetch の応答
  * @param {string} url 例外メッセージ用
- * @returns {Promise<unknown>} body。null は API が返した値としてそのまま通す
+ * @returns {Promise<object>} 読めた JSON (配列を含む)
  */
-async function unwrap(response, url) {
+async function readJson(response, url) {
 	let text;
 	try {
 		text = await response.text();
@@ -55,13 +56,27 @@ async function unwrap(response, url) {
 		throw new PixivError(PIXIV_ERROR_KINDS.NETWORK, `応答を読めません: ${url}`, response.status, { cause: error });
 	}
 	const json = parseJson(text);
-	const message = json !== null && typeof json === 'object' ? json.message : undefined;
+	// 配列には message が無いので、文言を探すのはオブジェクトのときだけ
+	const message = json !== null && typeof json === 'object' && !Array.isArray(json) ? json.message : undefined;
 	if (!response.ok) {
 		throw new PixivError(kindFromStatus(response.status), message || `HTTP ${response.status}`, response.status);
 	}
 	if (json === null || typeof json !== 'object') {
 		throw new PixivError(PIXIV_ERROR_KINDS.PARSE, `JSON として読めません: ${url}`, response.status);
 	}
+	return json;
+}
+
+/**
+ * 応答を読み、{error, body} を展開する。/ajax/* はすべてこの形 (SITE_SPEC §4)。
+ * この形を返さない旧 PHP エンドポイント (フォロー系) には使わないこと。
+ * @param {Response} response fetch の応答
+ * @param {string} url 例外メッセージ用
+ * @returns {Promise<unknown>} body。null は API が返した値としてそのまま通す
+ */
+async function unwrap(response, url) {
+	const json = await readJson(response, url);
+	const message = Array.isArray(json) ? undefined : json.message;
 	// 200 でも error:true のことがある
 	if (json.error === true) {
 		throw new PixivError(PIXIV_ERROR_KINDS.API, message || 'API がエラーを返しました', response.status);
@@ -78,9 +93,10 @@ async function unwrap(response, url) {
  * @param {string} url URL
  * @param {object} init fetch の init (credentials と signal はここで付ける)
  * @param {ClientDeps} deps 依存
+ * @param {(response: Response, url: string) => Promise<unknown>} [parse] 応答の読み方。既定は {error, body} の展開
  * @returns {Promise<unknown>} body
  */
-async function request(url, init, deps) {
+async function request(url, init, deps, parse = unwrap) {
 	const fetchImpl = deps.fetchImpl ?? fetch;
 	let response;
 	try {
@@ -91,7 +107,7 @@ async function request(url, init, deps) {
 		}
 		throw new PixivError(PIXIV_ERROR_KINDS.NETWORK, `通信に失敗しました: ${url}`, undefined, { cause: error });
 	}
-	return unwrap(response, url);
+	return parse(response, url);
 }
 
 /**
@@ -112,9 +128,10 @@ export function getJson(url, deps = {}) {
  * @param {BodyInit} body 送る本体
  * @param {string|null|undefined} token CSRF トークン
  * @param {ClientDeps} deps 依存
+ * @param {(response: Response, url: string) => Promise<unknown>} [parse] 応答の読み方。既定は {error, body} の展開
  * @returns {Promise<unknown>} body
  */
-async function post(url, headers, body, token, deps) {
+async function post(url, headers, body, token, deps, parse) {
 	if (!token) {
 		throw new PixivError(PIXIV_ERROR_KINDS.UNAUTHORIZED, `CSRF トークンがありません: ${url}`);
 	}
@@ -122,7 +139,7 @@ async function post(url, headers, body, token, deps) {
 		method: 'POST',
 		headers: { ...headers, [HEADER_CSRF]: token },
 		body,
-	}, deps);
+	}, deps, parse);
 }
 
 /**
@@ -141,18 +158,24 @@ export function postJson(url, payload, token, deps = {}) {
 }
 
 /**
- * urlencoded を POST する。フォロー・フォロー解除で使う。
+ * urlencoded を POST し、応答の JSON を展開せずそのまま返す。
+ * フォロー (/bookmark_add.php) とフォロー解除 (/rpc_group_setting.php) で使う。
+ *
+ * この 2 つは /ajax/* ではない旧 PHP エンドポイントで、{error, message, body} で包まない
+ * (フォローは素の配列、フォロー解除は {user_id}。SITE_SPEC §4-5/6)。
+ * unwrap() に通すと body が無いため成功しても PARSE になるので、読み方を分けている。
+ * 成功か失敗かの判定は応答の形を知っている actions.js が行う。
  * @param {string} url URL
  * @param {Record<string, string>} params 送るパラメータ
  * @param {string} token CSRF トークン
  * @param {ClientDeps} [deps] 依存
- * @returns {Promise<unknown>} body
+ * @returns {Promise<object>} 応答の JSON そのもの (配列を含む)
  */
-export function postForm(url, params, token, deps = {}) {
+export function postFormRaw(url, params, token, deps = {}) {
 	return post(url, {
 		[HEADER_ACCEPT]: ACCEPT_JSON,
 		[HEADER_CONTENT_TYPE]: CONTENT_TYPE_FORM,
-	}, new URLSearchParams(params).toString(), token, deps);
+	}, new URLSearchParams(params).toString(), token, deps, readJson);
 }
 
 /**

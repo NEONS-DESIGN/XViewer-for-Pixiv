@@ -2,7 +2,7 @@
  * pixiv の更新系 API。すべて SITE_SPEC §4 で実機観測して確定した仕様。
  * 追加と削除でエンドポイントも本体の形式も違うので、ここに閉じ込める。
  */
-import { postJson, postForm, postFormData } from './client.js';
+import { postJson, postFormRaw, postFormData } from './client.js';
 import { ACTION_URLS } from './endpoints.js';
 import { PixivError, PIXIV_ERROR_KINDS } from './errors.js';
 
@@ -11,6 +11,11 @@ import { PixivError, PIXIV_ERROR_KINDS } from './errors.js';
 /** ブックマークの公開設定。 */
 const RESTRICT_PUBLIC = 0;
 const RESTRICT_PRIVATE = 1;
+
+/** フォロー系の応答が予期しない形だったときの文言。console にしか出ないので日本語にしない。 */
+const FOLLOW_REJECTED = 'follow was rejected';
+const FOLLOW_UNEXPECTED = 'follow returned an unexpected body';
+const UNFOLLOW_REJECTED = 'unfollow was not applied';
 
 /**
  * 作品にいいねする。
@@ -64,15 +69,17 @@ export async function deleteBookmark(bookmarkId, token, deps) {
 
 /**
  * ユーザーをフォローする。
- * 応答本体の形は SITE_SPEC §4 に未記録 (リクエスト形のみ実測)。
- * {error, message, body} でなければ client.js が PARSE として投げる。
+ *
+ * 応答は /ajax/* の {error, message, body} ではなく**素の配列**で、空なら成功
+ * (中身があるときはエラー文言。SITE_SPEC §4-5)。pixiv 本体も長さだけで成否を決めている。
  * @param {string} userId ユーザー ID
  * @param {string} token CSRF トークン
  * @param {ClientDeps} [deps] テスト用の依存
  * @returns {Promise<void>}
+ * @throws {PixivError} フォローできなかったとき、または応答が配列でないとき
  */
 export async function followUser(userId, token, deps) {
-	await postForm(ACTION_URLS.FOLLOW, {
+	const body = await postFormRaw(ACTION_URLS.FOLLOW, {
 		mode: 'add',
 		type: 'user',
 		user_id: userId,
@@ -80,20 +87,36 @@ export async function followUser(userId, token, deps) {
 		restrict: String(RESTRICT_PUBLIC),
 		format: 'json',
 	}, token, deps);
+	// 形が変わったときに成功と誤認しない。できていないのに「フォロー中」と出すと嘘になる
+	if (!Array.isArray(body)) {
+		throw new PixivError(PIXIV_ERROR_KINDS.PARSE, FOLLOW_UNEXPECTED);
+	}
+	if (body.length > 0) {
+		const first = body[0];
+		throw new PixivError(PIXIV_ERROR_KINDS.API, typeof first === 'string' && first ? first : FOLLOW_REJECTED);
+	}
 }
 
 /**
  * フォローを外す。追加とはエンドポイントもパラメータ名も違う。
- * 応答本体の形は followUser と同じく SITE_SPEC §4 に未記録。
+ *
+ * 応答は {user_id} で、送った ID が返れば成功 (SITE_SPEC §4-6)。
+ * こちらも {error, message, body} では包まれない。
  * @param {string} userId ユーザー ID
  * @param {string} token CSRF トークン
  * @param {ClientDeps} [deps] テスト用の依存
  * @returns {Promise<void>}
+ * @throws {PixivError} 送った ID が返ってこなかったとき
  */
 export async function unfollowUser(userId, token, deps) {
-	await postForm(ACTION_URLS.UNFOLLOW, {
+	const body = await postFormRaw(ACTION_URLS.UNFOLLOW, {
 		mode: 'del',
 		type: 'bookuser',
 		id: userId,
 	}, token, deps);
+	// 数値で返ることもあるので文字列にそろえて比べる
+	const returned = Array.isArray(body) ? undefined : body?.user_id;
+	if (returned === null || returned === undefined || String(returned) !== String(userId)) {
+		throw new PixivError(PIXIV_ERROR_KINDS.API, UNFOLLOW_REJECTED);
+	}
 }
