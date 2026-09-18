@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { getJson, postJson, postForm, postFormData } from '../../src/pixiv/client.js';
+import { getJson, postJson, postFormRaw, postFormData } from '../../src/pixiv/client.js';
 import { PIXIV_ERROR_KINDS } from '../../src/pixiv/errors.js';
 import { fakeFetch } from '../helpers/pixiv.js';
 
@@ -138,9 +138,11 @@ test('postJson は JSON と CSRF トークンを送る', async () => {
 	assert.equal(calls[0].init.body, '{"illust_id":"1"}');
 });
 
-test('postForm は urlencoded で送る', async () => {
-	const { impl, calls } = fakeFetch({ json: { error: false, body: {} } });
-	await postForm('/bookmark_add.php', { mode: 'add', user_id: '934903' }, 'TOKEN', { fetchImpl: impl });
+test('postFormRaw は urlencoded で送り、応答を展開せずに返す', async () => {
+	// フォロー系の旧 PHP は {error, message, body} で包まない。展開すると成功しても PARSE になる
+	const { impl, calls } = fakeFetch({ json: [] });
+	const body = await postFormRaw('/bookmark_add.php', { mode: 'add', user_id: '934903' }, 'TOKEN', { fetchImpl: impl });
+	assert.deepEqual(body, []);
 	assert.equal(calls[0].init.method, 'POST');
 	assert.equal(calls[0].init.credentials, 'include');
 	assert.equal(calls[0].init.headers.accept, 'application/json');
@@ -178,7 +180,7 @@ test('POST は CSRF トークンが空なら通信せずに unauthorized とし�
 			(error) => error.kind === 'unauthorized',
 		);
 		await assert.rejects(
-			() => postForm('/bookmark_add.php', {}, token, { fetchImpl: impl }),
+			() => postFormRaw('/bookmark_add.php', {}, token, { fetchImpl: impl }),
 			(error) => error.kind === 'unauthorized',
 		);
 		await assert.rejects(

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { likeIllust, addBookmark, deleteBookmark, followUser, unfollowUser } from '../../src/pixiv/actions.js';
-import { fakeApiFetch } from '../helpers/pixiv.js';
+import { fakeApiFetch, fakeFetch as fakeRawFetch } from '../helpers/pixiv.js';
 
 /**
  * helpers の fakeApiFetch に text() を足す。client.js の unwrap() は text() で読む。
@@ -13,6 +13,16 @@ function fakeFetch(body) {
 	const text = JSON.stringify({ error: false, message: '', body });
 	const wrapped = async (url, init) => ({ ...(await impl(url, init)), text: async () => text });
 	return { impl: wrapped, calls };
+}
+
+/**
+ * フォロー系の旧 PHP エンドポイント用の偽 fetch。
+ * これらは {error, message, body} で包まず、値をそのまま返す (SITE_SPEC §4-5/6)。
+ * @param {unknown} json 応答そのもの
+ * @returns {{impl: Function, calls: Array<{url: string, init: object}>}} 偽の fetch と呼び出しの記録
+ */
+function fakeLegacyFetch(json) {
+	return fakeRawFetch({ json });
 }
 
 test('likeIllust は JSON を POST し、送信前のいいね状態を返す', async () => {
@@ -54,7 +64,7 @@ test('deleteBookmark は FormData で bookmark_id を送る', async () => {
 });
 
 test('followUser は bookmark_add.php へ urlencoded で送る', async () => {
-	const { impl, calls } = fakeFetch({});
+	const { impl, calls } = fakeLegacyFetch([]);
 	await followUser('934903', 'TOKEN', { fetchImpl: impl });
 	assert.equal(calls[0].url, '/bookmark_add.php');
 	const params = new URLSearchParams(calls[0].init.body);
@@ -66,13 +76,52 @@ test('followUser は bookmark_add.php へ urlencoded で送る', async () => {
 });
 
 test('unfollowUser は rpc_group_setting.php へ送る (追加と別のエンドポイント)', async () => {
-	const { impl, calls } = fakeFetch({});
+	const { impl, calls } = fakeLegacyFetch({ user_id: '934903' });
 	await unfollowUser('934903', 'TOKEN', { fetchImpl: impl });
 	assert.equal(calls[0].url, '/rpc_group_setting.php');
 	const params = new URLSearchParams(calls[0].init.body);
 	assert.equal(params.get('mode'), 'del');
 	assert.equal(params.get('type'), 'bookuser');
 	assert.equal(params.get('id'), '934903');
+});
+
+test('followUser は空配列の応答を成功として扱う', async () => {
+	// 成功の応答は {error, message, body} ではなく素の空配列。
+	// envelope を期待すると成功しても PARSE で失敗になり、ボタンが切り替わらない
+	const { impl } = fakeLegacyFetch([]);
+	await assert.doesNotReject(followUser('934903', 'TOKEN', { fetchImpl: impl }));
+});
+
+test('followUser は中身のある配列 (エラー文言) を失敗として投げる', async () => {
+	const { impl } = fakeLegacyFetch(['エラーが発生しました']);
+	await assert.rejects(followUser('934903', 'TOKEN', { fetchImpl: impl }), (error) => {
+		assert.equal(error.kind, 'api');
+		assert.equal(error.message, 'エラーが発生しました');
+		return true;
+	});
+});
+
+test('followUser は配列でない応答を失敗として投げる', async () => {
+	// 形が変わったときに成功と誤認すると、フォローできていないのにボタンが「フォロー中」になる
+	const { impl } = fakeLegacyFetch({ error: false, message: '', body: [] });
+	await assert.rejects(followUser('934903', 'TOKEN', { fetchImpl: impl }), (error) => {
+		assert.equal(error.kind, 'parse');
+		return true;
+	});
+});
+
+test('unfollowUser は送った ID が返ってくれば成功として扱う', async () => {
+	// 応答は {user_id}。数値で返ることもあるので文字列にそろえて比べる
+	const { impl } = fakeLegacyFetch({ user_id: 934903 });
+	await assert.doesNotReject(unfollowUser('934903', 'TOKEN', { fetchImpl: impl }));
+});
+
+test('unfollowUser は ID が返らなければ失敗として投げる', async () => {
+	const { impl } = fakeLegacyFetch({ user_id: '1' });
+	await assert.rejects(unfollowUser('934903', 'TOKEN', { fetchImpl: impl }), (error) => {
+		assert.equal(error.kind, 'api');
+		return true;
+	});
 });
 
 test('addBookmark は応答に ID が無ければ失敗として投げる', async () => {
