@@ -60,6 +60,8 @@ export const ACTION_URLS = Object.freeze({
 	BOOKMARK_DELETE: `${AJAX}/illusts/bookmarks/delete`,
 	FOLLOW: '/bookmark_add.php',
 	UNFOLLOW: '/rpc_group_setting.php',
+	/** コメントと返信の投稿。/ajax ではない旧 RPC だが応答は {error, body} で包まれる */
+	POST_COMMENT: '/rpc/post_comment.php',
 });
 
 /**
