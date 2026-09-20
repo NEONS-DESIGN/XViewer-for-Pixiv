@@ -165,6 +165,7 @@ export function postJson(url, payload, token, deps = {}) {
  * (フォローは素の配列、フォロー解除は {user_id}。SITE_SPEC §4-5/6)。
  * unwrap() に通すと body が無いため成功しても PARSE になるので、読み方を分けている。
  * 成功か失敗かの判定は応答の形を知っている actions.js が行う。
+ * 同じ urlencoded でも {error, body} を展開する版は postForm()。
  * @param {string} url URL
  * @param {Record<string, string>} params 送るパラメータ
  * @param {string} token CSRF トークン
@@ -176,6 +177,26 @@ export function postFormRaw(url, params, token, deps = {}) {
 		[HEADER_ACCEPT]: ACCEPT_JSON,
 		[HEADER_CONTENT_TYPE]: CONTENT_TYPE_FORM,
 	}, new URLSearchParams(params).toString(), token, deps, readJson);
+}
+
+/**
+ * urlencoded を POST し、応答の {error, body} を展開する。
+ * コメントの投稿 (/rpc/post_comment.php) で使う。
+ *
+ * 同じ urlencoded でも postFormRaw() とは読み方が違う。
+ * フォロー系の旧 PHP は {error, message, body} で包まないので展開してはいけないが、
+ * post_comment.php は旧 RPC でありながら /ajax/* と同じ形で包んで返す (SITE_SPEC §4 実測)。
+ * @param {string} url URL
+ * @param {Record<string, string>} params 送るパラメータ
+ * @param {string} token CSRF トークン
+ * @param {ClientDeps} [deps] 依存
+ * @returns {Promise<unknown>} body
+ */
+export function postForm(url, params, token, deps = {}) {
+	return post(url, {
+		[HEADER_ACCEPT]: ACCEPT_JSON,
+		[HEADER_CONTENT_TYPE]: CONTENT_TYPE_FORM,
+	}, new URLSearchParams(params).toString(), token, deps);
 }
 
 /**
