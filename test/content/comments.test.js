@@ -24,6 +24,7 @@ test('コメントを共通の形にする', () => {
 		isStamp: false,
 		stampId: null,
 		hasReplies: false,
+		isDeleted: false,
 	});
 });
 
@@ -43,6 +44,8 @@ test('返信があるコメントに印を付ける', () => {
 test('削除されたユーザーでも落ちない', () => {
 	const comment = normalizeComment({ id: '1', isDeletedUser: true, comment: 'a', commentDate: '' });
 	assert.equal(comment.userName, '退会したユーザー');
+	// 飛び先が無いことを後段 (リンクにするかの判断) へ伝える
+	assert.equal(comment.isDeleted, true);
 });
 
 test('絵文字を含まない本文は文字のまま並べる', () => {
@@ -146,6 +149,63 @@ test('続きが無ければ「もっと見る」は出さない', async () => {
 	const { container, comments } = build(async () => ({ comments: [ROOT], hasNext: false }));
 	await comments.load(DETAIL);
 	assert.equal(find(container, '.more').hidden, true);
+});
+
+test('投稿者のアイコンと名前をユーザーページへのリンクにする', async () => {
+	const { container, comments } = build(async () => ({ comments: [ROOT], hasNext: false }));
+	await comments.load(DETAIL);
+
+	const avatarLink = find(container, '.comment-avatar-link');
+	assert.equal(avatarLink.tag, 'a');
+	assert.equal(avatarLink.href, '/users/92064764');
+	// 同じ飛び先のリンクが 1 件に 2 つ並ぶので、アイコン側は読み上げと Tab から外す
+	assert.equal(avatarLink.getAttribute('aria-hidden'), 'true');
+	assert.equal(avatarLink.getAttribute('tabindex'), '-1');
+	assert.equal(find(avatarLink, '.comment-avatar').tag, 'img');
+
+	const name = find(container, '.comment-name');
+	assert.equal(name.tag, 'a');
+	assert.equal(name.href, '/users/92064764');
+	assert.equal(name.textContent, 'キーー');
+	// 同じタブで開く。サイドバーの作者行 (.author) と揃える
+	assert.equal(name.getAttribute('target'), null);
+});
+
+test('退会したユーザーはリンクにしない', async () => {
+	// 飛んでも何も無いページへ送らない
+	const { container, comments } = build(async () => ({
+		comments: [{ ...ROOT, isDeletedUser: true }],
+		hasNext: false,
+	}));
+	await comments.load(DETAIL);
+	assert.equal(find(container, '.comment-avatar-link'), null);
+	assert.equal(find(container, '.comment-avatar').tag, 'img');
+	const name = find(container, '.comment-name');
+	assert.equal(name.tag, 'span');
+	assert.equal(name.textContent, '退会したユーザー');
+});
+
+test('ユーザー ID が取れなければリンクにしない', async () => {
+	const { container, comments } = build(async () => ({
+		comments: [{ ...ROOT, userId: undefined }],
+		hasNext: false,
+	}));
+	await comments.load(DETAIL);
+	assert.equal(find(container, '.comment-avatar-link'), null);
+	assert.equal(find(container, '.comment-name').tag, 'span');
+});
+
+test('返信の投稿者もユーザーページへのリンクになる', async () => {
+	const { container, comments } = build(async (url) => {
+		if (url.includes('replies')) return { comments: [REPLY], hasNext: false };
+		return { comments: [ROOT], hasNext: false };
+	});
+	await comments.load(DETAIL);
+	find(container, '.comment-replies').click();
+	await flush();
+	const reply = find(container, '.comment-reply-list');
+	assert.equal(find(reply, '.comment-name').href, '/users/1');
+	assert.equal(find(reply, '.comment-avatar-link').href, '/users/1');
 });
 
 test('返信があるコメントだけが返信の開閉ボタンを持つ', async () => {
