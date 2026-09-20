@@ -1413,3 +1413,26 @@ test('返信を消すと返信一覧から外れ、読み込み済みの件数�
 	// ルートは消えていないので一覧はそのまま
 	assert.equal(findAll(container, '.comment-list').length, 1);
 });
+
+test('件数の数え直しはブラウザのキャッシュを外して引く', async () => {
+	// 作品を開いた時点で同じ URL を引いているので、素で引き直すと削除前の件数が返る
+	const urls = [];
+	const { container, comments } = buildPostable({
+		fetchJson: async (url) => {
+			urls.push(url);
+			return url.includes('/ajax/illust/')
+				? { commentCount: 0 }
+				: { comments: [{ ...ROOT, editable: true, hasReplies: false }], hasNext: false };
+		},
+		actions: { deleteComment: async () => {} },
+		// 受け手がいないと数え直しごと省かれる (?.() は引数も評価しない)
+		onDeleted: () => {},
+	});
+	await comments.load(POST_DETAIL);
+	const button = find(container, '.comment-delete');
+	await button.click();
+	await button.click();
+	await flush();
+	const counted = urls.find((url) => url.includes('/ajax/illust/'));
+	assert.match(counted, /[?&]_=\d+/);
+});
