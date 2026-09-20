@@ -186,6 +186,10 @@ export function createCommentPicker(deps) {
 
 		close,
 
+		/**
+		 * 開いているか。
+		 * @returns {boolean} 開いていれば true
+		 */
 		isOpen() { return handlers !== null; },
 
 		/**
@@ -200,6 +204,10 @@ export function createCommentPicker(deps) {
 			return true;
 		},
 
+		/**
+		 * 後片付けをする。閉じたうえでパネル自体も手放す。
+		 * @returns {void}
+		 */
 		dispose() {
 			close();
 			panel = null;
