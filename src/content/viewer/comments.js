@@ -219,6 +219,8 @@ export function createComments(deps) {
 	let moreButton = null;
 	/** @type {HTMLElement|null} 読み込み失敗の表示。再試行で消す */
 	let failure = null;
+	/** @type {HTMLElement|null} 「まだコメントはありません」。1 件目を投稿したら消す */
+	let emptyEl = null;
 	/** @type {ResizeObserver|null} 中身の高さが変わったら下限を測り直す */
 	let sizeWatcher = null;
 	/** @type {HTMLElement|null} 見出しと入力欄をまとめた入れ物。貼り付いたかを見るのはこれ */
@@ -808,11 +810,46 @@ export function createComments(deps) {
 	 * @returns {void}
 	 */
 	function prependComment(posted) {
-		if (!list) return;
+		// 0 件の作品では load() が一覧を作っていない。1 件目の投稿でここが作る。
+		// 作らずに捨てると、投稿は通っているのに画面へ出ない
+		ensureList();
 		// 一覧から読んだ 1 件と同じ導線を付ける。付けないと、描き直すまで
 		// この 1 件にだけ返信できない。返信はまだ無いので「返信を表示」は隠れる
 		list.prepend(createRootItem(fromPosted(posted)));
 		applyFloor();
+	}
+
+	/**
+	 * 一覧とスクロール領域を組み立てて入れ物へ入れる。既にあれば何もしない。
+	 * コメントのある作品では load() が、0 件の作品では 1 件目の投稿が呼ぶ。
+	 * @returns {void}
+	 */
+	function ensureList() {
+		if (list) return;
+		// 一覧と「まだコメントはありません」は両立しない。1 件目が入る時点で消す
+		emptyEl?.remove();
+		emptyEl = null;
+
+		// 一覧と「もっと見る」を同じ領域に入れてスクロールさせる。
+		// 外に置くと、一番下まで読んでいなくてもボタンが見えて不自然になる
+		scroll = doc.createElement('div');
+		scroll.className = 'comment-scroll';
+		container.appendChild(scroll);
+
+		list = doc.createElement('ul');
+		list.className = 'comment-list';
+		scroll.appendChild(list);
+		// 返信の開閉でも高さが変わる。一覧そのものを見張れば全部拾える
+		watchSize(list);
+
+		moreButton = doc.createElement('button');
+		moreButton.type = 'button';
+		moreButton.className = 'more';
+		moreButton.textContent = MESSAGES.MORE;
+		// 続きがあるかは読んでみるまで分からない。loadMore() が出す
+		moreButton.hidden = true;
+		moreButton.addEventListener('click', () => { void loadMore(); });
+		scroll.appendChild(moreButton);
 	}
 
 	/**
@@ -895,6 +932,7 @@ export function createComments(deps) {
 			list = null;
 			moreButton = null;
 			failure = null;
+			emptyEl = null;
 			// 前の作品の入力欄は捨てる。書きかけごと消えるが、別の作品へ送るほうが害が大きい
 			rootForm = null;
 			forms.clear();
@@ -920,35 +958,18 @@ export function createComments(deps) {
 				return;
 			}
 			if (detail.commentCount === 0) {
-				const empty = doc.createElement('p');
-				empty.className = 'status';
-				empty.textContent = MESSAGES.EMPTY;
-				container.appendChild(empty);
-				watchSize(empty);
+				// 引いても空なので読みに行かない。一覧もまだ作らず、
+				// 投稿されたときだけ prependComment() が作ってこの文言を消す
+				emptyEl = doc.createElement('p');
+				emptyEl.className = 'status';
+				emptyEl.textContent = MESSAGES.EMPTY;
+				container.appendChild(emptyEl);
+				watchSize(emptyEl);
 				applyFloor();
 				return;
 			}
 
-			// 一覧と「もっと見る」を同じ領域に入れてスクロールさせる。
-			// 外に置くと、一番下まで読んでいなくてもボタンが見えて不自然になる
-			scroll = doc.createElement('div');
-			scroll.className = 'comment-scroll';
-			container.appendChild(scroll);
-
-			list = doc.createElement('ul');
-			list.className = 'comment-list';
-			scroll.appendChild(list);
-			// 返信の開閉でも高さが変わる。一覧そのものを見張れば全部拾える
-			watchSize(list);
-
-			moreButton = doc.createElement('button');
-			moreButton.type = 'button';
-			moreButton.className = 'more';
-			moreButton.textContent = MESSAGES.MORE;
-			moreButton.hidden = true;
-			moreButton.addEventListener('click', () => { void loadMore(); });
-			scroll.appendChild(moreButton);
-
+			ensureList();
 			await loadMore();
 		},
 
@@ -982,6 +1003,7 @@ export function createComments(deps) {
 			scroll = null;
 			moreButton = null;
 			failure = null;
+			emptyEl = null;
 			workId = null;
 			rootForm = null;
 			canPost = false;

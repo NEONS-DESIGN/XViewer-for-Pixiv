@@ -1092,3 +1092,49 @@ test('投稿できたコメントにも返信の導線を付ける', async () =>
 	await find(first, '.comment-reply-toggle').click();
 	assert.ok(replyForm(first));
 });
+
+test('0 件の作品へ投稿した 1 件も一覧に出す', async () => {
+	// 一覧を作るのは load() だけだったので、0 件の作品では投稿の 1 件が黙って捨てられていた
+	const { container, comments } = buildPostable();
+	await comments.load({ ...POST_DETAIL, commentCount: 0 });
+	assert.equal(find(container, '.status').textContent, 'まだコメントはありません');
+
+	await submitText(find(find(container, '.comments-header'), '.comment-form'), 'はじめまして');
+	// 1 件入ったら「まだコメントはありません」は嘘になる
+	assert.equal(find(container, '.status'), null);
+	const items = findAll(find(container, '.comment-list'), '.comment-item');
+	assert.equal(items.length, 1);
+	assert.equal(find(items[0], '.comment-text').textContent, 'はじめまして');
+	// 一覧から読んだ 1 件と同じ導線が付く
+	assert.equal(find(items[0], '.comment-reply-toggle').textContent, '返信');
+	await find(items[0], '.comment-reply-toggle').click();
+	assert.ok(replyForm(items[0]));
+});
+
+test('0 件だった作品でも 2 件目は 1 件目の上に入る', async () => {
+	const { container, comments } = buildPostable();
+	await comments.load({ ...POST_DETAIL, commentCount: 0 });
+	const form = find(find(container, '.comments-header'), '.comment-form');
+	await submitText(form, '1 件目');
+	await submitText(form, '2 件目');
+	assert.deepEqual(
+		find(container, '.comment-list').children.map((item) => find(item, '.comment-text').textContent),
+		['2 件目', '1 件目'],
+	);
+});
+
+test('投稿していない 0 件の作品には一覧を作らない', async () => {
+	const { container, comments } = buildPostable();
+	await comments.load({ ...POST_DETAIL, commentCount: 0 });
+	assert.deepEqual(container.children.map((child) => child.className), ['comments-header', 'status']);
+	assert.equal(find(container, '.comment-list'), null);
+});
+
+test('コメントを受け付けていない作品には一覧も入力欄も作らない', async () => {
+	const { container, comments } = buildPostable();
+	await comments.load({ ...POST_DETAIL, commentOff: true, commentCount: 0 });
+	assert.deepEqual(container.children.map((child) => child.className), ['comments-header', 'status']);
+	assert.equal(find(container, '.comment-form'), null);
+	assert.equal(find(container, '.comment-list'), null);
+	assert.equal(find(container, '.status').textContent, 'この作品はコメントを受け付けていません');
+});
