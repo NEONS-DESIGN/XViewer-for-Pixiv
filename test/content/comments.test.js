@@ -809,8 +809,12 @@ test('ログインが切れていたら再読み込みまで案内する', async
 	);
 });
 
-test('投稿を待っている間に別の作品へ移ったら画面へは足さない', async () => {
-	// 投稿自体は通っているが、今見ている作品の一覧に別の作品のコメントを混ぜない
+/**
+ * 投稿の応答を待たせたまま load() を呼び直し、応答を返す。
+ * @param {object} nextDetail 呼び直すときの作品詳細
+ * @returns {Promise<{container: object, notified: number}>} 描画先と onPosted が呼ばれた回数
+ */
+async function postThenReload(nextDetail) {
 	let release;
 	let notified = 0;
 	const container = fakeElement('div');
@@ -828,12 +832,25 @@ test('投稿を待っている間に別の作品へ移ったら画面へは足�
 	const input = find(container, '.comment-form-input');
 	input.value = 'いいですね';
 	await input.dispatch('input', {});
-	// 応答を待たせたまま次の作品へ移る
+	// 応答を待たせたまま描き直す
 	void find(container, '.comment-form-submit').click();
-	await comments.load({ ...POST_DETAIL, id: '149425017' });
+	await comments.load(nextDetail);
 	release({ id: '900', userId: '99', userName: '自分', text: 'いいですね', stampId: null });
 	await flush();
+	return { container, notified };
+}
 
+test('投稿を待っている間に別の作品へ移ったら画面へは足さない', async () => {
+	// 投稿自体は通っているが、今見ている作品の一覧に別の作品のコメントを混ぜない
+	const { container, notified } = await postThenReload({ ...POST_DETAIL, id: '149425017' });
+	assert.equal(find(container, '.comment-list').children.length, 1);
+	assert.equal(notified, 0);
+});
+
+test('投稿を待っている間に同じ作品を描き直したら画面へは足さない', async () => {
+	// 作品が同じだと workId では気付けない。一覧そのものも世代の印にする (loadMore() と同じ)。
+	// 気付かないと組み直した一覧へ差し込まれ、件数も二重に増える
+	const { container, notified } = await postThenReload(POST_DETAIL);
 	assert.equal(find(container, '.comment-list').children.length, 1);
 	assert.equal(notified, 0);
 });

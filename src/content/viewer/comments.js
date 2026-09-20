@@ -424,13 +424,16 @@ export function createComments(deps) {
 			errorMessage: postErrorMessage,
 			onSubmit: async (value) => {
 				const requestedWorkId = workId;
+				// 同じ作品で load() を呼び直されたときも捨てられるよう、一覧そのものも世代の印にする
+				// (loadMore() と同じ。workId だけでは気付けず、組み直した一覧へ差し込んでしまう)
+				const requestedList = list;
 				// トークンは押された時点で読む。失効時にキャッシュを捨てれば全ての入力欄が追従する
 				const token = readSession(doc).csrfToken;
 				const posted = value.stampId === null
 					? await api.postComment(detailRef.id, detailRef.userId, value.text, options.parentId, token)
 					: await api.postStamp(detailRef.id, detailRef.userId, value.stampId, options.parentId, token);
-				// 待っている間に別の作品へ移っていたら画面へは足さない (投稿自体は通っている)
-				if (workId !== requestedWorkId) return;
+				// 待っている間に別の作品へ移ったか描き直されていたら画面へは足さない (投稿自体は通っている)
+				if (workId !== requestedWorkId || list !== requestedList) return;
 				options.onPosted(posted, value);
 				deps.onPosted?.();
 			},
