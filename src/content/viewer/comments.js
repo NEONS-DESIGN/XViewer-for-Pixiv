@@ -556,7 +556,8 @@ export function createComments(deps) {
 		let labelNode = null;
 		if (label) {
 			labelNode = doc.createElement('span');
-			labelNode.className = 'comment-label';
+			// 本体は「あなた」だけ地を緑にしている。色の出し分けは CSS に任せ、印だけ付ける
+			labelNode.className = label === LABELS.SELF ? 'comment-label is-self' : 'comment-label';
 			labelNode.textContent = label;
 		}
 

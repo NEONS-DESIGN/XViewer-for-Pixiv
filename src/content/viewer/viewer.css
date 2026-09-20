@@ -37,8 +37,11 @@
 	--brand-bg: #0096fa;
 	/* --charcoal-brand-hover */
 	--brand-bg-hover: #1fa3fb;
-	/* ラベルの文字。本体の実測値 */
+	/* ラベルの文字。本体の実測値。「あなた」も「作者」も白 */
 	--brand-fg: #ffffff;
+	/* 「あなた」のラベルだけ地が緑 (本体の実測値。--charcoal-success の #b1cc29 とは別の値)。
+	   --charcoal-brand と同じくテーマで変わらない (ライトでも同じ値なのを実測) */
+	--label-self-bg: #68d62a;
 	/* ボタンの文字。本体はラベルより僅かに落とした値を使っている (実測) */
 	--brand-button-fg: #f5f5f5;
 	/* フォローボタンはブランド色をそのまま使う。名前は用途で残す。
@@ -1217,8 +1220,10 @@ a.comment-name:hover {
 }
 
 /* 投稿者のラベル。名前の直後に置く (pixiv 本体と同じ並び)。
-   地と文字は本体と同じブランド色。ここは「本体に揃える」と決めた部品なので
-   --accent ではなく --brand-* を使う (フォローボタンと同じ扱い) */
+   地と文字は本体の実測値。ここは「本体に揃える」と決めた部品なので
+   --accent ではなく --brand-* / --label-self-bg を使う (フォローボタンと同じ扱い)。
+   **本体は「あなた」と「作者」で地の色を変えている** (緑と青)。
+   既定を「作者」の青に置き、「あなた」だけ is-self で緑へ差し替える */
 .comment-label {
 	display: inline-block;
 	margin-left: 4px;
@@ -1233,6 +1238,11 @@ a.comment-name:hover {
 	/* 名前が長い作品でラベルだけ改行されると迷子になる */
 	white-space: nowrap;
 	vertical-align: middle;
+}
+
+/* 自分のコメント。本体は「あなた」だけ緑にしている */
+.comment-label.is-self {
+	background: var(--label-self-bg);
 }
 
 /* 削除。返信と同じ、地の無い小さなボタン。
