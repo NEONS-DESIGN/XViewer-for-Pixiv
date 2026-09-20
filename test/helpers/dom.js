@@ -116,6 +116,14 @@ export function fakeElement(tag) {
 			for (const node of nodes) node.parent = element;
 			element.children.unshift(...nodes);
 		},
+		insertBefore(next, reference) {
+			const at = element.children.indexOf(reference);
+			next.parent = element;
+			// 本物は参照が null なら末尾へ入れる。見つからない場合もそれに倣う
+			if (at < 0) element.children.push(next);
+			else element.children.splice(at, 0, next);
+			return next;
+		},
 		replaceChildren(...nodes) {
 			element.children = [];
 			text = '';
