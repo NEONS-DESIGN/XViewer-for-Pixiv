@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { formatDate, splitComment, createSidebar } from '../../src/content/viewer/sidebar.js';
 import { createAvatar, showAvatar } from '../../src/content/viewer/avatar.js';
-import { fakeElement, fakeDoc, iconName, flush } from '../helpers/dom.js';
+import { fakeElement, fakeDoc, iconName, flush, find } from '../helpers/dom.js';
 
 test('formatDate は日本語の日時にする', () => {
 	// createDate は ISO 8601。タイムゾーンの表記が 2 種類あることを SITE_SPEC で確認済み
@@ -288,7 +288,7 @@ test('押せないカウンタは何の数字かを隠し文字で持ち、aria-
 	const counts = sidebar.countsSlot().children;
 	assert.deepEqual(
 		counts.map((count) => count.children.map((child) => child.className)),
-		Array(4).fill(['', 'visually-hidden', '']),
+		Array(4).fill(['', 'visually-hidden', 'count-value']),
 	);
 	assert.deepEqual(
 		counts.map((count) => count.textContent),
@@ -304,7 +304,7 @@ test('いいねとブックマークのカウンタには差し替え用の印�
 	sidebar.render(DETAIL);
 	assert.deepEqual(
 		sidebar.countsSlot().children.map((count) => count.className),
-		['count count-like', 'count count-bookmark', 'count', 'count'],
+		['count count-like', 'count count-bookmark', 'count', 'count count-comment'],
 	);
 });
 
@@ -315,4 +315,42 @@ test('dispose はスロットの参照も手放す', () => {
 	assert.equal(sidebar.followSlot(), null);
 	assert.equal(sidebar.countsSlot(), null);
 	assert.equal(sidebar.commentsSlot(), null);
+});
+
+test('コメントの件数は投稿のたびに増やせる', () => {
+	const { container, sidebar } = build();
+	sidebar.render(DETAIL);
+	const count = find(container, '.count-comment');
+	assert.equal(count.textContent.includes('4'), true);
+	sidebar.bumpCommentCount(1);
+	assert.equal(count.textContent.includes('5'), true);
+});
+
+test('bumpCommentCount は 0 未満へは減らさない', () => {
+	const { container, sidebar } = build();
+	sidebar.render({ ...DETAIL, commentCount: 0 });
+	sidebar.bumpCommentCount(-1);
+	const count = find(container, '.count-comment');
+	assert.equal(count.textContent.includes('0'), true);
+});
+
+test('render() で描き直すと件数は新しい作品の値に揃う', () => {
+	// 前の作品で足した分が次の作品へ持ち越らないように
+	const { container, sidebar } = build();
+	sidebar.render(DETAIL);
+	sidebar.bumpCommentCount(1);
+	sidebar.render({ ...DETAIL, commentCount: 10 });
+	sidebar.bumpCommentCount(1);
+	const count = find(container, '.count-comment');
+	assert.equal(count.textContent.includes('11'), true);
+});
+
+test('bumpCommentCount は render() より前でも dispose() の後でも何もしない', () => {
+	const { sidebar } = build();
+	// render() 前
+	assert.doesNotThrow(() => sidebar.bumpCommentCount(1));
+	sidebar.render(DETAIL);
+	sidebar.dispose();
+	// dispose() 後
+	assert.doesNotThrow(() => sidebar.bumpCommentCount(1));
 });

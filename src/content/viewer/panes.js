@@ -106,8 +106,14 @@ export async function renderWork(detail, session, settings, targets) {
 		sidebarPane.render(detail);
 
 		if (plan.comments) {
-			// 「上部へ」はサイドバーそのものを先頭へ戻す。区画の中からは届かないので渡す
-			commentsPane = createComments({ doc, container: sidebarPane.commentsSlot(), scrollTarget: sidebar });
+			// 「上部へ」はサイドバーそのものを先頭へ戻す。区画の中からは届かないので渡す。
+			// 投稿できたらサイドバーのコメント件数を手元で +1 する (再取得はしない。SPEC §10.12)
+			commentsPane = createComments({
+				doc,
+				container: sidebarPane.commentsSlot(),
+				scrollTarget: sidebar,
+				onPosted: () => { sidebarPane.bumpCommentCount(1); },
+			});
 			void commentsPane.load(detail);
 		}
 		if (plan.actions) {

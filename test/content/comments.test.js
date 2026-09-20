@@ -796,7 +796,9 @@ test('投稿できたら入力欄を空に戻す', async () => {
 });
 
 test('投稿に失敗しても書きかけは消さない', async () => {
+	let notified = 0;
 	const { container, comments } = buildPostable({
+		onPosted: () => { notified += 1; },
 		actions: {
 			postComment: async () => { throw new Error('落ちた'); },
 			postStamp: async () => { throw new Error('落ちた'); },
@@ -808,6 +810,23 @@ test('投稿に失敗しても書きかけは消さない', async () => {
 	assert.equal(find(container, '.comment-form-error').textContent, 'コメントを投稿できませんでした');
 	// 一覧は元のまま。失敗で 1 件増やさない
 	assert.equal(find(container, '.comment-list').children.length, 1);
+	// 差し込んでいないので、件数を増やす側へも知らせない
+	assert.equal(notified, 0);
+});
+
+test('投稿したスタンプは一覧へ画像として差し込まれる', async () => {
+	// 送る値だけでなく、差し込んだ 1 件が画像として描かれることまで見る
+	const { container, comments } = buildPostable();
+	await comments.load(POST_DETAIL);
+	const form = find(find(container, '.comments-header'), '.comment-form');
+	await find(form, '.comment-form-pick').click();
+	// 2 つ目のタブがスタンプ
+	await findAll(form, '.comment-picker-tab')[1].click();
+	await find(form, '.comment-picker-grid').children[0].click();
+	await find(form, '.comment-form-submit').click();
+	await flush();
+	const first = find(container, '.comment-list').children[0];
+	assert.equal(find(first, '.comment-stamp') !== null, true);
 });
 
 test('ログインが切れていたら再読み込みまで案内する', async () => {
