@@ -1192,7 +1192,7 @@ test('自分のコメントには「あなた」、作者には「作者」が�
 	assert.deepEqual(items.map((one) => find(one, '.comment-label')?.textContent ?? null), ['あなた', '作者', null]);
 	// 名前のすぐ後ろに置く (pixiv 本体と同じ並び)
 	const body = find(items[0], '.comment-body');
-	assert.deepEqual(body.children.slice(0, 2).map((child) => child.className), ['comment-name', 'comment-label']);
+	assert.deepEqual(body.children.slice(0, 2).map((child) => child.className), ['comment-name', 'comment-label is-self']);
 });
 
 test('削除できるコメントにだけ削除ボタンを出す', async () => {
@@ -1435,4 +1435,22 @@ test('件数の数え直しはブラウザのキャッシュを外して引く',
 	await flush();
 	const counted = urls.find((url) => url.includes('/ajax/illust/'));
 	assert.match(counted, /[?&]_=\d+/);
+});
+
+test('「あなた」のラベルだけ印を付けて色を分ける', async () => {
+	// pixiv 本体は「あなた」が緑、「作者」が青 (実測)。地の色は CSS が is-self で切り替える
+	const { container, comments } = buildPostable({
+		fetchJson: async () => ({
+			comments: [
+				{ ...ROOT, id: 'a', userId: '99', userName: '自分', hasReplies: false },
+				{ ...ROOT, id: 'b', userId: '54734418', userName: '作者さん', hasReplies: false },
+			],
+			hasNext: false,
+		}),
+	});
+	await comments.load(POST_DETAIL);
+	const labels = findAll(container, '.comment-label');
+	assert.deepEqual(labels.map((one) => one.textContent), ['あなた', '作者']);
+	assert.equal(labels[0].classList.contains('is-self'), true);
+	assert.equal(labels[1].classList.contains('is-self'), false);
 });
