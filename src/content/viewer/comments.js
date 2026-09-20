@@ -65,6 +65,9 @@ const LABELS = Object.freeze({
 	AUTHOR: '作者',
 });
 
+/** 件数を数え直すときに付ける、キャッシュを外すためのパラメータ名。 */
+const CACHE_BUSTER = '_';
+
 /** 返信の 1 ページ目。replies API は offset ではなく 1 始まりの page で送る。 */
 const FIRST_REPLY_PAGE = 1;
 
@@ -672,6 +675,8 @@ export function createComments(deps) {
 				// 最後の 1 件だったら「まだコメントはありません」へ戻す。
 				// 戻さないと見出しだけが残って、読み込みに失敗したように見える
 				if (list && list.children.length === 0) showEmpty();
+				// 受け手がいなければ数え直しも走らない (?.() は引数も評価しない)。
+				// 件数を出していない呼び出し元に無駄な通信をさせないので、これでよい
 				deps.onDeleted?.(await countAfterDelete(illustId));
 				applyFloor();
 			} catch (error) {
@@ -1010,7 +1015,10 @@ export function createComments(deps) {
 	 */
 	async function countAfterDelete(illustId) {
 		try {
-			const body = await fetchJson(illustUrl(illustId));
+			// 同じ URL を作品を開いた時点で引いているため、そのまま引き直すと
+			// ブラウザのキャッシュが**削除前の件数**を返すことがある (実機で確認)。
+			// 数え直しの意味が消えるので、毎回違う URL にして必ず取り直す
+			const body = await fetchJson(`${illustUrl(illustId)}&${CACHE_BUSTER}=${Date.now()}`);
 			const count = body?.commentCount;
 			return typeof count === 'number' ? count : null;
 		} catch (error) {
