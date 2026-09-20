@@ -436,6 +436,39 @@ test('入力欄の中では上下キーで作品が送られない', async () =>
 	assert.equal(fetched.length, 1, '入力欄の中では作品が送られない');
 });
 
+test('入力欄にフォーカスがある状態でも Tab はフォーカストラップに届く', async () => {
+	// 入力欄の素通しが Tab まで止めると、フォーカスがモーダルの外 (背後の pixiv) へ抜けてしまう
+	const { viewer, doc, shadow } = setup();
+	await viewer.open('1');
+	const first = enrich(doc.createElement('button'));
+	const last = enrich(doc.createElement('button'));
+	last.getClientRects = () => [{}];
+	shadow().querySelectorAll = () => [first, last];
+	shadow().activeElement = first;
+	const event = {
+		key: KEYS.FOCUS_NEXT,
+		shiftKey: false,
+		composedPath: () => [{ tagName: 'TEXTAREA' }],
+		preventDefault() {},
+	};
+	await doc.dispatch('keydown', event);
+	assert.equal(last.focused, true, 'Tab が navigation.onKeyDown まで届いて次へ巡回する');
+});
+
+test('入力欄が空なら Escape でビュワーを閉じる', async () => {
+	// 入力欄の素通しが Escape まで止めると、書きかけの文章が無くても閉じなくなってしまう
+	const { viewer, doc, closed } = setup();
+	await viewer.open('1');
+	const event = {
+		key: KEYS.CLOSE,
+		composedPath: () => [{ tagName: 'TEXTAREA' }],
+		preventDefault() {},
+		stopPropagation() {},
+	};
+	await doc.dispatch('keydown', event);
+	assert.equal(closed(), 1);
+});
+
 test('クリックで原寸表示がオンなら、画像を押すと overlay の直下に原寸レイヤが出る', async () => {
 	// ステージの中ではなく overlay の直下。サイドバーの上も覆う
 	const { viewer, shadow, stage } = setup({ settings: settings({ clickZoom: true }) });
