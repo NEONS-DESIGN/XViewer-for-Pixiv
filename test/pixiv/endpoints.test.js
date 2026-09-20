@@ -12,6 +12,7 @@ import {
 	safeCdnUrl,
 	emojiUrl,
 	stampUrl,
+	ACTION_URLS,
 } from '../../src/pixiv/endpoints.js';
 import { WORK_CATEGORY } from '../../src/common/constants.js';
 
@@ -131,4 +132,8 @@ test('safeCdnUrl は URL でない値と空を弾く', () => {
 	assert.equal(safeCdnUrl(''), null);
 	assert.equal(safeCdnUrl(null), null);
 	assert.equal(safeCdnUrl(undefined), null);
+});
+
+test('コメント投稿は旧 RPC のパス', () => {
+	assert.equal(ACTION_URLS.POST_COMMENT, '/rpc/post_comment.php');
 });

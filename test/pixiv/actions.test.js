@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { likeIllust, addBookmark, deleteBookmark, followUser, unfollowUser } from '../../src/pixiv/actions.js';
+import { likeIllust, addBookmark, deleteBookmark, followUser, unfollowUser, postComment, postStamp } from '../../src/pixiv/actions.js';
+import { PIXIV_ERROR_KINDS } from '../../src/pixiv/errors.js';
 import { fakeApiFetch, fakeFetch as fakeRawFetch } from '../helpers/pixiv.js';
 
 /**
@@ -136,4 +137,61 @@ test('addBookmark は応答に ID が無ければ失敗として投げる', asyn
 test('addBookmark は数値の ID を文字列にして返す', async () => {
 	const { impl } = fakeFetch({ last_bookmark_id: 38764433361 });
 	assert.equal(await addBookmark('1', false, 'T', { fetchImpl: impl }), '38764433361');
+});
+
+/** 投稿 API が返す body の実測値 (SITE_SPEC §4)。 */
+const POSTED = Object.freeze({
+	user_id: '54734418',
+	user_name: 'NEONS',
+	comment_id: '233867999',
+	comment: 'いいですね',
+	stamp_id: null,
+});
+
+test('postComment は type=comment の urlencoded を送る', async () => {
+	const { impl, calls } = fakeFetch(POSTED);
+	const posted = await postComment('149425016', '54734418', 'いいですね', null, 'TOKEN', { fetchImpl: impl });
+	assert.equal(calls[0].url, '/rpc/post_comment.php');
+	const sent = [...new URLSearchParams(calls[0].init.body).entries()];
+	assert.deepEqual(sent, [
+		['type', 'comment'],
+		['illust_id', '149425016'],
+		['author_user_id', '54734418'],
+		['comment', 'いいですね'],
+	]);
+	assert.deepEqual(posted, {
+		id: '233867999', userId: '54734418', userName: 'NEONS', text: 'いいですね', stampId: null,
+	});
+});
+
+test('postComment は返信のときだけ parent_id を送る', async () => {
+	const { impl, calls } = fakeFetch(POSTED);
+	await postComment('149425016', '54734418', 'あ', '233867786', 'TOKEN', { fetchImpl: impl });
+	assert.equal(new URLSearchParams(calls[0].init.body).get('parent_id'), '233867786');
+});
+
+test('postStamp は type=stamp と stamp_id を送る', async () => {
+	const { impl, calls } = fakeFetch({ ...POSTED, comment: '', stamp_id: '304' });
+	const posted = await postStamp('149425016', '54734418', '304', null, 'TOKEN', { fetchImpl: impl });
+	const sent = new URLSearchParams(calls[0].init.body);
+	assert.equal(sent.get('type'), 'stamp');
+	assert.equal(sent.get('stamp_id'), '304');
+	assert.equal(sent.has('parent_id'), false);
+	assert.equal(posted.stampId, '304');
+	assert.equal(posted.text, '');
+});
+
+test('postStamp も返信なら parent_id を送る', async () => {
+	const { impl, calls } = fakeFetch({ ...POSTED, stamp_id: '304' });
+	await postStamp('1', '2', '304', '9', 'T', { fetchImpl: impl });
+	assert.equal(new URLSearchParams(calls[0].init.body).get('parent_id'), '9');
+});
+
+test('comment_id が無ければ投稿は失敗として扱う', async () => {
+	// ID 無しで成功にすると、画面へ差し込んだ 1 件が実体と結び付かない
+	const { impl } = fakeFetch({ user_id: '1', user_name: 'x' });
+	await assert.rejects(
+		() => postComment('1', '2', 'a', null, 'T', { fetchImpl: impl }),
+		(error) => error.kind === PIXIV_ERROR_KINDS.API,
+	);
 });

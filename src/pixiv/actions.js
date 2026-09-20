@@ -2,7 +2,7 @@
  * pixiv の更新系 API。すべて SITE_SPEC §4 で実機観測して確定した仕様。
  * 追加と削除でエンドポイントも本体の形式も違うので、ここに閉じ込める。
  */
-import { postJson, postFormRaw, postFormData } from './client.js';
+import { postJson, postForm, postFormRaw, postFormData } from './client.js';
 import { ACTION_URLS } from './endpoints.js';
 import { PixivError, PIXIV_ERROR_KINDS } from './errors.js';
 
@@ -119,4 +119,93 @@ export async function unfollowUser(userId, token, deps) {
 	if (returned === null || returned === undefined || String(returned) !== String(userId)) {
 		throw new PixivError(PIXIV_ERROR_KINDS.API, UNFOLLOW_REJECTED);
 	}
+}
+
+/** 投稿の種類。同じエンドポイントを type で振り分ける (SITE_SPEC §4)。 */
+const COMMENT_TYPES = Object.freeze({ TEXT: 'comment', STAMP: 'stamp' });
+
+/**
+ * @typedef {object} PostedComment
+ * @property {string} id 投稿されたコメントの ID
+ * @property {string} userId 投稿者 (自分) のユーザー ID
+ * @property {string} userName 投稿者 (自分) の表示名
+ * @property {string} text 本文。スタンプなら空文字
+ * @property {string|null} stampId スタンプ ID。テキストなら null
+ */
+
+/**
+ * コメントを投稿して、投稿された 1 件を返す。
+ *
+ * 応答の値は snake_case なので、ここで画面側の語彙へそろえる。
+ * アバターの URL は応答に入らない (pixiv 本体も自分のセッションの値を使う)。
+ * @param {Record<string, string>} params 送るパラメータ
+ * @param {string} token CSRF トークン
+ * @param {ClientDeps} [deps] テスト用の依存
+ * @returns {Promise<PostedComment>} 投稿された 1 件
+ * @throws {PixivError} 応答に comment_id が無いとき
+ */
+async function submitComment(params, token, deps) {
+	const body = await postForm(ACTION_URLS.POST_COMMENT, params, token, deps);
+	const id = body?.comment_id;
+	if (id === null || id === undefined || id === '') {
+		throw new PixivError(PIXIV_ERROR_KINDS.API, 'post comment returned no comment_id');
+	}
+	const stampId = body.stamp_id;
+	return {
+		id: String(id),
+		userId: body.user_id === null || body.user_id === undefined ? '' : String(body.user_id),
+		userName: body.user_name ?? '',
+		text: body.comment ?? '',
+		stampId: stampId === null || stampId === undefined || stampId === '' ? null : String(stampId),
+	};
+}
+
+/**
+ * 返信のときだけ parent_id を足す。
+ * 値が無いのにキーだけ送ると pixiv 側でルートへの投稿と扱いが変わるので、キーごと落とす。
+ * @param {string|null|undefined} parentId 返信先のルートコメント ID
+ * @returns {Record<string, string>} 足すパラメータ
+ */
+function parentParam(parentId) {
+	return parentId ? { parent_id: String(parentId) } : {};
+}
+
+/**
+ * 作品にコメントする。parentId を渡すとそのコメントへの返信になる。
+ * @param {string} illustId 作品 ID
+ * @param {string} authorUserId 作品の作者のユーザー ID (返信先の相手ではない)
+ * @param {string} text 本文
+ * @param {string|null} parentId 返信先のルートコメント ID。作品へのコメントなら null
+ * @param {string} token CSRF トークン
+ * @param {ClientDeps} [deps] テスト用の依存
+ * @returns {Promise<PostedComment>} 投稿された 1 件
+ */
+export function postComment(illustId, authorUserId, text, parentId, token, deps) {
+	return submitComment({
+		type: COMMENT_TYPES.TEXT,
+		illust_id: illustId,
+		author_user_id: authorUserId,
+		comment: text,
+		...parentParam(parentId),
+	}, token, deps);
+}
+
+/**
+ * 作品にスタンプを投稿する。parentId を渡すとそのコメントへの返信になる。
+ * @param {string} illustId 作品 ID
+ * @param {string} authorUserId 作品の作者のユーザー ID
+ * @param {string} stampId スタンプ ID
+ * @param {string|null} parentId 返信先のルートコメント ID。作品へのコメントなら null
+ * @param {string} token CSRF トークン
+ * @param {ClientDeps} [deps] テスト用の依存
+ * @returns {Promise<PostedComment>} 投稿された 1 件
+ */
+export function postStamp(illustId, authorUserId, stampId, parentId, token, deps) {
+	return submitComment({
+		type: COMMENT_TYPES.STAMP,
+		illust_id: illustId,
+		author_user_id: authorUserId,
+		stamp_id: stampId,
+		...parentParam(parentId),
+	}, token, deps);
 }
