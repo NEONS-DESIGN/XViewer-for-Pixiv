@@ -113,7 +113,12 @@ export async function renderWork(detail, session, settings, targets) {
 				container: sidebarPane.commentsSlot(),
 				scrollTarget: sidebar,
 				onPosted: () => { sidebarPane.bumpCommentCount(1); },
-				onDeleted: () => { sidebarPane.bumpCommentCount(-1); },
+				// 削除は数え直した件数で置き換える。ルートを消すと返信も道連れになるので
+				// 手元で 1 を引くだけでは合わない。引けなかったときだけ 1 を引く
+				onDeleted: (count) => {
+					if (count === null) sidebarPane.bumpCommentCount(-1);
+					else sidebarPane.setCommentCount(count);
+				},
 			});
 			void commentsPane.load(detail);
 		}

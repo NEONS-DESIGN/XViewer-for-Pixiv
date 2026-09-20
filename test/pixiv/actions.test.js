@@ -220,3 +220,9 @@ test('deleteComment は API がエラーを返したら投げる', async () => {
 		(error) => error.kind === PIXIV_ERROR_KINDS.API && error.message === '削除できません',
 	);
 });
+
+test('deleteComment も JSON を受け取るヘッダを付ける', async () => {
+	const { impl, calls } = fakeFetch({});
+	await deleteComment('1', '2', 'T', { fetchImpl: impl });
+	assert.equal(calls[0].init.headers.accept, 'application/json');
+});
