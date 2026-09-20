@@ -29,15 +29,23 @@
    ここにはビュワーでしか使わないトークンと、Shadow DOM 固有の規則だけを置く。
    ダークが既定。ライトは :host([data-theme='light']) で変数だけを差し替える。 */
 :host {
-	/* フォローボタンだけは地も pixiv 本体 (charcoal) の実測値をそのまま使う。
-	   フォロー前 = --charcoal-brand、フォロー中 = --charcoal-surface3 (SITE_SPEC.md)。
-	   白文字との比は約 3.1:1 で AA には届かないが、本体の見え方に揃える判断
-	   (docs/DECISIONS.md)。他の塗りつぶしは --accent / --on-accent のまま */
-	--follow-fg: #ffffff;
-	/* --charcoal-brand。テーマで変わらない */
-	--follow-bg: #0096fa;
+	/* pixiv 本体 (charcoal) のブランド色。--charcoal-brand の実測値そのもので、
+	   テーマで変わらない。本体と同じ見え方にすると決めた部品だけがこれを使う:
+	   フォローボタン・コメントの送信ボタン・投稿者のラベル (SITE_SPEC.md)。
+	   白文字との比は約 3.1:1 で AA には届かないが、本体に揃える判断
+	   (docs/DECISIONS.md)。それ以外の塗りつぶしは --accent / --on-accent のまま */
+	--brand-bg: #0096fa;
 	/* --charcoal-brand-hover */
-	--follow-bg-hover: #1fa3fb;
+	--brand-bg-hover: #1fa3fb;
+	/* ラベルの文字。本体の実測値 */
+	--brand-fg: #ffffff;
+	/* ボタンの文字。本体はラベルより僅かに落とした値を使っている (実測) */
+	--brand-button-fg: #f5f5f5;
+	/* フォローボタンはブランド色をそのまま使う。名前は用途で残す。
+	   文字は #ffffff 側 (本体のフォローボタンの実測値) */
+	--follow-fg: var(--brand-fg);
+	--follow-bg: var(--brand-bg);
+	--follow-bg-hover: var(--brand-bg-hover);
 	/* フォロー中。--charcoal-surface3 とその hover。
 	   半端な小数は charcoal が実際に持っている値 (実測) */
 	--follow-on-bg: rgba(255, 255, 255, 0.12);
@@ -78,9 +86,9 @@
 }
 
 :host([data-theme='light']) {
-	/* フォローの地。--charcoal-brand はテーマ非依存なので --follow-bg は差し替えない。
+	/* ブランド色の地 (--charcoal-brand) はテーマ非依存なので差し替えない。
 	   ホバーと「フォロー中」だけライトの値へ (--charcoal-brand-hover / --charcoal-surface3) */
-	--follow-bg-hover: #0090f0;
+	--brand-bg-hover: #0090f0;
 	--follow-on-bg: rgba(0, 0, 0, 0.04);
 	--follow-on-bg-hover: rgba(0, 0, 0, 0.0784);
 	/* 幕はライトでも暗いままにする。画像の見え方を安定させるため */
@@ -1160,12 +1168,17 @@ a.comment-name:hover {
 	padding: 0 16px;
 	border: 0;
 	border-radius: 999px;
-	background: var(--accent);
-	color: var(--on-accent);
+	/* 地と文字は pixiv 本体の送信ボタンと同じブランド色 */
+	background: var(--brand-bg);
+	color: var(--brand-button-fg);
 	font: inherit;
 	font-size: 13px;
 	font-weight: bold;
 	cursor: pointer;
+}
+
+.comment-form-submit:hover:not(:disabled) {
+	background: var(--brand-bg-hover);
 }
 
 /* 送れる中身が無いときは押せない (空の投稿を止める)。
@@ -1204,15 +1217,15 @@ a.comment-name:hover {
 }
 
 /* 投稿者のラベル。名前の直後に置く (pixiv 本体と同じ並び)。
-   本体は #0096fa を直値で焼いているが、ここは --accent を使う。
-   直値だとライトへ切り替えたときに文字とのコントラストが崩れる */
+   地と文字は本体と同じブランド色。ここは「本体に揃える」と決めた部品なので
+   --accent ではなく --brand-* を使う (フォローボタンと同じ扱い) */
 .comment-label {
 	display: inline-block;
 	margin-left: 4px;
 	padding: 1px 5px;
 	border-radius: 3px;
-	background: var(--accent);
-	color: var(--on-accent);
+	background: var(--brand-bg);
+	color: var(--brand-fg);
 	font-size: 10px;
 	font-weight: bold;
 	/* 名前の行の高さを押し上げないよう、継承した 1.6 を切る */
