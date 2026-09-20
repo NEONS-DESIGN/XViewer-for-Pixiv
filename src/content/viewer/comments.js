@@ -4,7 +4,7 @@
  */
 import { createIcon } from '../../common/icons.js';
 import { getJson } from '../../pixiv/client.js';
-import { commentRootsUrl, commentRepliesUrl, emojiUrl, stampUrl } from '../../pixiv/endpoints.js';
+import { commentRootsUrl, commentRepliesUrl, emojiUrl, stampUrl, userPath } from '../../pixiv/endpoints.js';
 import { createAvatar, showAvatar } from './avatar.js';
 import { parseCommentText } from '../../pixiv/emoji.js';
 import { COMMENT_PAGE_SIZE } from '../../common/constants.js';
@@ -95,6 +95,7 @@ export function commentsFloorHeight({ outside, contentHeight, nthBottom }) {
  * @property {boolean} isStamp
  * @property {string|null} stampId スタンプの ID。スタンプでなければ null
  * @property {boolean} hasReplies
+ * @property {boolean} isDeleted 退会したユーザーか。ユーザーページへのリンクを出すかの判断に使う
  */
 
 /**
@@ -115,6 +116,7 @@ export function normalizeComment(raw) {
 		isStamp,
 		stampId: isStamp ? String(raw.stampId) : null,
 		hasReplies: raw.hasReplies === true,
+		isDeleted: raw.isDeletedUser === true,
 	};
 }
 
@@ -362,15 +364,33 @@ export function createComments(deps) {
 		const item = doc.createElement('li');
 		item.className = 'comment-item';
 
+		// 退会したユーザーと ID が取れなかったコメントには飛び先が無い。押せないままにする
+		const userPage = comment.userId && !comment.isDeleted ? userPath(comment.userId) : null;
+
 		// 作者行と同じ部品。CDN 以外の URL や読み込み失敗は枠だけ残して黙って続ける
 		const avatar = createAvatar(doc, 'comment-avatar');
 		showAvatar(avatar, comment.avatarUrl);
 
+		// アイコンもリンクにする (押せる範囲が広いほうが誤操作が減る)。
+		// ただし名前と飛び先が同じなので、読み上げと Tab の巡回からは外して 1 件 1 リンクに見せる
+		let avatarNode = avatar;
+		if (userPage) {
+			const avatarLink = doc.createElement('a');
+			avatarLink.className = 'comment-avatar-link';
+			avatarLink.href = userPage;
+			avatarLink.setAttribute('aria-hidden', 'true');
+			avatarLink.setAttribute('tabindex', '-1');
+			avatarLink.appendChild(avatar);
+			avatarNode = avatarLink;
+		}
+
 		const body = doc.createElement('div');
 		body.className = 'comment-body';
 
-		const name = doc.createElement('span');
+		// 飛び先があるときだけ a にする。target は付けない (作者行と同じく同じタブで開く)
+		const name = doc.createElement(userPage ? 'a' : 'span');
 		name.className = 'comment-name';
+		if (userPage) name.href = userPage;
 		name.textContent = comment.userName;
 
 		const text = doc.createElement('p');
@@ -390,7 +410,7 @@ export function createComments(deps) {
 		meta.append(repliesSlot, date);
 
 		body.append(name, text, meta);
-		item.append(avatar, body);
+		item.append(avatarNode, body);
 		return { item, body, repliesSlot };
 	}
 

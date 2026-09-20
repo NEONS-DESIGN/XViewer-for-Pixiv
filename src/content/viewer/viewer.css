@@ -858,6 +858,13 @@
 	border-bottom: 1px solid var(--divider);
 }
 
+/* アイコンを包む投稿者ページへのリンク。
+   flex の指定はここが持つ (img はリンクが無いときも同じ大きさで並ぶ) */
+.comment-avatar-link {
+	display: flex;
+	flex: 0 0 auto;
+}
+
 .comment-avatar {
 	flex: 0 0 auto;
 	width: 32px;
@@ -876,6 +883,16 @@
 .comment-name {
 	color: var(--muted);
 	font-size: 12px;
+}
+
+/* 投稿者ページへのリンク。色は文字のまま置き、押せることは hover の下線で示す
+   (作者行の .author:hover .author-name と同じ) */
+a.comment-name {
+	text-decoration: none;
+}
+
+a.comment-name:hover {
+	text-decoration: underline;
 }
 
 .comment-text {
