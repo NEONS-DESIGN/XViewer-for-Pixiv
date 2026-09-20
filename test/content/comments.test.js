@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeComment, renderCommentText, renderStamp, createComments, commentsFloorHeight, isHeadingStuck, formatPostedDate } from '../../src/content/viewer/comments.js';
+import { normalizeComment, renderCommentText, renderStamp, createComments, commentsFloorHeight, isHeadingStuck, formatPostedDate, commentLabel } from '../../src/content/viewer/comments.js';
 import { fakeElement, fakeDoc, find, findAll, iconName, flush } from '../helpers/dom.js';
 import { clearSessionCache } from '../../src/content/session.js';
 import { PixivError, PIXIV_ERROR_KINDS } from '../../src/pixiv/errors.js';
@@ -29,6 +29,7 @@ test('コメントを共通の形にする', () => {
 		stampId: null,
 		hasReplies: false,
 		isDeleted: false,
+		editable: false,
 	});
 });
 
@@ -188,6 +189,7 @@ function buildPostable(options = {}) {
 			},
 		},
 		onPosted: options.onPosted,
+		onDeleted: options.onDeleted,
 	});
 	return { doc, container, comments, posted, tokens };
 }
@@ -1152,4 +1154,172 @@ test('コメントを受け付けていない作品には一覧も入力欄も�
 	assert.equal(find(container, '.comment-form'), null);
 	assert.equal(find(container, '.comment-list'), null);
 	assert.equal(find(container, '.status').textContent, 'この作品はコメントを受け付けていません');
+});
+
+test('コメントは削除できるかを持ち回る', () => {
+	// editable は一覧 API が付けてくる。自分のコメントと自分の作品のコメントで true (SITE_SPEC §4)
+	assert.equal(normalizeComment({ id: '1', comment: 'a', commentDate: '', editable: true }).editable, true);
+	assert.equal(normalizeComment({ id: '1', comment: 'a', commentDate: '' }).editable, false);
+});
+
+test('投稿者のラベルは自分が最優先', () => {
+	// 自分の作品に自分でコメントすると両方に当てはまる。pixiv 本体は「あなた」を出す (実測)
+	assert.equal(commentLabel({ userId: '99' }, '99', '99'), 'あなた');
+	assert.equal(commentLabel({ userId: '99' }, '99', '54734418'), 'あなた');
+	assert.equal(commentLabel({ userId: '54734418' }, '99', '54734418'), '作者');
+	assert.equal(commentLabel({ userId: '92064764' }, '99', '54734418'), null);
+});
+
+test('ラベルは ID が欠けていたら出さない', () => {
+	// 空文字どうしが一致して、無関係なコメントに「あなた」が付くのを防ぐ
+	assert.equal(commentLabel({ userId: '' }, '', ''), null);
+	assert.equal(commentLabel({ userId: '99' }, null, null), null);
+});
+
+test('自分のコメントには「あなた」、作者には「作者」が名前の後ろに付く', async () => {
+	const { container, comments } = buildPostable({
+		fetchJson: async () => ({
+			comments: [
+				{ ...ROOT, id: 'a', userId: '99', userName: '自分', hasReplies: false },
+				{ ...ROOT, id: 'b', userId: '54734418', userName: '作者さん', hasReplies: false },
+				{ ...ROOT, id: 'c', hasReplies: false },
+			],
+			hasNext: false,
+		}),
+	});
+	await comments.load(POST_DETAIL);
+	const items = findAll(container, '.comment-item');
+	assert.deepEqual(items.map((one) => find(one, '.comment-label')?.textContent ?? null), ['あなた', '作者', null]);
+	// 名前のすぐ後ろに置く (pixiv 本体と同じ並び)
+	const body = find(items[0], '.comment-body');
+	assert.deepEqual(body.children.slice(0, 2).map((child) => child.className), ['comment-name', 'comment-label']);
+});
+
+test('削除できるコメントにだけ削除ボタンを出す', async () => {
+	const { container, comments } = buildPostable({
+		fetchJson: async () => ({
+			comments: [
+				{ ...ROOT, id: 'a', editable: true, hasReplies: false },
+				{ ...ROOT, id: 'b', hasReplies: false },
+			],
+			hasNext: false,
+		}),
+	});
+	await comments.load(POST_DETAIL);
+	const items = findAll(container, '.comment-item');
+	assert.ok(find(items[0], '.comment-delete'));
+	assert.equal(find(items[1], '.comment-delete'), null);
+});
+
+test('下段の並びは 返信・削除・返信を表示・日時', async () => {
+	const { container, comments } = buildPostable({
+		fetchJson: async () => ({ comments: [{ ...ROOT, editable: true }], hasNext: false }),
+	});
+	await comments.load(POST_DETAIL);
+	assert.deepEqual(find(container, '.comment-meta').children.map((child) => child.className), [
+		'comment-reply-toggle', 'comment-delete', 'comment-replies-slot', 'comment-date',
+	]);
+});
+
+test('削除は一度目で確認に変わり、二度目で実行する', async () => {
+	const removed = [];
+	const { container, comments } = buildPostable({
+		fetchJson: async () => ({ comments: [{ ...ROOT, editable: true, hasReplies: false }], hasNext: false }),
+		actions: { deleteComment: async (...args) => { removed.push(args.slice(0, 3)); } },
+	});
+	await comments.load(POST_DETAIL);
+	const button = find(container, '.comment-delete');
+	assert.equal(button.textContent, '削除');
+	await button.click();
+	// 取り消せない操作なので、一度目では消さずに聞き返す
+	assert.deepEqual(removed, []);
+	assert.equal(button.textContent, '本当に削除？');
+	await button.click();
+	await flush();
+	assert.deepEqual(removed, [['149425016', '233573595', 'csrf-token']]);
+});
+
+test('確認中にフォーカスが外れたら元に戻す', async () => {
+	const { container, comments } = buildPostable({
+		fetchJson: async () => ({ comments: [{ ...ROOT, editable: true, hasReplies: false }], hasNext: false }),
+		actions: { deleteComment: async () => {} },
+	});
+	await comments.load(POST_DETAIL);
+	const button = find(container, '.comment-delete');
+	await button.click();
+	assert.equal(button.textContent, '本当に削除？');
+	await button.dispatch('blur', {});
+	assert.equal(button.textContent, '削除');
+});
+
+test('削除できたら一覧から外して件数を減らす', async () => {
+	let delta = 0;
+	const { container, comments } = buildPostable({
+		fetchJson: async () => ({
+			comments: [
+				{ ...ROOT, id: 'a', editable: true, hasReplies: false },
+				{ ...ROOT, id: 'b', hasReplies: false },
+			],
+			hasNext: false,
+		}),
+		actions: { deleteComment: async () => {} },
+		onDeleted: () => { delta -= 1; },
+	});
+	await comments.load(POST_DETAIL);
+	const button = find(container, '.comment-delete');
+	await button.click();
+	await button.click();
+	await flush();
+	assert.equal(findAll(container, '.comment-item').length, 1);
+	assert.equal(delta, -1);
+});
+
+test('削除に失敗したら行を残して知らせる', async () => {
+	let delta = 0;
+	const { container, comments } = buildPostable({
+		fetchJson: async () => ({ comments: [{ ...ROOT, editable: true, hasReplies: false }], hasNext: false }),
+		actions: { deleteComment: async () => { throw new Error('失敗'); } },
+		onDeleted: () => { delta -= 1; },
+	});
+	await comments.load(POST_DETAIL);
+	const button = find(container, '.comment-delete');
+	await button.click();
+	await button.click();
+	await flush();
+	// 消せていないのに画面から消すと、読み直したときに戻ってくる
+	assert.equal(findAll(container, '.comment-item').length, 1);
+	assert.equal(delta, 0);
+	const error = find(container, '.comment-error');
+	assert.equal(error.getAttribute('role'), 'alert');
+	assert.equal(error.textContent, 'コメントを削除できませんでした');
+	// 押し直せるように文言を戻す
+	assert.equal(button.textContent, '削除');
+});
+
+test('投稿した直後の 1 件も自分で消せる', async () => {
+	const { container, comments } = buildPostable();
+	await comments.load(POST_DETAIL);
+	const form = find(find(container, '.comments-header'), '.comment-form');
+	const input = find(form, '.comment-form-input');
+	input.value = 'あ';
+	await input.dispatch('input', {});
+	await find(form, '.comment-form-submit').click();
+	await flush();
+	const first = find(container, '.comment-list').children[0];
+	assert.ok(find(first, '.comment-delete'));
+	assert.equal(find(first, '.comment-label').textContent, 'あなた');
+});
+
+test('返信も削除できる', async () => {
+	const { container, comments } = buildPostable({
+		fetchJson: async (url) => (url.includes('replies')
+			? { comments: [{ ...REPLY, editable: true }], hasNext: false }
+			: { comments: [ROOT], hasNext: false }),
+		actions: { deleteComment: async () => {} },
+	});
+	await comments.load(POST_DETAIL);
+	await find(container, '.comment-replies').click();
+	await flush();
+	const reply = find(container, '.comment-reply-list');
+	assert.ok(find(reply, '.comment-delete'));
 });

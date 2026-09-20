@@ -137,3 +137,8 @@ test('safeCdnUrl は URL でない値と空を弾く', () => {
 test('コメント投稿は旧 RPC のパス', () => {
 	assert.equal(ACTION_URLS.POST_COMMENT, '/rpc/post_comment.php');
 });
+
+test('コメント削除も旧 RPC のパス', () => {
+	// 投稿とは別のパス。/ajax でも /rpc/ 配下でもなくルート直下 (SITE_SPEC §4 実測)
+	assert.equal(ACTION_URLS.DELETE_COMMENT, '/rpc_delete_comment.php');
+});
