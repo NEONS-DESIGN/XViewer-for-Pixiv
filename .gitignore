@@ -39,3 +39,17 @@ tmp/
 temp/
 scratch/
 /パッケージ化
+
+# ローカル管理の設計資料 / ストア素材 (リポジトリには置かない)
+/CLAUDE.md
+/SPEC.md
+/SITE_SPEC.md
+/UI_DESIGN_KIT.md
+/docs/*.md
+/docs/superpowers/
+/store/README.md
+/store/screenshots/
+/store/sources/
+/store/edited/
+.claude/
+.superpowers/

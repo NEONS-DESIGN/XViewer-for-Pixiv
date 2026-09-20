@@ -142,15 +142,6 @@ pixiv の**ユーザーページ** (`https://www.pixiv.net/users/{id}` 系) を�
 バージョンの出どころは `package.json` の `version` だけで、ビルドが `dist/manifest.json` へ差し込みます。
 対応 Chrome の下限 (esbuild の target と `minimum_chrome_version`) の出どころは `scripts/targets.mjs` です。
 
-### ドキュメント
-
-| ファイル | 役割 |
-| --- | --- |
-| [`SPEC.md`](SPEC.md) | この拡張の詳細設計。構成・モジュール仕様・実行時フロー |
-| [`SITE_SPEC.md`](SITE_SPEC.md) | pixiv 側の実測仕様書。API・DOM・画像 CDN の調査結果 |
-| [`UI_DESIGN_KIT.md`](UI_DESIGN_KIT.md) | UI の指示書。配色トークン・部品・アクセシビリティ |
-| [`docs/DECISIONS.md`](docs/DECISIONS.md) | 実装中に下した判断とその理由 |
-
 ## ライセンス
 
 [MIT License](LICENSE)
