@@ -26,6 +26,7 @@ const ICON_SOURCES = {
 	expandLess: 'keyboard_arrow_up-fill',
 	lightMode: 'light_mode-fill',
 	darkMode: 'dark_mode-fill',
+	mood: 'mood-fill',
 };
 
 /**
