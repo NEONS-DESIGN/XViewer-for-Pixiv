@@ -209,3 +209,23 @@ export function postStamp(illustId, authorUserId, stampId, parentId, token, deps
 		...parentParam(parentId),
 	}, token, deps);
 }
+
+/**
+ * コメントか返信を削除する。
+ *
+ * pixiv の仕様上、消せるのは一覧の `editable` が true の 1 件だけ
+ * (自分のコメントと、自分の作品に付いたコメント)。呼び出し側で出し分けること。
+ * **削除は取り消せない。** UI 側で誤爆を防ぐこと。
+ *
+ * 応答は {error, message, body} で包まれる。pixiv 本体も投稿と同じ口へ通しており、
+ * その口は body が無ければ例外にするので、body は必ず付いてくる (SITE_SPEC §4)。
+ * 中身は使わないので読まない。
+ * @param {string} illustId 作品 ID
+ * @param {string} commentId 消すコメントの ID
+ * @param {string} token CSRF トークン
+ * @param {ClientDeps} [deps] テスト用の依存
+ * @returns {Promise<void>}
+ */
+export async function deleteComment(illustId, commentId, token, deps) {
+	await postForm(ACTION_URLS.DELETE_COMMENT, { i_id: illustId, del_id: commentId }, token, deps);
+}

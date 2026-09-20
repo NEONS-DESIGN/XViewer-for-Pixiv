@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { likeIllust, addBookmark, deleteBookmark, followUser, unfollowUser, postComment, postStamp } from '../../src/pixiv/actions.js';
+import { likeIllust, addBookmark, deleteBookmark, followUser, unfollowUser, postComment, postStamp, deleteComment } from '../../src/pixiv/actions.js';
 import { PIXIV_ERROR_KINDS } from '../../src/pixiv/errors.js';
 import { fakeApiFetch, fakeFetch as fakeRawFetch } from '../helpers/pixiv.js';
 
@@ -193,5 +193,30 @@ test('comment_id が無ければ投稿は失敗として扱う', async () => {
 	await assert.rejects(
 		() => postComment('1', '2', 'a', null, 'T', { fetchImpl: impl }),
 		(error) => error.kind === PIXIV_ERROR_KINDS.API,
+	);
+});
+
+test('deleteComment は作品 ID とコメント ID を urlencoded で送る', async () => {
+	const { impl, calls } = fakeFetch({});
+	await deleteComment('125431095', '234388252', 'TOKEN', { fetchImpl: impl });
+	assert.equal(calls[0].url, '/rpc_delete_comment.php');
+	assert.deepEqual([...new URLSearchParams(calls[0].init.body).entries()], [
+		['i_id', '125431095'],
+		['del_id', '234388252'],
+	]);
+	assert.equal(calls[0].init.headers['content-type'], 'application/x-www-form-urlencoded; charset=utf-8');
+	assert.equal(calls[0].init.headers['x-csrf-token'], 'TOKEN');
+});
+
+test('deleteComment は API がエラーを返したら投げる', async () => {
+	// 消せなかったのに画面から消すと、読み直したときに戻ってくる
+	const { impl } = fakeFetch(null);
+	const failing = async (url, init) => ({
+		...(await impl(url, init)),
+		text: async () => JSON.stringify({ error: true, message: '削除できません', body: null }),
+	});
+	await assert.rejects(
+		() => deleteComment('1', '2', 'T', { fetchImpl: failing }),
+		(error) => error.kind === PIXIV_ERROR_KINDS.API && error.message === '削除できません',
 	);
 });

@@ -10,7 +10,7 @@ import { createCommentForm } from './comment-form.js';
 import { createCommentPicker } from './comment-picker.js';
 import { isFocused } from './focus.js';
 import { parseCommentText } from '../../pixiv/emoji.js';
-import { postComment, postStamp } from '../../pixiv/actions.js';
+import { postComment, postStamp, deleteComment } from '../../pixiv/actions.js';
 import { PIXIV_ERROR_KINDS } from '../../pixiv/errors.js';
 import { readSession, clearSessionCache } from '../session.js';
 import { COMMENT_PAGE_SIZE } from '../../common/constants.js';
@@ -50,6 +50,19 @@ const MESSAGES = Object.freeze({
 	/** 投稿の失敗 */
 	POST_FAILED: 'コメントを投稿できませんでした',
 	SESSION_EXPIRED: 'ログインが切れています。pixiv にログインし直し、このページを再読み込みしてください',
+	/** 削除。取り消せないので押すと一度聞き返す */
+	DELETE: '削除',
+	DELETE_CONFIRM: '本当に削除？',
+	DELETE_FAILED: 'コメントを削除できませんでした',
+});
+
+/**
+ * 投稿者に付けるラベルの文言。
+ * pixiv 本体と同じく名前の直後に出す (SITE_SPEC §4)。
+ */
+const LABELS = Object.freeze({
+	SELF: 'あなた',
+	AUTHOR: '作者',
 });
 
 /** 返信の 1 ページ目。replies API は offset ではなく 1 始まりの page で送る。 */
@@ -111,6 +124,7 @@ export function commentsFloorHeight({ outside, contentHeight, nthBottom }) {
  * @property {string|null} stampId スタンプの ID。スタンプでなければ null
  * @property {boolean} hasReplies
  * @property {boolean} isDeleted 退会したユーザーか。ユーザーページへのリンクを出すかの判断に使う
+ * @property {boolean} editable 自分が消せるコメントか。削除ボタンを出すかの判断に使う
  */
 
 /**
@@ -132,7 +146,28 @@ export function normalizeComment(raw) {
 		stampId: isStamp ? String(raw.stampId) : null,
 		hasReplies: raw.hasReplies === true,
 		isDeleted: raw.isDeletedUser === true,
+		editable: raw.editable === true,
 	};
+}
+
+/**
+ * 投稿者に付けるラベルを決める。
+ *
+ * **自分が最優先。** 自分の作品に自分でコメントすると両方に当てはまるが、
+ * pixiv 本体は「あなた」だけを出す (実測)。
+ * ID が読めなかったときに空文字どうしが一致して無関係なコメントへラベルが付かないよう、
+ * 比べる前に両側が揃っていることを確かめる。
+ * @param {{userId: string}} comment コメント
+ * @param {string|null|undefined} selfId 自分のユーザー ID
+ * @param {string|null|undefined} authorId 作品の作者のユーザー ID
+ * @returns {string|null} ラベルの文言。付けないなら null
+ */
+export function commentLabel(comment, selfId, authorId) {
+	const userId = comment.userId;
+	if (!userId) return null;
+	if (selfId && userId === selfId) return LABELS.SELF;
+	if (authorId && userId === authorId) return LABELS.AUTHOR;
+	return null;
 }
 
 /**
@@ -194,8 +229,9 @@ export function renderStamp(doc, stampId) {
  * @property {HTMLElement} container 描画先
  * @property {HTMLElement} [scrollTarget] 「上部へ」で先頭に戻す相手 (.sidebar)。無ければボタンを出さない
  * @property {(url: string) => Promise<object>} [fetchJson] 取得の差し替え。テストから通信させないために使う
- * @property {{postComment?: Function, postStamp?: Function}} [actions] 投稿の差し替え。テストから通信させないために使う
+ * @property {{postComment?: Function, postStamp?: Function, deleteComment?: Function}} [actions] 更新系の差し替え。テストから通信させないために使う
  * @property {() => void} [onPosted] 投稿できたときに 1 回呼ぶ。コメント件数の +1 に使う
+ * @property {() => void} [onDeleted] 削除できたときに 1 回呼ぶ。コメント件数の -1 に使う
  */
 
 /**
@@ -207,7 +243,7 @@ export function createComments(deps) {
 	const { doc, container } = deps;
 	const scrollTarget = deps.scrollTarget ?? null;
 	const fetchJson = deps.fetchJson ?? ((url) => getJson(url));
-	const api = { postComment, postStamp, ...deps.actions };
+	const api = { postComment, postStamp, deleteComment, ...deps.actions };
 	/** 読み込み済みの件数。「もっと見る」で増やす */
 	let offset = 0;
 	/** 今表示している作品 */
@@ -382,19 +418,20 @@ export function createComments(deps) {
 	}
 
 	/**
-	 * 投稿の失敗を文言にする。
+	 * 更新系の失敗を文言にする。投稿にも削除にも使う。
 	 * 401 はログインが切れている (別タブでログアウトした等)。覚えているセッションを捨て、
 	 * 再読み込みまで案内する。__NEXT_DATA__ は SPA 遷移で変わらないので捨てても
 	 * 新しいトークンは得られない (SPEC §9.4)
 	 * @param {unknown} error 失敗の中身
+	 * @param {string} [fallback] 401 以外で出す文言。省略すると投稿の失敗
 	 * @returns {string} 出す文言
 	 */
-	function postErrorMessage(error) {
+	function postErrorMessage(error, fallback = MESSAGES.POST_FAILED) {
 		if (error?.kind === PIXIV_ERROR_KINDS.UNAUTHORIZED) {
 			clearSessionCache();
 			return MESSAGES.SESSION_EXPIRED;
 		}
-		return MESSAGES.POST_FAILED;
+		return fallback;
 	}
 
 	/**
@@ -509,6 +546,15 @@ export function createComments(deps) {
 		if (userPage) name.href = userPage;
 		name.textContent = comment.userName;
 
+		// 名前の直後にラベルを置く (pixiv 本体と同じ並び)。付かないコメントには要素ごと作らない
+		const label = commentLabel(comment, readSession(doc).self?.id ?? null, detailRef?.userId ?? null);
+		let labelNode = null;
+		if (label) {
+			labelNode = doc.createElement('span');
+			labelNode.className = 'comment-label';
+			labelNode.textContent = label;
+		}
+
 		const text = doc.createElement('p');
 		text.className = 'comment-text';
 		if (comment.isStamp) text.appendChild(renderStamp(doc, comment.stampId));
@@ -526,9 +572,104 @@ export function createComments(deps) {
 		date.textContent = comment.date;
 		meta.append(repliesSlot, date);
 
-		body.append(name, text, meta);
+		body.append(name, ...(labelNode ? [labelNode] : []), text, meta);
 		item.append(avatarNode, body);
+
+		// 削除はルートにも返信にも付く。返信を書く導線は後から meta.prepend() で
+		// 前へ差し込まれるので、並びは [返信][削除][返信を表示][日時] になる
+		if (comment.editable) attachDelete(comment, item, body, meta);
 		return { item, body, repliesSlot, meta };
+	}
+
+	/**
+	 * 削除の導線を 1 件のコメントに付ける。ルートにも返信にも同じものを使う。
+	 *
+	 * **削除は取り消せないので、一度目の押下では消さずに文言を聞き返しに変える。**
+	 * 別のモーダルを出さないのは、ビュワー自体がモーダルの中だから
+	 * (二重に重ねるとどれを閉じているのか分からなくなる)。
+	 * フォーカスが外れたら聞き返しをやめる。押しっぱなしの確認を残すと、
+	 * 別のコメントを消すつもりで押し直したときに誤爆する。
+	 * @param {Comment} comment 消す対象
+	 * @param {HTMLElement} item 一覧から外す相手 (.comment-item)
+	 * @param {HTMLElement} body 失敗の表示をぶら下げる先 (.comment-body)
+	 * @param {HTMLElement} meta 下段。ボタンをここの先頭へ差し込む
+	 * @returns {void}
+	 */
+	function attachDelete(comment, item, body, meta) {
+		/** 聞き返している最中か */
+		let confirming = false;
+		/** @type {HTMLElement|null} 失敗の表示。1 つだけ持つ */
+		let failureNode = null;
+
+		const button = doc.createElement('button');
+		button.type = 'button';
+		button.className = 'comment-delete';
+		button.textContent = MESSAGES.DELETE;
+
+		/**
+		 * 聞き返しの見た目を切り替える。
+		 * @param {boolean} next 聞き返すなら true
+		 * @returns {void}
+		 */
+		function setConfirming(next) {
+			confirming = next;
+			button.textContent = next ? MESSAGES.DELETE_CONFIRM : MESSAGES.DELETE;
+			button.classList.toggle('is-confirming', next);
+		}
+
+		/**
+		 * 失敗を 1 つだけ出す。コメント自体は読めるまま残す。
+		 * @param {unknown} error 失敗の中身
+		 * @returns {void}
+		 */
+		function showFailure(error) {
+			failureNode?.remove();
+			failureNode = doc.createElement('p');
+			failureNode.className = 'comment-error';
+			failureNode.setAttribute('role', 'alert');
+			failureNode.textContent = postErrorMessage(error, MESSAGES.DELETE_FAILED);
+			body.appendChild(failureNode);
+			warn('failed to delete comment', comment.id, error);
+		}
+
+		/**
+		 * 実際に消す。消せたら一覧から外して件数を減らす。
+		 * @returns {Promise<void>}
+		 */
+		async function remove() {
+			// 待っている間に別の作品へ移ったり描き直されたりしたら、画面には手を出さない
+			const requestedWorkId = workId;
+			const requestedList = list;
+			button.disabled = true;
+			try {
+				await api.deleteComment(detailRef.id, comment.id, readSession(doc).csrfToken);
+				if (workId !== requestedWorkId || list !== requestedList) return;
+				failureNode?.remove();
+				failureNode = null;
+				item.remove();
+				deps.onDeleted?.();
+				applyFloor();
+			} catch (error) {
+				if (workId !== requestedWorkId || list !== requestedList) return;
+				// 消せていないのに画面から外すと、読み直したときに戻ってきて食い違う
+				showFailure(error);
+			} finally {
+				button.disabled = false;
+				// 押し直せるように聞き返しは畳む
+				setConfirming(false);
+			}
+		}
+
+		button.addEventListener('click', () => {
+			if (!confirming) {
+				setConfirming(true);
+				return;
+			}
+			void remove();
+		});
+		button.addEventListener('blur', () => { setConfirming(false); });
+
+		meta.prepend(button);
 	}
 
 	/**
@@ -789,6 +930,8 @@ export function createComments(deps) {
 			stampId: posted.stampId,
 			hasReplies: false,
 			isDeleted: false,
+			// 今書いたものなので必ず自分で消せる
+			editable: true,
 		};
 	}
 

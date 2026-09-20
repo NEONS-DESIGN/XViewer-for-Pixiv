@@ -1203,6 +1203,59 @@ a.comment-name:hover {
 	text-decoration: underline;
 }
 
+/* 投稿者のラベル。名前の直後に置く (pixiv 本体と同じ並び)。
+   本体は #0096fa を直値で焼いているが、ここは --accent を使う。
+   直値だとライトへ切り替えたときに文字とのコントラストが崩れる */
+.comment-label {
+	display: inline-block;
+	margin-left: 4px;
+	padding: 1px 5px;
+	border-radius: 3px;
+	background: var(--accent);
+	color: var(--on-accent);
+	font-size: 10px;
+	font-weight: bold;
+	/* 名前の行の高さを押し上げないよう、継承した 1.6 を切る */
+	line-height: 1.4;
+	/* 名前が長い作品でラベルだけ改行されると迷子になる */
+	white-space: nowrap;
+	vertical-align: middle;
+}
+
+/* 削除。返信と同じ、地の無い小さなボタン。
+   ただし取り消せない操作なので、色は --accent ではなく --danger で置く */
+.comment-delete {
+	padding: 2px 6px 2px 0;
+	border: 0;
+	background: transparent;
+	color: var(--danger);
+	font: inherit;
+	font-size: 12px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.comment-delete:hover {
+	text-decoration: underline;
+}
+
+/* 聞き返している最中。押せば消える状態なので、文字を強めて区別を付ける */
+.comment-delete.is-confirming {
+	font-weight: bold;
+}
+
+.comment-delete:disabled {
+	color: var(--muted);
+	cursor: default;
+}
+
+/* 削除に失敗したときだけ、そのコメントの下に出す */
+.comment-error {
+	margin: 4px 0 0;
+	color: var(--danger);
+	font-size: 12px;
+}
+
 /* 返信の入力欄はコメントの直下。返信一覧 (.comment-replies-area の
    margin-left 4px + border-left 2px + padding-left 8px = 14px) と
    同じだけ内側へ寄せ、返信の並びに揃える */

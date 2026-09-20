@@ -113,6 +113,7 @@ export async function renderWork(detail, session, settings, targets) {
 				container: sidebarPane.commentsSlot(),
 				scrollTarget: sidebar,
 				onPosted: () => { sidebarPane.bumpCommentCount(1); },
+				onDeleted: () => { sidebarPane.bumpCommentCount(-1); },
 			});
 			void commentsPane.load(detail);
 		}

@@ -62,6 +62,8 @@ export const ACTION_URLS = Object.freeze({
 	UNFOLLOW: '/rpc_group_setting.php',
 	/** コメントと返信の投稿。/ajax ではない旧 RPC だが応答は {error, body} で包まれる */
 	POST_COMMENT: '/rpc/post_comment.php',
+	/** コメントと返信の削除。投稿とは別のパスで、/rpc/ 配下ですらない (SITE_SPEC §4 実測) */
+	DELETE_COMMENT: '/rpc_delete_comment.php',
 });
 
 /**
