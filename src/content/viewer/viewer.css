@@ -1086,10 +1086,15 @@ a.comment-name:hover {
 	font: inherit;
 	font-size: 13px;
 	line-height: 1.6;
-	/* 手で伸ばさせない。行数は中身に合わせて伸びる */
+	/* 手で伸ばさせない。高さは comment-form.js の syncHeight() が中身に合わせる */
 	resize: none;
-	/* 伸びすぎるとコメント一覧が潰れる。この高さで中がスクロールする */
-	max-height: 120px;
+	/* 上限は 10 行。本家は青天井だが、こちらは高さの決まったサイドバーの中にあり、
+	   「サイドバーごと送る」設定では上端に貼り付く。青天井だと長文を書いている間
+	   コメント一覧が最小の 3 件まで潰れ、入力欄がサイドバーを覆ってしまう。
+	   ここを超えた分だけ中がスクロールする。
+	   lh は行の高さそのもの (Chrome 109+。下限は 120 なので使える)。
+	   box-sizing: border-box なので上下の padding を足す */
+	max-height: calc(10lh + 6px * 2);
 	overflow-y: auto;
 }
 

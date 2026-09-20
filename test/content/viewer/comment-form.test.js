@@ -263,3 +263,51 @@ test('フォーカスが外にあるまま送ったときは奪わない', async
 	await flush();
 	assert.equal(input.focused, false);
 });
+
+test('中身に合わせて高さを測り直す', async () => {
+	// 本家と同じく、行が増えたらスクロールではなく入力欄自体が伸びる
+	const { element } = build();
+	const input = find(element, '.comment-form-input');
+	// 一度 auto へ戻してから測らないと、縮むときに前の高さが残る
+	const applied = [];
+	Object.defineProperty(input, 'scrollHeight', { get: () => 84, configurable: true });
+	input.style.height = '';
+	await input.dispatch('input', {});
+	applied.push(input.style.height);
+	assert.deepEqual(applied, ['84px']);
+});
+
+test('高さの測り直しは縮むときも効く', async () => {
+	const { element } = build();
+	const input = find(element, '.comment-form-input');
+	let scroll = 84;
+	Object.defineProperty(input, 'scrollHeight', { get: () => scroll, configurable: true });
+	await input.dispatch('input', {});
+	assert.equal(input.style.height, '84px');
+	// 消したときに前の高さが残ると、空の入力欄が伸びたままになる
+	scroll = 31;
+	await input.dispatch('input', {});
+	assert.equal(input.style.height, '31px');
+});
+
+test('送信できたら高さも元に戻す', async () => {
+	const { element } = build();
+	const input = find(element, '.comment-form-input');
+	let scroll = 84;
+	Object.defineProperty(input, 'scrollHeight', { get: () => scroll, configurable: true });
+	input.value = 'あ\nい\nう';
+	await input.dispatch('input', {});
+	assert.equal(input.style.height, '84px');
+	scroll = 31;
+	await find(element, '.comment-form-submit').click();
+	await flush();
+	assert.equal(input.style.height, '31px');
+});
+
+test('測れない DOM では高さに触らない', async () => {
+	// scrollHeight を持たない相手 (テスト用の DOM の既定) で落ちない
+	const { element } = build();
+	const input = find(element, '.comment-form-input');
+	await input.dispatch('input', {});
+	assert.equal(input.style.height, undefined);
+});
