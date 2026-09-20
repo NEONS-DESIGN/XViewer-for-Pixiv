@@ -115,6 +115,22 @@ export function createCommentForm(deps) {
 	}
 
 	/**
+	 * 入力欄の高さを中身に合わせ直す。
+	 *
+	 * 本家と同じく、行が増えたらスクロールさせずに入力欄自体を伸ばす。
+	 * **先に height を空に戻してから測る。** 前の高さが残っていると
+	 * scrollHeight がその値のままになり、行を消しても縮まない。
+	 * 上限は CSS の max-height が持つ (超えた分だけ中がスクロールする)。
+	 * 測る口が無い DOM (テスト用の偽物) では何もしない。見た目の調整なので黙って続ける
+	 * @returns {void}
+	 */
+	function syncHeight() {
+		if (typeof input.scrollHeight !== 'number') return;
+		input.style.height = '';
+		input.style.height = `${input.scrollHeight}px`;
+	}
+
+	/**
 	 * 送信ボタンの状態を今の中身に合わせる。
 	 * @returns {void}
 	 */
@@ -155,6 +171,8 @@ export function createCommentForm(deps) {
 		stampBox.hidden = true;
 		input.hidden = false;
 		syncSubmit();
+		// 隠している間は測れない。戻したところで測り直す
+		syncHeight();
 	}
 
 	/**
@@ -204,6 +222,8 @@ export function createCommentForm(deps) {
 			clearError();
 			input.value = '';
 			clearStamp();
+			// 伸びたままにすると、空の入力欄が長文のときの高さで残る
+			syncHeight();
 		} catch (error) {
 			// 本文は消さない。消すと打ち直しになる
 			showError(error);
@@ -217,7 +237,10 @@ export function createCommentForm(deps) {
 		}
 	}
 
-	input.addEventListener('input', () => { syncSubmit(); });
+	input.addEventListener('input', () => {
+		syncSubmit();
+		syncHeight();
+	});
 	input.addEventListener('keydown', (event) => {
 		// 変換中の Enter は確定の Enter。送信に使わない
 		if (event.isComposing === true) return;
