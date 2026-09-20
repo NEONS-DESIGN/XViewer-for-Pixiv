@@ -181,7 +181,7 @@ export function postFormRaw(url, params, token, deps = {}) {
 
 /**
  * urlencoded を POST し、応答の {error, body} を展開する。
- * コメントの投稿 (/rpc/post_comment.php) で使う。
+ * コメントの投稿 (/rpc/post_comment.php) と削除 (/rpc_delete_comment.php) で使う。
  *
  * 同じ urlencoded でも postFormRaw() とは読み方が違う。
  * フォロー系の旧 PHP は {error, message, body} で包まないので展開してはいけないが、

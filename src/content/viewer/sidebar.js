@@ -199,7 +199,7 @@ export function commentToNodes(doc, html) {
 /**
  * サイドバーを作る。
  * @param {SidebarDeps} deps 依存
- * @returns {{render: (detail: object) => void, followSlot: () => HTMLElement, countsSlot: () => HTMLElement, commentsSlot: () => HTMLElement, bumpCommentCount: (delta: number) => void, consumeEscape: () => boolean, consumeKey: (event: KeyboardEvent) => boolean, dispose: () => void}}
+ * @returns {{render: (detail: object) => void, followSlot: () => HTMLElement, countsSlot: () => HTMLElement, commentsSlot: () => HTMLElement, bumpCommentCount: (delta: number) => void, setCommentCount: (next: number) => void, consumeEscape: () => boolean, consumeKey: (event: KeyboardEvent) => boolean, dispose: () => void}}
  */
 export function createSidebar(deps) {
 	const { doc, container } = deps;
@@ -215,6 +215,8 @@ export function createSidebar(deps) {
 	 * 今出しているコメントの件数。投稿のたびに手元で増やす。
 	 * 取り直さないのは、投稿の反映に間があり、直後に引くと古い数字が返るため
 	 * (いいね・ブックマークと同じ方針。SPEC §10.12)。
+	 * **削除だけは例外で、数え直した値で置き換える** (ルートを消すと返信も道連れになり、
+	 * 手元では引く数が決まらないため。SPEC §10.11)。
 	 * @type {number}
 	 */
 	let commentCount = 0;
@@ -333,6 +335,23 @@ export function createSidebar(deps) {
 		return row;
 	}
 
+	/**
+	 * コメントの件数の表示を書き換える。増減も置き換えもここを通す。
+	 * render() より前や dispose() の後に呼ばれても何もしない。
+	 * @param {number} next 新しい件数。負数は 0 で止める
+	 * @returns {void}
+	 */
+	function writeCommentCount(next) {
+		if (!counts) return;
+		const node = counts.querySelector(`.${COMMENT_COUNT_MARKER}`);
+		if (!node) return;
+		commentCount = Math.max(0, next);
+		const value = node.querySelector(`.${COUNT_VALUE_CLASS}`);
+		if (!value) return;
+		value.textContent = formatCount(commentCount);
+		node.title = `${MESSAGES.COMMENTS} ${formatCount(commentCount)}`;
+	}
+
 	return {
 		/**
 		 * 作品詳細を描く。
@@ -421,14 +440,21 @@ export function createSidebar(deps) {
 		 * @returns {void}
 		 */
 		bumpCommentCount(delta) {
-			if (!counts) return;
-			const node = counts.querySelector(`.${COMMENT_COUNT_MARKER}`);
-			if (!node) return;
-			commentCount = Math.max(0, commentCount + delta);
-			const value = node.querySelector(`.${COUNT_VALUE_CLASS}`);
-			if (!value) return;
-			value.textContent = formatCount(commentCount);
-			node.title = `${MESSAGES.COMMENTS} ${formatCount(commentCount)}`;
+			writeCommentCount(commentCount + delta);
+		},
+
+		/**
+		 * コメントの件数を数え直した値で置き換える。
+		 *
+		 * 手元で足し引きできないときだけ使う。**ルートのコメントを消すと返信も道連れになり**、
+		 * 開いていない返信の数は分からないので、削除のあとは pixiv から引き直した値を入れる
+		 * (SPEC §10.11)。投稿のように 1 件と分かっているときは bumpCommentCount() を使う。
+		 * @param {number} next 新しい件数
+		 * @returns {void}
+		 */
+		setCommentCount(next) {
+			if (!Number.isFinite(next)) return;
+			writeCommentCount(next);
 		},
 
 		/**

@@ -1252,18 +1252,21 @@ test('確認中にフォーカスが外れたら元に戻す', async () => {
 	assert.equal(button.textContent, '削除');
 });
 
-test('削除できたら一覧から外して件数を減らす', async () => {
-	let delta = 0;
+test('削除できたら一覧から外して件数を数え直す', async () => {
+	let delta = null;
 	const { container, comments } = buildPostable({
-		fetchJson: async () => ({
-			comments: [
-				{ ...ROOT, id: 'a', editable: true, hasReplies: false },
-				{ ...ROOT, id: 'b', hasReplies: false },
-			],
-			hasNext: false,
-		}),
+		fetchJson: async (url) => (url.includes('/ajax/illust/')
+			// ルートを消すと返信も道連れになるので、件数は引き直した値で置き換える
+			? { commentCount: 7 }
+			: {
+				comments: [
+					{ ...ROOT, id: 'a', editable: true, hasReplies: false },
+					{ ...ROOT, id: 'b', hasReplies: false },
+				],
+				hasNext: false,
+			}),
 		actions: { deleteComment: async () => {} },
-		onDeleted: () => { delta -= 1; },
+		onDeleted: (count) => { delta = count; },
 	});
 	await comments.load(POST_DETAIL);
 	const button = find(container, '.comment-delete');
@@ -1271,15 +1274,15 @@ test('削除できたら一覧から外して件数を減らす', async () => {
 	await button.click();
 	await flush();
 	assert.equal(findAll(container, '.comment-item').length, 1);
-	assert.equal(delta, -1);
+	assert.equal(delta, 7);
 });
 
 test('削除に失敗したら行を残して知らせる', async () => {
-	let delta = 0;
+	let delta = 'よばれていない';
 	const { container, comments } = buildPostable({
 		fetchJson: async () => ({ comments: [{ ...ROOT, editable: true, hasReplies: false }], hasNext: false }),
 		actions: { deleteComment: async () => { throw new Error('失敗'); } },
-		onDeleted: () => { delta -= 1; },
+		onDeleted: (count) => { delta = count; },
 	});
 	await comments.load(POST_DETAIL);
 	const button = find(container, '.comment-delete');
@@ -1288,7 +1291,7 @@ test('削除に失敗したら行を残して知らせる', async () => {
 	await flush();
 	// 消せていないのに画面から消すと、読み直したときに戻ってくる
 	assert.equal(findAll(container, '.comment-item').length, 1);
-	assert.equal(delta, 0);
+	assert.equal(delta, 'よばれていない');
 	const error = find(container, '.comment-error');
 	assert.equal(error.getAttribute('role'), 'alert');
 	assert.equal(error.textContent, 'コメントを削除できませんでした');
@@ -1322,4 +1325,91 @@ test('返信も削除できる', async () => {
 	await flush();
 	const reply = find(container, '.comment-reply-list');
 	assert.ok(find(reply, '.comment-delete'));
+});
+
+test('最後の 1 件を消したら空の案内へ戻す', async () => {
+	const { container, comments } = buildPostable({
+		fetchJson: async (url) => (url.includes('/ajax/illust/')
+			? { commentCount: 0 }
+			: { comments: [{ ...ROOT, editable: true, hasReplies: false }], hasNext: false }),
+		actions: { deleteComment: async () => {} },
+	});
+	await comments.load(POST_DETAIL);
+	const button = find(container, '.comment-delete');
+	await button.click();
+	await button.click();
+	await flush();
+	// 見出しだけが残ると、読み込みに失敗したように見える
+	assert.equal(find(container, '.status').textContent, 'まだコメントはありません');
+});
+
+test('削除に失敗したら押したボタンへフォーカスを戻す', async () => {
+	// disabled にした時点でフォーカスが body へ落ちる。戻さないと押し直せない
+	const { container, comments } = buildPostable({
+		fetchJson: async () => ({ comments: [{ ...ROOT, editable: true, hasReplies: false }], hasNext: false }),
+		actions: { deleteComment: async () => { throw new Error('失敗'); } },
+	});
+	await comments.load(POST_DETAIL);
+	const button = find(container, '.comment-delete');
+	await button.click();
+	await button.click();
+	await flush();
+	assert.equal(button.focused, true);
+});
+
+test('Escape は削除の聞き返しだけを畳んでビュワーへ渡さない', async () => {
+	const { container, comments } = buildPostable({
+		fetchJson: async () => ({ comments: [{ ...ROOT, editable: true, hasReplies: false }], hasNext: false }),
+		actions: { deleteComment: async () => {} },
+	});
+	await comments.load(POST_DETAIL);
+	const button = find(container, '.comment-delete');
+	await button.click();
+	assert.equal(comments.consumeKey({ key: 'Escape' }), true);
+	assert.equal(button.textContent, '削除');
+	// 畳んだあとの Escape はビュワーに渡す
+	assert.equal(comments.consumeKey({ key: 'Escape' }), false);
+});
+
+test('聞き返しは同時に 1 つだけ', async () => {
+	const { container, comments } = buildPostable({
+		fetchJson: async () => ({
+			comments: [
+				{ ...ROOT, id: 'a', editable: true, hasReplies: false },
+				{ ...ROOT, id: 'b', editable: true, hasReplies: false },
+			],
+			hasNext: false,
+		}),
+		actions: { deleteComment: async () => {} },
+	});
+	await comments.load(POST_DETAIL);
+	const buttons = findAll(container, '.comment-delete');
+	await buttons[0].click();
+	await buttons[1].click();
+	// 前の聞き返しを残すと、別のコメントを消すつもりで押し直したときに誤爆する
+	assert.equal(buttons[0].textContent, '削除');
+	assert.equal(buttons[1].textContent, '本当に削除？');
+});
+
+test('返信を消すと返信一覧から外れ、読み込み済みの件数は動かない', async () => {
+	const removed = [];
+	const { container, comments } = buildPostable({
+		fetchJson: async (url) => {
+			if (url.includes('/ajax/illust/')) return { commentCount: 5 };
+			if (url.includes('replies')) return { comments: [{ ...REPLY, editable: true }], hasNext: false };
+			return { comments: [ROOT], hasNext: false };
+		},
+		actions: { deleteComment: async (...args) => { removed.push(args[1]); } },
+	});
+	await comments.load(POST_DETAIL);
+	await find(container, '.comment-replies').click();
+	await flush();
+	const button = find(find(container, '.comment-reply-list'), '.comment-delete');
+	await button.click();
+	await button.click();
+	await flush();
+	assert.deepEqual(removed, [REPLY.id]);
+	assert.equal(find(container, '.comment-reply-list').children.length, 0);
+	// ルートは消えていないので一覧はそのまま
+	assert.equal(findAll(container, '.comment-list').length, 1);
 });

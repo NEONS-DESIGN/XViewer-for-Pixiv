@@ -4,7 +4,7 @@
  */
 import { createIcon } from '../../common/icons.js';
 import { getJson } from '../../pixiv/client.js';
-import { commentRootsUrl, commentRepliesUrl, emojiUrl, stampUrl, userPath } from '../../pixiv/endpoints.js';
+import { commentRootsUrl, commentRepliesUrl, emojiUrl, stampUrl, userPath, illustUrl } from '../../pixiv/endpoints.js';
 import { createAvatar, showAvatar } from './avatar.js';
 import { createCommentForm } from './comment-form.js';
 import { createCommentPicker } from './comment-picker.js';
@@ -13,7 +13,7 @@ import { parseCommentText } from '../../pixiv/emoji.js';
 import { postComment, postStamp, deleteComment } from '../../pixiv/actions.js';
 import { PIXIV_ERROR_KINDS } from '../../pixiv/errors.js';
 import { readSession, clearSessionCache } from '../session.js';
-import { COMMENT_PAGE_SIZE } from '../../common/constants.js';
+import { COMMENT_PAGE_SIZE, KEYS } from '../../common/constants.js';
 import { warn } from '../../common/log.js';
 
 /** 画面に出す文言。 */
@@ -231,7 +231,7 @@ export function renderStamp(doc, stampId) {
  * @property {(url: string) => Promise<object>} [fetchJson] 取得の差し替え。テストから通信させないために使う
  * @property {{postComment?: Function, postStamp?: Function, deleteComment?: Function}} [actions] 更新系の差し替え。テストから通信させないために使う
  * @property {() => void} [onPosted] 投稿できたときに 1 回呼ぶ。コメント件数の +1 に使う
- * @property {() => void} [onDeleted] 削除できたときに 1 回呼ぶ。コメント件数の -1 に使う
+ * @property {(count: number|null) => void} [onDeleted] 削除できたときに 1 回呼ぶ。引数は数え直した件数で、引けなければ null
  */
 
 /**
@@ -258,6 +258,8 @@ export function createComments(deps) {
 	let failure = null;
 	/** @type {HTMLElement|null} 「まだコメントはありません」。1 件目を投稿したら消す */
 	let emptyEl = null;
+	/** @type {(() => void)|null} 聞き返し中の削除ボタンを畳む口。同時に 1 つだけ持つ */
+	let confirmingDelete = null;
 	/** @type {ResizeObserver|null} 中身の高さが変わったら下限を測り直す */
 	let sizeWatcher = null;
 	/** @type {HTMLElement|null} 見出しと入力欄をまとめた入れ物。貼り付いたかを見るのはこれ */
@@ -513,7 +515,7 @@ export function createComments(deps) {
 	 * @param {Comment} comment コメント
 	 * @returns {{item: HTMLElement, body: HTMLElement, repliesSlot: HTMLElement, meta: HTMLElement}} 要素・本文側の入れ物・返信ボタンの差し込み先・下段
 	 */
-	function createItem(comment) {
+	function createItem(comment, isRoot = false) {
 		const item = doc.createElement('li');
 		item.className = 'comment-item';
 
@@ -577,7 +579,7 @@ export function createComments(deps) {
 
 		// 削除はルートにも返信にも付く。返信を書く導線は後から meta.prepend() で
 		// 前へ差し込まれるので、並びは [返信][削除][返信を表示][日時] になる
-		if (comment.editable) attachDelete(comment, item, body, meta);
+		if (comment.editable) attachDelete(comment, item, body, meta, isRoot);
 		return { item, body, repliesSlot, meta };
 	}
 
@@ -593,9 +595,10 @@ export function createComments(deps) {
 	 * @param {HTMLElement} item 一覧から外す相手 (.comment-item)
 	 * @param {HTMLElement} body 失敗の表示をぶら下げる先 (.comment-body)
 	 * @param {HTMLElement} meta 下段。ボタンをここの先頭へ差し込む
+	 * @param {boolean} isRoot ルートコメントか。読み込み済みの件数を戻すかの判断に使う
 	 * @returns {void}
 	 */
-	function attachDelete(comment, item, body, meta) {
+	function attachDelete(comment, item, body, meta, isRoot) {
 		/** 聞き返している最中か */
 		let confirming = false;
 		/** @type {HTMLElement|null} 失敗の表示。1 つだけ持つ */
@@ -615,7 +618,20 @@ export function createComments(deps) {
 			confirming = next;
 			button.textContent = next ? MESSAGES.DELETE_CONFIRM : MESSAGES.DELETE;
 			button.classList.toggle('is-confirming', next);
+			// 聞き返しは同時に 1 つだけ。Escape で畳めるよう外から掴めるようにしておく
+			if (next) {
+				if (confirmingDelete && confirmingDelete !== cancel) confirmingDelete();
+				confirmingDelete = cancel;
+			} else if (confirmingDelete === cancel) {
+				confirmingDelete = null;
+			}
 		}
+
+		/**
+		 * 聞き返しをやめる。外 (Escape・別のボタン) から呼ぶ用の口。
+		 * @returns {void}
+		 */
+		function cancel() { setConfirming(false); }
 
 		/**
 		 * 失敗を 1 つだけ出す。コメント自体は読めるまま残す。
@@ -637,22 +653,33 @@ export function createComments(deps) {
 		 * @returns {Promise<void>}
 		 */
 		async function remove() {
+			// 描き直しの途中で押されることは無いが、押した瞬間に破棄されていれば送らない
+			if (!detailRef) return;
+			const illustId = detailRef.id;
 			// 待っている間に別の作品へ移ったり描き直されたりしたら、画面には手を出さない
 			const requestedWorkId = workId;
 			const requestedList = list;
 			button.disabled = true;
 			try {
-				await api.deleteComment(detailRef.id, comment.id, readSession(doc).csrfToken);
+				await api.deleteComment(illustId, comment.id, readSession(doc).csrfToken);
 				if (workId !== requestedWorkId || list !== requestedList) return;
 				failureNode?.remove();
 				failureNode = null;
 				item.remove();
-				deps.onDeleted?.();
+				// 読み込み済みの件数も戻す。戻さないと次の「もっと見る」が 1 件飛ばす。
+				// 返信は roots の数え方に入らないのでルートのときだけ
+				if (isRoot) offset = Math.max(0, offset - 1);
+				// 最後の 1 件だったら「まだコメントはありません」へ戻す。
+				// 戻さないと見出しだけが残って、読み込みに失敗したように見える
+				if (list && list.children.length === 0) showEmpty();
+				deps.onDeleted?.(await countAfterDelete(illustId));
 				applyFloor();
 			} catch (error) {
 				if (workId !== requestedWorkId || list !== requestedList) return;
 				// 消せていないのに画面から外すと、読み直したときに戻ってきて食い違う
 				showFailure(error);
+				// disabled にした時点でフォーカスが body へ落ちている。押し直せるよう戻す
+				button.focus();
 			} finally {
 				button.disabled = false;
 				// 押し直せるように聞き返しは畳む
@@ -904,7 +931,7 @@ export function createComments(deps) {
 	 * @returns {HTMLElement} 一覧へ入れる 1 件 (.comment-item)
 	 */
 	function createRootItem(comment) {
-		const { item, body, repliesSlot, meta } = createItem(comment);
+		const { item, body, repliesSlot, meta } = createItem(comment, true);
 		const replies = attachReplies(comment, body, repliesSlot);
 		// 投稿できない作品・未ログインでは返信も書けない
 		if (canPost) attachReplyForm(comment, body, meta, (posted) => { replies.appendPosted(posted); });
@@ -956,6 +983,43 @@ export function createComments(deps) {
 	 * コメントのある作品では load() が、0 件の作品では 1 件目の投稿が呼ぶ。
 	 * @returns {void}
 	 */
+	/**
+	 * 「まだコメントはありません」を出す。
+	 * 読み込み前に 0 件だったときと、最後の 1 件を消したときの両方から呼ぶ。
+	 * @returns {void}
+	 */
+	function showEmpty() {
+		if (emptyEl) return;
+		emptyEl = doc.createElement('p');
+		emptyEl.className = 'status';
+		emptyEl.textContent = MESSAGES.EMPTY;
+		container.appendChild(emptyEl);
+		watchSize(emptyEl);
+	}
+
+	/**
+	 * 削除のあとのコメント件数を pixiv から引き直す。
+	 *
+	 * **手元で 1 を引くだけでは合わない。** ルートを消すとぶら下がっていた返信も
+	 * 道連れになり (SITE_SPEC §4-8 実測)、開いていない返信の数は分からないため。
+	 * 削除の反映は即時で、消した直後に引いても正しい値が返ることを実測で確認している
+	 * (ブックマークの削除と違って遅れない)。
+	 * 引けなかったときは null を返し、呼び出し側が手元で 1 を引く側へ倒す。
+	 * @param {string} illustId 作品 ID
+	 * @returns {Promise<number|null>} 新しい件数。引けなければ null
+	 */
+	async function countAfterDelete(illustId) {
+		try {
+			const body = await fetchJson(illustUrl(illustId));
+			const count = body?.commentCount;
+			return typeof count === 'number' ? count : null;
+		} catch (error) {
+			// 数え直せなくても削除自体は通っている。件数は呼び出し側の控えに任せる
+			warn('failed to re-read comment count', illustId, error);
+			return null;
+		}
+	}
+
 	function ensureList() {
 		if (list) return;
 		// 一覧と「まだコメントはありません」は両立しない。1 件目が入る時点で消す
@@ -1065,6 +1129,7 @@ export function createComments(deps) {
 			moreButton = null;
 			failure = null;
 			emptyEl = null;
+			confirmingDelete = null;
 			// 前の作品の入力欄は捨てる。書きかけごと消えるが、別の作品へ送るほうが害が大きい
 			forms.clear();
 			picker?.close();
@@ -1091,11 +1156,7 @@ export function createComments(deps) {
 			if (detail.commentCount === 0) {
 				// 引いても空なので読みに行かない。一覧もまだ作らず、
 				// 投稿されたときだけ prependComment() が作ってこの文言を消す
-				emptyEl = doc.createElement('p');
-				emptyEl.className = 'status';
-				emptyEl.textContent = MESSAGES.EMPTY;
-				container.appendChild(emptyEl);
-				watchSize(emptyEl);
+				showEmpty();
 				applyFloor();
 				return;
 			}
@@ -1112,6 +1173,12 @@ export function createComments(deps) {
 		 */
 		consumeKey(event) {
 			if (picker?.consumeKey(event) === true) return true;
+			// 削除の聞き返しは Escape で畳む。ここで食い止めないとビュワーごと閉じてしまい、
+			// キーボードだけの利用者には取り消す手段が無くなる
+			if (event.key === KEYS.CLOSE && confirmingDelete) {
+				confirmingDelete();
+				return true;
+			}
 			for (const form of forms) {
 				if (form.consumeKey(event) === true) return true;
 			}
@@ -1135,6 +1202,7 @@ export function createComments(deps) {
 			moreButton = null;
 			failure = null;
 			emptyEl = null;
+			confirmingDelete = null;
 			workId = null;
 			canPost = false;
 			forms.clear();
