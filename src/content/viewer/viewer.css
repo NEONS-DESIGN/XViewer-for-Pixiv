@@ -66,6 +66,9 @@
 	--sidebar-width: 384px;
 	/* 操作部品の高さ。UI_DESIGN_KIT §3 に合わせる */
 	--control-height: 30px;
+	/* コメントの入力欄の地。pixiv 本体の入力欄と同じ濃さ (SITE_SPEC 実測) */
+	--field-bg: rgba(255, 255, 255, 0.12);
+	--field-bg-hover: rgba(255, 255, 255, 0.16);
 
 	/* Shadow DOM はフォントを継承しない。書体 (font-family) は tokens.css の :host が明示する。
 	   文字の大きさと色はここで決める */
@@ -83,6 +86,8 @@
 	/* 幕はライトでも暗いままにする。画像の見え方を安定させるため */
 	--backdrop: rgba(0, 0, 0, 0.88);
 	--menu-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+	--field-bg: rgba(0, 0, 0, 0.04);
+	--field-bg-hover: rgba(0, 0, 0, 0.08);
 }
 
 .overlay {
@@ -798,31 +803,39 @@
 	padding-top: 16px;
 }
 
-/* コメントが多い作品では、送るうちに見出しが流れて消える。
-   見出しには「上部へ」も載っているので、消えると投稿文へ戻る手段まで無くなる。
-   上端に貼り付けて、読んでいる間ずっと残す。
+/* コメントが多い作品では、送るうちに見出しと入力欄が流れて消える。
+   見出しには「上部へ」、入力欄には投稿文を書く手段が載っているので、
+   消えるとどちらも失われる。
+   上端に貼り付けて、読んでいる間ずっと残す。見出しと入力欄を同じ入れ物 (.comments-header)
+   に入れているのは comments.js 側の都合だが、貼り付ける対象もその入れ物ごとにする
+   ことで、見出しだけでなく入力欄も一緒に残る。
 
    margin は 0 にして padding へ移すこと。margin の分だけ下がって貼り付き、
    その隙間をコメントが素通りする (背景は margin には塗られない)。
    貼り付く先はサイドバー。sticky は近い方のスクロール領域を基準にする */
-:host([data-sidebar-scroll='whole']) .comments-heading {
+:host([data-sidebar-scroll='whole']) .comments-header {
 	position: sticky;
 	top: 0;
 	z-index: 1;
-	margin: 0;
 	padding-bottom: 8px;
 	/* 下を通るコメントを隠す。地色を敷かないと文字が重なって読めなくなる */
 	background: var(--surface);
 	/* 貼り付いたときに引く線の場所を先に空けておく。
-	   後から足すと見出しが 1px 高くなって、貼り付いた瞬間に中身がずれる */
+	   後から足すと 1px 高くなって、貼り付いた瞬間に中身がずれる */
 	border-bottom: 1px solid transparent;
 }
 
 /* 貼り付いている間だけ線を引く。地続きに見えてコメントとの境目が分からなくなるため。
    貼り付いていないときは上の罫線が境目を示しているので要らない。
    印を付けるのは comments.js の syncStuck() */
-:host([data-sidebar-scroll='whole']) .comments-heading.is-stuck {
+:host([data-sidebar-scroll='whole']) .comments-header.is-stuck {
 	border-bottom-color: var(--divider);
+}
+
+/* 入れ物側が margin を持つので、中の見出しは自分の margin を消す。
+   残すと貼り付いた入れ物の中で見出しだけ下がり、入力欄との間に隙間ができる */
+:host([data-sidebar-scroll='whole']) .comments-header .comments-heading {
+	margin: 0;
 }
 
 :host([data-sidebar-scroll='whole']) .comment-scroll {
@@ -999,6 +1012,250 @@ a.comment-name:hover {
 	width: auto;
 	padding: 0 10px;
 	font-size: 12px;
+}
+
+/* コメントの入力欄。作品へのコメントと返信で同じ形を使う。
+   配色と寸法は pixiv 本体の /artworks/ に寄せつつ、色はトークンで持つ
+   (直値で焼き付けるとテーマ切替に追従しない) */
+.comment-form {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin: 8px 0;
+}
+
+.comment-form-row {
+	display: flex;
+	align-items: flex-end;
+	gap: 8px;
+}
+
+.comment-form-avatar {
+	flex: 0 0 auto;
+	width: 32px;
+	height: 32px;
+	border-radius: 50%;
+	object-fit: cover;
+}
+
+/* 入力欄と、その右端に重ねる絵文字ボタンの土台 */
+.comment-form-field {
+	position: relative;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.comment-form-input {
+	display: block;
+	width: 100%;
+	/* 右端の絵文字ボタンの分だけ空ける (本体と同じ 32px) */
+	padding: 6px 32px 6px 8px;
+	border: 0;
+	border-radius: 4px;
+	background: var(--field-bg);
+	color: var(--fg);
+	font: inherit;
+	font-size: 13px;
+	line-height: 1.6;
+	/* 手で伸ばさせない。行数は中身に合わせて伸びる */
+	resize: none;
+	/* 伸びすぎるとコメント一覧が潰れる。この高さで中がスクロールする */
+	max-height: 120px;
+	overflow-y: auto;
+}
+
+.comment-form-input::placeholder {
+	color: var(--muted);
+}
+
+.comment-form-input:hover {
+	background: var(--field-bg-hover);
+}
+
+/* 絵文字とスタンプを開くボタン。入力欄の右端に重ねる */
+.comment-form-pick-slot {
+	position: absolute;
+	right: 4px;
+	bottom: 4px;
+}
+
+.comment-form-pick {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	border: 0;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--muted);
+	cursor: pointer;
+}
+
+.comment-form-pick:hover {
+	color: var(--fg);
+}
+
+/* 選んだスタンプの確認。本体と違って送信で確定するので、取り消す口を添える */
+.comment-form-stamp-box {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 4px 8px;
+	border-radius: 4px;
+	background: var(--field-bg);
+}
+
+.comment-form-stamp {
+	width: 64px;
+	height: 64px;
+}
+
+.comment-form-stamp-clear {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: transparent;
+	color: var(--muted);
+	cursor: pointer;
+}
+
+.comment-form-stamp-clear:hover {
+	color: var(--fg);
+}
+
+.comment-form-submit {
+	flex: 0 0 auto;
+	height: var(--control-height);
+	padding: 0 16px;
+	border: 0;
+	border-radius: 999px;
+	background: var(--accent);
+	color: var(--on-accent);
+	font: inherit;
+	font-size: 13px;
+	font-weight: bold;
+	cursor: pointer;
+}
+
+.comment-form-submit:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.comment-form-error {
+	margin: 0;
+	color: var(--danger);
+	font-size: 12px;
+}
+
+/* 返信を書く導線。「返信を表示」と同じ、地の無い小さなボタン */
+.comment-reply-toggle {
+	padding: 2px 6px 2px 0;
+	border: 0;
+	background: transparent;
+	color: var(--accent);
+	font: inherit;
+	font-size: 12px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.comment-reply-toggle:hover {
+	text-decoration: underline;
+}
+
+/* 返信の入力欄はコメントの直下。返信一覧 (.comment-replies-area の
+   margin-left 4px + border-left 2px + padding-left 8px = 14px) と
+   同じだけ内側へ寄せ、返信の並びに揃える */
+.comment-body > .comment-form {
+	margin-left: 14px;
+}
+
+/* 絵文字とスタンプのパネル。入力欄の右上に浮かせる */
+.comment-picker {
+	position: absolute;
+	right: 0;
+	bottom: calc(100% + 4px);
+	z-index: 2;
+	width: 260px;
+	padding: 8px;
+	border: 1px solid var(--divider);
+	border-radius: 8px;
+	background: var(--surface);
+	box-shadow: var(--menu-shadow);
+}
+
+.comment-picker-tabs {
+	display: flex;
+	gap: 4px;
+	margin-bottom: 8px;
+}
+
+.comment-picker-tab {
+	flex: 1 1 0;
+	padding: 4px 8px;
+	border: 0;
+	border-radius: 999px;
+	background: transparent;
+	color: var(--muted);
+	font: inherit;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.comment-picker-tab[aria-selected='true'] {
+	background: var(--field-bg);
+	color: var(--fg);
+}
+
+.comment-picker-grid {
+	display: grid;
+	gap: 4px;
+	max-height: 200px;
+	overflow-y: auto;
+}
+
+.comment-picker-grid[data-tab='emoji'] {
+	grid-template-columns: repeat(8, 1fr);
+}
+
+.comment-picker-grid[data-tab='stamp'] {
+	grid-template-columns: repeat(4, 1fr);
+}
+
+.comment-picker-item {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 2px;
+	border: 0;
+	border-radius: 4px;
+	background: transparent;
+	font: inherit;
+	font-size: 11px;
+	cursor: pointer;
+}
+
+.comment-picker-item:hover {
+	background: var(--field-bg);
+}
+
+.comment-picker-grid[data-tab='emoji'] .comment-picker-item img {
+	width: 24px;
+	height: 24px;
+}
+
+.comment-picker-grid[data-tab='stamp'] .comment-picker-item img {
+	width: 100%;
+	aspect-ratio: 1;
+	object-fit: contain;
 }
 
 .more {
