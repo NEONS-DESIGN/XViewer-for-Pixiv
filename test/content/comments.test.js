@@ -651,12 +651,12 @@ test('キーボードで押した返信ボタンへ読み込み後にフォー�
 	});
 	await comments.load(DETAIL);
 	const toggle = find(container, '.comment-replies');
-	doc.activeElement = toggle;
+	toggle.focus();
 	await toggle.click();
 	assert.equal(toggle.focused, true);
 
 	const more = find(container, '.reply-more');
-	doc.activeElement = more;
+	more.focus();
 	await more.click();
 	assert.equal(more.focused, true);
 });
@@ -674,7 +674,6 @@ test('フォーカスが無いボタンには読み込み後もフォーカス�
 	});
 	await comments.load(DETAIL);
 	const toggle = find(container, '.comment-replies');
-	doc.activeElement = null;
 	await toggle.click();
 	assert.equal(toggle.focused, false);
 	const more = find(container, '.more');
@@ -696,7 +695,7 @@ test('「もっと見る」をキーボードで押したら読み込み後に�
 	});
 	await comments.load(DETAIL);
 	const more = find(container, '.more');
-	doc.activeElement = more;
+	more.focus();
 	await more.click();
 	assert.equal(more.focused, true);
 });
@@ -910,12 +909,28 @@ test('未ログインなら入力欄の代わりに案内を出す', async () =>
 	assert.equal(find(find(container, '.comments-header'), '.status').textContent, 'ログインするとコメントできます');
 });
 
+test('未ログインでもコメントを受け付けていない作品では案内を重ねない', async () => {
+	// 「ログインすれば書ける」と「受け付けていない」が並ぶと、どちらが理由か読めなくなる
+	clearSessionCache();
+	const container = fakeElement('div');
+	const comments = createComments({
+		doc: fakeDoc({ nextData: buildNextData({ isLoggedIn: false, token: '' }) }),
+		container,
+		fetchJson: async () => ({ comments: [ROOT], hasNext: false }),
+	});
+	await comments.load({ ...POST_DETAIL, commentOff: true });
+	assert.deepEqual(
+		findAll(container, '.status').map((status) => status.textContent),
+		['この作品はコメントを受け付けていません'],
+	);
+});
+
 test('書きかけがあるうちは Escape をビュワーへ渡さない', async () => {
 	// Escape で閉じると打った本文が消える
 	const { container, comments } = buildPostable();
 	await comments.load(POST_DETAIL);
 	const input = find(container, '.comment-form-input');
-	await input.dispatch('focus', {});
+	input.focus();
 	assert.equal(comments.consumeKey({ key: 'Escape' }), false);
 
 	input.value = '書きかけ';

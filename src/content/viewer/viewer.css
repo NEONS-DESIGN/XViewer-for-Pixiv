@@ -767,6 +767,9 @@
    スクロールバーの出入りで一覧の幅が変わり、本文の折り返しが変わって高さが変わる。
    comments.js は中身の高さを測って下限に入れるので、測る→幅が変わる→また測る、
    の往復になりうる (docs/DECISIONS.md) */
+/* この overflow-y は絵文字とスタンプのパネルの向きにも効く。
+   ここで切り取られると、上へ開いたパネルは画面に入っていても見えない。
+   comment-picker.js の clipTop() がこの領域の上端を測って下向きへ回す */
 .comment-scroll {
 	flex: 0 1 auto;
 	min-height: 0;
@@ -827,7 +830,7 @@
 
 /* 貼り付いている間だけ線を引く。地続きに見えてコメントとの境目が分からなくなるため。
    貼り付いていないときは上の罫線が境目を示しているので要らない。
-   印を付けるのは comments.js の syncStuck() */
+   印を付けるのは comments.js の syncScrollState() */
 :host([data-sidebar-scroll='whole']) .comments-header.is-stuck {
 	border-bottom-color: var(--divider);
 }

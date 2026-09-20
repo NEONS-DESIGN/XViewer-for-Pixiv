@@ -8,6 +8,7 @@ import { commentRootsUrl, commentRepliesUrl, emojiUrl, stampUrl, userPath } from
 import { createAvatar, showAvatar } from './avatar.js';
 import { createCommentForm } from './comment-form.js';
 import { createCommentPicker } from './comment-picker.js';
+import { isFocused } from './focus.js';
 import { parseCommentText } from '../../pixiv/emoji.js';
 import { postComment, postStamp } from '../../pixiv/actions.js';
 import { PIXIV_ERROR_KINDS } from '../../pixiv/errors.js';
@@ -229,8 +230,6 @@ export function createComments(deps) {
 	let toTopButton = null;
 	/** @type {(() => void)|null} scrollTarget の購読を解く */
 	let unwatchScroll = null;
-	/** @type {object|null} 作品への入力欄 */
-	let rootForm = null;
 	/** 今の作品に投稿できるか。返信の導線を出すかの判断にも使う。load() が決める */
 	let canPost = false;
 	/** @type {object|null} 絵文字とスタンプのピッカー。1 枚を使い回す */
@@ -239,17 +238,6 @@ export function createComments(deps) {
 	const forms = new Set();
 	/** @type {object|null} 今開いている作品。投稿に作者 ID が要る */
 	let detailRef = null;
-
-	/**
-	 * 要素にフォーカスがあるか。
-	 * Shadow DOM の中では document.activeElement がホストを返すので、自分の属する木から引く。
-	 * @param {HTMLElement} el 調べる要素
-	 * @returns {boolean} フォーカスがあれば true
-	 */
-	function isFocused(el) {
-		const tree = typeof el.getRootNode === 'function' ? el.getRootNode() : null;
-		return (tree?.activeElement ?? doc.activeElement ?? null) === el;
-	}
 
 	/**
 	 * 要素の外側の高さ (margin 込み)。
@@ -452,25 +440,26 @@ export function createComments(deps) {
 	 * 入力欄を見出しと同じ入れ物に入れるのは、「サイドバーごと送る」設定で
 	 * 一緒に画面の上端へ貼り付かせるため。別の子にすると見出しだけが貼り付き、
 	 * 入力欄は流れていく。
-	 * @param {object} session セッション
 	 * @param {boolean} canPost 入力欄を出してよいか
+	 * @param {boolean} commentOff コメントを受け付けていない作品か (未ログインの案内を出さない)
 	 * @returns {HTMLElement} 入れ物
 	 */
-	function createHeader(session, canPost) {
+	function createHeader(canPost, commentOff) {
 		const header = doc.createElement('div');
 		header.className = 'comments-header';
 		headerEl = header;
 		header.appendChild(createHeading());
 		if (canPost) {
-			rootForm = buildForm({
+			const form = buildForm({
 				placeholder: MESSAGES.COMMENT_PLACEHOLDER,
 				parentId: null,
 				avatarUrl: null,
 				onPosted: (posted) => { prependComment(posted); },
 			});
-			header.appendChild(rootForm.element);
-		} else if (!session.isLoggedIn || !session.csrfToken) {
-			// 案内を出すのは未ログインのときだけ。コメントを受け付けていない作品は一覧側が伝える
+			header.appendChild(form.element);
+		} else if (!commentOff) {
+			// 案内を出すのは未ログインのときだけ。コメントを受け付けていない作品は一覧側が
+			// 伝えるので、両方出して二重に断らない
 			const signIn = doc.createElement('p');
 			signIn.className = 'status';
 			signIn.textContent = MESSAGES.SIGN_IN;
@@ -623,8 +612,8 @@ export function createComments(deps) {
 		async function loadPage() {
 			const requestedWorkId = workId;
 			// disabled にするとフォーカスが body へ落ちる。終わったら押したボタンへ戻す
-			const focusedMore = replyMore !== null && isFocused(replyMore);
-			const focusedToggle = isFocused(toggle);
+			const focusedMore = replyMore !== null && isFocused(doc, replyMore);
+			const focusedToggle = isFocused(doc, toggle);
 			toggle.disabled = true;
 			if (replyMore) replyMore.disabled = true;
 			try {
@@ -864,7 +853,7 @@ export function createComments(deps) {
 		const requestedList = list;
 		const button = moreButton;
 		// disabled にするとフォーカスが body へ落ちる。終わったら押したボタンへ戻す
-		const focused = button !== null && isFocused(button);
+		const focused = button !== null && isFocused(doc, button);
 		if (button) button.disabled = true;
 		try {
 			const body = await fetchJson(commentRootsUrl(requestedWorkId, offset, COMMENT_PAGE_SIZE));
@@ -934,7 +923,6 @@ export function createComments(deps) {
 			failure = null;
 			emptyEl = null;
 			// 前の作品の入力欄は捨てる。書きかけごと消えるが、別の作品へ送るほうが害が大きい
-			rootForm = null;
 			forms.clear();
 			picker?.close();
 			container.style.minHeight = '';
@@ -944,7 +932,7 @@ export function createComments(deps) {
 			// コメントを受け付けていない作品と未ログインでは投稿できない。
 			// 返信の導線を出すかの判断にも使うので、モジュールの状態として覚えておく
 			canPost = detail.commentOff !== true && session.isLoggedIn === true && Boolean(session.csrfToken);
-			container.appendChild(createHeader(session, canPost));
+			container.appendChild(createHeader(canPost, detail.commentOff === true));
 			// 判定は文書に入れてから。createHeader() の中では位置を測れない
 			syncScrollState();
 
@@ -1005,7 +993,6 @@ export function createComments(deps) {
 			failure = null;
 			emptyEl = null;
 			workId = null;
-			rootForm = null;
 			canPost = false;
 			forms.clear();
 			picker?.dispose();
