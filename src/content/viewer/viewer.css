@@ -1020,6 +1020,18 @@ a.comment-name:hover {
 /* コメントの入力欄。作品へのコメントと返信で同じ形を使う。
    配色と寸法は pixiv 本体の /artworks/ に寄せつつ、色はトークンで持つ
    (直値で焼き付けるとテーマ切替に追従しない) */
+/* 入力欄一式は border-box で組む。Shadow DOM にはホストページの reset が届かず、
+   この CSS も全体には box-sizing を敷いていないので、既定の content-box のままだと
+   width と padding が足し算になる (.comment-form-input が width: 100% + 左右 40px の
+   padding で、入れ物より 40px 広くなって送信ボタンの下へ潜り込んでいた)。
+   全体に敷かないのは、.close / .arrow / .ugoira-toggle / .action の外寸が 2px 縮み、
+   .comment-picker には絵文字 8 列が入らなくなるため。
+   子孫まで当てておけば、後からこの中に部品を足しても同じ罠を踏まない */
+.comment-form,
+.comment-form * {
+	box-sizing: border-box;
+}
+
 .comment-form {
 	display: flex;
 	flex-direction: column;
@@ -1027,9 +1039,12 @@ a.comment-name:hover {
 	margin: 8px 0;
 }
 
+/* 高さの違う部品 (32px のアバター / 中身で伸びる入力欄 / 30px の送信) を同じ中心線に揃える。
+   下端合わせにすると、スタンプを選んで入力欄が 72px になったときに
+   送信ボタンだけが行の底に取り残され、揃っていないように見える */
 .comment-form-row {
 	display: flex;
-	align-items: flex-end;
+	align-items: center;
 	gap: 8px;
 }
 
@@ -1075,11 +1090,17 @@ a.comment-name:hover {
 	background: var(--field-bg-hover);
 }
 
-/* 絵文字とスタンプを開くボタン。入力欄の右端に重ねる */
+/* 絵文字とスタンプを開くボタン。入力欄の右端に重ねる。
+   土台は入力欄の高さいっぱいに伸ばし、その中で縦中央へ置く。
+   bottom だけで留めると、この span が作る行 (line-height 1.6 + 24px のボタン = 30px) の
+   上端にボタンが乗り、入力欄 (33px) の上端から飛び出す */
 .comment-form-pick-slot {
 	position: absolute;
+	top: 0;
 	right: 4px;
-	bottom: 4px;
+	bottom: 0;
+	display: flex;
+	align-items: center;
 }
 
 .comment-form-pick {
@@ -1147,8 +1168,13 @@ a.comment-name:hover {
 	cursor: pointer;
 }
 
+/* 送れる中身が無いときは押せない (空の投稿を止める)。
+   半透明にはしない。いいね済みのカウンタ (.count-action:disabled) と同じ考えで、
+   押せないことは地と文字の色、それに cursor で示す。
+   塗りつぶしたボタンを薄くすると、押せないのではなく壊れているように見える */
 .comment-form-submit:disabled {
-	opacity: 0.4;
+	background: var(--field-bg);
+	color: var(--muted);
 	cursor: default;
 }
 
@@ -1185,14 +1211,21 @@ a.comment-name:hover {
 .comment-picker {
 	/* 入力欄との間隔。上向きでも下向きでも同じだけ空ける */
 	--picker-gap: 4px;
+	/* 中身の幅。絵文字は 8 列で、1 マスに 24px の画像と左右 2px の余白が入り、
+	   隙間が 7 か所 4px なので 8 * 28 + 7 * 4 = 252px 要る。
+	   縦に溢れたときの 6px のスクロールバーもここから引かれるので 260px 持たせる */
+	--picker-inner-width: 260px;
+	--picker-padding: 8px;
+	--picker-border: 1px;
 
 	position: absolute;
 	right: 0;
 	bottom: calc(100% + var(--picker-gap));
 	z-index: 2;
-	width: 260px;
-	padding: 8px;
-	border: 1px solid var(--divider);
+	/* .comment-form 以下は border-box なので、width は枠と余白を含めた外寸で書く */
+	width: calc(var(--picker-inner-width) + (var(--picker-padding) + var(--picker-border)) * 2);
+	padding: var(--picker-padding);
+	border: var(--picker-border) solid var(--divider);
 	border-radius: 8px;
 	background: var(--surface);
 	box-shadow: var(--menu-shadow);
