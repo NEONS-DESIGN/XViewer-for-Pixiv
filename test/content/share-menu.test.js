@@ -133,29 +133,27 @@ test('開いたら最初の項目へフォーカスを置く', () => {
 });
 
 test('上下キーで項目を巡り、端で折り返す', () => {
-	const { doc, menu, button, items } = build();
+	const { menu, button, items } = build();
 	button.dispatch('click', {});
-	doc.activeElement = items[0];
+	items[0].focus();
 	const down = keyEvent('ArrowDown');
 	assert.equal(menu.consumeKey(down), true);
 	assert.equal(down.prevented, true);
 	assert.equal(items[1].focused, true);
 
-	doc.activeElement = items[3];
+	items[3].focus();
 	assert.equal(menu.consumeKey(keyEvent('ArrowDown')), true);
 	assert.equal(items[0].focused, true);
 
-	items[3].focused = false;
-	doc.activeElement = items[0];
+	items[0].focus();
 	assert.equal(menu.consumeKey(keyEvent('ArrowUp')), true);
 	assert.equal(items[3].focused, true);
 });
 
 test('Home と End で端の項目へ移る', () => {
-	const { doc, menu, button, items } = build();
+	const { menu, button, items } = build();
 	button.dispatch('click', {});
-	doc.activeElement = items[1];
-	items[0].focused = false;
+	items[1].focus();
 	assert.equal(menu.consumeKey(keyEvent('End')), true);
 	assert.equal(items[3].focused, true);
 	assert.equal(menu.consumeKey(keyEvent('Home')), true);

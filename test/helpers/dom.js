@@ -63,6 +63,9 @@ export function find(root, selector) {
  * - listeners[type] に登録順の配列で覚え、dispatch(type, event) で呼び出す
  * - textContent は本物と同じく、代入で子を消し、取得で子の文字を繋げる
  * - classList は className の文字列を読み書きする (どちらで見ても同じ状態)
+ * - focus() は木の根 (getRootNode()) の activeElement を動かす。
+ *   **disabled にするとブラウザと同じくフォーカスが外れる** (本物の挙動。これが無いと
+ *   「送信中に disabled にしてフォーカスを失う」不具合をテストで捕まえられない)
  * @param {string} tag タグ名
  * @returns {object} 要素の代わり
  */
@@ -84,7 +87,6 @@ export function fakeElement(tag) {
 		value: '',
 		title: '',
 		checked: false,
-		disabled: false,
 		hidden: false,
 		focused: false,
 		/** replaceWith で差し替えられた先。差し替えを確かめるテストが見る */
@@ -147,6 +149,26 @@ export function fakeElement(tag) {
 		setAttribute(name, value) { element.attributes[name] = String(value); },
 		getAttribute(name) { return element.attributes[name] ?? null; },
 		removeAttribute(name) { delete element.attributes[name]; },
+		/**
+		 * その要素が自分か自分の子孫か。
+		 * @param {object} node 調べる要素
+		 * @returns {boolean} 含んでいれば true
+		 */
+		contains(node) {
+			for (let at = node; at; at = at.parent) {
+				if (at === element) return true;
+			}
+			return false;
+		},
+		/**
+		 * 自分の属する木の根を返す。本物は document か shadowRoot を返す。
+		 * @returns {object} 根 (親をたどれる限りの一番上)
+		 */
+		getRootNode() {
+			let root = element;
+			while (root.parent) root = root.parent;
+			return root;
+		},
 		addEventListener(type, handler) { (element.listeners[type] ??= []).push(handler); },
 		removeEventListener(type, handler) {
 			element.listeners[type] = (element.listeners[type] ?? []).filter((one) => one !== handler);
@@ -162,10 +184,47 @@ export function fakeElement(tag) {
 			return Promise.all([...(element.listeners[type] ?? [])].map((handler) => handler(event)));
 		},
 		click() { return element.dispatch('click', {}); },
-		focus() { element.focused = true; },
+		/**
+		 * フォーカスを自分へ移す。前にフォーカスのあった要素からは外す。
+		 * @returns {void}
+		 */
+		focus() {
+			const root = element.getRootNode();
+			const previous = root.activeElement ?? null;
+			if (previous === element) return;
+			if (previous) previous.blur();
+			root.activeElement = element;
+			element.focused = true;
+			void element.dispatch('focus', {});
+		},
+		/**
+		 * フォーカスを外す。
+		 * @returns {void}
+		 */
+		blur() {
+			const root = element.getRootNode();
+			if (root.activeElement === element) root.activeElement = null;
+			if (element.focused === false) return;
+			element.focused = false;
+			void element.dispatch('blur', {});
+		},
 		querySelector(selector) { return find(element, selector); },
 		querySelectorAll(selector) { return findAll(element, selector); },
 	};
+	Object.defineProperty(element, 'parentElement', {
+		enumerable: true,
+		get() { return element.parent; },
+	});
+	let disabled = false;
+	Object.defineProperty(element, 'disabled', {
+		enumerable: true,
+		get() { return disabled; },
+		set(value) {
+			disabled = value;
+			// 本物のブラウザは disabled にした瞬間にフォーカスを body へ落とす
+			if (value === true) element.blur();
+		},
+	});
 	Object.defineProperty(element, 'textContent', {
 		get() {
 			if (element.children.length === 0) return text;

@@ -8,6 +8,7 @@
 import { PIXIV_EMOJI } from '../../pixiv/emoji.js';
 import { emojiUrl, stampUrl } from '../../pixiv/endpoints.js';
 import { stampIds } from '../../pixiv/stamps.js';
+import { activeElementIn, hasFocusWithin } from './focus.js';
 import { KEYS } from '../../common/constants.js';
 
 /** 画面に出す文言。 */
@@ -24,6 +25,22 @@ const TABS = Object.freeze([
 	{ key: 'stamp', label: MESSAGES.STAMP },
 ]);
 
+/**
+ * タブを移るキー。選ばれていないタブは Tab の巡回から外してあるので、
+ * これが無いとキーボードではスタンプのタブへ辿り着けない (UI_DESIGN_KIT §4.3)。
+ */
+const TAB_KEYS = Object.freeze({ PREV: 'ArrowLeft', NEXT: 'ArrowRight' });
+
+/**
+ * 読み上げでタブと中身を結ぶための id。
+ * パネルは 1 枚しか作らないので固定値でよい (Shadow DOM の中なのでページ側とも衝突しない)。
+ */
+const IDS = Object.freeze({
+	GRID: 'comment-picker-grid',
+	/** タブの id は種別ごと。`comment-picker-tab-emoji` の形になる */
+	TAB_PREFIX: 'comment-picker-tab-',
+});
+
 /** 下向きに開いたパネルに付ける印。viewer.css が上下を入れ替える。 */
 const BELOW_CLASS = 'is-below';
 
@@ -33,6 +50,9 @@ const BELOW_CLASS = 'is-below';
  * 端数の丸めで 1px はみ出すこともある。
  */
 const EDGE_MARGIN = 4;
+
+/** 中身を切り取る overflow の値。この指定を持つ祖先より外側は見えない。 */
+const CLIPPING_OVERFLOW = Object.freeze(['auto', 'scroll', 'hidden', 'clip']);
 
 /**
  * ピッカーを作る。
@@ -53,6 +73,8 @@ export function createCommentPicker(deps) {
 	let current = TABS[0].key;
 	/** @type {(() => void)|null} 外側のクリックの購読を解く */
 	let unwatchOutside = null;
+	/** @type {HTMLElement|null} 開いたボタン。閉じるときにフォーカスを返す先 */
+	let opener = null;
 
 	/**
 	 * 項目を 1 つ作る。
@@ -114,9 +136,47 @@ export function createCommentPicker(deps) {
 		for (const tab of tabs) {
 			const selected = tab.dataset.tab === current;
 			tab.setAttribute('aria-selected', String(selected));
-			// 選ばれていないタブは Tab の巡回から外す (tablist の作法。UI_DESIGN_KIT §3)
+			// 選ばれていないタブは Tab の巡回から外す (roving tabindex。UI_DESIGN_KIT §4.3)
 			tab.setAttribute('tabindex', selected ? '0' : '-1');
+			// 中身の見出しは選ばれているタブ。読み上げが「今どちらを見ているか」を言えるようにする
+			if (selected) grid.setAttribute('aria-labelledby', `${IDS.TAB_PREFIX}${current}`);
 		}
+	}
+
+	/**
+	 * タブを選び直す。中身も見た目も一度に揃える。
+	 * @param {string} key タブの種別 (TABS の key)
+	 * @param {boolean} [moveFocus] フォーカスもそのタブへ移すか (左右キーのとき)
+	 * @returns {void}
+	 */
+	function selectTab(key, moveFocus = false) {
+		if (current !== key) {
+			current = key;
+			syncTabs();
+			renderGrid();
+		}
+		if (moveFocus) tabs.find((tab) => tab.dataset.tab === key)?.focus();
+	}
+
+	/**
+	 * 今フォーカスのあるタブの位置。
+	 * @returns {number} タブにフォーカスが無ければ -1
+	 */
+	function focusedTabIndex() {
+		return panel === null ? -1 : tabs.indexOf(activeElementIn(doc, panel));
+	}
+
+	/**
+	 * 左右キーで隣のタブへ移る。端では折り返す。
+	 * @param {KeyboardEvent} event キー
+	 * @param {number} at 今フォーカスのあるタブの位置
+	 * @returns {boolean} 移したなら true
+	 */
+	function moveTab(event, at) {
+		const step = event.key === TAB_KEYS.NEXT ? 1 : (event.key === TAB_KEYS.PREV ? -1 : 0);
+		if (step === 0) return false;
+		selectTab(TABS[(at + step + TABS.length) % TABS.length].key, true);
+		return true;
 	}
 
 	/**
@@ -137,14 +197,11 @@ export function createCommentPicker(deps) {
 			tab.type = 'button';
 			tab.className = 'comment-picker-tab';
 			tab.setAttribute('role', 'tab');
+			tab.setAttribute('id', `${IDS.TAB_PREFIX}${one.key}`);
+			tab.setAttribute('aria-controls', IDS.GRID);
 			tab.dataset.tab = one.key;
 			tab.textContent = one.label;
-			tab.addEventListener('click', () => {
-				if (current === one.key) return;
-				current = one.key;
-				syncTabs();
-				renderGrid();
-			});
+			tab.addEventListener('click', () => { selectTab(one.key); });
 			tablist.appendChild(tab);
 			return tab;
 		});
@@ -152,15 +209,37 @@ export function createCommentPicker(deps) {
 
 		grid = doc.createElement('div');
 		grid.className = 'comment-picker-grid';
+		// タブの中身であることを読み上げへ伝える。見出しは syncTabs() が選ばれたタブに向ける
+		grid.setAttribute('role', 'tabpanel');
+		grid.setAttribute('id', IDS.GRID);
 		element.appendChild(grid);
 		return element;
+	}
+
+	/**
+	 * パネルが切り取られる上端 (画面座標) を求める。
+	 *
+	 * 「コメントだけを送る」設定では一覧 (`.comment-scroll`) が `overflow-y: auto` になり、
+	 * 画面には入っていてもその領域の外側は見えない。切り取る相手は一番近い
+	 * スクロールする祖先で、いなければ画面そのもの (0)。
+	 * @returns {number} 上端 (px)
+	 */
+	function clipTop() {
+		const view = doc.defaultView;
+		for (let node = panel.parentElement; node; node = node.parentElement) {
+			const style = view?.getComputedStyle?.(node);
+			if (!style || !CLIPPING_OVERFLOW.includes(style.overflowY)) continue;
+			// 測る口が無い相手は無いものとして通り過ぎる (テスト用の DOM)
+			if (typeof node.getBoundingClientRect === 'function') return node.getBoundingClientRect().top;
+		}
+		return 0;
 	}
 
 	/**
 	 * 上下どちらへ開くかを実際の位置から決める。
 	 *
 	 * 既定は上。一覧に重なるだけで済み、一覧を押し下げるより読みやすい。
-	 * ただし入力欄が上端に貼り付いていると上には収まらず、タブごと画面の外へ出てしまう。
+	 * ただし入力欄が上端に貼り付いていると上には収まらず、タブごと外へ出てしまう。
 	 * そのときだけ下へ回す。**差し込んだ直後に呼ぶこと** (文書の中でないと位置を測れない)。
 	 * @returns {void}
 	 */
@@ -169,8 +248,9 @@ export function createCommentPicker(deps) {
 		panel.classList.remove(BELOW_CLASS);
 		// テスト用の DOM には測る口が無い。見た目の調整なので黙って既定 (上) のままにする
 		if (typeof panel.getBoundingClientRect !== 'function') return;
-		// 既定の位置で描いた結果をそのまま読む。入力欄との間隔も高さも計算せずに済む
-		if (panel.getBoundingClientRect().top < EDGE_MARGIN) panel.classList.add(BELOW_CLASS);
+		// 既定の位置で描いた結果をそのまま読む。入力欄との間隔も高さも計算せずに済む。
+		// 上へ出た分は上へスクロールしても戻ってこないので、下へ回すしかない
+		if (panel.getBoundingClientRect().top < clipTop() + EDGE_MARGIN) panel.classList.add(BELOW_CLASS);
 	}
 
 	/**
@@ -178,23 +258,29 @@ export function createCommentPicker(deps) {
 	 * @returns {void}
 	 */
 	function close() {
+		// 項目ごと外すとフォーカスが body へ落ち、Escape がビュワーまで届く。開いたボタンへ返す。
+		// パネルの外 (受け口が入力欄へ移したあと等) にあるフォーカスは動かさない
+		const returnFocus = panel !== null && opener !== null && hasFocusWithin(doc, panel);
 		panel?.remove();
 		handlers = null;
 		unwatchOutside?.();
 		unwatchOutside = null;
+		if (returnFocus) opener.focus();
+		opener = null;
 	}
 
 	return {
 		/**
 		 * 入力欄の差し込み先に開く。
 		 * @param {HTMLElement} slot 差し込み先
-		 * @param {{onEmoji: (name: string) => void, onStamp: (id: string) => void}} next 選ばれたときの受け口
+		 * @param {{opener?: HTMLElement, onEmoji: (name: string) => void, onStamp: (id: string) => void}} next 選ばれたときの受け口と、閉じるときにフォーカスを返す先
 		 * @returns {void}
 		 */
 		open(slot, next) {
 			close();
 			panel ??= buildPanel();
 			handlers = next;
+			opener = next.opener ?? null;
 			syncTabs();
 			renderGrid();
 			slot.appendChild(panel);
@@ -222,15 +308,23 @@ export function createCommentPicker(deps) {
 		isOpen() { return handlers !== null; },
 
 		/**
-		 * Escape を食い止める。開いていなければ何もしない。
+		 * キー操作を先に使う。開いていなければ何もしない。
+		 *
+		 * Escape で閉じ、タブにフォーカスがあるときだけ左右キーでタブを移る。
+		 * **ビュワーは document の捕捉フェーズで全キーを取っている** ので、タブ側に
+		 * keydown を付けても届かない。ここで奪わないと左右キーが作品のページ送りになる (§10.5)。
+		 * 本文を書いている最中の左右キー (キャレットの移動) は奪わない。
 		 * @param {KeyboardEvent} event キー
 		 * @returns {boolean} 食い止めたなら true
 		 */
 		consumeKey(event) {
-			if (event.key !== KEYS.CLOSE) return false;
 			if (handlers === null) return false;
-			close();
-			return true;
+			if (event.key === KEYS.CLOSE) {
+				close();
+				return true;
+			}
+			const at = focusedTabIndex();
+			return at < 0 ? false : moveTab(event, at);
 		},
 
 		/**

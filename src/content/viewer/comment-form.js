@@ -7,6 +7,7 @@
  */
 import { createIcon } from '../../common/icons.js';
 import { createAvatar, showAvatar } from './avatar.js';
+import { hasFocusWithin } from './focus.js';
 import { stampUrl } from '../../pixiv/endpoints.js';
 import { KEYS } from '../../common/constants.js';
 
@@ -42,8 +43,6 @@ export function createCommentForm(deps) {
 	let stampId = null;
 	/** 送信中か。二重送信を止める */
 	let sending = false;
-	/** この入力欄の中にフォーカスがあるか。Escape を食い止めるかの判断に使う */
-	let focused = false;
 	/** @type {HTMLElement|null} 失敗の表示。1 つだけ持つ */
 	let errorNode = null;
 
@@ -86,6 +85,26 @@ export function createCommentForm(deps) {
 	submit.className = 'comment-form-submit';
 	submit.textContent = MESSAGES.SUBMIT;
 	row.appendChild(submit);
+
+	/**
+	 * この入力欄の中にフォーカスがあるか。Escape を食い止めるかの判断に使う。
+	 *
+	 * 真偽値で覚えないこと。`disabled` にした瞬間にブラウザがフォーカスを外すので、
+	 * 送信のたびに嘘になる (書きかけを Escape で失う原因だった)。
+	 * @returns {boolean} 中にフォーカスがあれば true
+	 */
+	function isFocusInside() {
+		return hasFocusWithin(doc, element);
+	}
+
+	/**
+	 * 送信のあとにフォーカスを戻す先。
+	 * スタンプを選んでいる間は本文の入力が hidden で、隠れた要素には戻せない。
+	 * @returns {HTMLElement} 戻す先
+	 */
+	function focusTarget() {
+		return input.hidden ? submit : input;
+	}
 
 	/**
 	 * 送れる中身があるか。
@@ -158,8 +177,6 @@ export function createCommentForm(deps) {
 		clear.setAttribute('aria-label', MESSAGES.STAMP_CLEAR);
 		clear.appendChild(createIcon(doc, 'close'));
 		clear.addEventListener('click', () => { clearStamp(); });
-		clear.addEventListener('focus', () => { focused = true; });
-		clear.addEventListener('blur', () => { focused = false; });
 		stampBox.append(image, clear);
 		stampBox.hidden = false;
 		// 本文は隠すだけで消さない。取り消したら書きかけが戻る
@@ -174,6 +191,9 @@ export function createCommentForm(deps) {
 	async function send() {
 		if (sending || !hasInput()) return;
 		sending = true;
+		// disabled にするとブラウザがフォーカスを body へ落とす。先に覚えて、終わったら戻す。
+		// 戻さないと、本文を残した失敗のあとの Escape がビュワーまで届いて書きかけごと消える
+		const restoreFocus = isFocusInside();
 		input.disabled = true;
 		submit.disabled = true;
 		submit.setAttribute('aria-busy', 'true');
@@ -192,6 +212,8 @@ export function createCommentForm(deps) {
 			input.disabled = false;
 			submit.removeAttribute('aria-busy');
 			syncSubmit();
+			// 戻すのは全て有効に戻したあと。disabled のままの要素にはフォーカスを置けない
+			if (restoreFocus) focusTarget().focus();
 		}
 	}
 
@@ -206,11 +228,6 @@ export function createCommentForm(deps) {
 	});
 	submit.addEventListener('click', () => send());
 
-	for (const target of [input, submit]) {
-		target.addEventListener('focus', () => { focused = true; });
-		target.addEventListener('blur', () => { focused = false; });
-	}
-
 	if (picker) {
 		const pick = doc.createElement('button');
 		pick.type = 'button';
@@ -218,14 +235,14 @@ export function createCommentForm(deps) {
 		pick.title = MESSAGES.PICK;
 		pick.setAttribute('aria-label', MESSAGES.PICK);
 		pick.appendChild(createIcon(doc, 'mood'));
-		pick.addEventListener('focus', () => { focused = true; });
-		pick.addEventListener('blur', () => { focused = false; });
 		pick.addEventListener('click', () => {
 			if (picker.isOpen()) {
 				picker.close();
 				return;
 			}
 			picker.open(pickSlot, {
+				// 閉じるときにフォーカスを返す先。項目ごと消えて body へ落ちるのを防ぐ
+				opener: pick,
 				onEmoji: (name) => {
 					// 絵文字は文字として入る。表示側の parseCommentText() が画像へ戻す
 					input.value = `${input.value}(${name})`;
@@ -249,16 +266,6 @@ export function createCommentForm(deps) {
 		 */
 		focus() { input.focus(); },
 
-		/**
-		 * 中身を捨てる。
-		 * @returns {void}
-		 */
-		reset() {
-			input.value = '';
-			clearStamp();
-			clearError();
-		},
-
 		hasInput,
 
 		/**
@@ -269,7 +276,7 @@ export function createCommentForm(deps) {
 		 */
 		consumeKey(event) {
 			if (event.key !== KEYS.CLOSE) return false;
-			if (!focused) return false;
+			if (!isFocusInside()) return false;
 			return hasInput();
 		},
 

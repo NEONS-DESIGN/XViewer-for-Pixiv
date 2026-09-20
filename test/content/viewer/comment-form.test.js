@@ -184,13 +184,13 @@ test('入力中の Escape はビュワーへ渡さない', async () => {
 	const { form, element } = build();
 	const input = type(element, 'あ');
 	await input.dispatch('input', {});
-	await input.dispatch('focus', {});
+	input.focus();
 	assert.equal(form.consumeKey({ key: 'Escape' }), true);
 });
 
 test('空のままならビュワーの Escape を邪魔しない', async () => {
 	const { form, element } = build();
-	await find(element, '.comment-form-input').dispatch('focus', {});
+	find(element, '.comment-form-input').focus();
 	assert.equal(form.consumeKey({ key: 'Escape' }), false);
 });
 
@@ -206,7 +206,7 @@ test('スタンプの取り消しボタンにフォーカスがあるときも E
 	const { form, element } = build({ picker });
 	await find(element, '.comment-form-pick').click();
 	picked[0].onStamp('304');
-	await find(element, '.comment-form-stamp-clear').dispatch('focus', {});
+	find(element, '.comment-form-stamp-clear').focus();
 	assert.equal(form.consumeKey({ key: 'Escape' }), true);
 });
 
@@ -214,4 +214,52 @@ test('アバターを渡したときだけ左に出す', () => {
 	assert.equal(find(build().element, '.comment-form-avatar'), null);
 	const withAvatar = build({ avatarUrl: 'https://i.pximg.net/user-profile/img/1_50.jpg' });
 	assert.ok(find(withAvatar.element, '.comment-form-avatar'));
+});
+
+test('送信が終わったら本文の入力へフォーカスを戻す', async () => {
+	// disabled にした瞬間にブラウザがフォーカスを body へ落とす。戻さないと続けて書けない
+	const { element } = build();
+	const input = type(element, 'あ');
+	await input.dispatch('input', {});
+	input.focus();
+	await find(element, '.comment-form-submit').click();
+	await flush();
+	assert.equal(input.focused, true);
+});
+
+test('送信に失敗しても入力へフォーカスを戻し、Escape で書きかけを消させない', async () => {
+	// 戻さないと Escape がビュワーまで届き、残したはずの本文ごとモーダルが閉じる
+	const { form, element } = build({ onSubmit: async () => { throw new Error('失敗'); } });
+	const input = type(element, 'あ');
+	await input.dispatch('input', {});
+	input.focus();
+	await find(element, '.comment-form-submit').click();
+	await flush();
+	assert.equal(input.focused, true);
+	assert.equal(form.consumeKey({ key: 'Escape' }), true);
+});
+
+test('スタンプの送信に失敗したら送信ボタンへフォーカスを戻す', async () => {
+	// 本文の入力はスタンプを選んでいる間 hidden。隠れた要素には戻せない
+	const picked = [];
+	const picker = { open: (_slot, handlers) => { picked.push(handlers); }, close: () => {}, isOpen: () => false };
+	const { form, element } = build({ picker, onSubmit: async () => { throw new Error('失敗'); } });
+	await find(element, '.comment-form-pick').click();
+	picked[0].onStamp('304');
+	const submit = find(element, '.comment-form-submit');
+	submit.focus();
+	await submit.click();
+	await flush();
+	assert.equal(submit.focused, true);
+	assert.equal(form.consumeKey({ key: 'Escape' }), true);
+});
+
+test('フォーカスが外にあるまま送ったときは奪わない', async () => {
+	// マウスで押した人の画面を勝手に動かさない (「もっと見る」と同じ作法)
+	const { element } = build();
+	const input = type(element, 'あ');
+	await input.dispatch('input', {});
+	await find(element, '.comment-form-submit').click();
+	await flush();
+	assert.equal(input.focused, false);
 });
