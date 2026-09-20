@@ -12,6 +12,7 @@ import {
 	FOCUSABLE_SELECTOR,
 	HIDDEN_SELECTOR,
 	INERT_ATTRIBUTE,
+	KEYS,
 	POPUP_THEMES,
 	SIDEBAR_SCROLL,
 	STATUS_KINDS,
@@ -32,6 +33,17 @@ const BODY_LOCK_STYLE = 'overflow:hidden';
 
 /** キーをそのまま入力に使う要素。ここにフォーカスがある間はビュワーの割り当てを効かせない。 */
 const TEXT_ENTRY_TAGS = Object.freeze(['TEXTAREA', 'INPUT']);
+
+/**
+ * 入力欄の中でも素通しするキー。
+ * Tab は navigation.onKeyDown → focusNext が Shadow DOM の中だけへフォーカスを
+ * 巡回させる役目を持ち、ここで止めるとモーダルを開いたまま背後の pixiv へフォーカスが抜ける。
+ * Escape は navigation.onKeyDown がビュワーを閉じる最終段 (ピッカーも書きかけの文章も
+ * 無ければ閉じる) を持ち、ここで止めると空の入力欄で Escape が無反応になる。
+ * どちらも consumeKey() が先に判断しているので、割り込みたい側 (ピッカー・書きかけの文章)
+ * があれば手前で食い止められる。
+ */
+const TEXT_ENTRY_PASSTHROUGH_KEYS = Object.freeze([KEYS.FOCUS_NEXT, KEYS.CLOSE]);
 
 /**
  * 設定のうち、変わったら今開いている作品を描き直す必要があるもの。
@@ -385,9 +397,9 @@ export function createViewer(deps) {
 			event.stopPropagation();
 			return;
 		}
-		// 入力欄の中では、ここから先のビュワーの割り当ては一切効かせない。
-		// Escape だけは consumeKey() が先に判断している (書きかけがあれば食い止める)
-		if (isTextEntry(event)) return;
+		// 入力欄の中では移動系の割り当て (矢印キー等) を効かせない。
+		// Tab と Escape だけは TEXT_ENTRY_PASSTHROUGH_KEYS で通す (理由は定義側のコメント)
+		if (isTextEntry(event) && !TEXT_ENTRY_PASSTHROUGH_KEYS.includes(event.key)) return;
 		navigation.onKeyDown(event);
 	}
 
