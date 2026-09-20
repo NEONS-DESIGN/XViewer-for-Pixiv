@@ -14,7 +14,7 @@ export async function load(url, context, next) {
 	return next(url, context);
 }
 `)}`);
-const { createViewer } = await import('../../../src/content/viewer/viewer.js');
+const { createViewer, isTextEntry } = await import('../../../src/content/viewer/viewer.js');
 
 /** 実際の CDN と同じ形の URL。safeCdnUrl の関門を通す必要がある。 */
 const REGULAR_URL = 'https://i.pximg.net/img-master/img/2026/09/10/00/00/00/x_p0_master1200.jpg';
@@ -404,6 +404,36 @@ test('開いたシェアメニューでは上下キーと Escape をメニュー
 	assert.deepEqual(fetched, ['/ajax/illust/1?lang=ja', '/ajax/illust/2?lang=ja']);
 	await doc.dispatch('keydown', key(KEYS.CLOSE));
 	assert.equal(closed(), 1);
+});
+
+test('入力欄の中のキーはビュワーの割り当てに使わない', () => {
+	// composedPath の先頭が textarea なら、左右キーで作品が送られてはいけない
+	assert.equal(isTextEntry({ composedPath: () => [{ tagName: 'TEXTAREA' }] }), true);
+	assert.equal(isTextEntry({ composedPath: () => [{ tagName: 'INPUT' }] }), true);
+	assert.equal(isTextEntry({ composedPath: () => [{ tagName: 'BUTTON' }] }), false);
+	assert.equal(isTextEntry({ composedPath: () => [] }), false);
+	assert.equal(isTextEntry({}), false);
+});
+
+test('編集できる要素の中でも効かせない', () => {
+	assert.equal(isTextEntry({ composedPath: () => [{ tagName: 'DIV', isContentEditable: true }] }), true);
+});
+
+test('入力欄の中では上下キーで作品が送られない', async () => {
+	// document の捕捉フェーズで全キーを取っているため、コメントを書いている最中の
+	// 上下キーで作品が送られていた。composedPath の先頭を入力欄にして確かめる
+	const { viewer, doc, fetched } = setup();
+	await viewer.open('1', fakeSequence(['1', '2']));
+	assert.equal(fetched.length, 1);
+	const event = {
+		key: KEYS.NEXT_WORK,
+		composedPath: () => [{ tagName: 'TEXTAREA' }],
+		preventDefault() {},
+		stopPropagation() {},
+	};
+	await doc.dispatch('keydown', event);
+	await flush();
+	assert.equal(fetched.length, 1, '入力欄の中では作品が送られない');
 });
 
 test('クリックで原寸表示がオンなら、画像を押すと overlay の直下に原寸レイヤが出る', async () => {

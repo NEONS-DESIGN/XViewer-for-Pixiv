@@ -182,14 +182,17 @@ export function consumeEscape() {
 }
 
 /**
- * キー操作をサイドバーに先に使わせる。
+ * キー操作を手前に出ているものへ先に使わせる。
  * consumeEscape() の一般形。開いたシェアメニューは Escape だけでなく上下 / Home / End も
- * 自分で使うので、本体が作品の移動に使う前にここで聞く。
+ * 自分で使うので、本体が作品の移動に使う前にここで聞く。コメントの入力欄も同様で、
+ * ピッカーを開いていたり書きかけの文章があれば Escape を自分で使う。
  * @param {KeyboardEvent} event キー
  * @returns {boolean} 食い止めたなら true (本体は反応してはいけない)
  */
 export function consumeKey(event) {
-	return sidebarPane?.consumeKey(event) === true;
+	// 手前に出ているものから順に使わせる。シェアメニュー (浮いている) が先、次にコメントの入力欄
+	if (sidebarPane?.consumeKey(event) === true) return true;
+	return commentsPane?.consumeKey(event) === true;
 }
 
 /**
