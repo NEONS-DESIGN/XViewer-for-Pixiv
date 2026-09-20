@@ -1,7 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeComment, renderCommentText, renderStamp, createComments, commentsFloorHeight, isHeadingStuck } from '../../src/content/viewer/comments.js';
+import { normalizeComment, renderCommentText, renderStamp, createComments, commentsFloorHeight, isHeadingStuck, formatPostedDate } from '../../src/content/viewer/comments.js';
 import { fakeElement, fakeDoc, find, findAll, iconName, flush } from '../helpers/dom.js';
+import { clearSessionCache } from '../../src/content/session.js';
+import { PixivError, PIXIV_ERROR_KINDS } from '../../src/pixiv/errors.js';
+import { stampIds } from '../../src/pixiv/stamps.js';
+import { buildNextData } from '../helpers/pixiv.js';
 
 test('コメントを共通の形にする', () => {
 	const raw = {
@@ -124,6 +128,28 @@ const REPLY = Object.freeze({
 /** コメント区画へ渡す作品詳細の代わり。 */
 const DETAIL = Object.freeze({ id: '149425016', commentOff: false, commentCount: 1 });
 
+/** コメント区画へ渡す作品詳細の代わり (投稿に作者 ID が要る)。 */
+const POST_DETAIL = Object.freeze({ id: '149425016', userId: '54734418', commentOff: false, commentCount: 1 });
+
+/** 自分のセッション。投稿できる状態 */
+const SELF = Object.freeze({
+	id: '99',
+	name: '自分',
+	profileImg: 'https://i.pximg.net/user-profile/img/1_50.jpg',
+	xRestrict: 1,
+	hideAiWorks: false,
+});
+
+/**
+ * ログイン済みの document の代わりを作る。
+ * readSession() は解析結果を覚えるので、前のテストの値が残らないよう毎回捨てる。
+ * @returns {object} doc の代わり
+ */
+function loggedInDoc() {
+	clearSessionCache();
+	return fakeDoc({ nextData: buildNextData({ token: 'csrf-token', self: SELF }) });
+}
+
 /**
  * コメント区画を組み立てる。
  * @param {(url: string) => Promise<object>} fetchJson 取得の差し替え
@@ -131,15 +157,57 @@ const DETAIL = Object.freeze({ id: '149425016', commentOff: false, commentCount:
  */
 function build(fetchJson) {
 	const container = fakeElement('div');
-	const comments = createComments({ doc: fakeDoc(), container, fetchJson });
+	const comments = createComments({ doc: loggedInDoc(), container, fetchJson });
 	return { container, comments };
+}
+
+/**
+ * 投稿できる状態のコメント区画を組み立てる。
+ * @param {object} [options] fetchJson と actions の差し替え
+ * @returns {{doc: object, container: object, comments: object, posted: Array}} 描画先・コメント区画・投稿の記録
+ */
+function buildPostable(options = {}) {
+	const doc = loggedInDoc();
+	const container = fakeElement('div');
+	const posted = [];
+	const comments = createComments({
+		doc,
+		container,
+		fetchJson: options.fetchJson ?? (async () => ({ comments: [ROOT], hasNext: false })),
+		actions: options.actions ?? {
+			postComment: async (...args) => {
+				posted.push(['comment', ...args.slice(0, 4)]);
+				return { id: '900', userId: '99', userName: '自分', text: args[2], stampId: null };
+			},
+			postStamp: async (...args) => {
+				posted.push(['stamp', ...args.slice(0, 4)]);
+				return { id: '901', userId: '99', userName: '自分', text: '', stampId: args[2] };
+			},
+		},
+		onPosted: options.onPosted,
+	});
+	return { doc, container, comments, posted };
+}
+
+/**
+ * 入力欄に本文を書いて送信ボタンを押す。
+ * @param {object} form 入力欄 (.comment-form)
+ * @param {string} text 書く本文
+ * @returns {Promise<void>}
+ */
+async function submitText(form, text) {
+	const input = find(form, '.comment-form-input');
+	input.value = text;
+	await input.dispatch('input', {});
+	await find(form, '.comment-form-submit').click();
+	await flush();
 }
 
 test('「もっと見る」はスクロールする領域の中、一覧の後ろに置く', async () => {
 	// 一番下まで読んだときだけ見えるようにする。外に置くと常に見えて不自然になる
 	const { container, comments } = build(async () => ({ comments: [ROOT], hasNext: true }));
 	await comments.load(DETAIL);
-	assert.deepEqual(container.children.map((child) => child.className), ['comments-heading', 'comment-scroll']);
+	assert.deepEqual(container.children.map((child) => child.className), ['comments-header', 'comment-scroll']);
 	const scroll = container.children[1];
 	assert.deepEqual(scroll.children.map((child) => child.className), ['comment-list', 'more']);
 	assert.equal(scroll.children[1].hidden, false);
@@ -372,11 +440,11 @@ test('一覧が無いとき (0 件・コメント不可・失敗) の下限は�
 /**
  * 位置を測れる document の代わりを作る。
  * 本物と同じく、親に入るまでは全て 0 を返す。
- * @param {() => number} headingTop 親に入った後の見出しの上端
+ * @param {() => number} headingTop 親に入った後の上端 (見出しと入力欄の入れ物を測る)
  * @returns {object} doc の代わり
  */
 function measurableDoc(headingTop) {
-	const doc = fakeDoc();
+	const doc = loggedInDoc();
 	const create = doc.createElement;
 	doc.createElement = (tag) => {
 		const element = create(tag);
@@ -404,8 +472,9 @@ test('見出しの「上部へ」は下の線と同じ合図 (貼り付き) で�
 	await comments.load(DETAIL);
 
 	const toTop = find(container, '.to-top');
-	const heading = find(container, '.comments-heading');
-	const stuck = () => heading.className.includes('is-stuck');
+	// 印が付くのは見出しと入力欄をまとめた入れ物のほう
+	const header = find(container, '.comments-header');
+	const stuck = () => header.className.includes('is-stuck');
 
 	// まだ投稿文が見えている。線もボタンも出さない
 	assert.equal(stuck(), false);
@@ -441,7 +510,7 @@ test('dispose すると scrollTarget の購読を解く', async () => {
 	const scrollTarget = fakeElement('div');
 	scrollTarget.scrollTop = 0;
 	const comments = createComments({
-		doc: fakeDoc(),
+		doc: loggedInDoc(),
 		container,
 		scrollTarget,
 		fetchJson: async () => ({ comments: [ROOT], hasNext: false }),
@@ -480,9 +549,9 @@ test('開いた直後の見出しを貼り付き扱いにしない', async () =>
 	});
 	await comments.load(DETAIL);
 
-	// 見出しを作った時点で測ると位置が全て 0 になり、上端に並んでいることになってしまう。
+	// 入れ物を作った時点で測ると位置が全て 0 になり、上端に並んでいることになってしまう。
 	// container へ入れてから測ること
-	assert.equal(find(container, '.comments-heading').className.includes('is-stuck'), false);
+	assert.equal(find(container, '.comments-header').className.includes('is-stuck'), false);
 });
 
 test('返信の失敗表示は 1 つだけで、読み直せたら消す', async () => {
@@ -554,7 +623,7 @@ test('2 ページ目以降の返信に失敗しても、見えている返信は
 
 test('キーボードで押した返信ボタンへ読み込み後にフォーカスを戻す', async () => {
 	// disabled にした瞬間にフォーカスが body へ落ち、Tab の起点を失う
-	const doc = fakeDoc();
+	const doc = loggedInDoc();
 	const container = fakeElement('div');
 	const comments = createComments({
 		doc,
@@ -577,7 +646,7 @@ test('キーボードで押した返信ボタンへ読み込み後にフォー�
 
 test('フォーカスが無いボタンには読み込み後もフォーカスを移さない', async () => {
 	// マウスで押した人の画面を勝手にスクロールさせない
-	const doc = fakeDoc();
+	const doc = loggedInDoc();
 	const container = fakeElement('div');
 	const comments = createComments({
 		doc,
@@ -597,7 +666,7 @@ test('フォーカスが無いボタンには読み込み後もフォーカス�
 });
 
 test('「もっと見る」をキーボードで押したら読み込み後にフォーカスを戻す', async () => {
-	const doc = fakeDoc();
+	const doc = loggedInDoc();
 	const container = fakeElement('div');
 	let page = 0;
 	const comments = createComments({
@@ -643,7 +712,7 @@ test('文字が見えている「上部へ」に title を重ねない', async (
 	const scrollTarget = fakeElement('div');
 	scrollTarget.scrollTop = 0;
 	const comments = createComments({
-		doc: fakeDoc(),
+		doc: loggedInDoc(),
 		container,
 		scrollTarget,
 		fetchJson: async () => ({ comments: [ROOT], hasNext: false }),
@@ -652,4 +721,162 @@ test('文字が見えている「上部へ」に title を重ねない', async (
 	const toTop = find(container, '.to-top');
 	assert.equal(toTop.title, '');
 	assert.equal(toTop.children[1].textContent, '上部へ');
+});
+
+test('見出しと入力欄を 1 つの header にまとめる', async () => {
+	// 「サイドバーごと送る」設定で一緒に上端へ貼り付かせるため、同じ入れ物に入れる
+	const { container, comments } = buildPostable();
+	await comments.load(POST_DETAIL);
+	assert.deepEqual(container.children.map((child) => child.className), ['comments-header', 'comment-scroll']);
+	const header = container.children[0];
+	assert.deepEqual(header.children.map((child) => child.className), ['comments-heading', 'comment-form']);
+});
+
+test('コメントを投稿すると作者 ID 付きで送られる', async () => {
+	const { container, comments, posted } = buildPostable();
+	await comments.load(POST_DETAIL);
+	await submitText(find(find(container, '.comments-header'), '.comment-form'), 'いいですね');
+	// illustId / authorUserId / text / parentId
+	assert.deepEqual(posted[0], ['comment', '149425016', '54734418', 'いいですね', null]);
+});
+
+test('スタンプを選んで投稿するとスタンプとして送られる', async () => {
+	const { container, comments, posted } = buildPostable();
+	await comments.load(POST_DETAIL);
+	const form = find(find(container, '.comments-header'), '.comment-form');
+	await find(form, '.comment-form-pick').click();
+	// 2 つ目のタブがスタンプ
+	await findAll(form, '.comment-picker-tab')[1].click();
+	await find(form, '.comment-picker-grid').children[0].click();
+	await find(form, '.comment-form-submit').click();
+	await flush();
+	assert.deepEqual(posted[0], ['stamp', '149425016', '54734418', stampIds()[0], null]);
+});
+
+test('投稿できたコメントを一覧の先頭へ差し込む', async () => {
+	// 取り直すと offset がずれ、読み進めた位置も飛ぶ
+	let notified = 0;
+	const { container, comments } = buildPostable({ onPosted: () => { notified += 1; } });
+	await comments.load(POST_DETAIL);
+	await submitText(find(find(container, '.comments-header'), '.comment-form'), 'いいですね');
+
+	const list = find(container, '.comment-list');
+	assert.equal(list.children.length, 2);
+	const first = list.children[0];
+	assert.equal(find(first, '.comment-name').textContent, '自分');
+	assert.equal(find(first, '.comment-text').textContent, 'いいですね');
+	// 投稿直後に返信は無いので、開閉ボタンは付けない (一覧と同じ規則)
+	assert.equal(find(first, '.comment-replies'), null);
+	// 件数を +1 する側へ 1 回だけ伝える
+	assert.equal(notified, 1);
+});
+
+test('投稿できたら入力欄を空に戻す', async () => {
+	const { container, comments } = buildPostable();
+	await comments.load(POST_DETAIL);
+	await submitText(find(find(container, '.comments-header'), '.comment-form'), 'いいですね');
+	assert.equal(find(container, '.comment-form-input').value, '');
+});
+
+test('投稿に失敗しても書きかけは消さない', async () => {
+	const { container, comments } = buildPostable({
+		actions: {
+			postComment: async () => { throw new Error('落ちた'); },
+			postStamp: async () => { throw new Error('落ちた'); },
+		},
+	});
+	await comments.load(POST_DETAIL);
+	await submitText(find(find(container, '.comments-header'), '.comment-form'), 'いいですね');
+	assert.equal(find(container, '.comment-form-input').value, 'いいですね');
+	assert.equal(find(container, '.comment-form-error').textContent, 'コメントを投稿できませんでした');
+	// 一覧は元のまま。失敗で 1 件増やさない
+	assert.equal(find(container, '.comment-list').children.length, 1);
+});
+
+test('ログインが切れていたら再読み込みまで案内する', async () => {
+	// 401 は別タブでログアウトした等。__NEXT_DATA__ は SPA 遷移で変わらないので読み直させる
+	const { container, comments } = buildPostable({
+		actions: {
+			postComment: async () => { throw new PixivError(PIXIV_ERROR_KINDS.UNAUTHORIZED, 'unauthorized', 401); },
+			postStamp: async () => { throw new Error('落ちた'); },
+		},
+	});
+	await comments.load(POST_DETAIL);
+	await submitText(find(find(container, '.comments-header'), '.comment-form'), 'いいですね');
+	assert.equal(
+		find(container, '.comment-form-error').textContent,
+		'ログインが切れています。pixiv にログインし直し、このページを再読み込みしてください',
+	);
+});
+
+test('投稿を待っている間に別の作品へ移ったら画面へは足さない', async () => {
+	// 投稿自体は通っているが、今見ている作品の一覧に別の作品のコメントを混ぜない
+	let release;
+	let notified = 0;
+	const container = fakeElement('div');
+	const comments = createComments({
+		doc: loggedInDoc(),
+		container,
+		fetchJson: async () => ({ comments: [ROOT], hasNext: false }),
+		actions: {
+			postComment: () => new Promise((resolve) => { release = resolve; }),
+			postStamp: async () => ({}),
+		},
+		onPosted: () => { notified += 1; },
+	});
+	await comments.load(POST_DETAIL);
+	const input = find(container, '.comment-form-input');
+	input.value = 'いいですね';
+	await input.dispatch('input', {});
+	// 応答を待たせたまま次の作品へ移る
+	void find(container, '.comment-form-submit').click();
+	await comments.load({ ...POST_DETAIL, id: '149425017' });
+	release({ id: '900', userId: '99', userName: '自分', text: 'いいですね', stampId: null });
+	await flush();
+
+	assert.equal(find(container, '.comment-list').children.length, 1);
+	assert.equal(notified, 0);
+});
+
+test('コメントを受け付けていない作品には入力欄を出さない', async () => {
+	const { container, comments } = buildPostable();
+	await comments.load({ ...POST_DETAIL, commentOff: true });
+	assert.equal(find(container, '.comment-form'), null);
+});
+
+test('未ログインなら入力欄の代わりに案内を出す', async () => {
+	clearSessionCache();
+	const container = fakeElement('div');
+	const comments = createComments({
+		doc: fakeDoc({ nextData: buildNextData({ isLoggedIn: false, token: '' }) }),
+		container,
+		fetchJson: async () => ({ comments: [ROOT], hasNext: false }),
+	});
+	await comments.load(POST_DETAIL);
+	assert.equal(find(container, '.comment-form'), null);
+	assert.equal(find(find(container, '.comments-header'), '.status').textContent, 'ログインするとコメントできます');
+});
+
+test('書きかけがあるうちは Escape をビュワーへ渡さない', async () => {
+	// Escape で閉じると打った本文が消える
+	const { container, comments } = buildPostable();
+	await comments.load(POST_DETAIL);
+	const input = find(container, '.comment-form-input');
+	await input.dispatch('focus', {});
+	assert.equal(comments.consumeKey({ key: 'Escape' }), false);
+
+	input.value = '書きかけ';
+	await input.dispatch('input', {});
+	assert.equal(comments.consumeKey({ key: 'Escape' }), true);
+
+	// ピッカーが開いていれば、先にそちらを閉じる
+	await find(container, '.comment-form-pick').click();
+	assert.equal(comments.consumeKey({ key: 'Escape' }), true);
+	assert.equal(find(container, '.comment-picker'), null);
+});
+
+test('投稿した時刻を一覧の日時と同じ形にする', () => {
+	// 応答に日時は入らないので手元の時計を使う。桁は一覧に合わせて 0 で埋める
+	assert.equal(formatPostedDate(new Date(2026, 8, 20, 9, 5)), '2026-09-20 09:05');
+	assert.equal(formatPostedDate(new Date(2026, 11, 31, 23, 59)), '2026-12-31 23:59');
 });

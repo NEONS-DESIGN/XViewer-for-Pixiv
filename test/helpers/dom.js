@@ -112,6 +112,10 @@ export function fakeElement(tag) {
 		append(...nodes) {
 			for (const node of nodes) element.appendChild(node);
 		},
+		prepend(...nodes) {
+			for (const node of nodes) node.parent = element;
+			element.children.unshift(...nodes);
+		},
 		replaceChildren(...nodes) {
 			element.children = [];
 			text = '';
