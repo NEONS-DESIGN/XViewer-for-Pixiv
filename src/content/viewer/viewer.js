@@ -30,6 +30,9 @@ import { createNavigation } from './navigation.js';
 /** ホストページのスクロールを止めるために body へ付ける style。 */
 const BODY_LOCK_STYLE = 'overflow:hidden';
 
+/** キーをそのまま入力に使う要素。ここにフォーカスがある間はビュワーの割り当てを効かせない。 */
+const TEXT_ENTRY_TAGS = Object.freeze(['TEXTAREA', 'INPUT']);
+
 /**
  * 設定のうち、変わったら今開いている作品を描き直す必要があるもの。
  * closeOnBackdrop は押されたときに読むので入れない。popupTheme はビュワーに関係ない
@@ -99,6 +102,23 @@ function isRendered(element) {
  */
 function keepsOpen(target) {
 	return typeof target?.closest === 'function' && Boolean(target.closest(KEEP_OPEN_SELECTOR));
+}
+
+/**
+ * キーが入力欄の中で押されたか。
+ *
+ * ビュワーは document の捕捉フェーズで全キーを取るので、この判定が無いと
+ * コメントを書いている最中の左右キーで作品が送られる。
+ * Shadow DOM の中の要素は event.target がホストになるため composedPath() で見る。
+ * @param {KeyboardEvent} event キー
+ * @returns {boolean} 入力欄の中なら true
+ */
+export function isTextEntry(event) {
+	const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+	const target = path[0];
+	if (!target) return false;
+	if (TEXT_ENTRY_TAGS.includes(target.tagName)) return true;
+	return target.isContentEditable === true;
 }
 
 /**
@@ -348,7 +368,7 @@ export function createViewer(deps) {
 	 * キーボード操作。
 	 *
 	 * キーは手前に出ているものから順に使わせる。
-	 * 原寸表示 (画面全体を覆う) が最優先で、次がサイドバーの部品 (シェアメニュー)。
+	 * 原寸表示 (画面全体を覆う) が最優先で、次がサイドバーの部品 (シェアメニュー・コメント欄)。
 	 * 開いているメニューを閉じたつもりでモーダルごと閉じる、メニューの項目を
 	 * 下キーで送ったつもりで次の作品へ移る、を防ぐ。
 	 * @param {KeyboardEvent} event キー
@@ -365,6 +385,9 @@ export function createViewer(deps) {
 			event.stopPropagation();
 			return;
 		}
+		// 入力欄の中では、ここから先のビュワーの割り当ては一切効かせない。
+		// Escape だけは consumeKey() が先に判断している (書きかけがあれば食い止める)
+		if (isTextEntry(event)) return;
 		navigation.onKeyDown(event);
 	}
 
