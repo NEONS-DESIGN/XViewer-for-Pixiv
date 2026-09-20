@@ -1178,11 +1178,14 @@ a.comment-name:hover {
 	margin-left: 14px;
 }
 
-/* 絵文字とスタンプのパネル。入力欄の右上に浮かせる */
+/* 絵文字とスタンプのパネル。既定は入力欄の右上に浮かせる */
 .comment-picker {
+	/* 入力欄との間隔。上向きでも下向きでも同じだけ空ける */
+	--picker-gap: 4px;
+
 	position: absolute;
 	right: 0;
-	bottom: calc(100% + 4px);
+	bottom: calc(100% + var(--picker-gap));
 	z-index: 2;
 	width: 260px;
 	padding: 8px;
@@ -1190,6 +1193,13 @@ a.comment-name:hover {
 	border-radius: 8px;
 	background: var(--surface);
 	box-shadow: var(--menu-shadow);
+}
+
+/* 上に余地が無いとき (入力欄が上端に貼り付いているとき) だけ下へ回す。
+   付け外しは comment-picker.js が開くたびに実測して決める */
+.comment-picker.is-below {
+	top: calc(100% + var(--picker-gap));
+	bottom: auto;
 }
 
 .comment-picker-tabs {

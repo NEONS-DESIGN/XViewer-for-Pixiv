@@ -94,3 +94,46 @@ test('開き直すと同じパネルを使い回す', () => {
 	assert.equal(first, second);
 	assert.equal(one.slot.children.length, 1);
 });
+
+/**
+ * 位置を測れるピッカーを作る。
+ * パネル以外を測ることは無いので、作る要素すべてに同じ値を返させる。
+ * @param {() => number} panelTop 既定 (上向き) で描いたときのパネルの上端 (画面座標)
+ * @returns {{doc: object, slot: object, picker: object, opened: {emoji: string[], stamps: string[]}}} 一式
+ */
+function measurable(panelTop) {
+	const one = build();
+	const create = one.doc.createElement;
+	one.doc.createElement = (tag) => {
+		const element = create(tag);
+		element.getBoundingClientRect = () => ({ top: panelTop(), height: 248, bottom: panelTop() + 248 });
+		return element;
+	};
+	return one;
+}
+
+test('上に余地が無ければ下へ開く', () => {
+	// 入力欄が上端に貼り付いていると、上へ開いたパネルは画面の外へ出て触れなくなる
+	const one = measurable(() => -171);
+	assert.equal(open(one).classList.contains('is-below'), true);
+});
+
+test('上に余地があれば上のまま開く', () => {
+	// 一覧に重なるほうが、一覧を押し下げるより読みやすい
+	const one = measurable(() => 120);
+	assert.equal(open(one).classList.contains('is-below'), false);
+});
+
+test('開き直すたびに向きを測り直す', () => {
+	let top = -171;
+	const one = measurable(() => top);
+	assert.equal(open(one).classList.contains('is-below'), true);
+	one.picker.close();
+	top = 120;
+	assert.equal(open(one).classList.contains('is-below'), false);
+});
+
+test('位置を測れなければ既定の向き (上) のままにする', () => {
+	const one = build();
+	assert.equal(open(one).classList.contains('is-below'), false);
+});
