@@ -35,6 +35,12 @@ const MESSAGES = Object.freeze({
 /** 読み上げにだけ渡す文字に付けるクラス。見た目は viewer.css の .visually-hidden。 */
 const VISUALLY_HIDDEN_CLASS = 'visually-hidden';
 
+/** カウンタの数字だけを持つ要素のクラス。bumpCommentCount() が書き換え先を探すのに使う。 */
+const COUNT_VALUE_CLASS = 'count-value';
+
+/** コメントのカウンタに付ける差し替え用の印。actions-bar のいいね・ブックマークと同じ流儀。 */
+const COMMENT_COUNT_MARKER = 'count-comment';
+
 /** 日時の表示に使うタイムゾーン。閲覧地に依らず pixiv 本体と同じ表示にするため固定する。 */
 const DISPLAY_TIME_ZONE = 'Asia/Tokyo';
 
@@ -193,7 +199,7 @@ export function commentToNodes(doc, html) {
 /**
  * サイドバーを作る。
  * @param {SidebarDeps} deps 依存
- * @returns {{render: (detail: object) => void, followSlot: () => HTMLElement, countsSlot: () => HTMLElement, commentsSlot: () => HTMLElement, consumeEscape: () => boolean, consumeKey: (event: KeyboardEvent) => boolean, dispose: () => void}}
+ * @returns {{render: (detail: object) => void, followSlot: () => HTMLElement, countsSlot: () => HTMLElement, commentsSlot: () => HTMLElement, bumpCommentCount: (delta: number) => void, consumeEscape: () => boolean, consumeKey: (event: KeyboardEvent) => boolean, dispose: () => void}}
  */
 export function createSidebar(deps) {
 	const { doc, container } = deps;
@@ -205,6 +211,13 @@ export function createSidebar(deps) {
 	let counts = null;
 	/** @type {HTMLElement|null} コメントを後から差し込む場所 */
 	let comments = null;
+	/**
+	 * 今出しているコメントの件数。投稿のたびに手元で増やす。
+	 * 取り直さないのは、投稿の反映に間があり、直後に引くと古い数字が返るため
+	 * (いいね・ブックマークと同じ方針。SPEC §10.12)。
+	 * @type {number}
+	 */
+	let commentCount = 0;
 	/** @type {ReturnType<typeof createShareMenu>|null} シェアメニュー。Escape を先に食べる */
 	let shareMenu = null;
 	/** 描画の世代。アイコンの取得を待っている間に描き直されたかを見る */
@@ -234,6 +247,8 @@ export function createSidebar(deps) {
 		name.textContent = `${label} `;
 		item.appendChild(name);
 		const text = doc.createElement('span');
+		// 数字だけを持つ要素に印を付けておく。bumpCommentCount() がここだけを書き換える
+		text.className = COUNT_VALUE_CLASS;
 		text.textContent = formatCount(value);
 		item.appendChild(text);
 		item.title = `${label} ${formatCount(value)}`;
@@ -380,9 +395,11 @@ export function createSidebar(deps) {
 				createCount('like', MESSAGES.LIKE, detail.likeCount, 'count-like'),
 				createCount('favorite', MESSAGES.BOOKMARK, detail.bookmarkCount, 'count-bookmark'),
 				createCount('visibility', MESSAGES.VIEWS, detail.viewCount),
-				createCount('comment', MESSAGES.COMMENTS, detail.commentCount),
+				createCount('comment', MESSAGES.COMMENTS, detail.commentCount, COMMENT_COUNT_MARKER),
 			);
 			info.appendChild(counts);
+			// 新しい作品を描いたら、前の作品で足した分は持ち越さず detail の値に揃える
+			commentCount = typeof detail.commentCount === 'number' ? detail.commentCount : 0;
 
 			info.appendChild(createLinkRow(detail));
 
@@ -394,6 +411,25 @@ export function createSidebar(deps) {
 		followSlot() { return follow; },
 		countsSlot() { return counts; },
 		commentsSlot() { return comments; },
+
+		/**
+		 * コメントの件数を手元で増減する。
+		 * 取り直さないのは、投稿の反映に間があり、直後に引くと古い数字が返るため
+		 * (いいね・ブックマークと同じ方針。SPEC §10.12)。
+		 * render() より前や dispose() の後に呼ばれても何もしない。
+		 * @param {number} delta 増やす数 (減らすときは負数)
+		 * @returns {void}
+		 */
+		bumpCommentCount(delta) {
+			if (!counts) return;
+			const node = counts.querySelector(`.${COMMENT_COUNT_MARKER}`);
+			if (!node) return;
+			commentCount = Math.max(0, commentCount + delta);
+			const value = node.querySelector(`.${COUNT_VALUE_CLASS}`);
+			if (!value) return;
+			value.textContent = formatCount(commentCount);
+			node.title = `${MESSAGES.COMMENTS} ${formatCount(commentCount)}`;
+		},
 
 		/**
 		 * Escape をシェアメニューに使わせる。
@@ -424,6 +460,7 @@ export function createSidebar(deps) {
 			follow = null;
 			counts = null;
 			comments = null;
+			commentCount = 0;
 		},
 	};
 }
