@@ -6,7 +6,12 @@ import { createIcon } from '../../common/icons.js';
 import { getJson } from '../../pixiv/client.js';
 import { commentRootsUrl, commentRepliesUrl, emojiUrl, stampUrl, userPath } from '../../pixiv/endpoints.js';
 import { createAvatar, showAvatar } from './avatar.js';
+import { createCommentForm } from './comment-form.js';
+import { createCommentPicker } from './comment-picker.js';
 import { parseCommentText } from '../../pixiv/emoji.js';
+import { postComment, postStamp } from '../../pixiv/actions.js';
+import { PIXIV_ERROR_KINDS } from '../../pixiv/errors.js';
+import { readSession, clearSessionCache } from '../session.js';
 import { COMMENT_PAGE_SIZE } from '../../common/constants.js';
 import { warn } from '../../common/log.js';
 
@@ -35,12 +40,21 @@ const MESSAGES = Object.freeze({
 	EMPTY: 'まだコメントはありません',
 	/** 見出しの右端のボタン。サイドバーの先頭 (投稿文) へ戻す */
 	TO_TOP: '上部へ',
+	/** 投稿の入力欄 */
+	COMMENT_PLACEHOLDER: 'コメントする',
+	REPLY_PLACEHOLDER: '返信する',
+	REPLY: '返信',
+	/** 未ログイン */
+	SIGN_IN: 'ログインするとコメントできます',
+	/** 投稿の失敗 */
+	POST_FAILED: 'コメントを投稿できませんでした',
+	SESSION_EXPIRED: 'ログインが切れています。pixiv にログインし直し、このページを再読み込みしてください',
 });
 
 /** 返信の 1 ページ目。replies API は offset ではなく 1 始まりの page で送る。 */
 const FIRST_REPLY_PAGE = 1;
 
-/** 見出しが上端に貼り付いている間だけ付ける印。下に線を引くのに使う。 */
+/** 見出しと入力欄の入れ物が上端に貼り付いている間だけ付ける印。下に線を引くのに使う。 */
 const STUCK_CLASS = 'is-stuck';
 
 /**
@@ -51,7 +65,7 @@ const STUCK_EPSILON = 1;
 
 /**
  * 見出しがスクロール領域の上端に貼り付いているかを判定する。
- * @param {number} headingTop 見出しの上端 (画面座標)
+ * @param {number} headingTop 見出しの上端 (画面座標)。実際に測るのは見出しと入力欄をまとめた入れ物
  * @param {number} scrollportTop スクロール領域の上端 (画面座標)
  * @returns {boolean} 貼り付いていれば true
  */
@@ -121,6 +135,18 @@ export function normalizeComment(raw) {
 }
 
 /**
+ * 投稿した時刻を一覧の日時と同じ形にする。
+ * 応答に日時は入らないので手元の時計を使う (pixiv 本体も同じ)。
+ * 形は API の commentDate に合わせた 'YYYY-MM-DD HH:mm'。
+ * @param {Date} at 時刻
+ * @returns {string} 'YYYY-MM-DD HH:mm'
+ */
+export function formatPostedDate(at) {
+	const pad = (value) => String(value).padStart(2, '0');
+	return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())} ${pad(at.getHours())}:${pad(at.getMinutes())}`;
+}
+
+/**
  * コメント本文を描画用のノードにする。絵文字は画像へ、それ以外は文字のまま。
  * @param {Document} doc document
  * @param {string} text コメント本文
@@ -167,17 +193,20 @@ export function renderStamp(doc, stampId) {
  * @property {HTMLElement} container 描画先
  * @property {HTMLElement} [scrollTarget] 「上部へ」で先頭に戻す相手 (.sidebar)。無ければボタンを出さない
  * @property {(url: string) => Promise<object>} [fetchJson] 取得の差し替え。テストから通信させないために使う
+ * @property {{postComment?: Function, postStamp?: Function}} [actions] 投稿の差し替え。テストから通信させないために使う
+ * @property {() => void} [onPosted] 投稿できたときに 1 回呼ぶ。コメント件数の +1 に使う
  */
 
 /**
  * コメント区画を作る。
  * @param {CommentsDeps} deps 依存
- * @returns {{load: (detail: object) => Promise<void>, dispose: () => void}}
+ * @returns {{load: (detail: object) => Promise<void>, consumeKey: (event: KeyboardEvent) => boolean, dispose: () => void}}
  */
 export function createComments(deps) {
 	const { doc, container } = deps;
 	const scrollTarget = deps.scrollTarget ?? null;
 	const fetchJson = deps.fetchJson ?? ((url) => getJson(url));
+	const api = { postComment, postStamp, ...deps.actions };
 	/** 読み込み済みの件数。「もっと見る」で増やす */
 	let offset = 0;
 	/** 今表示している作品 */
@@ -192,12 +221,20 @@ export function createComments(deps) {
 	let failure = null;
 	/** @type {ResizeObserver|null} 中身の高さが変わったら下限を測り直す */
 	let sizeWatcher = null;
-	/** @type {HTMLElement|null} コメントの見出し。貼り付いたかを見るのに使う */
-	let headingEl = null;
+	/** @type {HTMLElement|null} 見出しと入力欄をまとめた入れ物。貼り付いたかを見るのはこれ */
+	let headerEl = null;
 	/** @type {HTMLButtonElement|null} 見出しの右端の「上部へ」 */
 	let toTopButton = null;
 	/** @type {(() => void)|null} scrollTarget の購読を解く */
 	let unwatchScroll = null;
+	/** @type {object|null} 作品への入力欄 */
+	let rootForm = null;
+	/** @type {object|null} 絵文字とスタンプのピッカー。1 枚を使い回す */
+	let picker = null;
+	/** @type {Set<object>} 今出ている入力欄。Escape の行き先を決めるのに使う */
+	const forms = new Set();
+	/** @type {object|null} 今開いている作品。投稿に作者 ID が要る */
+	let detailRef = null;
 
 	/**
 	 * 要素にフォーカスがあるか。
@@ -273,22 +310,22 @@ export function createComments(deps) {
 	/**
 	 * サイドバーを送るたびに見直す。
 	 *
-	 * **下の線と「上部へ」は同じ合図で出す。** どちらも「見出しが上端に貼り付いた」ことに
+	 * **下の線と「上部へ」は同じ合図で出す。** どちらも「見出しと入力欄が上端に貼り付いた」ことに
 	 * 結び付いている: 線はコメントとの境目を示すため、ボタンは投稿文が画面から出た
 	 * ことを意味するため。貼り付いていなければ投稿文はまだ見えているので、戻す導線は要らない。
 	 * @returns {void}
 	 */
 	function syncScrollState() {
-		if (!headingEl || !scrollTarget) return;
+		if (!headerEl || !scrollTarget) return;
 		// テスト用の DOM には測る口が無い。見た目の調整なので黙って何もしない
-		if (typeof headingEl.getBoundingClientRect !== 'function') return;
+		if (typeof headerEl.getBoundingClientRect !== 'function') return;
 		// 文書に入る前は位置が全て 0 で、上端に並んでいると誤判定する
-		if (headingEl.isConnected === false) return;
+		if (headerEl.isConnected === false) return;
 		const stuck = isHeadingStuck(
-			headingEl.getBoundingClientRect().top,
+			headerEl.getBoundingClientRect().top,
 			scrollTarget.getBoundingClientRect().top,
 		);
-		headingEl.classList.toggle(STUCK_CLASS, stuck);
+		headerEl.classList.toggle(STUCK_CLASS, stuck);
 		// 押しても何も起きないボタンは見せない (UI_DESIGN_KIT §6)
 		if (toTopButton) toTopButton.hidden = !stuck;
 	}
@@ -320,7 +357,6 @@ export function createComments(deps) {
 	function createHeading() {
 		const heading = doc.createElement('h3');
 		heading.className = 'comments-heading';
-		headingEl = heading;
 
 		// 「上部へ」を右端へ寄せるため、見出しの文字も要素に入れる
 		const title = doc.createElement('span');
@@ -350,15 +386,99 @@ export function createComments(deps) {
 			// 位置を測れず、上端に並んでいることになってしまう。入れてから load() が呼ぶ
 		}
 
-		watchSize(heading);
 		return heading;
+	}
+
+	/**
+	 * 投稿の失敗を文言にする。
+	 * 401 はログインが切れている (別タブでログアウトした等)。覚えているセッションを捨て、
+	 * 再読み込みまで案内する。__NEXT_DATA__ は SPA 遷移で変わらないので捨てても
+	 * 新しいトークンは得られない (SPEC §9.4)
+	 * @param {unknown} error 失敗の中身
+	 * @returns {string} 出す文言
+	 */
+	function postErrorMessage(error) {
+		if (error?.kind === PIXIV_ERROR_KINDS.UNAUTHORIZED) {
+			clearSessionCache();
+			return MESSAGES.SESSION_EXPIRED;
+		}
+		return MESSAGES.POST_FAILED;
+	}
+
+	/**
+	 * 入力欄を 1 つ作る。投稿の宛先と、成功したときの置き場所だけが違う。
+	 * @param {object} options 設定
+	 * @param {string} options.placeholder 空のときの文言
+	 * @param {string|null} options.parentId 返信先のルートコメント ID。作品へのコメントなら null
+	 * @param {string|null} options.avatarUrl 左に出すアバター
+	 * @param {(posted: object, value: object) => void} options.onPosted 投稿できたときの置き場所
+	 * @returns {object} 入力欄
+	 */
+	function buildForm(options) {
+		picker ??= createCommentPicker({ doc });
+		const form = createCommentForm({
+			doc,
+			placeholder: options.placeholder,
+			avatarUrl: options.avatarUrl,
+			picker,
+			errorMessage: postErrorMessage,
+			onSubmit: async (value) => {
+				const requestedWorkId = workId;
+				// トークンは押された時点で読む。失効時にキャッシュを捨てれば全ての入力欄が追従する
+				const token = readSession(doc).csrfToken;
+				const posted = value.stampId === null
+					? await api.postComment(detailRef.id, detailRef.userId, value.text, options.parentId, token)
+					: await api.postStamp(detailRef.id, detailRef.userId, value.stampId, options.parentId, token);
+				// 待っている間に別の作品へ移っていたら画面へは足さない (投稿自体は通っている)
+				if (workId !== requestedWorkId) return;
+				options.onPosted(posted, value);
+				deps.onPosted?.();
+			},
+		});
+		forms.add(form);
+		return form;
+	}
+
+	/**
+	 * 見出しと作品への入力欄をまとめた入れ物を作る。
+	 *
+	 * 入力欄を見出しと同じ入れ物に入れるのは、「サイドバーごと送る」設定で
+	 * 一緒に画面の上端へ貼り付かせるため。別の子にすると見出しだけが貼り付き、
+	 * 入力欄は流れていく。
+	 * @param {object} session セッション
+	 * @param {boolean} canPost 入力欄を出してよいか
+	 * @returns {HTMLElement} 入れ物
+	 */
+	function createHeader(session, canPost) {
+		const header = doc.createElement('div');
+		header.className = 'comments-header';
+		headerEl = header;
+		header.appendChild(createHeading());
+		if (canPost) {
+			rootForm = buildForm({
+				placeholder: MESSAGES.COMMENT_PLACEHOLDER,
+				parentId: null,
+				avatarUrl: null,
+				onPosted: (posted) => { prependComment(posted); },
+			});
+			header.appendChild(rootForm.element);
+		} else if (!session.isLoggedIn || !session.csrfToken) {
+			// 案内を出すのは未ログインのときだけ。コメントを受け付けていない作品は一覧側が伝える
+			const signIn = doc.createElement('p');
+			signIn.className = 'status';
+			signIn.textContent = MESSAGES.SIGN_IN;
+			header.appendChild(signIn);
+		}
+		// 入力欄の高さも下限に効く。入れ物ごと見張る
+		watchSize(header);
+		return header;
 	}
 
 	/**
 	 * コメント本体 (アバター・名前・本文・日時) を要素にする。
 	 * ルートにも返信にも同じ形を使う。
 	 * @param {Comment} comment コメント
-	 * @returns {{item: HTMLElement, body: HTMLElement, repliesSlot: HTMLElement}} 要素・本文側の入れ物・返信ボタンの差し込み先
+	 * @returns {{item: HTMLElement, body: HTMLElement, repliesSlot: HTMLElement, meta: HTMLElement}} 要素・本文側の入れ物・返信ボタンの差し込み先・下段
 	 */
 	function createItem(comment) {
 		const item = doc.createElement('li');
@@ -411,7 +531,7 @@ export function createComments(deps) {
 
 		body.append(name, text, meta);
 		item.append(avatarNode, body);
-		return { item, body, repliesSlot };
+		return { item, body, repliesSlot, meta };
 	}
 
 	/**
@@ -570,6 +690,44 @@ export function createComments(deps) {
 	}
 
 	/**
+	 * 投稿の応答を一覧の 1 件の形にする。
+	 * アバターは応答に入らないのでセッションの値を使う。
+	 * @param {object} posted actions.js が返した 1 件
+	 * @returns {Comment} 一覧に並べる形
+	 */
+	function fromPosted(posted) {
+		const self = readSession(doc).self;
+		return {
+			id: posted.id,
+			userId: posted.userId || self?.id || '',
+			userName: posted.userName || self?.name || MESSAGES.DELETED_USER,
+			avatarUrl: self?.profileImg ?? '',
+			text: posted.text,
+			date: formatPostedDate(new Date()),
+			isStamp: posted.stampId !== null,
+			stampId: posted.stampId,
+			hasReplies: false,
+			isDeleted: false,
+		};
+	}
+
+	/**
+	 * 投稿できたコメントを一覧の先頭へ差し込む。
+	 * 取り直さないのは offset がずれ、読み進めた位置も飛ぶため (pixiv 本体も同じ)。
+	 * @param {object} posted actions.js が返した 1 件
+	 * @returns {void}
+	 */
+	function prependComment(posted) {
+		if (!list) return;
+		const comment = fromPosted(posted);
+		const { item, body, repliesSlot } = createItem(comment);
+		// 投稿直後に返信は無い。開閉は返信があるものにだけ付ける (一覧と同じ規則)
+		if (comment.hasReplies) attachReplies(comment, body, repliesSlot);
+		list.prepend(item);
+		applyFloor();
+	}
+
+	/**
 	 * 続きを読み込んで並べる。
 	 * @returns {Promise<void>}
 	 */
@@ -646,16 +804,24 @@ export function createComments(deps) {
 			sizeWatcher?.disconnect();
 			unwatchScroll?.();
 			unwatchScroll = null;
-			headingEl = null;
+			headerEl = null;
 			toTopButton = null;
 			scroll = null;
 			list = null;
 			moreButton = null;
 			failure = null;
+			// 前の作品の入力欄は捨てる。書きかけごと消えるが、別の作品へ送るほうが害が大きい
+			rootForm = null;
+			forms.clear();
+			picker?.close();
 			container.style.minHeight = '';
 
-			container.appendChild(createHeading());
-			// 判定は文書に入れてから。createHeading() の中では位置を測れない
+			detailRef = detail;
+			const session = readSession(doc);
+			// コメントを受け付けていない作品と未ログインでは投稿できない
+			const canPost = detail.commentOff !== true && session.isLoggedIn === true && Boolean(session.csrfToken);
+			container.appendChild(createHeader(session, canPost));
+			// 判定は文書に入れてから。createHeader() の中では位置を測れない
 			syncScrollState();
 
 			if (detail.commentOff) {
@@ -700,19 +866,42 @@ export function createComments(deps) {
 			await loadMore();
 		},
 
+		/**
+		 * キー操作を入力欄に先に使わせる。
+		 * 開いているピッカーの Escape と、書きかけを消さないための Escape を食い止める。
+		 * @param {KeyboardEvent} event キー
+		 * @returns {boolean} 食い止めたなら true
+		 */
+		consumeKey(event) {
+			if (picker?.consumeKey(event) === true) return true;
+			for (const form of forms) {
+				if (form.consumeKey(event) === true) return true;
+			}
+			return false;
+		},
+
+		/**
+		 * コメント区画を片付ける。
+		 * @returns {void}
+		 */
 		dispose() {
 			// 見張ったままだと、閉じたあとの高さの変化で測りに行って落ちる
 			sizeWatcher?.disconnect();
 			sizeWatcher = null;
 			unwatchScroll?.();
 			unwatchScroll = null;
-			headingEl = null;
+			headerEl = null;
 			toTopButton = null;
 			list = null;
 			scroll = null;
 			moreButton = null;
 			failure = null;
 			workId = null;
+			rootForm = null;
+			forms.clear();
+			picker?.dispose();
+			picker = null;
+			detailRef = null;
 		},
 	};
 }
