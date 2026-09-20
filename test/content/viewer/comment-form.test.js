@@ -200,6 +200,16 @@ test('フォーカスが外にあるときは Escape を食い止めない', () 
 	assert.equal(form.consumeKey({ key: 'Escape' }), false);
 });
 
+test('スタンプの取り消しボタンにフォーカスがあるときも Escape を食い止める', async () => {
+	const picked = [];
+	const picker = { open: (_slot, handlers) => { picked.push(handlers); }, close: () => {}, isOpen: () => false };
+	const { form, element } = build({ picker });
+	await find(element, '.comment-form-pick').click();
+	picked[0].onStamp('304');
+	await find(element, '.comment-form-stamp-clear').dispatch('focus', {});
+	assert.equal(form.consumeKey({ key: 'Escape' }), true);
+});
+
 test('アバターを渡したときだけ左に出す', () => {
 	assert.equal(find(build().element, '.comment-form-avatar'), null);
 	const withAvatar = build({ avatarUrl: 'https://i.pximg.net/user-profile/img/1_50.jpg' });

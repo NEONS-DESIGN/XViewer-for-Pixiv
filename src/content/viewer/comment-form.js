@@ -158,6 +158,8 @@ export function createCommentForm(deps) {
 		clear.setAttribute('aria-label', MESSAGES.STAMP_CLEAR);
 		clear.appendChild(createIcon(doc, 'close'));
 		clear.addEventListener('click', () => { clearStamp(); });
+		clear.addEventListener('focus', () => { focused = true; });
+		clear.addEventListener('blur', () => { focused = false; });
 		stampBox.append(image, clear);
 		stampBox.hidden = false;
 		// 本文は隠すだけで消さない。取り消したら書きかけが戻る
@@ -241,6 +243,10 @@ export function createCommentForm(deps) {
 	return {
 		element,
 
+		/**
+		 * 本文の入力へフォーカスを移す。
+		 * @returns {void}
+		 */
 		focus() { input.focus(); },
 
 		/**
@@ -267,6 +273,10 @@ export function createCommentForm(deps) {
 			return hasInput();
 		},
 
+		/**
+		 * 入力欄を片付ける。開いていればピッカーも閉じる。
+		 * @returns {void}
+		 */
 		dispose() {
 			picker?.close();
 			clearError();
