@@ -277,7 +277,7 @@ const SHEETS = [
 			'無限スクロールの動作',
 			'背景クリックで閉じるか',
 		])}
-			${framed({ id: 'c4', name: 'shot-popup.png', ...fit('shot-popup.png', { x: 812, y: 216, width: 412, height: 560 }) })}`,
+			${framed({ id: 'c4', name: 'popup-top-dark.png', ...fit('popup-top-dark.png', { x: 812, y: 216, width: 412, height: 560 }) })}`,
 	},
 	{ name: 'store-5-keys', build: keySheet },
 ];
