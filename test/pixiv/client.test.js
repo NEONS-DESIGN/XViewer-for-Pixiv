@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { getJson, postJson, postFormRaw, postFormData } from '../../src/pixiv/client.js';
+import { getJson, postJson, postFormRaw, postFormData, postForm } from '../../src/pixiv/client.js';
 import { PIXIV_ERROR_KINDS } from '../../src/pixiv/errors.js';
 import { fakeFetch } from '../helpers/pixiv.js';
 
@@ -169,6 +169,34 @@ test('POST は signal を fetch へ渡す', async () => {
 	const controller = new AbortController();
 	await postJson('/ajax/x', {}, 'TOKEN', { fetchImpl: impl, signal: controller.signal });
 	assert.equal(calls[0].init.signal, controller.signal);
+});
+
+test('postForm は urlencoded を送り、body を展開して返す', async () => {
+	const { impl, calls } = fakeFetch({ json: { error: false, message: '', body: { comment_id: '233867786' } } });
+	const body = await postForm('/rpc/post_comment.php', { type: 'comment', comment: 'あ' }, 'TOKEN', { fetchImpl: impl });
+	assert.deepEqual(body, { comment_id: '233867786' });
+	assert.equal(calls[0].init.method, 'POST');
+	assert.equal(calls[0].init.headers.accept, 'application/json');
+	assert.equal(calls[0].init.headers['content-type'], 'application/x-www-form-urlencoded; charset=utf-8');
+	assert.equal(calls[0].init.headers['x-csrf-token'], 'TOKEN');
+	assert.equal(calls[0].init.body, 'type=comment&comment=%E3%81%82');
+});
+
+test('postForm は error:true を PixivError にする', async () => {
+	const { impl } = fakeFetch({ json: { error: true, message: 'コメントできません', body: null } });
+	await assert.rejects(
+		() => postForm('/rpc/post_comment.php', { type: 'comment' }, 'TOKEN', { fetchImpl: impl }),
+		(error) => error.kind === PIXIV_ERROR_KINDS.API && error.message === 'コメントできません',
+	);
+});
+
+test('postForm はトークンが無ければ通信せずに UNAUTHORIZED', async () => {
+	const { impl, calls } = fakeFetch({ json: { error: false, body: {} } });
+	await assert.rejects(
+		() => postForm('/rpc/post_comment.php', {}, '', { fetchImpl: impl }),
+		(error) => error.kind === PIXIV_ERROR_KINDS.UNAUTHORIZED,
+	);
+	assert.equal(calls.length, 0);
 });
 
 test('POST は CSRF トークンが空なら通信せずに unauthorized として投げる', async () => {
