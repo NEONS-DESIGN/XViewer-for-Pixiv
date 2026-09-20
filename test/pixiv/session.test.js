@@ -76,3 +76,20 @@ test('self.id が無ければ null にする', () => {
 	assert.equal(parseNextData(buildNextData({ self: {} })).self.id, null);
 	assert.equal(parseNextData(buildNextData({ self: { id: '' } })).self.id, null);
 });
+
+test('自分の名前とアバターを読む', () => {
+	const session = parseNextData(buildNextData({
+		self: {
+			id: '54734418', name: 'NEONS', xRestrict: 1,
+			profileImg: 'https://i.pximg.net/user-profile/img/2023/01/01/00/00/00/1_50.jpg',
+		},
+	}));
+	assert.equal(session.self.name, 'NEONS');
+	assert.equal(session.self.profileImg, 'https://i.pximg.net/user-profile/img/2023/01/01/00/00/00/1_50.jpg');
+});
+
+test('名前とアバターが無くても落ちない', () => {
+	const session = parseNextData(buildNextData({ self: { id: '1', xRestrict: 0 } }));
+	assert.equal(session.self.name, null);
+	assert.equal(session.self.profileImg, null);
+});

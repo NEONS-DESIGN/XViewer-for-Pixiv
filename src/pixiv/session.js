@@ -15,6 +15,10 @@ const EMPTY_SESSION = Object.freeze({ isLoggedIn: false, self: null, csrfToken: 
  * @typedef {object} SessionSelf
  * @property {string|null} id 自分のユーザー ID。作品の userId と比べて「自分の作品か」を決める
  *   (SITE_SPEC §6)。読めなければ null で、その場合は「自分ではない」に倒す
+ * @property {string|null} name 自分の表示名。投稿直後のコメントを画面へ差し込むときの控え
+ *   (応答の user_name が本命。読めなければ null)
+ * @property {string|null} profileImg 自分のアバター URL。投稿の応答には入らないので
+ *   差し込む 1 件のアバターはこれが唯一の出どころ。読めなければ null (枠だけ出る)
  * @property {number} xRestrict 表示設定 0=全年齢のみ 1=R-18まで 2=R-18Gまで
  * @property {boolean} hideAiWorks AI 作品を隠す設定。未使用。SPEC §16 のとおり AI 生成の表示は未実装で、
  *   サーバー側フィルタなので拡張側で判定に使う場面も無い (SITE_SPEC §6)。読めるように残してある
@@ -64,6 +68,8 @@ export function parseNextData(text) {
 			const id = self.id === null || self.id === undefined ? '' : String(self.id);
 			session.self = {
 				id: id === '' ? null : id,
+				name: typeof self.name === 'string' && self.name !== '' ? self.name : null,
+				profileImg: typeof self.profileImg === 'string' && self.profileImg !== '' ? self.profileImg : null,
 				xRestrict: typeof self.xRestrict === 'number' ? self.xRestrict : DEFAULT_X_RESTRICT,
 				hideAiWorks: self.hideAiWorks === true,
 			};
