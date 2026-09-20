@@ -251,19 +251,19 @@ const SHEETS = [
 		name: 'store-1-viewer',
 		build: () => sheetWithShot('c1', 'クリックした作品が、その場で開く',
 			'ページ遷移せずにモーダルで表示。閉じれば元のグリッドの、元のスクロール位置に戻ります。',
-			'viewer-single.jpg'),
+			'viewer-single-dark.jpg'),
 	},
 	{
 		name: 'store-2-sidebar',
 		build: () => sheetWithShot('c2', '投稿文もコメントも、画像の横に',
 			'タグ・投稿日・いいね数・コメントをサイドバーに。スタンプと絵文字は画像のまま表示します。',
-			'viewer-multi.jpg'),
+			'viewer-multi-dark.jpg'),
 	},
 	{
 		name: 'store-3-infinite',
 		build: () => sheetWithShot('c3', '一覧を、途切れさせない',
 			'ページャーを押さずに読み込み続けます。URL のページ番号も、画面に出ているページへ追従します。',
-			'grid.jpg'),
+			'grid-dark.jpg'),
 	},
 	{
 		name: 'store-4-settings',
