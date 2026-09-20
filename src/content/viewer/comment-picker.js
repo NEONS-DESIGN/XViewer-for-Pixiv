@@ -24,6 +24,16 @@ const TABS = Object.freeze([
 	{ key: 'stamp', label: MESSAGES.STAMP },
 ]);
 
+/** 下向きに開いたパネルに付ける印。viewer.css が上下を入れ替える。 */
+const BELOW_CLASS = 'is-below';
+
+/**
+ * 画面の上端との間に残したい余白 (px)。
+ * これだけ空けられないなら上には開かない。縁に貼り付くと押しにくく、
+ * 端数の丸めで 1px はみ出すこともある。
+ */
+const EDGE_MARGIN = 4;
+
 /**
  * ピッカーを作る。
  * @param {{doc: Document}} deps 依存
@@ -147,6 +157,23 @@ export function createCommentPicker(deps) {
 	}
 
 	/**
+	 * 上下どちらへ開くかを実際の位置から決める。
+	 *
+	 * 既定は上。一覧に重なるだけで済み、一覧を押し下げるより読みやすい。
+	 * ただし入力欄が上端に貼り付いていると上には収まらず、タブごと画面の外へ出てしまう。
+	 * そのときだけ下へ回す。**差し込んだ直後に呼ぶこと** (文書の中でないと位置を測れない)。
+	 * @returns {void}
+	 */
+	function applyDirection() {
+		// 前に開いたときの向きは引きずらない。測り直した結果だけで決める
+		panel.classList.remove(BELOW_CLASS);
+		// テスト用の DOM には測る口が無い。見た目の調整なので黙って既定 (上) のままにする
+		if (typeof panel.getBoundingClientRect !== 'function') return;
+		// 既定の位置で描いた結果をそのまま読む。入力欄との間隔も高さも計算せずに済む
+		if (panel.getBoundingClientRect().top < EDGE_MARGIN) panel.classList.add(BELOW_CLASS);
+	}
+
+	/**
 	 * 閉じる。パネルは捨てずに差し込み先から外すだけ。
 	 * @returns {void}
 	 */
@@ -171,6 +198,8 @@ export function createCommentPicker(deps) {
 			syncTabs();
 			renderGrid();
 			slot.appendChild(panel);
+			// 向きは開くたびに決め直す。同じ入力欄でもサイドバーを送れば余地は変わる
+			applyDirection();
 			// 外側を押したら閉じる。捕捉フェーズで受けて、下の要素が反応する前に閉じる
 			if (typeof doc.addEventListener === 'function') {
 				const onOutside = (event) => {
