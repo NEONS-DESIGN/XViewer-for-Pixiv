@@ -229,6 +229,8 @@ export function createComments(deps) {
 	let unwatchScroll = null;
 	/** @type {object|null} 作品への入力欄 */
 	let rootForm = null;
+	/** 今の作品に投稿できるか。返信の導線を出すかの判断にも使う。load() が決める */
+	let canPost = false;
 	/** @type {object|null} 絵文字とスタンプのピッカー。1 枚を使い回す */
 	let picker = null;
 	/** @type {Set<object>} 今出ている入力欄。Escape の行き先を決めるのに使う */
@@ -521,8 +523,9 @@ export function createComments(deps) {
 		if (comment.isStamp) text.appendChild(renderStamp(doc, comment.stampId));
 		else text.append(...renderCommentText(doc, comment.text));
 
-		// 下段は「返信ボタンが左、日時が右」で揃える。
-		// 返信ボタンは後から差し込むので、無い場合でも枠だけ先に置いて位置をずらさない
+		// 下段は「返信を書く導線が左端、返信を読む導線がその隣、日時が右端」で揃える。
+		// どちらの導線も後から差し込む。返信を読む導線は枠だけ先に置いて、
+		// 返信の有無で日時の位置がずれないようにする
 		const meta = doc.createElement('div');
 		meta.className = 'comment-meta';
 		const repliesSlot = doc.createElement('span');
@@ -544,8 +547,8 @@ export function createComments(deps) {
 	 * 残しておくとコメントの多い作品で要素が増え続ける。
 	 * @param {Comment} comment ルートコメント
 	 * @param {HTMLElement} body 返信をぶら下げる先 (.comment-body)
-	 * @param {HTMLElement} repliesSlot 開閉ボタンの差し込み先 (下段の左端)
-	 * @returns {void}
+	 * @param {HTMLElement} repliesSlot 開閉ボタンの差し込み先 (下段、返信ボタンの隣)
+	 * @returns {{appendPosted: (posted: object) => void}} 投稿できた返信を足す口
 	 */
 	function attachReplies(comment, body, repliesSlot) {
 		/** 開いているか */
@@ -689,7 +692,91 @@ export function createComments(deps) {
 			void loadPage();
 		});
 
+		// 返信が無くても枠は作る。自分が返信したらその場で出せるようにするため
+		toggle.hidden = comment.hasReplies !== true;
 		repliesSlot.appendChild(toggle);
+
+		return {
+			/**
+			 * 投稿できた返信を返信一覧の末尾へ足す。
+			 * 畳んでいるときは足さず、「返信を表示」を出すだけにする (開けば取り直される)。
+			 * @param {object} posted actions.js が返した 1 件
+			 * @returns {void}
+			 */
+			appendPosted(posted) {
+				toggle.hidden = false;
+				if (!open || !replyList) return;
+				replyList.appendChild(createItem(fromPosted(posted)).item);
+				applyFloor();
+			},
+		};
+	}
+
+	/**
+	 * 返信を書く導線を 1 件のコメントに付ける。
+	 *
+	 * 「返信を表示」の左に置く。押すたびに入力欄を出し入れし、畳んだら DOM ごと捨てる
+	 * (開いたまま残すとコメントの多い作品で入力欄が積み上がる)。
+	 * @param {Comment} comment ルートコメント
+	 * @param {HTMLElement} body 入力欄をぶら下げる先 (.comment-body)
+	 * @param {HTMLElement} meta 下段。ボタンをここの先頭へ差し込む
+	 * @param {(posted: object) => void} onReplied 返信できたときに呼ぶ (返信一覧へ足す)
+	 * @returns {void}
+	 */
+	function attachReplyForm(comment, body, meta, onReplied) {
+		/** @type {object|null} 開いている入力欄。畳んでいる間は null */
+		let form = null;
+
+		const toggle = doc.createElement('button');
+		toggle.type = 'button';
+		toggle.className = 'comment-reply-toggle';
+		toggle.textContent = MESSAGES.REPLY;
+		toggle.setAttribute('aria-expanded', 'false');
+		toggle.addEventListener('click', () => {
+			if (form) {
+				// forms から外し忘れると、消えた入力欄が Escape を食い止め続ける
+				forms.delete(form);
+				form.dispose();
+				form = null;
+				toggle.setAttribute('aria-expanded', 'false');
+				applyFloor();
+				// 入力欄ごと消えるとフォーカスが body へ落ちる。押したボタンへ戻す
+				toggle.focus();
+				return;
+			}
+			form = buildForm({
+				placeholder: MESSAGES.REPLY_PLACEHOLDER,
+				parentId: comment.id,
+				avatarUrl: readSession(doc).self?.profileImg ?? null,
+				onPosted: (posted) => { onReplied(posted); },
+			});
+			// 返信一覧より前、コメントの直下に出す (pixiv 本体と同じ位置)。
+			// 返信の下に置くと、返信が多いコメントほど書く場所が遠くなる
+			const area = body.querySelector('.comment-replies-area');
+			if (area) body.insertBefore(form.element, area);
+			else body.appendChild(form.element);
+			toggle.setAttribute('aria-expanded', 'true');
+			applyFloor();
+			form.focus();
+		});
+
+		meta.prepend(toggle);
+	}
+
+	/**
+	 * ルートコメント 1 件を導線ごと組み立てる。
+	 *
+	 * 返信を読む導線と書く導線はルートにだけ付ける (pixiv 側も入れ子は 1 段まで)。
+	 * 一覧から読んだ 1 件も投稿直後の 1 件もここを通し、同じ形にする。
+	 * @param {Comment} comment ルートコメント
+	 * @returns {HTMLElement} 一覧へ入れる 1 件 (.comment-item)
+	 */
+	function createRootItem(comment) {
+		const { item, body, repliesSlot, meta } = createItem(comment);
+		const replies = attachReplies(comment, body, repliesSlot);
+		// 投稿できない作品・未ログインでは返信も書けない
+		if (canPost) attachReplyForm(comment, body, meta, (posted) => { replies.appendPosted(posted); });
+		return item;
 	}
 
 	/**
@@ -722,11 +809,9 @@ export function createComments(deps) {
 	 */
 	function prependComment(posted) {
 		if (!list) return;
-		const comment = fromPosted(posted);
-		const { item, body, repliesSlot } = createItem(comment);
-		// 投稿直後に返信は無い。開閉は返信があるものにだけ付ける (一覧と同じ規則)
-		if (comment.hasReplies) attachReplies(comment, body, repliesSlot);
-		list.prepend(item);
+		// 一覧から読んだ 1 件と同じ導線を付ける。付けないと、描き直すまで
+		// この 1 件にだけ返信できない。返信はまだ無いので「返信を表示」は隠れる
+		list.prepend(createRootItem(fromPosted(posted)));
 		applyFloor();
 	}
 
@@ -750,10 +835,7 @@ export function createComments(deps) {
 			if (workId !== requestedWorkId || !list || list !== requestedList) return;
 			const comments = (body?.comments ?? []).map(normalizeComment);
 			for (const comment of comments) {
-				const { item, body: commentBody, repliesSlot } = createItem(comment);
-				// 返信の開閉はルートにだけ付ける。pixiv 側も入れ子は 1 段まで
-				if (comment.hasReplies) attachReplies(comment, commentBody, repliesSlot);
-				list.appendChild(item);
+				list.appendChild(createRootItem(comment));
 			}
 			offset += comments.length;
 			failure?.remove();
@@ -821,8 +903,9 @@ export function createComments(deps) {
 
 			detailRef = detail;
 			const session = readSession(doc);
-			// コメントを受け付けていない作品と未ログインでは投稿できない
-			const canPost = detail.commentOff !== true && session.isLoggedIn === true && Boolean(session.csrfToken);
+			// コメントを受け付けていない作品と未ログインでは投稿できない。
+			// 返信の導線を出すかの判断にも使うので、モジュールの状態として覚えておく
+			canPost = detail.commentOff !== true && session.isLoggedIn === true && Boolean(session.csrfToken);
 			container.appendChild(createHeader(session, canPost));
 			// 判定は文書に入れてから。createHeader() の中では位置を測れない
 			syncScrollState();
@@ -901,6 +984,7 @@ export function createComments(deps) {
 			failure = null;
 			workId = null;
 			rootForm = null;
+			canPost = false;
 			forms.clear();
 			picker?.dispose();
 			picker = null;

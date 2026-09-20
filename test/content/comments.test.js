@@ -164,12 +164,13 @@ function build(fetchJson) {
 /**
  * 投稿できる状態のコメント区画を組み立てる。
  * @param {object} [options] fetchJson と actions の差し替え
- * @returns {{doc: object, container: object, comments: object, posted: Array}} 描画先・コメント区画・投稿の記録
+ * @returns {{doc: object, container: object, comments: object, posted: Array, tokens: string[]}} 描画先・コメント区画・投稿の記録・渡された CSRF トークンの記録
  */
 function buildPostable(options = {}) {
 	const doc = loggedInDoc();
 	const container = fakeElement('div');
 	const posted = [];
+	const tokens = [];
 	const comments = createComments({
 		doc,
 		container,
@@ -177,16 +178,28 @@ function buildPostable(options = {}) {
 		actions: options.actions ?? {
 			postComment: async (...args) => {
 				posted.push(['comment', ...args.slice(0, 4)]);
+				tokens.push(args[4]);
 				return { id: '900', userId: '99', userName: '自分', text: args[2], stampId: null };
 			},
 			postStamp: async (...args) => {
 				posted.push(['stamp', ...args.slice(0, 4)]);
+				tokens.push(args[4]);
 				return { id: '901', userId: '99', userName: '自分', text: '', stampId: args[2] };
 			},
 		},
 		onPosted: options.onPosted,
 	});
-	return { doc, container, comments, posted };
+	return { doc, container, comments, posted, tokens };
+}
+
+/**
+ * コメント 1 件にぶら下がっている返信の入力欄を探す。
+ * 偽の DOM は子孫セレクタを解さないので、本文側の入れ物から引き直す。
+ * @param {object} item コメント 1 件 (.comment-item)
+ * @returns {object|null} 入力欄 (.comment-form)。開いていなければ null
+ */
+function replyForm(item) {
+	return find(find(item, '.comment-body'), '.comment-form');
 }
 
 /**
@@ -276,17 +289,20 @@ test('返信の投稿者もユーザーページへのリンクになる', async
 	assert.equal(find(reply, '.comment-avatar-link').href, '/users/1');
 });
 
-test('返信があるコメントだけが返信の開閉ボタンを持つ', async () => {
+test('返信が無いコメントでは返信の開閉ボタンを隠す', async () => {
+	// 枠は全件に作る。返信を投稿したその場で出せるようにするため (作り直すと位置がずれる)
 	const { container, comments } = build(async () => ({
 		comments: [ROOT, { ...ROOT, id: '2', hasReplies: false }],
 		hasNext: false,
 	}));
 	await comments.load(DETAIL);
 	const buttons = findAll(container, '.comment-replies');
-	assert.equal(buttons.length, 1);
+	assert.equal(buttons.length, 2);
 	assert.equal(buttons[0].tag, 'button');
 	assert.equal(buttons[0].children[1].textContent, '返信を表示');
 	assert.equal(buttons[0].getAttribute('aria-expanded'), 'false');
+	assert.equal(buttons[0].hidden, false);
+	assert.equal(buttons[1].hidden, true);
 });
 
 test('返信を表示すると replies API を引いてぶら下げる', async () => {
@@ -379,8 +395,8 @@ test('コメントの下段は返信ボタンが左、日時が右', async () =>
 	const body = find(container, '.comment-body');
 	assert.deepEqual(body.children.map((child) => child.className), ['comment-name', 'comment-text', 'comment-meta']);
 	const meta = find(container, '.comment-meta');
-	assert.deepEqual(meta.children.map((child) => child.className), ['comment-replies-slot', 'comment-date']);
-	assert.equal(meta.children[0].children[0].className, 'comment-replies');
+	assert.deepEqual(meta.children.map((child) => child.className), ['comment-reply-toggle', 'comment-replies-slot', 'comment-date']);
+	assert.equal(meta.children[1].children[0].className, 'comment-replies');
 });
 
 test('返信が無いコメントでも日時は同じ下段に置く', async () => {
@@ -391,8 +407,9 @@ test('返信が無いコメントでも日時は同じ下段に置く', async ()
 	}));
 	await comments.load(DETAIL);
 	const meta = find(container, '.comment-meta');
-	assert.deepEqual(meta.children.map((child) => child.className), ['comment-replies-slot', 'comment-date']);
-	assert.equal(meta.children[0].children.length, 0);
+	assert.deepEqual(meta.children.map((child) => child.className), ['comment-reply-toggle', 'comment-replies-slot', 'comment-date']);
+	// 枠は作るが中のボタンは隠す。場所を空けたままにして日時を動かさない
+	assert.equal(meta.children[1].children[0].hidden, true);
 });
 
 test('読み込みに失敗したら再試行できるようにボタンを残す', async () => {
@@ -765,8 +782,8 @@ test('投稿できたコメントを一覧の先頭へ差し込む', async () =>
 	const first = list.children[0];
 	assert.equal(find(first, '.comment-name').textContent, '自分');
 	assert.equal(find(first, '.comment-text').textContent, 'いいですね');
-	// 投稿直後に返信は無いので、開閉ボタンは付けない (一覧と同じ規則)
-	assert.equal(find(first, '.comment-replies'), null);
+	// 投稿直後に返信は無いので、開閉ボタンは隠しておく (一覧と同じ規則)
+	assert.equal(find(first, '.comment-replies').hidden, true);
 	// 件数を +1 する側へ 1 回だけ伝える
 	assert.equal(notified, 1);
 });
@@ -896,4 +913,163 @@ test('投稿した時刻を一覧の日時と同じ形にする', () => {
 	// 応答に日時は入らないので手元の時計を使う。桁は一覧に合わせて 0 で埋める
 	assert.equal(formatPostedDate(new Date(2026, 8, 20, 9, 5)), '2026-09-20 09:05');
 	assert.equal(formatPostedDate(new Date(2026, 11, 31, 23, 59)), '2026-12-31 23:59');
+});
+
+test('投稿には CSRF トークンを渡す', async () => {
+	// トークンが欠けると pixiv 側が 403 を返す。押された時点のセッションから読めているかを見る
+	const { container, comments, tokens } = buildPostable();
+	await comments.load(POST_DETAIL);
+	await submitText(find(find(container, '.comments-header'), '.comment-form'), 'いいですね');
+	assert.deepEqual(tokens, ['csrf-token']);
+});
+
+test('返信ボタンは「返信を表示」の左に並ぶ', async () => {
+	// 返信を書く導線が左端、返信を読む導線がその隣、日時が右端
+	const { container, comments } = buildPostable();
+	await comments.load(POST_DETAIL);
+	const meta = find(container, '.comment-meta');
+	assert.deepEqual(meta.children.map((child) => child.className), [
+		'comment-reply-toggle', 'comment-replies-slot', 'comment-date',
+	]);
+	assert.equal(meta.children[0].textContent, '返信');
+	assert.equal(meta.children[0].type, 'button');
+});
+
+test('返信ボタンは押すたびに入力欄を出し入れする', async () => {
+	const { container, comments } = buildPostable();
+	await comments.load(POST_DETAIL);
+	const item = find(container, '.comment-item');
+	const toggle = find(item, '.comment-reply-toggle');
+	assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+
+	await toggle.click();
+	assert.equal(toggle.getAttribute('aria-expanded'), 'true');
+	assert.deepEqual(find(item, '.comment-body').children.map((child) => child.className), [
+		'comment-name', 'comment-text', 'comment-meta', 'comment-form',
+	]);
+
+	await toggle.click();
+	assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+	// 畳んだら DOM ごと捨てる。開きっぱなしの入力欄を積み上げない
+	assert.equal(replyForm(item), null);
+});
+
+test('返信の入力欄は返信一覧より前に出す', async () => {
+	// pixiv 本体と同じ位置。返信の下に出すと、返信が多いほど遠くなる
+	const { container, comments } = buildPostable({
+		fetchJson: async (url) => (url.includes('replies')
+			? { comments: [REPLY], hasNext: false }
+			: { comments: [ROOT], hasNext: false }),
+	});
+	await comments.load(POST_DETAIL);
+	const item = find(container, '.comment-item');
+	await find(item, '.comment-replies').click();
+	await flush();
+	await find(item, '.comment-reply-toggle').click();
+	assert.deepEqual(find(item, '.comment-body').children.map((child) => child.className), [
+		'comment-name', 'comment-text', 'comment-meta', 'comment-form', 'comment-replies-area',
+	]);
+});
+
+test('返信は parent_id 付きで送られる', async () => {
+	const { container, comments, posted } = buildPostable();
+	await comments.load(POST_DETAIL);
+	const item = find(container, '.comment-item');
+	await find(item, '.comment-reply-toggle').click();
+	await submitText(replyForm(item), 'ありがとう');
+	// illustId / authorUserId / text / parentId
+	assert.deepEqual(posted[0], ['comment', '149425016', '54734418', 'ありがとう', ROOT.id]);
+});
+
+test('返信できたら開いている返信一覧の末尾へ足す', async () => {
+	const { container, comments } = buildPostable({
+		fetchJson: async (url) => (url.includes('replies')
+			? { comments: [REPLY], hasNext: false }
+			: { comments: [ROOT], hasNext: false }),
+	});
+	await comments.load(POST_DETAIL);
+	const item = find(container, '.comment-item');
+	await find(item, '.comment-replies').click();
+	await flush();
+	await find(item, '.comment-reply-toggle').click();
+	await submitText(replyForm(item), 'ありがとう');
+
+	const replies = find(item, '.comment-reply-list');
+	assert.equal(replies.children.length, 2);
+	assert.equal(find(replies.children[1], '.comment-text').textContent, 'ありがとう');
+	// 返信に返信は付けられない (pixiv 側も入れ子は 1 段まで)
+	assert.equal(find(replies.children[1], '.comment-reply-toggle'), null);
+});
+
+test('返信が無かったコメントも返信できたら「返信を表示」を出す', async () => {
+	// 畳んだままなら足さずにボタンだけ出す。開けば取り直されるので二重にならない
+	const { container, comments } = buildPostable({
+		fetchJson: async () => ({ comments: [{ ...ROOT, hasReplies: false }], hasNext: false }),
+	});
+	await comments.load(POST_DETAIL);
+	const item = find(container, '.comment-item');
+	assert.equal(find(item, '.comment-replies').hidden, true);
+
+	await find(item, '.comment-reply-toggle').click();
+	await submitText(replyForm(item), 'ありがとう');
+	assert.equal(find(item, '.comment-replies').hidden, false);
+	assert.equal(find(item, '.comment-reply-list'), null);
+});
+
+test('返信コメントには返信ボタンを付けない', async () => {
+	// pixiv 側も入れ子は 1 段まで
+	const { container, comments } = buildPostable({
+		fetchJson: async (url) => (url.includes('replies')
+			? { comments: [REPLY], hasNext: false }
+			: { comments: [ROOT], hasNext: false }),
+	});
+	await comments.load(POST_DETAIL);
+	await find(container, '.comment-replies').click();
+	await flush();
+	const reply = find(find(container, '.comment-reply-list'), '.comment-item');
+	assert.equal(find(reply, '.comment-reply-toggle'), null);
+});
+
+test('未ログインでは返信ボタンを出さない', async () => {
+	clearSessionCache();
+	const container = fakeElement('div');
+	const comments = createComments({
+		doc: fakeDoc({ nextData: buildNextData({ isLoggedIn: false, token: '' }) }),
+		container,
+		fetchJson: async () => ({ comments: [ROOT], hasNext: false }),
+	});
+	await comments.load(POST_DETAIL);
+	assert.equal(find(container, '.comment-reply-toggle'), null);
+	// 返信を読む導線は未ログインでも残す
+	assert.equal(find(container, '.comment-replies').hidden, false);
+});
+
+test('返信欄を閉じたら書きかけごと捨てて Escape を渡す', async () => {
+	// 閉じた入力欄が残っていると、見えない書きかけが Escape を食い止め続ける
+	const { container, comments } = buildPostable();
+	await comments.load(POST_DETAIL);
+	const item = find(container, '.comment-item');
+	const toggle = find(item, '.comment-reply-toggle');
+	await toggle.click();
+	const input = find(replyForm(item), '.comment-form-input');
+	await input.dispatch('focus', {});
+	input.value = '書きかけ';
+	await input.dispatch('input', {});
+	assert.equal(comments.consumeKey({ key: 'Escape' }), true);
+
+	await toggle.click();
+	assert.equal(comments.consumeKey({ key: 'Escape' }), false);
+	// disabled と同じ理由。消えた入力欄にフォーカスを残さず、押したボタンへ戻す
+	assert.equal(toggle.focused, true);
+});
+
+test('投稿できたコメントにも返信の導線を付ける', async () => {
+	// 一覧から読んだ 1 件と同じ形にする。付けないと描き直すまでその 1 件にだけ返信できない
+	const { container, comments } = buildPostable();
+	await comments.load(POST_DETAIL);
+	await submitText(find(find(container, '.comments-header'), '.comment-form'), 'いいですね');
+	const first = find(container, '.comment-list').children[0];
+	assert.equal(find(first, '.comment-reply-toggle').textContent, '返信');
+	await find(first, '.comment-reply-toggle').click();
+	assert.ok(replyForm(first));
 });
