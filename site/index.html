@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>XViewer for Pixiv - pixiv に X 風の画像ビュワーを追加する Chrome 拡張機能</title>
+<meta name="description" content="pixiv のユーザーページで作品をクリックすると、ページ遷移せずにその場でモーダルが開きます。複数枚の切り替え、うごイラの再生、投稿文やコメントの閲覧までモーダルの中で完結する非公式の Chrome 拡張機能です。">
+<link rel="canonical" href="https://neons-design.github.io/XViewer-for-Pixiv/">
+<link rel="alternate" hreflang="ja" href="https://neons-design.github.io/XViewer-for-Pixiv/">
+<link rel="alternate" hreflang="en" href="https://neons-design.github.io/XViewer-for-Pixiv/en/">
+<link rel="icon" href="assets/img/icon-32.png" sizes="32x32">
+<link rel="icon" href="assets/img/icon-128.png" sizes="128x128">
+<link rel="apple-touch-icon" href="assets/img/icon-128.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="XViewer for Pixiv">
+<meta property="og:title" content="XViewer for Pixiv">
+<meta property="og:description" content="pixiv のユーザーページに、X.com のメディア閲覧に近い画像ビュワーを追加する Chrome 拡張機能。">
+<meta property="og:url" content="https://neons-design.github.io/XViewer-for-Pixiv/">
+<meta property="og:image" content="https://neons-design.github.io/XViewer-for-Pixiv/assets/img/shot-viewer.jpg">
+<meta property="og:locale" content="ja_JP">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+	/* 描画前に配色をあてて、切り替え時のちらつきを防ぐ */
+	(function () {
+		try {
+			var saved = window.localStorage.getItem('xviewer-site-theme');
+			if (saved === 'dark' || saved === 'light') document.documentElement.setAttribute('data-theme', saved);
+		} catch (error) {
+			/* 保存領域が使えなくても OS の設定で描ける */
+		}
+	})();
+</script>
+<script src="assets/site.js" defer></script>
+</head>
+<body>
+
+<a class="skip-link" href="#main">本文へ移動</a>
+
+<!-- アイコンの図形。出典は Material Symbols (Apache-2.0)。フッターに表示している -->
+<svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+	<defs>
+		<symbol id="i-open" viewBox="0 -960 960 960"><path d="M180-120q-24 0-42-18t-18-42v-600q0-24 18-42t42-18h249q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H180v600h600v-249q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v249q0 24-18 42t-42 18H180Zm600-617L403-360q-9 9-21 8.5t-21-9.5q-9-9-9-21t9-21l377-377H549q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h261q12.75 0 21.38 8.62Q840-822.75 840-810v261q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63-8.5-8.62-8.5-21.37v-188Z"/></symbol>
+		<symbol id="i-next" viewBox="0 -960 960 960"><path d="M530-481 353-658q-9-9-8.5-21t9.5-21q9-9 21.5-9t21.5 9l198 198q5 5 7 10t2 11q0 6-2 11t-7 10L396-261q-9 9-21 8.5t-21-9.5q-9-9-9-21.5t9-21.5l176-176Z"/></symbol>
+		<symbol id="i-play" viewBox="0 -960 960 960"><path d="M320-258v-450q0-14 9-22t21-8q4 0 8 1t8 3l354 226q7 5 10.5 11t3.5 14q0 8-3.5 14T720-458L366-232q-4 2-8 3t-8 1q-12 0-21-8t-9-22Z"/></symbol>
+		<symbol id="i-zoom" viewBox="0 -960 960 960"><path d="M600.5-379.62q49.5-49.62 49.5-120.5T600.38-620.5Q550.76-670 479.88-670T359.5-620.38Q310-570.76 310-499.88t49.62 120.38q49.62 49.5 120.5 49.5t120.38-49.62Zm-200-41.12q-32.5-32.73-32.5-79.5 0-46.76 32.74-79.26 32.73-32.5 79.5-32.5 46.76 0 79.26 32.74 32.5 32.73 32.5 79.5 0 46.76-32.74 79.26-32.73 32.5-79.5 32.5-46.76 0-79.26-32.74ZM234.5-276Q124-352 57-470q-4-7.13-6-14.65-2-7.52-2-15.43 0-7.92 2-15.38 2-7.47 6-14.54 67-118 177.5-194T480-800q135 0 245.5 76T903-530q4 7.12 6 14.65 2 7.52 2 15.43 0 7.92-2 15.38-2 7.47-6 14.54-67 118-177.5 194T480-200q-135 0-245.5-76Z"/></symbol>
+		<symbol id="i-comment" viewBox="0 -960 960 960"><path d="M270-400h420q13 0 21.5-8.5T720-430q0-13-8.5-21.5T690-460H270q-13 0-21.5 8.5T240-430q0 13 8.5 21.5T270-400Zm0-130h420q13 0 21.5-8.5T720-560q0-13-8.5-21.5T690-590H270q-13 0-21.5 8.5T240-560q0 13 8.5 21.5T270-530Zm0-130h420q13 0 21.5-8.5T720-690q0-13-8.5-21.5T690-720H270q-13 0-21.5 8.5T240-690q0 13 8.5 21.5T270-660ZM140-240q-24 0-42-18t-18-42v-520q0-24 18-42t42-18h680q24 0 42 18t18 42v668q0 20-18.5 27.5T829-131L720-240H140Z"/></symbol>
+		<symbol id="i-like" viewBox="0 -960 960 960"><path d="M458-144q-11-4-19-12l-53-49Q262-320 171-424.5T80-643q0-90 60.5-150.5T290-854q51 0 101 24.5t89 80.5q44-56 91-80.5t99-24.5q89 0 149.5 60.5T880-643q0 114-91 218.5T574-205l-53 49q-8 8-19 12t-22 4q-11 0-22-4Z"/></symbol>
+		<symbol id="i-scroll" viewBox="0 -960 960 960"><path d="M469-358q-5-2-10-7L261-563q-9-9-8.5-21.5T262-606q9-9 21.5-9t21.5 9l175 176 176-176q9-9 21-8.5t21 9.5q9 9 9 21.5t-9 21.5L501-365q-5 5-10 7t-11 2q-6 0-11-2Z"/></symbol>
+		<symbol id="i-theme" viewBox="0 -960 960 960"><path d="M480-120q-150 0-255-105T120-480q0-135 79.5-229T408-830q20-5 34-1t22 15q8 10 7.5 25t-8.5 35q-9 23-14 47t-5 49q0 90 63 153t153 63q25 0 48.5-4.5T754-461q22-8 38-7t26 9q10 8 13 23t-2 36q-27 121-121 200.5T480-120Z"/></symbol>
+		<symbol id="i-share" viewBox="0 -960 960 960"><path d="M686-80q-47.5 0-80.75-33.25T572-194q0-8 5-34L278-403q-16.28 17.34-37.64 27.17Q219-366 194-366q-47.5 0-80.75-33T80-480q0-48 33.25-81T194-594q24 0 45 9.3 21 9.29 37 25.7l301-173q-2-8-3.5-16.5T572-766q0-47.5 33.25-80.75T686-880q47.5 0 80.75 33.25T800-766q0 47.5-33.25 80.75T686-652q-23.27 0-43.64-9Q622-670 606-685L302-516q3 8 4.5 17.5t1.5 18q0 8.5-1 16t-3 15.5l303 173q16-15 36.09-23.5 20.1-8.5 43.07-8.5Q734-308 767-274.75T800-194q0 47.5-33.25 80.75T686-80Z"/></symbol>
+		<symbol id="i-follow" viewBox="0 -960 960 960"><path d="M730-530H630q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h100v-100q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v100h100q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H790v100q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63-8.5-8.62-8.5-21.37v-100Zm-478 7q-42-42-42-108t42-108q42-42 108-42t108 42q42 42 42 108t-42 108q-42 42-108 42t-108-42ZM40-220v-34q0-35 17.5-63.5T108-360q75-33 133.34-46.5t118.5-13.5Q420-420 478-406.5T611-360q33 15 51 43t18 63v34q0 24.75-17.62 42.37Q644.75-160 620-160H100q-24.75 0-42.37-17.63Q40-195.25 40-220Z"/></symbol>
+	</defs>
+</svg>
+
+<header class="site-header">
+	<div class="wrap">
+		<a class="brand" href="./">
+			<img src="assets/img/icon-128.png" alt="" width="28" height="28">
+			<span>XViewer for Pixiv</span>
+		</a>
+		<nav class="site-nav" aria-label="ページ内の移動">
+			<a href="#features">機能</a>
+			<a href="#settings">設定</a>
+			<a href="#requirements">動作環境</a>
+			<a href="privacy.html">プライバシー</a>
+		</nav>
+		<div class="header-tools">
+			<div class="lang-switch">
+				<a href="./" aria-current="true" lang="ja">日本語</a>
+				<a href="en/" lang="en">English</a>
+			</div>
+			<button type="button" class="theme-toggle" aria-label="配色をライトに切り替える"
+				data-label-light="配色をライトに切り替える" data-label-dark="配色をダークに切り替える">
+				<svg class="icon-moon" viewBox="0 -960 960 960" aria-hidden="true"><path d="M480-120q-150 0-255-105T120-480q0-135 79.5-229T408-830q20-5 34-1t22 15q8 10 7.5 25t-8.5 35q-9 23-14 47t-5 49q0 90 63 153t153 63q25 0 48.5-4.5T754-461q22-8 38-7t26 9q10 8 13 23t-2 36q-27 121-121 200.5T480-120Z"/></svg>
+				<svg class="icon-sun" viewBox="0 -960 960 960" aria-hidden="true"><path d="M338.5-338.5Q280-397 280-480t58.5-141.5Q397-680 480-680t141.5 58.5Q680-563 680-480t-58.5 141.5Q563-280 480-280t-141.5-58.5ZM70-450q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32Q57.25-510 70-510h100q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H70Zm720 0q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h100q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H790ZM458.5-768.63Q450-777.25 450-790v-100q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v100q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63Zm0 720Q450-57.25 450-70v-100q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v100q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63ZM240-678l-57-56q-9-9-8.63-21.6.37-12.61 8.53-21.5 8.89-8.9 21.5-8.9 12.6 0 21.6 9l56 57q8 9 8 21t-8 20.5q-8 8.5-20.5 8.5t-21.5-8Zm494 495-56-57q-8-9-8-21.38 0-12.37 8.5-20.62 8.5-9 20.5-9t21 9l57 56q9 9 8.63 21.6-.37 12.61-8.53 21.5-8.89 8.9-21.5 8.9-12.6 0-21.6-9Zm-56-495q-9-9-9-21t9-21l56-57q9-9 21.6-8.63 12.61.37 21.5 8.53 8.9 8.89 8.9 21.5 0 12.6-9 21.6l-57 56q-8 8-20.36 8-12.37 0-21.64-8ZM182.9-182.9q-8.9-8.89-8.9-21.5 0-12.6 9-21.6l57-56q8.8-9 20.9-9 12.1 0 20.71 9 9.39 9 9.39 21t-9 21l-56 57q-9 9-21.6 8.63-12.61-.37-21.5-8.53Z"/></svg>
+			</button>
+		</div>
+	</div>
+</header>
+
+<main id="main">
+
+	<section class="hero">
+		<div class="wrap">
+			<p class="eyebrow">Chrome / Brave / Edge 対応</p>
+			<h1>pixiv を、<span class="accent">X</span> のように見る。</h1>
+			<p class="lede">
+				ユーザーページで作品をクリックすると、ページ遷移せずにその場でモーダルが開きます。
+				複数枚の切り替え、うごイラの再生、投稿文やコメントの閲覧、いいねやブックマークまで、すべてモーダルの中で完結します。
+				閉じれば、元のグリッドの元のスクロール位置に戻ります。
+			</p>
+			<div class="cta-row">
+				<a class="btn btn-primary" href="#" aria-disabled="true">
+					Chrome ウェブストア (公開準備中)
+				</a>
+				<a class="btn btn-secondary" href="https://github.com/NEONS-DESIGN/XViewer-for-Pixiv" target="_blank" rel="noopener">
+					<svg aria-hidden="true"><use href="#i-open"></use></svg>
+					GitHub で見る
+				</a>
+			</div>
+			<p class="cta-note">現在ストアの審査を待っています。公開され次第このボタンから入手できるようになります。</p>
+			<div class="hero-shot">
+				<img src="assets/img/shot-viewer.jpg" width="1568" height="703"
+					alt="pixiv の作品がモーダルで開き、右側のサイドバーに投稿文、タグ、カウンタ、コメントが並んでいる画面">
+			</div>
+		</div>
+	</section>
+
+	<hr class="divider">
+
+	<section class="section" id="features">
+		<div class="wrap">
+			<div class="section-head center">
+				<h2>グリッドから指を離さずに、最後まで見る</h2>
+				<p>作品を開くたびにページが切り替わり、戻るたびにスクロール位置を見失う。その往復をなくすための拡張機能です。</p>
+			</div>
+			<div class="card-grid">
+				<div class="card">
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-open"></use></svg></span>モーダルで開く</h3>
+					<p>グリッドのクリックを受け取り、ページ遷移せずに表示します。URL は作品ページのものへ差し替わるので、リロードも共有もできます。</p>
+				</div>
+				<div class="card">
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-next"></use></svg></span>複数枚の切り替え</h3>
+					<p>左右キーと画面端の矢印でページ送り。前後の画像を先読みするので、切り替えに待ち時間がありません。</p>
+				</div>
+				<div class="card">
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-scroll"></use></svg></span>作品から作品へ</h3>
+					<p>上下キーでグリッドの前後の作品へ移動します。端まで来たら次のページ分を自動で読み足します。</p>
+				</div>
+				<div class="card">
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-play"></use></svg></span>うごイラの再生</h3>
+					<p>zip を展開してフレームを組み立て、その場で再生します。一時停止にも対応しています。</p>
+				</div>
+				<div class="card">
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-zoom"></use></svg></span>原寸表示</h3>
+					<p>画像をクリックすると、原寸のまま画面いっぱいに開きます。細部を確かめたいときのための機能です。</p>
+				</div>
+				<div class="card">
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-comment"></use></svg></span>コメントの閲覧</h3>
+					<p>スタンプと絵文字を画像で表示します。返信の展開や続きの読み込みにも対応しています。</p>
+				</div>
+				<div class="card">
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-like"></use></svg></span>いいねとブックマーク</h3>
+					<p>フォローとシェアも含めて、モーダルの中から操作できます。自分の作品には表示しません。</p>
+				</div>
+				<div class="card">
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-theme"></use></svg></span>ダークとライト</h3>
+					<p>ビュワーの配色は pixiv 本体の設定に追従します。設定を二重に持たせません。</p>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<hr class="divider">
+
+	<section class="section" id="screens">
+		<div class="wrap">
+			<div class="showcase">
+				<div class="showcase-text">
+					<h3>投稿文もコメントも、画像の横に</h3>
+					<p>
+						サイドバーには投稿文、タグ、投稿日、いいね数、ブックマーク数、閲覧数、作者のアイコンとフォローボタンが並びます。
+						コメントはスタンプと絵文字を画像のまま描画し、返信もその場で開けます。
+					</p>
+					<ul class="feature-list">
+						<li>サイドバーごと送るか、コメントだけ送るかを選べます</li>
+						<li>読み込みに失敗しても、再試行から続きを読めます</li>
+						<li>サイドバーを消して、画像だけを見ることもできます</li>
+					</ul>
+				</div>
+				<figure>
+					<img src="assets/img/shot-comments.jpg" width="1568" height="703"
+						alt="サイドバーにコメントが並び、スタンプと絵文字が画像で表示されている画面">
+				</figure>
+			</div>
+
+			<div class="showcase reverse">
+				<div class="showcase-text">
+					<h3>一覧を、途切れさせない</h3>
+					<p>
+						イラストやマンガの一覧のページャーを、下に続けて読み込む形にできます。
+						URL のページ番号は画面に出ているページへ追従するので、リロードしても同じあたりへ戻れます。
+					</p>
+					<ul class="feature-list">
+						<li>下まで来たら読み込む / 常に 1 ページ先を読んでおく、から選べます</li>
+						<li>プロフィールのピックアップ欄を隠して、作品一覧をすぐ目に入れられます</li>
+					</ul>
+				</div>
+				<figure class="has-video">
+					<video class="shot-video" src="assets/img/infinite-scroll.mp4"
+						poster="assets/img/infinite-scroll.jpg" width="1280" height="688"
+						autoplay loop muted playsinline
+						aria-label="ユーザーページを下へスクロールし続けると、ページャーを押さずに次のページの作品が読み込まれ、URL のページ番号が追従していく様子"></video>
+					<button type="button" class="video-toggle" aria-label="動画を一時停止する"
+						data-label-pause="動画を一時停止する" data-label-play="動画を再生する">
+						<svg class="icon-pause" viewBox="0 -960 960 960" aria-hidden="true"><path d="M615-200q-24.75 0-42.37-17.63Q555-235.25 555-260v-440q0-24.75 17.63-42.38Q590.25-760 615-760h55q24.75 0 42.38 17.62Q730-724.75 730-700v440q0 24.75-17.62 42.37Q694.75-200 670-200h-55Zm-325 0q-24.75 0-42.37-17.63Q230-235.25 230-260v-440q0-24.75 17.63-42.38Q265.25-760 290-760h55q24.75 0 42.38 17.62Q405-724.75 405-700v440q0 24.75-17.62 42.37Q369.75-200 345-200h-55Z"/></svg>
+						<svg class="icon-play" viewBox="0 -960 960 960" aria-hidden="true"><path d="M320-258v-450q0-14 9-22t21-8q4 0 8 1t8 3l354 226q7 5 10.5 11t3.5 14q0 8-3.5 14T720-458L366-232q-4 2-8 3t-8 1q-12 0-21-8t-9-22Z"/></svg>
+					</button>
+				</figure>
+			</div>
+
+			<div class="showcase">
+				<div class="showcase-text">
+					<h3>設定は、その場で反映される</h3>
+					<p>
+						ツールバーのアイコンから開きます。保存ボタンはありません。変更した瞬間に保存され、開いているページにもすぐ反映されます。
+					</p>
+					<ul class="feature-list">
+						<li>画質や先読みの設定は、開いている作品にもその場で効きます</li>
+						<li>ビュワー自体をオフにすれば、pixiv 標準の動作に戻ります</li>
+					</ul>
+				</div>
+				<figure class="portrait">
+					<img src="assets/img/shot-popup.png" width="460" height="857"
+						alt="拡張機能の設定ポップアップ。ビュワー、画像、ユーザーページ、操作の区分ごとに設定項目が並んでいる">
+				</figure>
+			</div>
+		</div>
+	</section>
+
+	<hr class="divider">
+
+	<section class="section" id="settings">
+		<div class="wrap">
+			<div class="section-head">
+				<h2>設定でできること</h2>
+				<p>すべてツールバーのポップアップから変更できます。設定は Chrome の同期領域に保存され、外部には送信されません。</p>
+			</div>
+			<div class="table-scroll">
+				<table>
+					<thead>
+						<tr>
+							<th scope="col">区分</th>
+							<th scope="col">項目</th>
+							<th scope="col">既定</th>
+							<th scope="col">効果</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>ビュワー</td>
+							<td>ビュワーを使う</td>
+							<td class="default">オン</td>
+							<td>オフにすると pixiv 標準の動作に戻ります</td>
+						</tr>
+						<tr>
+							<td>ビュワー</td>
+							<td>サイドバーを表示する</td>
+							<td class="default">オン</td>
+							<td>投稿文、タグ、いいね数、コメントを画像の横に出します</td>
+						</tr>
+						<tr>
+							<td>ビュワー</td>
+							<td>サイドバーのスクロール</td>
+							<td class="default">サイドバーごと</td>
+							<td>投稿文からコメントまでを 1 つにつなげて送るか、投稿文を固定してコメントだけを送るか</td>
+						</tr>
+						<tr>
+							<td>画像</td>
+							<td>画像の解像度</td>
+							<td class="default">標準</td>
+							<td>原寸を選ぶと鮮明になりますが、読み込みは重くなります</td>
+						</tr>
+						<tr>
+							<td>画像</td>
+							<td>先読み</td>
+							<td class="default">前後 1 枚</td>
+							<td>次のページを先に読み込んでおく枚数を選べます</td>
+						</tr>
+						<tr>
+							<td>画像</td>
+							<td>クリックで原寸表示</td>
+							<td class="default">オフ</td>
+							<td>画像を押すと、原寸のまま画面いっぱいに開きます</td>
+						</tr>
+						<tr>
+							<td>ユーザーページ</td>
+							<td>ピックアップ欄を隠す</td>
+							<td class="default">オフ</td>
+							<td>プロフィールのホームに出るピックアップ欄を隠します</td>
+						</tr>
+						<tr>
+							<td>ユーザーページ</td>
+							<td>無限スクロール</td>
+							<td class="default">使わない</td>
+							<td>下まで来たら読み込む / 常に 1 ページ先を読んでおく、から選べます</td>
+						</tr>
+						<tr>
+							<td>操作</td>
+							<td>背景クリックで閉じる</td>
+							<td class="default">オン</td>
+							<td>画像の外側をクリックしたときに閉じるかどうか</td>
+						</tr>
+						<tr>
+							<td>操作</td>
+							<td>グリッドの Tab 移動</td>
+							<td class="default">飛ばさない</td>
+							<td>グリッドで Tab を押したときに、ブックマークとタイトルをフォーカス順から外すか</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+
+			<h3 style="margin-block:56px 20px;font-size:19px">キー操作</h3>
+			<div class="keys">
+				<div class="key-row"><kbd>←</kbd><kbd>→</kbd><span>同じ作品のページ送り</span></div>
+				<div class="key-row"><kbd>↑</kbd><kbd>↓</kbd><span>前後の作品へ移動</span></div>
+				<div class="key-row"><kbd>Esc</kbd><span>モーダルを閉じる</span></div>
+				<div class="key-row"><kbd>Tab</kbd><span>モーダル内のフォーカス移動</span></div>
+			</div>
+		</div>
+	</section>
+
+	<hr class="divider">
+
+	<section class="section" id="requirements">
+		<div class="wrap">
+			<div class="section-head">
+				<h2>動作環境</h2>
+				<p>Manifest V3 に対応した Chromium 系ブラウザで動作します。</p>
+			</div>
+			<div class="card-grid">
+				<div class="card">
+					<h3>対応ブラウザ</h3>
+					<p>Chrome、Brave、Edge などの Chromium 系ブラウザ。<strong>Chrome 120 以上</strong>が必要です。Firefox と Safari には対応していません。</p>
+				</div>
+				<div class="card">
+					<h3>対象ページ</h3>
+					<p><code>https://www.pixiv.net/</code> のユーザーページ。他のサイトでは動作しません。</p>
+				</div>
+				<div class="card">
+					<h3>ライセンス</h3>
+					<p>ソースコードは GitHub で公開しています。同梱している第三者の成果物の表示は、設定画面のライセンスタブにあります。</p>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<hr class="divider">
+
+	<section class="section" id="privacy">
+		<div class="wrap">
+			<div class="section-head center">
+				<h2>データは、どこにも送りません</h2>
+				<p>この拡張機能はサーバーを持ちません。通信するのは、あなたが開いている pixiv とその画像 CDN だけです。</p>
+			</div>
+			<div class="card-grid">
+				<div class="card">
+					<h3>収集しないもの</h3>
+					<p>閲覧履歴、作品 ID、ユーザー ID、Cookie、認証情報、個人情報。いずれも取得も保存も送信もしません。</p>
+				</div>
+				<div class="card">
+					<h3>保存するもの</h3>
+					<p>あなたが選んだ 11 項目の設定だけ。Chrome の同期領域に置かれ、外部サーバーへは出ません。</p>
+				</div>
+				<div class="card">
+					<h3>要求する権限</h3>
+					<p><code>storage</code> と <code>https://www.pixiv.net/*</code> の 2 つだけ。他のサイトへのアクセス権限は求めません。</p>
+				</div>
+			</div>
+			<p style="text-align:center;margin-block:40px 0">
+				<a class="btn btn-secondary" href="privacy.html">プライバシーポリシーを読む</a>
+			</p>
+		</div>
+	</section>
+
+	<section class="section" style="padding-top:0">
+		<div class="wrap">
+			<div class="notice">
+				<p><strong>これは非公式の拡張機能です。</strong></p>
+				<p>
+					pixiv プラットフォームを利用して開発したもので、ピクシブ株式会社が作成・配布しているアプリケーションではありません。
+					同社とは一切関係がなく、提携・支援・推奨を受けたものでもありません。
+				</p>
+				<ul>
+					<li>利用は自己責任でお願いします。本拡張の利用によって生じた損害について、作者およびピクシブ株式会社は責任を負いません</li>
+					<li>R-18 作品の表示は pixiv 側の設定に従います。拡張側で年齢制限を回避することはしません</li>
+					<li>pixiv の仕様変更によって動作しなくなる場合があります</li>
+				</ul>
+			</div>
+		</div>
+	</section>
+
+</main>
+
+<footer class="site-footer">
+	<div class="wrap">
+		<div class="footer-grid">
+			<div>
+				<a class="brand" href="./">
+					<img src="assets/img/icon-128.png" alt="" width="28" height="28">
+					<span>XViewer for Pixiv</span>
+				</a>
+			</div>
+			<ul class="footer-links">
+				<li><a href="https://github.com/NEONS-DESIGN/XViewer-for-Pixiv" target="_blank" rel="noopener">GitHub</a></li>
+				<li><a href="privacy.html">プライバシーポリシー</a></li>
+				<li><a href="en/" lang="en">English</a></li>
+			</ul>
+		</div>
+		<div class="footer-note">
+			<p>pixiv はピクシブ株式会社の登録商標です。本サイトおよび本拡張機能は、ピクシブ株式会社とは一切関係がありません。</p>
+			<p>掲載しているスクリーンショットは、動作を説明するためのデモ用のダミーデータです。実在の作品情報やコメントではありません。</p>
+			<p>アイコンの図形は Material Symbols (Apache License 2.0) と Font Awesome Free (CC BY 4.0) を使用しています。</p>
+		</div>
+	</div>
+</footer>
+
+</body>
+</html>

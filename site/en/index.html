@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>XViewer for Pixiv - An X-style image viewer for pixiv</title>
+<meta name="description" content="Click an artwork on a pixiv user page and it opens in place, without navigating away. Page through multi-image works, play ugoira, and read captions and comments without ever leaving the grid.">
+<link rel="canonical" href="https://neons-design.github.io/XViewer-for-Pixiv/en/">
+<link rel="alternate" hreflang="ja" href="https://neons-design.github.io/XViewer-for-Pixiv/">
+<link rel="alternate" hreflang="en" href="https://neons-design.github.io/XViewer-for-Pixiv/en/">
+<link rel="icon" href="../assets/img/icon-32.png" sizes="32x32">
+<link rel="icon" href="../assets/img/icon-128.png" sizes="128x128">
+<link rel="apple-touch-icon" href="../assets/img/icon-128.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="XViewer for Pixiv">
+<meta property="og:title" content="XViewer for Pixiv">
+<meta property="og:description" content="An X-style image viewer for pixiv user pages, as a Chrome extension.">
+<meta property="og:url" content="https://neons-design.github.io/XViewer-for-Pixiv/en/">
+<meta property="og:image" content="https://neons-design.github.io/XViewer-for-Pixiv/assets/img/shot-viewer.jpg">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="../assets/style.css">
+<script>
+	/* Apply the theme before paint so the page does not flash */
+	(function () {
+		try {
+			var saved = window.localStorage.getItem('xviewer-site-theme');
+			if (saved === 'dark' || saved === 'light') document.documentElement.setAttribute('data-theme', saved);
+		} catch (error) {
+			/* Falling back to the OS setting is fine */
+		}
+	})();
+</script>
+<script src="../assets/site.js" defer></script>
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<!-- Icon shapes from Material Symbols (Apache-2.0). Credited in the footer -->
+<svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+	<defs>
+		<symbol id="i-open" viewBox="0 -960 960 960"><path d="M180-120q-24 0-42-18t-18-42v-600q0-24 18-42t42-18h249q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H180v600h600v-249q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v249q0 24-18 42t-42 18H180Zm600-617L403-360q-9 9-21 8.5t-21-9.5q-9-9-9-21t9-21l377-377H549q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h261q12.75 0 21.38 8.62Q840-822.75 840-810v261q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63-8.5-8.62-8.5-21.37v-188Z"/></symbol>
+		<symbol id="i-next" viewBox="0 -960 960 960"><path d="M530-481 353-658q-9-9-8.5-21t9.5-21q9-9 21.5-9t21.5 9l198 198q5 5 7 10t2 11q0 6-2 11t-7 10L396-261q-9 9-21 8.5t-21-9.5q-9-9-9-21.5t9-21.5l176-176Z"/></symbol>
+		<symbol id="i-play" viewBox="0 -960 960 960"><path d="M320-258v-450q0-14 9-22t21-8q4 0 8 1t8 3l354 226q7 5 10.5 11t3.5 14q0 8-3.5 14T720-458L366-232q-4 2-8 3t-8 1q-12 0-21-8t-9-22Z"/></symbol>
+		<symbol id="i-zoom" viewBox="0 -960 960 960"><path d="M600.5-379.62q49.5-49.62 49.5-120.5T600.38-620.5Q550.76-670 479.88-670T359.5-620.38Q310-570.76 310-499.88t49.62 120.38q49.62 49.5 120.5 49.5t120.38-49.62Zm-200-41.12q-32.5-32.73-32.5-79.5 0-46.76 32.74-79.26 32.73-32.5 79.5-32.5 46.76 0 79.26 32.74 32.5 32.73 32.5 79.5 0 46.76-32.74 79.26-32.73 32.5-79.5 32.5-46.76 0-79.26-32.74ZM234.5-276Q124-352 57-470q-4-7.13-6-14.65-2-7.52-2-15.43 0-7.92 2-15.38 2-7.47 6-14.54 67-118 177.5-194T480-800q135 0 245.5 76T903-530q4 7.12 6 14.65 2 7.52 2 15.43 0 7.92-2 15.38-2 7.47-6 14.54-67 118-177.5 194T480-200q-135 0-245.5-76Z"/></symbol>
+		<symbol id="i-comment" viewBox="0 -960 960 960"><path d="M270-400h420q13 0 21.5-8.5T720-430q0-13-8.5-21.5T690-460H270q-13 0-21.5 8.5T240-430q0 13 8.5 21.5T270-400Zm0-130h420q13 0 21.5-8.5T720-560q0-13-8.5-21.5T690-590H270q-13 0-21.5 8.5T240-560q0 13 8.5 21.5T270-530Zm0-130h420q13 0 21.5-8.5T720-690q0-13-8.5-21.5T690-720H270q-13 0-21.5 8.5T240-690q0 13 8.5 21.5T270-660ZM140-240q-24 0-42-18t-18-42v-520q0-24 18-42t42-18h680q24 0 42 18t18 42v668q0 20-18.5 27.5T829-131L720-240H140Z"/></symbol>
+		<symbol id="i-like" viewBox="0 -960 960 960"><path d="M458-144q-11-4-19-12l-53-49Q262-320 171-424.5T80-643q0-90 60.5-150.5T290-854q51 0 101 24.5t89 80.5q44-56 91-80.5t99-24.5q89 0 149.5 60.5T880-643q0 114-91 218.5T574-205l-53 49q-8 8-19 12t-22 4q-11 0-22-4Z"/></symbol>
+		<symbol id="i-scroll" viewBox="0 -960 960 960"><path d="M469-358q-5-2-10-7L261-563q-9-9-8.5-21.5T262-606q9-9 21.5-9t21.5 9l175 176 176-176q9-9 21-8.5t21 9.5q9 9 9 21.5t-9 21.5L501-365q-5 5-10 7t-11 2q-6 0-11-2Z"/></symbol>
+		<symbol id="i-theme" viewBox="0 -960 960 960"><path d="M480-120q-150 0-255-105T120-480q0-135 79.5-229T408-830q20-5 34-1t22 15q8 10 7.5 25t-8.5 35q-9 23-14 47t-5 49q0 90 63 153t153 63q25 0 48.5-4.5T754-461q22-8 38-7t26 9q10 8 13 23t-2 36q-27 121-121 200.5T480-120Z"/></symbol>
+	</defs>
+</svg>
+
+<header class="site-header">
+	<div class="wrap">
+		<a class="brand" href="./">
+			<img src="../assets/img/icon-128.png" alt="" width="28" height="28">
+			<span>XViewer for Pixiv</span>
+		</a>
+		<nav class="site-nav" aria-label="On this page">
+			<a href="#features">Features</a>
+			<a href="#settings">Settings</a>
+			<a href="#requirements">Requirements</a>
+			<a href="privacy.html">Privacy</a>
+		</nav>
+		<div class="header-tools">
+			<div class="lang-switch">
+				<a href="../" lang="ja">日本語</a>
+				<a href="./" aria-current="true" lang="en">English</a>
+			</div>
+			<button type="button" class="theme-toggle" aria-label="Switch to the light theme"
+				data-label-light="Switch to the light theme" data-label-dark="Switch to the dark theme">
+				<svg class="icon-moon" viewBox="0 -960 960 960" aria-hidden="true"><path d="M480-120q-150 0-255-105T120-480q0-135 79.5-229T408-830q20-5 34-1t22 15q8 10 7.5 25t-8.5 35q-9 23-14 47t-5 49q0 90 63 153t153 63q25 0 48.5-4.5T754-461q22-8 38-7t26 9q10 8 13 23t-2 36q-27 121-121 200.5T480-120Z"/></svg>
+				<svg class="icon-sun" viewBox="0 -960 960 960" aria-hidden="true"><path d="M338.5-338.5Q280-397 280-480t58.5-141.5Q397-680 480-680t141.5 58.5Q680-563 680-480t-58.5 141.5Q563-280 480-280t-141.5-58.5ZM70-450q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32Q57.25-510 70-510h100q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H70Zm720 0q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h100q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H790ZM458.5-768.63Q450-777.25 450-790v-100q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v100q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63Zm0 720Q450-57.25 450-70v-100q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v100q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63ZM240-678l-57-56q-9-9-8.63-21.6.37-12.61 8.53-21.5 8.89-8.9 21.5-8.9 12.6 0 21.6 9l56 57q8 9 8 21t-8 20.5q-8 8.5-20.5 8.5t-21.5-8Zm494 495-56-57q-8-9-8-21.38 0-12.37 8.5-20.62 8.5-9 20.5-9t21 9l57 56q9 9 8.63 21.6-.37 12.61-8.53 21.5-8.89 8.9-21.5 8.9-12.6 0-21.6-9Zm-56-495q-9-9-9-21t9-21l56-57q9-9 21.6-8.63 12.61.37 21.5 8.53 8.9 8.89 8.9 21.5 0 12.6-9 21.6l-57 56q-8 8-20.36 8-12.37 0-21.64-8ZM182.9-182.9q-8.9-8.89-8.9-21.5 0-12.6 9-21.6l57-56q8.8-9 20.9-9 12.1 0 20.71 9 9.39 9 9.39 21t-9 21l-56 57q-9 9-21.6 8.63-12.61-.37-21.5-8.53Z"/></svg>
+			</button>
+		</div>
+	</div>
+</header>
+
+<main id="main">
+
+	<section class="hero">
+		<div class="wrap">
+			<p class="eyebrow">Chrome / Brave / Edge</p>
+			<h1>Read pixiv the way you read <span class="accent">X</span>.</h1>
+			<p class="lede">
+				Click an artwork on a user page and it opens right there, without navigating away.
+				Page through multi-image works, play ugoira, read the caption and comments, like, bookmark and follow -
+				all inside the viewer. Close it and you are back on the grid, at the scroll position you left.
+			</p>
+			<div class="cta-row">
+				<a class="btn btn-primary" href="#" aria-disabled="true">
+					Chrome Web Store (coming soon)
+				</a>
+				<a class="btn btn-secondary" href="https://github.com/NEONS-DESIGN/XViewer-for-Pixiv" target="_blank" rel="noopener">
+					<svg aria-hidden="true"><use href="#i-open"></use></svg>
+					View on GitHub
+				</a>
+			</div>
+			<p class="cta-note">The extension is awaiting store review. This button will go live once it is published.</p>
+			<div class="hero-shot">
+				<img src="../assets/img/shot-viewer.jpg" width="1568" height="703"
+					alt="A pixiv artwork open in the modal viewer, with the caption, tags, counters and comments in the sidebar on the right">
+			</div>
+		</div>
+	</section>
+
+	<hr class="divider">
+
+	<section class="section" id="features">
+		<div class="wrap">
+			<div class="section-head center">
+				<h2>Stay on the grid, all the way through</h2>
+				<p>Every artwork you open costs you a page load, and every step back costs you your place. This extension removes that round trip.</p>
+			</div>
+			<div class="card-grid">
+				<div class="card">
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-open"></use></svg></span>Opens in place</h3>
+					<p>The viewer takes over the grid click and renders without navigating. The URL still changes to the artwork page, so reloading and sharing both work.</p>
+				</div>
+				<div class="card">
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-next"></use></svg></span>Multi-image works</h3>
+					<p>Arrow keys and the on-screen arrows page through the work. Neighbouring images are prefetched, so there is nothing to wait for.</p>
+				</div>
+				<div class="card">
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-scroll"></use></svg></span>Work to work</h3>
+					<p>Up and down move to the previous or next work in the grid. Reach the end and the next page is loaded for you.</p>
+				</div>
+				<div class="card">
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-play"></use></svg></span>Ugoira playback</h3>
+					<p>The zip is decoded into frames and played in the viewer, with pause and resume.</p>
+				</div>
+				<div class="card">
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-zoom"></use></svg></span>Full size</h3>
+					<p>Click the image to open it at its original resolution, filling the screen, for when the detail is the point.</p>
+				</div>
+				<div class="card">
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-comment"></use></svg></span>Comments</h3>
+					<p>Stamps and emoji are rendered as images. Replies expand in place, and more comments load on demand.</p>
+				</div>
+				<div class="card">
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-like"></use></svg></span>Like and bookmark</h3>
+					<p>Follow and share too, all from inside the viewer. None of them are shown on your own works.</p>
+				</div>
+				<div class="card">
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-theme"></use></svg></span>Dark and light</h3>
+					<p>The viewer follows pixiv's own theme setting, so there is no second preference to keep in sync.</p>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<hr class="divider">
+
+	<section class="section" id="screens">
+		<div class="wrap">
+			<div class="showcase">
+				<div class="showcase-text">
+					<h3>The caption and comments, beside the image</h3>
+					<p>
+						The sidebar carries the caption, tags, post date, like / bookmark / view counts, and the author's
+						avatar and follow button. Comments render stamps and emoji as images, and replies open in place.
+					</p>
+					<ul class="feature-list">
+						<li>Scroll the whole sidebar, or pin the caption and scroll only the comments</li>
+						<li>If a request fails, retry picks up where it stopped</li>
+						<li>Hide the sidebar entirely to see nothing but the image</li>
+					</ul>
+				</div>
+				<figure>
+					<img src="../assets/img/shot-comments.jpg" width="1568" height="703"
+						alt="The sidebar showing a list of comments with stamps and emoji rendered as images">
+				</figure>
+			</div>
+
+			<div class="showcase reverse">
+				<div class="showcase-text">
+					<h3>An uninterrupted list</h3>
+					<p>
+						The paginator on illustration and manga listings can be replaced with continuous loading.
+						The page number in the URL follows whatever is on screen, so a reload brings you back to roughly the same place.
+					</p>
+					<ul class="feature-list">
+						<li>Load when you reach the bottom, or always keep one page ahead</li>
+						<li>Hide the pickup section on a profile home to get straight to the works</li>
+					</ul>
+				</div>
+				<figure class="has-video">
+					<video class="shot-video" src="../assets/img/infinite-scroll.mp4"
+						poster="../assets/img/infinite-scroll.jpg" width="1280" height="688"
+						autoplay loop muted playsinline
+						aria-label="Scrolling a pixiv user page keeps loading the next page of works without touching the paginator, while the page number in the URL follows along"></video>
+					<button type="button" class="video-toggle" aria-label="Pause the video"
+						data-label-pause="Pause the video" data-label-play="Play the video">
+						<svg class="icon-pause" viewBox="0 -960 960 960" aria-hidden="true"><path d="M615-200q-24.75 0-42.37-17.63Q555-235.25 555-260v-440q0-24.75 17.63-42.38Q590.25-760 615-760h55q24.75 0 42.38 17.62Q730-724.75 730-700v440q0 24.75-17.62 42.37Q694.75-200 670-200h-55Zm-325 0q-24.75 0-42.37-17.63Q230-235.25 230-260v-440q0-24.75 17.63-42.38Q265.25-760 290-760h55q24.75 0 42.38 17.62Q405-724.75 405-700v440q0 24.75-17.62 42.37Q369.75-200 345-200h-55Z"/></svg>
+						<svg class="icon-play" viewBox="0 -960 960 960" aria-hidden="true"><path d="M320-258v-450q0-14 9-22t21-8q4 0 8 1t8 3l354 226q7 5 10.5 11t3.5 14q0 8-3.5 14T720-458L366-232q-4 2-8 3t-8 1q-12 0-21-8t-9-22Z"/></svg>
+					</button>
+				</figure>
+			</div>
+
+			<div class="showcase">
+				<div class="showcase-text">
+					<h3>Settings apply as you change them</h3>
+					<p>
+						Open the popup from the toolbar icon. There is no save button: every change is stored the moment you make it,
+						and the page you have open updates with it.
+					</p>
+					<ul class="feature-list">
+						<li>Image quality and prefetch apply to the artwork already on screen</li>
+						<li>Turn the viewer off and pixiv behaves exactly as it did before</li>
+					</ul>
+				</div>
+				<figure class="portrait">
+					<img src="../assets/img/shot-popup.png" width="460" height="857"
+						alt="The extension's settings popup, grouped into viewer, image, user page and interaction sections">
+				</figure>
+			</div>
+		</div>
+	</section>
+
+	<hr class="divider">
+
+	<section class="section" id="settings">
+		<div class="wrap">
+			<div class="section-head">
+				<h2>What you can change</h2>
+				<p>Everything lives in the toolbar popup. Settings are kept in Chrome's sync storage and are never sent anywhere.</p>
+			</div>
+			<div class="table-scroll">
+				<table>
+					<thead>
+						<tr>
+							<th scope="col">Group</th>
+							<th scope="col">Setting</th>
+							<th scope="col">Default</th>
+							<th scope="col">Effect</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>Viewer</td>
+							<td>Use the viewer</td>
+							<td class="default">On</td>
+							<td>Turn it off and pixiv behaves normally</td>
+						</tr>
+						<tr>
+							<td>Viewer</td>
+							<td>Show the sidebar</td>
+							<td class="default">On</td>
+							<td>Caption, tags, counts and comments beside the image</td>
+						</tr>
+						<tr>
+							<td>Viewer</td>
+							<td>Sidebar scrolling</td>
+							<td class="default">Whole sidebar</td>
+							<td>Scroll caption and comments as one, or pin the caption and scroll only the comments</td>
+						</tr>
+						<tr>
+							<td>Image</td>
+							<td>Resolution</td>
+							<td class="default">Regular</td>
+							<td>Original is sharper but slower to load</td>
+						</tr>
+						<tr>
+							<td>Image</td>
+							<td>Prefetch</td>
+							<td class="default">1 each way</td>
+							<td>How many neighbouring pages to load ahead of time</td>
+						</tr>
+						<tr>
+							<td>Image</td>
+							<td>Click to view full size</td>
+							<td class="default">Off</td>
+							<td>Clicking the image opens it at its original resolution</td>
+						</tr>
+						<tr>
+							<td>User page</td>
+							<td>Hide the pickup section</td>
+							<td class="default">Off</td>
+							<td>Hides the pickup block on a profile home</td>
+						</tr>
+						<tr>
+							<td>User page</td>
+							<td>Infinite scroll</td>
+							<td class="default">Off</td>
+							<td>Load at the bottom, or always keep one page ahead</td>
+						</tr>
+						<tr>
+							<td>Interaction</td>
+							<td>Close on backdrop click</td>
+							<td class="default">On</td>
+							<td>Whether clicking outside the image closes the viewer</td>
+						</tr>
+						<tr>
+							<td>Interaction</td>
+							<td>Grid tab order</td>
+							<td class="default">Keep all stops</td>
+							<td>Whether Tab skips the bookmark button and title on grid cards</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+
+			<h3 style="margin-block:56px 20px;font-size:19px">Keyboard</h3>
+			<div class="keys">
+				<div class="key-row"><kbd>←</kbd><kbd>→</kbd><span>Page through the current work</span></div>
+				<div class="key-row"><kbd>↑</kbd><kbd>↓</kbd><span>Previous or next work</span></div>
+				<div class="key-row"><kbd>Esc</kbd><span>Close the viewer</span></div>
+				<div class="key-row"><kbd>Tab</kbd><span>Move focus inside the viewer</span></div>
+			</div>
+		</div>
+	</section>
+
+	<hr class="divider">
+
+	<section class="section" id="requirements">
+		<div class="wrap">
+			<div class="section-head">
+				<h2>Requirements</h2>
+				<p>Any Chromium-based browser with Manifest V3 support.</p>
+			</div>
+			<div class="card-grid">
+				<div class="card">
+					<h3>Browsers</h3>
+					<p>Chrome, Brave, Edge and other Chromium browsers. <strong>Chrome 120 or newer</strong> is required. Firefox and Safari are not supported.</p>
+				</div>
+				<div class="card">
+					<h3>Where it runs</h3>
+					<p>User pages on <code>https://www.pixiv.net/</code>. It does nothing on any other site.</p>
+				</div>
+				<div class="card">
+					<h3>License</h3>
+					<p>The source is published on GitHub. Third-party notices for the bundled assets are in the license tab of the settings popup.</p>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<hr class="divider">
+
+	<section class="section" id="privacy">
+		<div class="wrap">
+			<div class="section-head center">
+				<h2>Nothing is sent anywhere</h2>
+				<p>The extension has no server. The only thing it talks to is the pixiv you already have open, and pixiv's image CDN.</p>
+			</div>
+			<div class="card-grid">
+				<div class="card">
+					<h3>Never collected</h3>
+					<p>Browsing history, artwork IDs, user IDs, cookies, credentials, personal information. None of it is read, stored or transmitted.</p>
+				</div>
+				<div class="card">
+					<h3>What is stored</h3>
+					<p>The 11 preferences you choose, and nothing else. They live in Chrome's sync storage and never leave it.</p>
+				</div>
+				<div class="card">
+					<h3>Permissions</h3>
+					<p>Just <code>storage</code> and <code>https://www.pixiv.net/*</code>. No access to any other site is requested.</p>
+				</div>
+			</div>
+			<p style="text-align:center;margin-block:40px 0">
+				<a class="btn btn-secondary" href="privacy.html">Read the privacy policy</a>
+			</p>
+		</div>
+	</section>
+
+	<section class="section" style="padding-top:0">
+		<div class="wrap">
+			<div class="notice">
+				<p><strong>This is an unofficial extension.</strong></p>
+				<p>
+					It was built on top of the pixiv platform and is not created or distributed by pixiv Inc.
+					It is not affiliated with, endorsed by, or supported by pixiv Inc. in any way.
+				</p>
+				<ul>
+					<li>Use it at your own risk. Neither the author nor pixiv Inc. is liable for any damage arising from its use</li>
+					<li>Age-restricted works follow your pixiv account settings. The extension never works around them</li>
+					<li>Changes on pixiv's side may break it at any time</li>
+				</ul>
+			</div>
+		</div>
+	</section>
+
+</main>
+
+<footer class="site-footer">
+	<div class="wrap">
+		<div class="footer-grid">
+			<div>
+				<a class="brand" href="./">
+					<img src="../assets/img/icon-128.png" alt="" width="28" height="28">
+					<span>XViewer for Pixiv</span>
+				</a>
+			</div>
+			<ul class="footer-links">
+				<li><a href="https://github.com/NEONS-DESIGN/XViewer-for-Pixiv" target="_blank" rel="noopener">GitHub</a></li>
+				<li><a href="privacy.html">Privacy policy</a></li>
+				<li><a href="../" lang="ja">日本語</a></li>
+			</ul>
+		</div>
+		<div class="footer-note">
+			<p>pixiv is a registered trademark of pixiv Inc. Neither this site nor this extension is affiliated with pixiv Inc.</p>
+			<p>The screenshots on this site use demo data to illustrate the interface. They are not real artwork records or comments.</p>
+			<p>Icon shapes come from Material Symbols (Apache License 2.0) and Font Awesome Free (CC BY 4.0).</p>
+		</div>
+	</div>
+</footer>
+
+</body>
+</html>
