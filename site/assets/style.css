@@ -1,0 +1,939 @@
+/*
+ * XViewer for Pixiv 紹介サイトの配色と体裁。
+ * 配色トークンの名前と値は拡張本体の UI_DESIGN_KIT.md §2 に合わせてある。
+ * 色は必ずここの変数で決め、個々の規則に直書きしない。
+ */
+
+:root {
+	color-scheme: dark;
+	--bg: #14161c;
+	--surface: #1d212b;
+	--surface-2: #232838;
+	--fg: #eff0f4;
+	--muted: #9aa0b4;
+	--border: #262b38;
+	--divider: rgba(255, 255, 255, 0.12);
+	--accent: #4ea3d6;
+	--on-accent: #04121a;
+	--accent-soft: rgba(78, 163, 214, 0.14);
+	--hover: rgba(255, 255, 255, 0.08);
+	--shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+
+	--maxw: 1120px;
+	--radius: 14px;
+	--radius-sm: 8px;
+	--gap: 24px;
+	--section-gap: 96px;
+	--pad-x: 24px;
+
+	--font: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans",
+		"BIZ UDPGothic", Meiryo, "Yu Gothic", "Noto Sans JP", system-ui, sans-serif;
+	--font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Courier New", monospace;
+}
+
+/* OS がライトで、かつ利用者が明示的にダークを選んでいないときだけライトへ倒す */
+@media (prefers-color-scheme: light) {
+	:root:not([data-theme="dark"]) {
+		color-scheme: light;
+		--bg: #f5f6f8;
+		--surface: #ffffff;
+		--surface-2: #eef0f4;
+		--fg: #1c1e26;
+		--muted: #5c6275;
+		--border: #d6d9e0;
+		--divider: rgba(0, 0, 0, 0.12);
+		--accent: #1a6b9e;
+		--on-accent: #ffffff;
+		--accent-soft: rgba(26, 107, 158, 0.10);
+		--hover: rgba(0, 0, 0, 0.05);
+		--shadow: 0 18px 50px rgba(20, 24, 35, 0.14);
+	}
+}
+
+/* 手動で選んだライト。media query より後に置いて必ず勝たせる */
+:root[data-theme="light"] {
+	color-scheme: light;
+	--bg: #f5f6f8;
+	--surface: #ffffff;
+	--surface-2: #eef0f4;
+	--fg: #1c1e26;
+	--muted: #5c6275;
+	--border: #d6d9e0;
+	--divider: rgba(0, 0, 0, 0.12);
+	--accent: #1a6b9e;
+	--on-accent: #ffffff;
+	--accent-soft: rgba(26, 107, 158, 0.10);
+	--hover: rgba(0, 0, 0, 0.05);
+	--shadow: 0 18px 50px rgba(20, 24, 35, 0.14);
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	scroll-behavior: smooth;
+	scroll-padding-top: 88px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto;
+	}
+
+	* {
+		animation-duration: 0.01ms !important;
+		transition-duration: 0.01ms !important;
+	}
+}
+
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--fg);
+	font-family: var(--font);
+	font-size: 16px;
+	line-height: 1.8;
+	-webkit-font-smoothing: antialiased;
+}
+
+img {
+	max-width: 100%;
+	height: auto;
+}
+
+a {
+	color: var(--accent);
+	text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent);
+	text-underline-offset: 3px;
+}
+
+a:hover {
+	text-decoration-color: currentColor;
+}
+
+/* 輪郭はサイト全体で 1 つの規則にそろえる (UI_DESIGN_KIT §6) */
+:where(a, button, summary, [tabindex]):focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+	border-radius: 4px;
+}
+
+h1,
+h2,
+h3 {
+	line-height: 1.35;
+	letter-spacing: 0.01em;
+	margin: 0;
+}
+
+p {
+	margin: 0 0 1em;
+}
+
+code {
+	font-family: var(--font-mono);
+	font-size: 0.9em;
+	background: var(--surface-2);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	padding: 0.1em 0.4em;
+}
+
+/* 目に見えないが読み上げには残す */
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.skip-link {
+	position: absolute;
+	left: 8px;
+	top: -60px;
+	z-index: 100;
+	background: var(--accent);
+	color: var(--on-accent);
+	padding: 10px 16px;
+	border-radius: var(--radius-sm);
+	font-weight: 700;
+	text-decoration: none;
+	transition: top 0.15s ease;
+}
+
+.skip-link:focus {
+	top: 8px;
+}
+
+.wrap {
+	width: 100%;
+	max-width: var(--maxw);
+	margin: 0 auto;
+	padding-inline: var(--pad-x);
+}
+
+/* ------------------------------------------------------------------ header */
+
+.site-header {
+	position: sticky;
+	top: 0;
+	z-index: 50;
+	background: color-mix(in srgb, var(--bg) 88%, transparent);
+	backdrop-filter: saturate(180%) blur(12px);
+	border-bottom: 1px solid var(--border);
+}
+
+.site-header .wrap {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	min-height: 64px;
+}
+
+.brand {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	font-weight: 700;
+	color: var(--fg);
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.brand img {
+	width: 28px;
+	height: 28px;
+	border-radius: 6px;
+}
+
+.site-nav {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	margin-inline-start: auto;
+}
+
+.site-nav a {
+	color: var(--muted);
+	text-decoration: none;
+	padding: 8px 12px;
+	border-radius: var(--radius-sm);
+	font-size: 14px;
+}
+
+.site-nav a:hover {
+	color: var(--fg);
+	background: var(--hover);
+}
+
+.header-tools {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.lang-switch {
+	display: inline-flex;
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	overflow: hidden;
+	background: var(--surface);
+}
+
+.lang-switch a {
+	padding: 5px 12px;
+	font-size: 13px;
+	font-weight: 700;
+	color: var(--muted);
+	text-decoration: none;
+	line-height: 1.6;
+}
+
+.lang-switch a[aria-current="true"] {
+	background: var(--accent);
+	color: var(--on-accent);
+}
+
+.lang-switch a:not([aria-current="true"]):hover {
+	background: var(--hover);
+	color: var(--fg);
+}
+
+.theme-toggle {
+	display: inline-grid;
+	place-items: center;
+	width: 36px;
+	height: 36px;
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	background: var(--surface);
+	color: var(--fg);
+	cursor: pointer;
+	padding: 0;
+}
+
+.theme-toggle:hover {
+	background: var(--hover);
+}
+
+.theme-toggle svg {
+	width: 18px;
+	height: 18px;
+	fill: currentColor;
+}
+
+/* テーマに応じて片方のアイコンだけ出す */
+.theme-toggle .icon-sun {
+	display: none;
+}
+
+:root[data-theme="light"] .theme-toggle .icon-sun,
+.theme-toggle .icon-moon {
+	display: block;
+}
+
+:root[data-theme="light"] .theme-toggle .icon-moon {
+	display: none;
+}
+
+@media (prefers-color-scheme: light) {
+	:root:not([data-theme="dark"]) .theme-toggle .icon-sun {
+		display: block;
+	}
+
+	:root:not([data-theme="dark"]) .theme-toggle .icon-moon {
+		display: none;
+	}
+}
+
+/* ------------------------------------------------------------------- hero */
+
+.hero {
+	padding-block: 72px 0;
+	text-align: center;
+	position: relative;
+	overflow: hidden;
+}
+
+/* 背景の淡い光。装飾なので読み上げからは外れる */
+.hero::before {
+	content: "";
+	position: absolute;
+	inset-inline: 0;
+	top: -220px;
+	height: 520px;
+	background: radial-gradient(ellipse 60% 55% at 50% 50%, var(--accent-soft), transparent 70%);
+	pointer-events: none;
+}
+
+.hero .wrap {
+	position: relative;
+}
+
+.eyebrow {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 13px;
+	font-weight: 700;
+	color: var(--accent);
+	background: var(--accent-soft);
+	border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+	border-radius: 999px;
+	padding: 5px 14px;
+	margin-bottom: 24px;
+}
+
+.hero h1 {
+	font-size: clamp(34px, 6vw, 60px);
+	letter-spacing: -0.01em;
+	margin-bottom: 20px;
+}
+
+.hero h1 .accent {
+	color: var(--accent);
+}
+
+.lede {
+	font-size: clamp(16px, 2.2vw, 19px);
+	color: var(--muted);
+	max-width: 46em;
+	margin-inline: auto;
+	text-wrap: pretty;
+}
+
+.cta-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	justify-content: center;
+	margin-block: 32px 12px;
+}
+
+.btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+	border-radius: 999px;
+	padding: 13px 26px;
+	font-size: 15px;
+	font-weight: 700;
+	text-decoration: none;
+	border: 1px solid transparent;
+	cursor: pointer;
+	font-family: inherit;
+}
+
+.btn svg {
+	width: 18px;
+	height: 18px;
+	fill: currentColor;
+	flex: none;
+}
+
+.btn-primary {
+	background: var(--accent);
+	color: var(--on-accent);
+}
+
+.btn-primary:hover {
+	background: color-mix(in srgb, var(--accent) 86%, var(--fg));
+}
+
+.btn-secondary {
+	background: var(--surface);
+	color: var(--fg);
+	border-color: var(--border);
+}
+
+.btn-secondary:hover {
+	background: var(--hover);
+}
+
+/* ストア公開までの無効状態。押せないことが見た目で分かるようにする */
+.btn[aria-disabled="true"] {
+	background: var(--surface);
+	color: var(--muted);
+	border-color: var(--border);
+	cursor: not-allowed;
+}
+
+.btn[aria-disabled="true"]:hover {
+	background: var(--surface);
+}
+
+.cta-note {
+	font-size: 13px;
+	color: var(--muted);
+	margin: 0;
+}
+
+.hero-shot {
+	margin-top: 56px;
+	border-radius: var(--radius);
+	border: 1px solid var(--border);
+	background: var(--surface);
+	box-shadow: var(--shadow);
+	overflow: hidden;
+	line-height: 0;
+}
+
+.hero-shot img {
+	width: 100%;
+	display: block;
+}
+
+/* ---------------------------------------------------------------- section */
+
+.section {
+	padding-block: var(--section-gap);
+}
+
+.section-head {
+	max-width: 42em;
+	margin-bottom: 48px;
+}
+
+.section-head.center {
+	margin-inline: auto;
+	text-align: center;
+}
+
+.section h2 {
+	font-size: clamp(26px, 4vw, 36px);
+	margin-bottom: 16px;
+}
+
+.section-head p {
+	color: var(--muted);
+	margin: 0;
+	text-wrap: pretty;
+}
+
+.divider {
+	border: 0;
+	border-top: 1px solid var(--border);
+	margin: 0;
+}
+
+/* ------------------------------------------------------------------ cards */
+
+.card-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+	gap: var(--gap);
+}
+
+.card {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: 26px;
+}
+
+.card h3 {
+	font-size: 17px;
+	margin-bottom: 10px;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.card p {
+	color: var(--muted);
+	font-size: 14.5px;
+	margin: 0;
+}
+
+.card-icon {
+	display: grid;
+	place-items: center;
+	width: 34px;
+	height: 34px;
+	border-radius: 9px;
+	background: var(--accent-soft);
+	color: var(--accent);
+	flex: none;
+}
+
+.card-icon svg {
+	width: 19px;
+	height: 19px;
+	fill: currentColor;
+}
+
+/* --------------------------------------------------------------- showcase */
+
+.showcase {
+	display: grid;
+	grid-template-columns: 1fr 1.25fr;
+	gap: 56px;
+	align-items: center;
+}
+
+.showcase + .showcase {
+	margin-top: var(--section-gap);
+}
+
+/* 左右を入れ替える段。order だけ変えると図が狭い側の列に入るので、列幅も入れ替える */
+.showcase.reverse {
+	grid-template-columns: 1.25fr 1fr;
+}
+
+.showcase.reverse .showcase-text {
+	order: 2;
+}
+
+.showcase h3 {
+	font-size: clamp(21px, 3vw, 27px);
+	margin-bottom: 14px;
+}
+
+.showcase p {
+	color: var(--muted);
+	margin-bottom: 0;
+}
+
+.showcase figure {
+	margin: 0;
+	border-radius: var(--radius);
+	border: 1px solid var(--border);
+	background: var(--surface);
+	box-shadow: var(--shadow);
+	overflow: hidden;
+	line-height: 0;
+}
+
+.showcase figure img,
+.showcase figure video {
+	width: 100%;
+	height: auto;
+	display: block;
+}
+
+/* 自動再生の動画。止める手段を必ず添える (WCAG 2.2.2) */
+.shot-video {
+	background: var(--surface-2);
+}
+
+.showcase figure.has-video {
+	position: relative;
+}
+
+.video-toggle {
+	position: absolute;
+	right: 12px;
+	bottom: 12px;
+	display: inline-grid;
+	place-items: center;
+	width: 38px;
+	height: 38px;
+	padding: 0;
+	border: 1px solid color-mix(in srgb, #ffffff 24%, transparent);
+	border-radius: 999px;
+	/* 動画の上に載るので、サイトの配色ではなく映像に対して読める固定色にする */
+	background: rgba(12, 14, 20, 0.66);
+	color: #ffffff;
+	cursor: pointer;
+	backdrop-filter: blur(6px);
+	opacity: 0.55;
+	transition: opacity 0.15s ease;
+}
+
+.showcase figure.has-video:hover .video-toggle,
+.video-toggle:focus-visible {
+	opacity: 1;
+}
+
+.video-toggle svg {
+	width: 18px;
+	height: 18px;
+	fill: currentColor;
+}
+
+/* 再生中は一時停止、止まっているときは再生のアイコンだけ出す */
+.video-toggle .icon-play {
+	display: none;
+}
+
+.video-toggle[data-state="paused"] .icon-play {
+	display: block;
+}
+
+.video-toggle[data-state="paused"] .icon-pause {
+	display: none;
+}
+
+/* 縦長の図 (設定ポップアップ) は幅を抑えないと段組みが崩れて見える */
+.showcase figure.portrait {
+	max-width: 380px;
+	margin-inline: auto;
+}
+
+.feature-list {
+	list-style: none;
+	padding: 0;
+	margin: 18px 0 0;
+	color: var(--muted);
+	font-size: 14.5px;
+}
+
+.feature-list li {
+	position: relative;
+	padding-inline-start: 24px;
+	margin-bottom: 6px;
+}
+
+.feature-list li::before {
+	content: "";
+	position: absolute;
+	left: 6px;
+	top: 0.72em;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--accent);
+}
+
+/* ------------------------------------------------------------------ table */
+
+.table-scroll {
+	overflow-x: auto;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--surface);
+}
+
+table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 14.5px;
+	min-width: 560px;
+}
+
+th,
+td {
+	text-align: start;
+	padding: 13px 18px;
+	border-bottom: 1px solid var(--divider);
+	vertical-align: top;
+}
+
+thead th {
+	font-size: 13px;
+	color: var(--muted);
+	font-weight: 700;
+	background: var(--surface-2);
+	white-space: nowrap;
+}
+
+tbody tr:last-child td {
+	border-bottom: 0;
+}
+
+td.default {
+	color: var(--muted);
+	white-space: nowrap;
+}
+
+/* -------------------------------------------------------------------- キー */
+
+.keys {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+	gap: 12px;
+}
+
+.key-row {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-sm);
+	padding: 14px 18px;
+	font-size: 14.5px;
+	color: var(--muted);
+}
+
+kbd {
+	font-family: var(--font-mono);
+	font-size: 13px;
+	color: var(--fg);
+	background: var(--surface-2);
+	border: 1px solid var(--border);
+	border-bottom-width: 2px;
+	border-radius: 6px;
+	padding: 3px 9px;
+	white-space: nowrap;
+	flex: none;
+}
+
+/* ------------------------------------------------------------------ notice */
+
+.notice {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-inline-start: 3px solid var(--accent);
+	border-radius: var(--radius-sm);
+	padding: 20px 24px;
+	font-size: 14.5px;
+	color: var(--muted);
+}
+
+.notice strong {
+	color: var(--fg);
+}
+
+.notice p:last-child {
+	margin-bottom: 0;
+}
+
+.notice ul {
+	margin: 0;
+	padding-inline-start: 1.2em;
+}
+
+.notice li + li {
+	margin-top: 6px;
+}
+
+/* -------------------------------------------------------------- privacy 用 */
+
+.doc {
+	padding-block: 56px var(--section-gap);
+}
+
+.doc .wrap {
+	max-width: 780px;
+}
+
+.doc h1 {
+	font-size: clamp(28px, 5vw, 40px);
+	margin-bottom: 12px;
+}
+
+.doc .doc-meta {
+	color: var(--muted);
+	font-size: 14px;
+	margin-bottom: 40px;
+}
+
+.doc h2 {
+	font-size: 21px;
+	margin-block: 48px 14px;
+	padding-top: 24px;
+	border-top: 1px solid var(--border);
+}
+
+.doc h3 {
+	font-size: 17px;
+	margin-block: 28px 10px;
+}
+
+.doc p,
+.doc li {
+	color: var(--muted);
+}
+
+.doc strong {
+	color: var(--fg);
+}
+
+.doc ul,
+.doc ol {
+	padding-inline-start: 1.3em;
+	margin-block: 0 1em;
+}
+
+.doc li + li {
+	margin-top: 8px;
+}
+
+.doc .summary-box {
+	background: var(--accent-soft);
+	border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+	border-radius: var(--radius);
+	padding: 22px 26px;
+	margin-bottom: 8px;
+}
+
+.doc .summary-box p {
+	color: var(--fg);
+	margin-bottom: 0;
+	font-weight: 700;
+}
+
+.doc .summary-box p + p {
+	margin-top: 8px;
+	font-weight: 400;
+	color: var(--muted);
+}
+
+/* ----------------------------------------------------------------- footer */
+
+.site-footer {
+	border-top: 1px solid var(--border);
+	background: var(--surface);
+	padding-block: 48px;
+	font-size: 14px;
+	color: var(--muted);
+}
+
+.footer-grid {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 32px;
+	justify-content: space-between;
+	align-items: start;
+}
+
+.footer-links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 24px;
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.footer-links a {
+	color: var(--muted);
+	text-decoration: none;
+}
+
+.footer-links a:hover {
+	color: var(--fg);
+	text-decoration: underline;
+}
+
+.footer-note {
+	max-width: 42em;
+	font-size: 13px;
+	line-height: 1.75;
+	margin-block: 24px 0;
+}
+
+.footer-note p {
+	margin-bottom: 8px;
+}
+
+.footer-note p:last-child {
+	margin-bottom: 0;
+}
+
+/* ------------------------------------------------------------- responsive */
+
+@media (max-width: 860px) {
+	:root {
+		--section-gap: 72px;
+		--pad-x: 20px;
+	}
+
+	.showcase {
+		grid-template-columns: 1fr;
+		gap: 28px;
+	}
+
+	.showcase.reverse {
+		grid-template-columns: 1fr;
+	}
+
+	.showcase.reverse .showcase-text {
+		order: 0;
+	}
+
+	.site-nav {
+		display: none;
+	}
+
+	.header-tools {
+		margin-inline-start: auto;
+	}
+
+	.hero {
+		padding-block: 48px 0;
+	}
+
+	.hero-shot {
+		margin-top: 40px;
+	}
+}
+
+@media (max-width: 520px) {
+	.btn {
+		width: 100%;
+		justify-content: center;
+	}
+
+	.cta-row {
+		gap: 10px;
+	}
+}
