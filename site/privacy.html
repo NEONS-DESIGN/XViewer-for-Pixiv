@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>プライバシーポリシー - XViewer for Pixiv</title>
-<meta name="description" content="XViewer for Pixiv のプライバシーポリシー。この拡張機能はいかなる個人情報も収集せず、外部への送信も行いません。保存するのは利用者が選んだ設定項目だけです。">
+<meta name="description" content="XViewer for Pixiv のプライバシーポリシー。この拡張機能はいかなる個人情報も収集せず、作者のサーバーへ送ることもありません。保存するのは利用者が選んだ設定項目だけです。">
 <link rel="canonical" href="https://neons-design.github.io/XViewer-for-Pixiv/privacy.html">
 <link rel="alternate" hreflang="ja" href="https://neons-design.github.io/XViewer-for-Pixiv/privacy.html">
 <link rel="alternate" hreflang="en" href="https://neons-design.github.io/XViewer-for-Pixiv/en/privacy.html">
@@ -13,7 +13,7 @@
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="XViewer for Pixiv">
 <meta property="og:title" content="プライバシーポリシー - XViewer for Pixiv">
-<meta property="og:description" content="この拡張機能はいかなる個人情報も収集せず、外部への送信も行いません。">
+<meta property="og:description" content="この拡張機能はいかなる個人情報も収集せず、作者のサーバーへ送ることもありません。">
 <meta property="og:url" content="https://neons-design.github.io/XViewer-for-Pixiv/privacy.html">
 <meta property="og:locale" content="ja_JP">
 <link rel="stylesheet" href="assets/style.css">
@@ -64,13 +64,13 @@
 	<div class="wrap">
 
 		<h1>プライバシーポリシー</h1>
-		<p class="doc-meta">最終更新日: 2026 年 9 月 17 日 / 制定日: 2026 年 9 月 17 日</p>
+		<p class="doc-meta">最終更新日: 2026 年 9 月 21 日 / 制定日: 2026 年 9 月 17 日</p>
 
 		<div class="summary-box">
 			<p>この拡張機能は、いかなる個人情報も収集しません。</p>
 			<p>
-				サーバーを持たず、外部へのデータ送信を行いません。保存するのは、あなたが選んだ設定項目だけです。
-				以下はその詳細です。
+				作者が管理するサーバーを持たず、あなたが開いている pixiv 以外へデータを送ることはありません。
+				保存するのは、あなたが選んだ設定項目だけです。以下はその詳細です。
 			</p>
 		</div>
 
@@ -102,6 +102,12 @@
 			本拡張機能は、pixiv の画像や投稿文、コメントをビュワーに表示するために読み込みますが、
 			それらは画面に描画するためにブラウザのメモリ上で扱われるだけです。
 			保存されることも、作者を含む第三者が取得できる場所へ送られることもありません。
+		</p>
+		<p>
+			あなたがモーダルの中で書いたコメントや返信についても同じです。
+			送信ボタンを押したときに pixiv 自身の API へそのまま渡すだけで、本拡張機能が保存したり、
+			作者を含む第三者へ送ったりすることはありません。投稿したコメントの公開範囲や取り扱いは、
+			pixiv 本体のコメント欄から投稿した場合とまったく同じです。
 		</p>
 
 		<h2>3. 保存する情報</h2>
@@ -141,7 +147,7 @@
 			通信するのは、あなたがすでに開いている pixiv と、その画像配信用サーバーだけです。
 		</p>
 		<ul>
-			<li><code>https://www.pixiv.net/</code> — 作品情報、コメント、作者情報の取得。いいね、ブックマーク、フォローの送信 (いずれもあなたがボタンを押したときだけ)</li>
+			<li><code>https://www.pixiv.net/</code> — 作品情報、コメント、作者情報の取得。いいね、ブックマーク、フォロー、コメントと返信の投稿、自分のコメントの削除の送信 (いずれもあなたがボタンを押したときだけ)</li>
 			<li><code>https://i.pximg.net/</code> — 作品画像とうごイラのデータの読み込み</li>
 			<li><code>https://s.pximg.net/</code> — コメントのスタンプと絵文字の画像の読み込み</li>
 		</ul>
@@ -172,8 +178,9 @@
 			本拡張機能がログイン情報そのものを扱うことはありません。
 		</p>
 		<p>
-			いいね、ブックマーク、フォローの操作は、あなたがモーダル内のボタンを押したときにだけ実行されます。
-			自動的に送信されることはありません。
+			いいね、ブックマーク、フォロー、コメントと返信の投稿、自分のコメントの削除は、
+			あなたがモーダル内のボタンを押したときにだけ実行されます。自動的に送信されることはありません。
+			なお、いいねは pixiv の仕様により取り消せません。コメントの削除も元には戻せないため、2 段階の確認を挟んでいます。
 		</p>
 
 		<h2>7. 第三者への提供</h2>
@@ -196,8 +203,12 @@
 			詳細は GitHub 社のプライバシーに関する声明をご確認ください。
 		</p>
 		<p>
-			なお、本サイトに掲載しているスクリーンショットは、動作を説明するためのデモ用のダミーデータであり、
+			なお、本サイトに掲載している静止画のスクリーンショットは、動作を説明するためのデモ用のダミーデータであり、
 			実在の作品情報やコメントではありません。
+		</p>
+		<p>
+			一方、無限スクロールを説明する動画は、pixiv の公開アカウントを実際に閲覧した画面録画です。
+			表示されている作品情報やカウンタには手を加えていません。
 		</p>
 
 		<h2>9. 子どもの利用について</h2>

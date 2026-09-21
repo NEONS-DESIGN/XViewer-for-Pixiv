@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>XViewer for Pixiv - pixiv に X 風の画像ビュワーを追加する Chrome 拡張機能</title>
-<meta name="description" content="pixiv のユーザーページで作品をクリックすると、ページ遷移せずにその場でモーダルが開きます。複数枚の切り替え、うごイラの再生、投稿文やコメントの閲覧までモーダルの中で完結する非公式の Chrome 拡張機能です。">
+<meta name="description" content="pixiv のユーザーページで作品をクリックすると、ページ遷移せずにその場でモーダルが開きます。複数枚の切り替え、うごイラの再生、投稿文やコメントの閲覧から投稿までモーダルの中で完結する非公式の Chrome 拡張機能です。">
 <link rel="canonical" href="https://neons-design.github.io/XViewer-for-Pixiv/">
 <link rel="alternate" hreflang="ja" href="https://neons-design.github.io/XViewer-for-Pixiv/">
 <link rel="alternate" hreflang="en" href="https://neons-design.github.io/XViewer-for-Pixiv/en/">
@@ -87,7 +87,8 @@
 			<h1>pixiv を、<span class="accent">X</span> のように見る。</h1>
 			<p class="lede">
 				ユーザーページで作品をクリックすると、ページ遷移せずにその場でモーダルが開きます。
-				複数枚の切り替え、うごイラの再生、投稿文やコメントの閲覧、いいねやブックマークまで、すべてモーダルの中で完結します。
+				複数枚の切り替え、うごイラの再生、投稿文やコメントの閲覧から、いいね・ブックマーク・フォロー・コメントの投稿まで、
+				すべてモーダルの中で完結します。
 				閉じれば、元のグリッドの元のスクロール位置に戻ります。
 			</p>
 			<div class="cta-row">
@@ -126,7 +127,7 @@
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-scroll"></use></svg></span>作品から作品へ</h3>
-					<p>上下キーでグリッドの前後の作品へ移動します。端まで来たら次のページ分を自動で読み足します。</p>
+					<p>上下キーでグリッドの前後の作品へ移動します。端まで来たら次のページ分を自動で読み足します。イラストとマンガのタブでは、その種別の作品だけをたどります。</p>
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-play"></use></svg></span>うごイラの再生</h3>
@@ -134,15 +135,15 @@
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-zoom"></use></svg></span>原寸表示</h3>
-					<p>画像をクリックすると、原寸のまま画面いっぱいに開きます。細部を確かめたいときのための機能です。</p>
+					<p>画像をクリックすると、原寸のまま画面いっぱいに開きます。開いたままページ送りもできるので、細部を確かめながら読み進められます。</p>
 				</div>
 				<div class="card">
-					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-comment"></use></svg></span>コメントの閲覧</h3>
-					<p>スタンプと絵文字を画像で表示します。返信の展開や続きの読み込みにも対応しています。</p>
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-comment"></use></svg></span>コメントを読む、書く</h3>
+					<p>スタンプと絵文字を画像で表示し、返信の展開や続きの読み込みにも対応しています。投稿と返信、自分のコメントの削除も、モーダルを開いたままできます。</p>
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-like"></use></svg></span>いいねとブックマーク</h3>
-					<p>フォローとシェアも含めて、モーダルの中から操作できます。自分の作品には表示しません。</p>
+					<p>フォローと、X / Facebook / Pawoo / リンクのコピーへのシェアも含めて、モーダルの中から操作できます。ブックマークは Shift を押しながらで非公開。自分の作品には表示しません。</p>
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-theme"></use></svg></span>ダークとライト</h3>
@@ -166,6 +167,7 @@
 					<ul class="feature-list">
 						<li>サイドバーごと送るか、コメントだけ送るかを選べます</li>
 						<li>読み込みに失敗しても、再試行から続きを読めます</li>
+						<li>別のタブで押したいいねを、二重に数えません</li>
 						<li>サイドバーを消して、画像だけを見ることもできます</li>
 					</ul>
 				</div>
@@ -176,6 +178,25 @@
 			</div>
 
 			<div class="showcase reverse">
+				<div class="showcase-text">
+					<h3>返すのも、閉じずにそのまま</h3>
+					<p>
+						コメントと返信は、モーダルを開いたまま投稿できます。入力欄は書いた行数に合わせて伸び、
+						絵文字とスタンプはパネルから選べます。<kbd>Ctrl</kbd> + <kbd>Enter</kbd> で送信、<kbd>Enter</kbd> は改行です。
+					</p>
+					<ul class="feature-list">
+						<li>自分のコメントは、2 段階の確認を挟んで削除できます</li>
+						<li>書きかけの文章があるときは、<kbd>Esc</kbd> でモーダルを閉じません</li>
+						<li>投稿したコメントは、pixiv 本体で書いたものと同じ扱いです</li>
+					</ul>
+				</div>
+				<figure class="compact">
+					<img src="assets/img/shot-comment-form.jpg" width="1019" height="984"
+						alt="サイドバーのコメント入力欄に 3 行の文章が入り、右に絵文字ボタンと送信ボタンが並んでいる画面">
+				</figure>
+			</div>
+
+			<div class="showcase">
 				<div class="showcase-text">
 					<h3>一覧を、途切れさせない</h3>
 					<p>
@@ -200,7 +221,7 @@
 				</figure>
 			</div>
 
-			<div class="showcase">
+			<div class="showcase reverse">
 				<div class="showcase-text">
 					<h3>設定は、その場で反映される</h3>
 					<p>
@@ -304,11 +325,16 @@
 
 			<h3 style="margin-block:56px 20px;font-size:19px">キー操作</h3>
 			<div class="keys">
-				<div class="key-row"><kbd>←</kbd><kbd>→</kbd><span>同じ作品のページ送り</span></div>
+				<div class="key-row"><kbd>←</kbd><kbd>→</kbd><span>同じ作品のページ送り (原寸表示中も同じ)</span></div>
 				<div class="key-row"><kbd>↑</kbd><kbd>↓</kbd><span>前後の作品へ移動</span></div>
-				<div class="key-row"><kbd>Esc</kbd><span>モーダルを閉じる</span></div>
+				<div class="key-row"><kbd>Ctrl</kbd><kbd>Enter</kbd><span>コメントを送信 (Mac は <kbd>Cmd</kbd>)</span></div>
+				<div class="key-row"><kbd>Esc</kbd><span>手前にあるものから順に閉じる</span></div>
 				<div class="key-row"><kbd>Tab</kbd><span>モーダル内のフォーカス移動</span></div>
 			</div>
+			<p class="key-note">
+				<kbd>Esc</kbd> は絵文字パネル、原寸表示とシェアメニュー、モーダルの順に閉じます。書きかけのコメントがあるときはモーダルを閉じません。<br>
+				コメントを書いている間は <kbd>Enter</kbd> が改行になり、<kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> はキャレットの移動に使われます (作品は動きません)。
+			</p>
 		</div>
 	</section>
 
@@ -331,7 +357,7 @@
 				</div>
 				<div class="card">
 					<h3>ライセンス</h3>
-					<p>ソースコードは GitHub で公開しています。同梱している第三者の成果物の表示は、設定画面のライセンスタブにあります。</p>
+					<p>ソースコードは GitHub で公開しています。免責事項と、同梱している第三者の成果物の表示は、設定画面のライセンスタブにあります。設定画面の配色は、そこでダークとライトを切り替えられます。</p>
 				</div>
 			</div>
 		</div>
@@ -342,13 +368,13 @@
 	<section class="section" id="privacy">
 		<div class="wrap">
 			<div class="section-head center">
-				<h2>データは、どこにも送りません</h2>
-				<p>この拡張機能はサーバーを持ちません。通信するのは、あなたが開いている pixiv とその画像 CDN だけです。</p>
+				<h2>データは、pixiv の外へ出ません</h2>
+				<p>この拡張機能には作者のサーバーがありません。通信するのは、あなたが開いている pixiv とその画像 CDN だけです。</p>
 			</div>
 			<div class="card-grid">
 				<div class="card">
 					<h3>収集しないもの</h3>
-					<p>閲覧履歴、作品 ID、ユーザー ID、Cookie、認証情報、個人情報。いずれも取得も保存も送信もしません。</p>
+					<p>閲覧履歴、作品 ID、ユーザー ID、Cookie、認証情報、個人情報。いずれも取得も保存も送信もしません。あなたが書いたコメントも、その場で pixiv へ渡すだけで、拡張側には残りません。</p>
 				</div>
 				<div class="card">
 					<h3>保存するもの</h3>
@@ -376,6 +402,9 @@
 				<ul>
 					<li>利用は自己責任でお願いします。本拡張の利用によって生じた損害について、作者およびピクシブ株式会社は責任を負いません</li>
 					<li>R-18 作品の表示は pixiv 側の設定に従います。拡張側で年齢制限を回避することはしません</li>
+					<li>いいねは取り消せません。これは pixiv の仕様で、押し間違えても元には戻せません</li>
+					<li>コメントの投稿・削除は pixiv 本体と同じ扱いです。押した分だけそのまま pixiv へ送られます。削除は元に戻せないので、2 段階の確認を挟んでいます</li>
+					<li>作品を収集する機能はありません。ダウンロードも一括操作の自動化もなく、取得するのはいま開いている作品とその前後の数枚だけです</li>
 					<li>pixiv の仕様変更によって動作しなくなる場合があります</li>
 				</ul>
 			</div>
@@ -401,7 +430,7 @@
 		</div>
 		<div class="footer-note">
 			<p>pixiv はピクシブ株式会社の登録商標です。本サイトおよび本拡張機能は、ピクシブ株式会社とは一切関係がありません。</p>
-			<p>掲載しているスクリーンショットは、動作を説明するためのデモ用のダミーデータです。実在の作品情報やコメントではありません。</p>
+			<p>掲載している静止画のスクリーンショットは、動作を説明するためのデモ用のダミーデータです。実在の作品情報やコメントではありません。無限スクロールの動画は実際の画面録画で、作品情報とカウンタは加工していません。</p>
 			<p>アイコンの図形は Material Symbols (Apache License 2.0) と Font Awesome Free (CC BY 4.0) を使用しています。</p>
 		</div>
 	</div>

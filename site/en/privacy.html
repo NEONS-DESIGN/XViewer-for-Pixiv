@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Privacy Policy - XViewer for Pixiv</title>
-<meta name="description" content="The privacy policy for XViewer for Pixiv. The extension collects no personal information and transmits nothing to any server. It stores only the preferences you choose.">
+<meta name="description" content="The privacy policy for XViewer for Pixiv. The extension collects no personal information and sends nothing to any server run by the author. It stores only the preferences you choose.">
 <link rel="canonical" href="https://neons-design.github.io/XViewer-for-Pixiv/en/privacy.html">
 <link rel="alternate" hreflang="ja" href="https://neons-design.github.io/XViewer-for-Pixiv/privacy.html">
 <link rel="alternate" hreflang="en" href="https://neons-design.github.io/XViewer-for-Pixiv/en/privacy.html">
@@ -13,7 +13,7 @@
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="XViewer for Pixiv">
 <meta property="og:title" content="Privacy Policy - XViewer for Pixiv">
-<meta property="og:description" content="The extension collects no personal information and transmits nothing to any server.">
+<meta property="og:description" content="The extension collects no personal information and sends nothing to any server run by the author.">
 <meta property="og:url" content="https://neons-design.github.io/XViewer-for-Pixiv/en/privacy.html">
 <meta property="og:locale" content="en_US">
 <link rel="stylesheet" href="../assets/style.css">
@@ -64,13 +64,13 @@
 	<div class="wrap">
 
 		<h1>Privacy Policy</h1>
-		<p class="doc-meta">Last updated: 17 September 2026 / Effective: 17 September 2026</p>
+		<p class="doc-meta">Last updated: 21 September 2026 / Effective: 17 September 2026</p>
 
 		<div class="summary-box">
 			<p>This extension collects no personal information.</p>
 			<p>
-				It has no server and transmits no data anywhere. The only thing it stores is the set of
-				preferences you choose. The details follow.
+				There is no server run by the author, and nothing is sent anywhere other than the pixiv you
+				already have open. The only thing it stores is the set of preferences you choose. The details follow.
 			</p>
 		</div>
 
@@ -102,6 +102,11 @@
 			The extension loads pixiv's images, captions and comments in order to render them in the viewer, but they are
 			only held in the browser's memory while they are on screen. They are never stored, and never sent anywhere the
 			author or any third party could read them.
+		</p>
+		<p>
+			The same applies to comments and replies you write inside the viewer. When you press send, the text is handed
+			to pixiv's own API and nothing more; the extension neither stores it nor forwards it to the author or any third
+			party. A comment posted here is treated exactly like one posted from pixiv's own comment box.
 		</p>
 
 		<h2>3. What is stored</h2>
@@ -140,7 +145,7 @@
 			to are the pixiv you already have open and pixiv's image servers.
 		</p>
 		<ul>
-			<li><code>https://www.pixiv.net/</code> - fetching artwork data, comments and author information; sending likes, bookmarks and follows (only when you press the button)</li>
+			<li><code>https://www.pixiv.net/</code> - fetching artwork data, comments and author information; sending likes, bookmarks, follows, comments and replies, and deletions of your own comments (only when you press the button)</li>
 			<li><code>https://i.pximg.net/</code> - loading artwork images and ugoira data</li>
 			<li><code>https://s.pximg.net/</code> - loading the stamp and emoji images used in comments</li>
 		</ul>
@@ -169,8 +174,9 @@
 			as it does for ordinary page loads. The extension never handles your login credentials itself.
 		</p>
 		<p>
-			Likes, bookmarks and follows are only ever sent when you press the corresponding button in the viewer.
-			Nothing is sent automatically.
+			Likes, bookmarks, follows, comments and replies, and deletions of your own comments are only ever sent when you
+			press the corresponding button in the viewer. Nothing is sent automatically. Note that pixiv does not allow a
+			like to be undone, and a comment deletion cannot be reversed either, so it sits behind a two-step confirmation.
 		</p>
 
 		<h2>7. Sharing with third parties</h2>
@@ -190,8 +196,12 @@
 			Those logs are not under the author's control. See GitHub's privacy statement for details.
 		</p>
 		<p>
-			The screenshots on this site use demo data to illustrate the interface. They are not real artwork records or
-			comments.
+			The still screenshots on this site use demo data to illustrate the interface. They are not real artwork records
+			or comments.
+		</p>
+		<p>
+			The video illustrating infinite scroll, by contrast, is a screen recording of a public pixiv account being
+			browsed for real. The artwork details and counters visible in it have not been altered.
 		</p>
 
 		<h2>9. Children</h2>

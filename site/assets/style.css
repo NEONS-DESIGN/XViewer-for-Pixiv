@@ -637,6 +637,12 @@ code {
 	margin-inline: auto;
 }
 
+/* 部分の寄り。元の解像度より引き伸ばすと文字が甘くなるので上限を切る */
+.showcase figure.compact {
+	max-width: 560px;
+	margin-inline: auto;
+}
+
 .feature-list {
 	list-style: none;
 	padding: 0;
@@ -707,8 +713,15 @@ td.default {
 
 .keys {
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+	/* 説明が 1 行に収まる程度の下限。240px だと Esc の段が 3 行に折れる */
+	grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
 	gap: 12px;
+}
+
+.key-note {
+	margin-top: 16px;
+	font-size: 14px;
+	color: var(--muted);
 }
 
 .key-row {

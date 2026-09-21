@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>XViewer for Pixiv - An X-style image viewer for pixiv</title>
-<meta name="description" content="Click an artwork on a pixiv user page and it opens in place, without navigating away. Page through multi-image works, play ugoira, and read captions and comments without ever leaving the grid.">
+<meta name="description" content="Click an artwork on a pixiv user page and it opens in place, without navigating away. Page through multi-image works, play ugoira, and read and post comments without ever leaving the grid.">
 <link rel="canonical" href="https://neons-design.github.io/XViewer-for-Pixiv/en/">
 <link rel="alternate" hreflang="ja" href="https://neons-design.github.io/XViewer-for-Pixiv/">
 <link rel="alternate" hreflang="en" href="https://neons-design.github.io/XViewer-for-Pixiv/en/">
@@ -85,8 +85,8 @@
 			<h1>Read pixiv the way you read <span class="accent">X</span>.</h1>
 			<p class="lede">
 				Click an artwork on a user page and it opens right there, without navigating away.
-				Page through multi-image works, play ugoira, read the caption and comments, like, bookmark and follow -
-				all inside the viewer. Close it and you are back on the grid, at the scroll position you left.
+				Page through multi-image works, play ugoira, read the caption and comments, like, bookmark, follow and
+				post a comment - all inside the viewer. Close it and you are back on the grid, at the scroll position you left.
 			</p>
 			<div class="cta-row">
 				<a class="btn btn-primary" href="#" aria-disabled="true">
@@ -124,7 +124,7 @@
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-scroll"></use></svg></span>Work to work</h3>
-					<p>Up and down move to the previous or next work in the grid. Reach the end and the next page is loaded for you.</p>
+					<p>Up and down move to the previous or next work in the grid. Reach the end and the next page is loaded for you. On the illustration and manga tabs, only works of that kind are visited.</p>
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-play"></use></svg></span>Ugoira playback</h3>
@@ -132,15 +132,15 @@
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-zoom"></use></svg></span>Full size</h3>
-					<p>Click the image to open it at its original resolution, filling the screen, for when the detail is the point.</p>
+					<p>Click the image to open it at its original resolution, filling the screen. You can keep paging through the work while it is open.</p>
 				</div>
 				<div class="card">
-					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-comment"></use></svg></span>Comments</h3>
-					<p>Stamps and emoji are rendered as images. Replies expand in place, and more comments load on demand.</p>
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-comment"></use></svg></span>Read and write comments</h3>
+					<p>Stamps and emoji are rendered as images, replies expand in place, and more comments load on demand. Posting, replying and deleting your own comments all work without leaving the viewer.</p>
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-like"></use></svg></span>Like and bookmark</h3>
-					<p>Follow and share too, all from inside the viewer. None of them are shown on your own works.</p>
+					<p>Follow and share to X, Facebook, Pawoo or the clipboard, all from inside the viewer. Hold Shift while bookmarking to keep it private. None of them are shown on your own works.</p>
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-theme"></use></svg></span>Dark and light</h3>
@@ -164,6 +164,7 @@
 					<ul class="feature-list">
 						<li>Scroll the whole sidebar, or pin the caption and scroll only the comments</li>
 						<li>If a request fails, retry picks up where it stopped</li>
+						<li>A like you already gave in another tab is never counted twice</li>
 						<li>Hide the sidebar entirely to see nothing but the image</li>
 					</ul>
 				</div>
@@ -174,6 +175,25 @@
 			</div>
 
 			<div class="showcase reverse">
+				<div class="showcase-text">
+					<h3>Reply without closing anything</h3>
+					<p>
+						Comments and replies can be posted with the viewer still open. The box grows with what you type,
+						and emoji and stamps come from a panel. <kbd>Ctrl</kbd> + <kbd>Enter</kbd> sends; <kbd>Enter</kbd> is a line break.
+					</p>
+					<ul class="feature-list">
+						<li>Your own comments can be deleted behind a two-step confirmation</li>
+						<li><kbd>Esc</kbd> will not close the viewer while a draft is unsent</li>
+						<li>A comment posted here is exactly a comment posted on pixiv</li>
+					</ul>
+				</div>
+				<figure class="compact">
+					<img src="../assets/img/shot-comment-form.jpg" width="1019" height="984"
+						alt="The comment box in the sidebar holding three lines of text, with the emoji button and the send button beside it">
+				</figure>
+			</div>
+
+			<div class="showcase">
 				<div class="showcase-text">
 					<h3>An uninterrupted list</h3>
 					<p>
@@ -198,7 +218,7 @@
 				</figure>
 			</div>
 
-			<div class="showcase">
+			<div class="showcase reverse">
 				<div class="showcase-text">
 					<h3>Settings apply as you change them</h3>
 					<p>
@@ -303,11 +323,16 @@
 
 			<h3 style="margin-block:56px 20px;font-size:19px">Keyboard</h3>
 			<div class="keys">
-				<div class="key-row"><kbd>←</kbd><kbd>→</kbd><span>Page through the current work</span></div>
+				<div class="key-row"><kbd>←</kbd><kbd>→</kbd><span>Page through the current work (also at full size)</span></div>
 				<div class="key-row"><kbd>↑</kbd><kbd>↓</kbd><span>Previous or next work</span></div>
-				<div class="key-row"><kbd>Esc</kbd><span>Close the viewer</span></div>
+				<div class="key-row"><kbd>Ctrl</kbd><kbd>Enter</kbd><span>Send a comment (<kbd>Cmd</kbd> on Mac)</span></div>
+				<div class="key-row"><kbd>Esc</kbd><span>Close the frontmost thing first</span></div>
 				<div class="key-row"><kbd>Tab</kbd><span>Move focus inside the viewer</span></div>
 			</div>
+			<p class="key-note">
+				<kbd>Esc</kbd> closes the emoji panel, then full size or the share menu, then the viewer. It will not close the viewer while a draft is unsent.<br>
+				While you are writing a comment, <kbd>Enter</kbd> is a line break and <kbd>&larr;</kbd> <kbd>&rarr;</kbd> <kbd>&uarr;</kbd> <kbd>&darr;</kbd> move the caret instead of the work.
+			</p>
 		</div>
 	</section>
 
@@ -330,7 +355,7 @@
 				</div>
 				<div class="card">
 					<h3>License</h3>
-					<p>The source is published on GitHub. Third-party notices for the bundled assets are in the license tab of the settings popup.</p>
+					<p>The source is published on GitHub. The disclaimer and the third-party notices for the bundled assets are in the license tab of the settings popup, where you can also switch that popup between dark and light.</p>
 				</div>
 			</div>
 		</div>
@@ -341,13 +366,13 @@
 	<section class="section" id="privacy">
 		<div class="wrap">
 			<div class="section-head center">
-				<h2>Nothing is sent anywhere</h2>
-				<p>The extension has no server. The only thing it talks to is the pixiv you already have open, and pixiv's image CDN.</p>
+				<h2>Your data never leaves pixiv</h2>
+				<p>The extension has no server of its own. The only thing it talks to is the pixiv you already have open, and pixiv's image CDN.</p>
 			</div>
 			<div class="card-grid">
 				<div class="card">
 					<h3>Never collected</h3>
-					<p>Browsing history, artwork IDs, user IDs, cookies, credentials, personal information. None of it is read, stored or transmitted.</p>
+					<p>Browsing history, artwork IDs, user IDs, cookies, credentials, personal information. None of it is read, stored or transmitted. A comment you write is handed straight to pixiv and never kept by the extension.</p>
 				</div>
 				<div class="card">
 					<h3>What is stored</h3>
@@ -375,6 +400,9 @@
 				<ul>
 					<li>Use it at your own risk. Neither the author nor pixiv Inc. is liable for any damage arising from its use</li>
 					<li>Age-restricted works follow your pixiv account settings. The extension never works around them</li>
+					<li>A like cannot be undone. That is how pixiv works, so a misclick cannot be taken back</li>
+					<li>Posting and deleting comments behaves exactly as it does on pixiv itself. A deletion cannot be undone, so it sits behind a two-step confirmation</li>
+					<li>There is nothing here for collecting works. No downloads, no batch automation - only the work you have open and the few around it are fetched</li>
 					<li>Changes on pixiv's side may break it at any time</li>
 				</ul>
 			</div>
@@ -400,7 +428,7 @@
 		</div>
 		<div class="footer-note">
 			<p>pixiv is a registered trademark of pixiv Inc. Neither this site nor this extension is affiliated with pixiv Inc.</p>
-			<p>The screenshots on this site use demo data to illustrate the interface. They are not real artwork records or comments.</p>
+			<p>The still screenshots on this site use demo data to illustrate the interface; they are not real artwork records or comments. The infinite-scroll video is an actual screen recording, with the artwork details and counters left untouched.</p>
 			<p>Icon shapes come from Material Symbols (Apache License 2.0) and Font Awesome Free (CC BY 4.0).</p>
 		</div>
 	</div>
