@@ -11,9 +11,9 @@
 ![manifest](https://img.shields.io/badge/manifest-v3-4ea3d6)
 ![tests](https://img.shields.io/badge/tests-920%20passing-4ea3d6)
 
-**[紹介サイト](https://www.xviewer.neonsdesign.com/)** ・
-[プライバシーポリシー](https://www.xviewer.neonsdesign.com/privacy.html) ・
-[English](https://www.xviewer.neonsdesign.com/en/)
+**[紹介サイト](https://xviewer.neonsdesign.com/)** ・
+[プライバシーポリシー](https://xviewer.neonsdesign.com/privacy.html) ・
+[English](https://xviewer.neonsdesign.com/en/)
 
 </div>
 
@@ -172,7 +172,7 @@ pixiv の**ユーザーページ** (`https://www.pixiv.net/users/{id}` 系) を�
 バージョンの出どころは `package.json` の `version` だけで、ビルドが `dist/manifest.json` へ差し込みます。
 対応 Chrome の下限 (esbuild の target と `minimum_chrome_version`) の出どころは `scripts/targets.mjs` です。
 
-`site/` は[紹介サイト](https://www.xviewer.neonsdesign.com/)の実体です。ビルド工程はありません。
+`site/` は[紹介サイト](https://xviewer.neonsdesign.com/)の実体です。ビルド工程はありません。
 `main` へ push すると `.github/workflows/pages.yml` が `site/` だけを GitHub Pages へ公開します。
 ローカルでの確認は `cd site && python -m http.server 8000` で `http://localhost:8000/` を開いてください
 (`file://` で開くとルート相対のリンクだけ挙動が変わります)。
