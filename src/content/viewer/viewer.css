@@ -72,13 +72,15 @@
 	--side-fg: #f5f5f5;
 	--side-body: #d6d6d6;
 	--side-sub: #858585;
-	/* 投稿文とタグのリンク。作品ページのリンクの実測値そのもの。
-	   ブランド色 (--accent / #0096fa) より沈んだ青で、本体も読み物の中のリンクだけは
-	   この色を使い、ボタン類にはブランド色を使い分けている。ここも同じ切り分けにする。
-	   (押せる導線 = シェア・作品ページを開く・いいね は --accent のまま)
+	/* サイドバーの文字色の青。投稿文とタグのリンクに加えて、
+	   地を持たない文字だけの導線 (作品ページを開く・シェア・上部へ・返信) もこれで塗る。
+	   作品ページのリンクの実測値そのもので、ブランド色 (--accent / #0096fa) より沈んだ青。
+	   サイドバーは読むための面なので、文字と同じ大きさで並ぶ青はここまで落とす。
+	   --accent が残るのは「状態」を示すところだけ = いいね済み (--like)・
+	   フォロー中の枠 (.action.is-on)・カウンタの済み表示。色が状態の合図になっている
 	   テーマで変えない。本体が両テーマともこの値を直書きしているため。
 	   地 #1f1f1f との比は 3.35:1 で AA に届かないが、本体と同じ見え方を優先した判断
-	   (--accent と同じ扱い。docs/DECISIONS.md 0.30.3) */
+	   (--accent と同じ扱い。docs/DECISIONS.md 0.30.3 / 0.30.4) */
 	--side-link: #3d7699;
 	/* サイドバーのスクロールバーだけ、画面の端から空ける隙間。
 	   窓の縁に貼り付いて見えないようにするためのもの。(コメント一覧側には使わない)
@@ -648,7 +650,7 @@
 	display: inline-flex;
 	align-items: center;
 	gap: 4px;
-	color: var(--accent);
+	color: var(--side-link);
 	font-size: 13px;
 	text-decoration: none;
 }
@@ -673,7 +675,7 @@
 	border: 0;
 	border-radius: 999px;
 	background: transparent;
-	color: var(--accent);
+	color: var(--side-link);
 	font: inherit;
 	font-size: 13px;
 	cursor: pointer;
@@ -794,7 +796,7 @@
 	border: 0;
 	border-radius: 999px;
 	background: transparent;
-	color: var(--accent);
+	color: var(--side-link);
 	font: inherit;
 	font-size: 12px;
 	font-weight: normal;
@@ -1012,7 +1014,7 @@ a.comment-name:hover {
 	border: 0;
 	border-radius: 999px;
 	background: transparent;
-	color: var(--accent);
+	color: var(--side-link);
 	font: inherit;
 	font-size: 12px;
 	cursor: pointer;
@@ -1255,7 +1257,7 @@ a.comment-name:hover {
 	padding: 2px 6px 2px 0;
 	border: 0;
 	background: transparent;
-	color: var(--accent);
+	color: var(--side-link);
 	font: inherit;
 	font-size: 12px;
 	line-height: 1;
