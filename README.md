@@ -159,6 +159,11 @@ pixiv の**ユーザーページ** (`https://www.pixiv.net/users/{id}` 系) を�
 
 これらは [ピクシブ株式会社 サービス利用規約](https://policies.pixiv.net/) の「登録商標のガイドライン &gt; アプリケーション、各種サービス等への使用について」に沿ったものです。
 
+## バグ報告・質問・リクエスト
+
+不具合の報告、使い方の質問、機能のご要望は **[お問い合わせフォーム](https://forms.gle/aWmu45UCpBqxuvqC9)** へお送りください。
+GitHub をお使いの方は [Issues](https://github.com/NEONS-DESIGN/XViewer-for-Pixiv/issues) でも構いません。
+
 ## 開発
 
 | コマンド | 内容 |
