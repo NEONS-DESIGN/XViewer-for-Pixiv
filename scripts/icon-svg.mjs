@@ -6,8 +6,11 @@
  * 小さいサイズは同じ 3 枚でも中の絵を山だけに減らし、16px でも形が残るようにする。
  */
 
-/** 背景のアクセント色。UI_DESIGN_KIT §2 の --accent (ダーク) と同じ値。 */
-const ACCENT = '#4ea3d6';
+/**
+ * 背景のアクセント色。UI_DESIGN_KIT §2 の --accent (ダーク) と同じ値で、
+ * その実体は pixiv 本体のブランド色 --charcoal-brand。(SITE_SPEC.md §14)
+ */
+const ACCENT = '#0096fa';
 
 /** カードの色。背景のアクセント色に白を重ねる。 */
 const CARD_COLOR = '#ffffff';

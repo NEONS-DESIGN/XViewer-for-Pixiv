@@ -31,12 +31,19 @@
 	--control-border: #3a3a3a;
 	--control-hover: #333333;
 	--hover: rgba(255, 255, 255, 0.08);
-	/* 拡張機能のアイコン (scripts/icon-svg.mjs) の背景もこの値。
+	/* pixiv 本体のブランド色 --charcoal-brand そのもの (SITE_SPEC.md §14)。
+	   本体の青と同じ色を使うことで、拡張の UI が pixiv の一部として読める。
+	   拡張機能のアイコン (scripts/icon-svg.mjs) の背景もこの値。
 	   食い違いは test/popup/popup-css.test.js が止める */
-	--accent: #4ea3d6;
-	/* 塗りつぶしボタンの文字色。背景 var(--accent) との組み合わせで決める値なので、
-	   テーマごとに必ず対で見直すこと。ダークは明るい水色の上の濃紺で約 6.8:1 */
-	--on-accent: #04121a;
+	--accent: #0096fa;
+	/* var(--accent) で塗りつぶした面に載せる文字色。pixiv 本体がブランド色の上に
+	   白を載せているので、ここも白で揃える。比は約 3.1:1 で WCAG AA (4.5:1) には
+	   届かないが、本体と同じ見え方にすることを優先した判断 (docs/DECISIONS.md 0.30.2)。
+	   --accent はテーマで変えないので、この値もライトと同じ。
+	   今この拡張に --accent の塗りつぶしは無く (塗りは --brand-bg 側に寄せてある)、
+	   実際に読んでいるのは紹介サイトの CTA ボタン (site/assets/style.css)。
+	   新しく塗りつぶしを足すときの出どころとして残している */
+	--on-accent: #ffffff;
 	/* 取り返しの付かない操作 (設定の初期化の確定など) の枠と文字。
 	   やり直せる失敗 (保存の失敗の通知) には使わない (UI_DESIGN_KIT §2) */
 	--danger: #e5737a;
@@ -61,7 +68,9 @@
    線は pixiv が実際に引いている rgba(0,0,0,0.08) (ダーク側の rgba(255,255,255,0.12) と対) と、
    それを白地で不透明にした #ebebeb。地との明暗差はダークの #1f1f1f/#333333 と同じ比に揃えてある。
    枠 (--control-border) は --charcoal-surface1-press。ホバーの地 (#ebebeb) より濃いので、ホバー中も輪郭が残る。
-   --accent は白文字を載せる前提で暗くしてある。白との比は約 5.8:1 (#1f7fb8 は 4.4:1 で AA 未達だった) */
+   --accent / --on-accent はライトでも差し替えない。pixiv 本体のブランド色 --charcoal-brand は
+   両テーマ共通で #0096fa、その上の文字も白だからで、片方だけ暗くすると本体と色がずれる。
+   (以前はコントラストのためライトだけ #1a6b9e に落としていた。docs/DECISIONS.md 0.30.2) */
 :root[data-theme='light'],
 :host([data-theme='light']) {
 	color-scheme: light;
@@ -75,7 +84,7 @@
 	--control-border: #d6d6d6;
 	--control-hover: #ebebeb;
 	--hover: rgba(0, 0, 0, 0.05);
-	--accent: #1a6b9e;
+	--accent: #0096fa;
 	--on-accent: #ffffff;
 	--danger: #c0392b;
 	--scrollbar-track: rgba(0, 0, 0, 0.06);
@@ -105,7 +114,7 @@
 		--control-border: #d6d6d6;
 		--control-hover: #ebebeb;
 		--hover: rgba(0, 0, 0, 0.05);
-		--accent: #1a6b9e;
+		--accent: #0096fa;
 		--on-accent: #ffffff;
 		--danger: #c0392b;
 		--scrollbar-track: rgba(0, 0, 0, 0.06);
