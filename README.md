@@ -13,7 +13,7 @@
 
 **[紹介サイト](https://xviewer.neonsdesign.com/)** ・
 [プライバシーポリシー](https://xviewer.neonsdesign.com/privacy.html) ・
-[English](https://xviewer.neonsdesign.com/en/)
+[English](README.en.md)
 
 </div>
 
