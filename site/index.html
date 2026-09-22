@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14161c" media="(prefers-color-scheme: dark)">
 <title>XViewer for Pixiv - pixiv に X 風の画像ビュワーを追加する Chrome 拡張機能</title>
 <meta name="description" content="pixiv のユーザーページで作品をクリックすると、ページ遷移せずにその場でモーダルが開きます。複数枚の切り替え、うごイラの再生、投稿文やコメントの閲覧から投稿までモーダルの中で完結する非公式の Chrome 拡張機能です。">
 <link rel="canonical" href="https://xviewer.neonsdesign.com/">
@@ -18,6 +20,7 @@
 <meta property="og:description" content="pixiv のユーザーページに、X.com のメディア閲覧に近い画像ビュワーを追加する Chrome 拡張機能。">
 <meta property="og:url" content="https://xviewer.neonsdesign.com/">
 <meta property="og:image" content="https://xviewer.neonsdesign.com/assets/img/shot-viewer.jpg">
+<meta property="og:image:alt" content="pixiv の作品がモーダルで開き、右側のサイドバーに投稿文、タグ、カウンタ、コメントが並んでいる画面">
 <meta property="og:locale" content="ja_JP">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="assets/style.css">
@@ -33,6 +36,52 @@
 	})();
 </script>
 <script src="assets/site.js" defer></script>
+<script type="application/ld+json">
+{
+	"@context": "https://schema.org",
+	"@graph": [
+		{
+			"@type": "WebSite",
+			"url": "https://xviewer.neonsdesign.com/",
+			"name": "XViewer for Pixiv",
+			"inLanguage": "ja",
+			"description": "pixiv のユーザーページに X.com のメディア閲覧に近い画像ビュワーを追加する Chrome 拡張機能の紹介サイト。"
+		},
+		{
+			"@type": "SoftwareApplication",
+			"name": "XViewer for Pixiv",
+			"url": "https://xviewer.neonsdesign.com/",
+			"applicationCategory": "BrowserApplication",
+			"operatingSystem": "Windows, macOS, Linux, ChromeOS",
+			"softwareRequirements": "Chrome 120 以上の Chromium 系ブラウザ (Chrome / Brave / Edge)",
+			"inLanguage": "ja",
+			"description": "pixiv のユーザーページで作品をクリックすると、ページ遷移せずにその場でモーダルが開く非公式の Chrome 拡張機能。複数枚の切り替え、うごイラの再生、投稿文やコメントの閲覧から投稿までモーダルの中で完結する。",
+			"isAccessibleForFree": true,
+			"license": "https://opensource.org/licenses/MIT",
+			"sameAs": "https://github.com/NEONS-DESIGN/XViewer-for-Pixiv",
+			"offers": {
+				"@type": "Offer",
+				"price": "0",
+				"priceCurrency": "JPY"
+			},
+			"screenshot": [
+				"https://xviewer.neonsdesign.com/assets/img/shot-viewer.jpg",
+				"https://xviewer.neonsdesign.com/assets/img/shot-comments.jpg",
+				"https://xviewer.neonsdesign.com/assets/img/shot-comment-form.jpg",
+				"https://xviewer.neonsdesign.com/assets/img/shot-popup.png"
+			],
+			"featureList": [
+				"ページ遷移せずにモーダルで作品を開く",
+				"複数枚の作品をキーボードで切り替える",
+				"うごイラを再生する",
+				"投稿文・タグ・カウンタ・コメントをサイドバーに表示する",
+				"いいね・ブックマーク・フォロー・コメントの投稿",
+				"ユーザーページの無限スクロール"
+			]
+		}
+	]
+}
+</script>
 </head>
 <body>
 
@@ -103,7 +152,7 @@
 			</div>
 			<p class="cta-note">現在ストアの審査を待っています。公開され次第このボタンから入手できるようになります。</p>
 			<div class="hero-shot">
-				<img src="assets/img/shot-viewer.jpg" width="1920" height="1024"
+				<img src="assets/img/shot-viewer.jpg" width="1920" height="1024" fetchpriority="high" decoding="async"
 					alt="pixiv の作品がモーダルで開き、右側のサイドバーに投稿文、タグ、カウンタ、コメント入力欄、コメントが並んでいる画面">
 			</div>
 		</div>
@@ -173,7 +222,7 @@
 					</ul>
 				</div>
 				<figure>
-					<img src="assets/img/shot-comments.jpg" width="1920" height="1024"
+					<img src="assets/img/shot-comments.jpg" loading="lazy" decoding="async" width="1920" height="1024"
 						alt="サイドバーの上部にコメント入力欄があり、その下にコメントが並んでいる画面">
 				</figure>
 			</div>
@@ -192,7 +241,7 @@
 					</ul>
 				</div>
 				<figure class="compact">
-					<img src="assets/img/shot-comment-form.jpg" width="1019" height="984"
+					<img src="assets/img/shot-comment-form.jpg" loading="lazy" decoding="async" width="1019" height="984"
 						alt="サイドバーのコメント入力欄に 3 行の文章が入り、右に絵文字ボタンと送信ボタンが並んでいる画面">
 				</figure>
 			</div>
@@ -211,7 +260,7 @@
 				</div>
 				<figure class="has-video">
 					<video class="shot-video" src="assets/img/infinite-scroll.mp4"
-						poster="assets/img/infinite-scroll.jpg" width="1280" height="688"
+						poster="assets/img/infinite-scroll.jpg" width="1280" height="688" preload="none"
 						autoplay loop muted playsinline
 						aria-label="ユーザーページを下へスクロールし続けると、ページャーを押さずに次のページの作品が読み込まれ、URL のページ番号が追従していく様子"></video>
 					<button type="button" class="video-toggle" aria-label="動画を一時停止する"
@@ -234,7 +283,7 @@
 					</ul>
 				</div>
 				<figure class="portrait">
-					<img src="assets/img/shot-popup.png" width="459" height="861"
+					<img src="assets/img/shot-popup.png" loading="lazy" decoding="async" width="459" height="861"
 						alt="拡張機能の設定ポップアップ。ビュワー、画像、ユーザーページ、操作の区分ごとに設定項目が並んでいる">
 				</figure>
 			</div>

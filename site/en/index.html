@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14161c" media="(prefers-color-scheme: dark)">
 <title>XViewer for Pixiv - An X-style image viewer for pixiv</title>
 <meta name="description" content="Click an artwork on a pixiv user page and it opens in place, without navigating away. Page through multi-image works, play ugoira, and read and post comments without ever leaving the grid.">
 <link rel="canonical" href="https://xviewer.neonsdesign.com/en/">
@@ -18,6 +20,7 @@
 <meta property="og:description" content="An X-style image viewer for pixiv user pages, as a Chrome extension.">
 <meta property="og:url" content="https://xviewer.neonsdesign.com/en/">
 <meta property="og:image" content="https://xviewer.neonsdesign.com/assets/img/shot-viewer.jpg">
+<meta property="og:image:alt" content="A pixiv artwork open in the modal viewer, with the caption, tags, counters and comments in the sidebar on the right">
 <meta property="og:locale" content="en_US">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="../assets/style.css">
@@ -33,6 +36,52 @@
 	})();
 </script>
 <script src="../assets/site.js" defer></script>
+<script type="application/ld+json">
+{
+	"@context": "https://schema.org",
+	"@graph": [
+		{
+			"@type": "WebSite",
+			"url": "https://xviewer.neonsdesign.com/en/",
+			"name": "XViewer for Pixiv",
+			"inLanguage": "en",
+			"description": "The website for a Chrome extension that adds an X.com-style image viewer to pixiv user pages."
+		},
+		{
+			"@type": "SoftwareApplication",
+			"name": "XViewer for Pixiv",
+			"url": "https://xviewer.neonsdesign.com/en/",
+			"applicationCategory": "BrowserApplication",
+			"operatingSystem": "Windows, macOS, Linux, ChromeOS",
+			"softwareRequirements": "Chrome 120 or newer, or another Chromium browser (Brave, Edge)",
+			"inLanguage": "en",
+			"description": "An unofficial Chrome extension that opens a pixiv artwork in place, without navigating away. Page through multi-image works, play ugoira, and read and post comments without ever leaving the grid.",
+			"isAccessibleForFree": true,
+			"license": "https://opensource.org/licenses/MIT",
+			"sameAs": "https://github.com/NEONS-DESIGN/XViewer-for-Pixiv",
+			"offers": {
+				"@type": "Offer",
+				"price": "0",
+				"priceCurrency": "USD"
+			},
+			"screenshot": [
+				"https://xviewer.neonsdesign.com/assets/img/shot-viewer.jpg",
+				"https://xviewer.neonsdesign.com/assets/img/shot-comments.jpg",
+				"https://xviewer.neonsdesign.com/assets/img/shot-comment-form.jpg",
+				"https://xviewer.neonsdesign.com/assets/img/shot-popup.png"
+			],
+			"featureList": [
+				"Opens artworks in a modal without navigating away",
+				"Pages through multi-image works from the keyboard",
+				"Plays ugoira",
+				"Shows the caption, tags, counters and comments in a sidebar",
+				"Like, bookmark, follow and post comments",
+				"Infinite scroll on user pages"
+			]
+		}
+	]
+}
+</script>
 </head>
 <body>
 
@@ -100,7 +149,7 @@
 			</div>
 			<p class="cta-note">The extension is awaiting store review. This button will go live once it is published.</p>
 			<div class="hero-shot">
-				<img src="../assets/img/shot-viewer.jpg" width="1920" height="1024"
+				<img src="../assets/img/shot-viewer.jpg" width="1920" height="1024" fetchpriority="high" decoding="async"
 					alt="A pixiv artwork open in the modal viewer, with the caption, tags, counters and comments in the sidebar on the right">
 			</div>
 		</div>
@@ -170,7 +219,7 @@
 					</ul>
 				</div>
 				<figure>
-					<img src="../assets/img/shot-comments.jpg" width="1920" height="1024"
+					<img src="../assets/img/shot-comments.jpg" loading="lazy" decoding="async" width="1920" height="1024"
 						alt="The sidebar with the comment box at the top and a list of comments below it">
 				</figure>
 			</div>
@@ -189,7 +238,7 @@
 					</ul>
 				</div>
 				<figure class="compact">
-					<img src="../assets/img/shot-comment-form.jpg" width="1019" height="984"
+					<img src="../assets/img/shot-comment-form.jpg" loading="lazy" decoding="async" width="1019" height="984"
 						alt="The comment box in the sidebar holding three lines of text, with the emoji button and the send button beside it">
 				</figure>
 			</div>
@@ -208,7 +257,7 @@
 				</div>
 				<figure class="has-video">
 					<video class="shot-video" src="../assets/img/infinite-scroll.mp4"
-						poster="../assets/img/infinite-scroll.jpg" width="1280" height="688"
+						poster="../assets/img/infinite-scroll.jpg" width="1280" height="688" preload="none"
 						autoplay loop muted playsinline
 						aria-label="Scrolling a pixiv user page keeps loading the next page of works without touching the paginator, while the page number in the URL follows along"></video>
 					<button type="button" class="video-toggle" aria-label="Pause the video"
@@ -232,7 +281,7 @@
 					</ul>
 				</div>
 				<figure class="portrait">
-					<img src="../assets/img/shot-popup.png" width="459" height="861"
+					<img src="../assets/img/shot-popup.png" loading="lazy" decoding="async" width="459" height="861"
 						alt="The extension's settings popup, grouped into viewer, image, user page and interaction sections">
 				</figure>
 			</div>
