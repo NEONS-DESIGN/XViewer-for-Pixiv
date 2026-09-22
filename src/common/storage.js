@@ -1,7 +1,7 @@
 /**
  * 設定の読み書き。
  * 保存ボタンは作らず変更のたびに書くので、書き込みは 1 項目ずつ。
- * 保存値が壊れていても既定へ倒して必ず描けるようにする (UI_DESIGN_KIT §9)。
+ * 保存値が壊れていても既定へ倒して必ず描けるようにする。(UI_DESIGN_KIT §9)
  */
 import { SETTINGS_DEFAULTS, IMAGE_QUALITY, PREFETCH_CHOICES, GRID_TAB_SKIP, POPUP_THEMES, SIDEBAR_SCROLL, INFINITE_SCROLL } from './constants.js';
 import { warn } from './log.js';
@@ -96,7 +96,7 @@ export function loadSettings(deps = {}) {
 }
 
 /**
- * 設定を 1 項目書く。失敗しても投げない (見た目の反映は保存を待たない)。
+ * 設定を 1 項目書く。失敗しても投げない。(見た目の反映は保存を待たない)
  * 呼び出し側が結果を伝えられるよう、成否は戻り値で返す。
  * SETTINGS_DEFAULTS に無いキーは書かない。読み出しが捨てる値で sync 領域の容量を食わないため。
  * @param {string} key 設定キー
@@ -114,7 +114,7 @@ export function saveSetting(key, value, deps = {}) {
 
 /**
  * 設定の変更を購読する。popup で変えた値を開いているページへ即座に届けるために使う。
- * コールバックが投げても unhandled rejection にせず warn に残す (SPEC §12)。
+ * コールバックが投げても unhandled rejection にせず warn に残す。(SPEC §12)
  * @param {(settings: typeof SETTINGS_DEFAULTS) => void} callback 変更後の設定を受け取る
  * @param {{storage?: object}} [deps] chrome.storage の差し替え
  * @returns {{dispose: () => void}} 購読の解除

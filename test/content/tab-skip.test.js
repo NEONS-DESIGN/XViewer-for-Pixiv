@@ -43,7 +43,7 @@ function fakeCard(children) {
 
 /**
  * 作品カードの代わりを 1 枚作る。実測どおり「サムネ → ブックマーク → タイトル」の並び。
- * 中の要素は closest('li') で自分のカードへ戻れる (attachTabSkip がカードを引くため)。
+ * 中の要素は closest('li') で自分のカードへ戻れる。(attachTabSkip がカードを引くため)
  * @param {string} [id] 作品 ID
  * @param {{alt?: string}} [options] alt を渡すとサムネリンクの中に img を置く (実機はこちら。SITE_SPEC §3)
  * @returns {{card: object, thumb: object, button: object, title: object}}
@@ -214,7 +214,7 @@ test('img が無いサムネイル (未読込) にも作品名を補う', () => 
 });
 
 test('サムネイルの img に alt があれば aria-label を足さない', () => {
-	// 実機の alt は「#タグ タイトル - 作者のイラスト」で作品名を含む (SITE_SPEC §3)。
+	// 実機の alt は「#タグ タイトル - 作者のイラスト」で作品名を含む。(SITE_SPEC §3)
 	// aria-label を足すと alt 由来の名前を上書きし、タグと作者名が読み上げから消える
 	const cards = [makeCard('7', { alt: '#タグ 作品7 - 作者のイラスト' })];
 	const { deps } = fakeObserverDeps();

@@ -1,6 +1,6 @@
 /**
  * ライセンスタブと、設定タブの末尾に残す非公式の断り。
- * 文言の出どころは `common/licenses.js` と `sections.js`。ここでは並べるだけにする (SPEC §11.1.1)。
+ * 文言の出どころは `common/licenses.js` と `sections.js`。ここでは並べるだけにする。(SPEC §11.1.1)
  */
 import { DISCLAIMER, PROJECT_LICENSE, THIRD_PARTY } from '../common/licenses.js';
 import { createDescription } from './description.js';
@@ -8,7 +8,7 @@ import { LICENSE_HEADINGS } from './sections.js';
 
 /**
  * 外部サイトへのリンクを組み立てる。
- * popup から開くので必ず新しいタブにし、参照元を渡さない (SPEC §13-3)。
+ * popup から開くので必ず新しいタブにし、参照元を渡さない。(SPEC §13-3)
  * @param {Document} doc 対象のドキュメント
  * @param {string} url 行き先
  * @returns {HTMLAnchorElement} リンク

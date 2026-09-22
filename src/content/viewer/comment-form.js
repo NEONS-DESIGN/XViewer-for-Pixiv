@@ -2,8 +2,8 @@
  * コメントの入力欄。作品へのコメントと、コメントへの返信で同じ部品を使う。
  *
  * 投稿そのものは知らない。onSubmit に値を渡し、解決したら入力を空にするだけ。
- * pixiv 本体はスタンプを選んだ瞬間に投稿するが、ここは一段挟んで「送信」で確定する
- * (モーダルの中の小さいパネルで誤爆すると実害が出る。設計書 §4.3)。
+ * pixiv 本体はスタンプを選んだ瞬間に投稿するが、ここは一段挟んで「送信」で確定する。
+ * (モーダルの中の小さいパネルで誤爆すると実害が出る。設計書 §4.3)
  */
 import { createIcon } from '../../common/icons.js';
 import { createAvatar, showAvatar } from './avatar.js';
@@ -90,7 +90,7 @@ export function createCommentForm(deps) {
 	 * この入力欄の中にフォーカスがあるか。Escape を食い止めるかの判断に使う。
 	 *
 	 * 真偽値で覚えないこと。`disabled` にした瞬間にブラウザがフォーカスを外すので、
-	 * 送信のたびに嘘になる (書きかけを Escape で失う原因だった)。
+	 * 送信のたびに嘘になる。(書きかけを Escape で失う原因だった)
 	 * @returns {boolean} 中にフォーカスがあれば true
 	 */
 	function isFocusInside() {
@@ -120,7 +120,7 @@ export function createCommentForm(deps) {
 	 * 本家と同じく、行が増えたらスクロールさせずに入力欄自体を伸ばす。
 	 * **先に height を空に戻してから測る。** 前の高さが残っていると
 	 * scrollHeight がその値のままになり、行を消しても縮まない。
-	 * 上限は CSS の max-height が持つ (超えた分だけ中がスクロールする)。
+	 * 上限は CSS の max-height が持つ。(超えた分だけ中がスクロールする)
 	 * 測る口が無い DOM (テスト用の偽物) では何もしない。見た目の調整なので黙って続ける
 	 * @returns {void}
 	 */
@@ -176,7 +176,7 @@ export function createCommentForm(deps) {
 	}
 
 	/**
-	 * スタンプを選んだ状態にする。本文とは排他 (pixiv 本体も同じ)。
+	 * スタンプを選んだ状態にする。本文とは排他。(pixiv 本体も同じ)
 	 * @param {string} id スタンプ ID
 	 * @returns {void}
 	 */

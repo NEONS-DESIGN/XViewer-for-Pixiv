@@ -109,7 +109,7 @@ test('appendChild が投げても投げず、isActive は false のまま', (t) 
 });
 
 test('隠すのは作品リンクを持つ section だけ', () => {
-	// クラス名は掴まない (SPEC §2)。作品と無関係な section を巻き込まないため作品リンクまで求める
+	// クラス名は掴まない。(SPEC §2) 作品と無関係な section を巻き込まないため作品リンクまで求める
 	assert.equal(PICKUP_SECTION_SELECTOR, `section:has(${ARTWORK_LINK_SELECTOR})`);
 	assert.doesNotMatch(PICKUP_SECTION_SELECTOR, /sc-/);
 	assert.match(PICKUP_HIDE_CSS, /display:\s*none\s*!important/);

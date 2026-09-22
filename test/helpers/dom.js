@@ -30,7 +30,7 @@ function classNames(node) {
 }
 
 /**
- * セレクタに合う子孫をすべて集める (起点自身は含めない。querySelectorAll と同じ)。
+ * セレクタに合う子孫をすべて集める。(起点自身は含めない。querySelectorAll と同じ)
  * @param {object} root 起点
  * @param {string} selector '.name' / 'tag' / それらのカンマ区切り
  * @returns {object[]} 見つかった要素 (文書順)
@@ -48,7 +48,7 @@ export function findAll(root, selector) {
 }
 
 /**
- * セレクタに合う子孫を 1 つ探す (起点自身は含めない。querySelector と同じ)。
+ * セレクタに合う子孫を 1 つ探す。(起点自身は含めない。querySelector と同じ)
  * @param {object} root 起点
  * @param {string} selector '.name' / 'tag' / それらのカンマ区切り
  * @returns {object|null} 見つかった要素

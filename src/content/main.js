@@ -77,11 +77,11 @@ let infiniteListImages = -1;
  */
 let infiniteGridKey = null;
 /**
- * pixiv 自身がグリッドに並べているページ番号 (継ぎ足したぶんは数えない)。
+ * pixiv 自身がグリッドに並べているページ番号。(継ぎ足したぶんは数えない)
  * 継ぎ足しはこの次のページから読む。値が動くのは pixiv が `?p=` を動かしたとき
  * (別のグリッドを見始めた / ページャ / 戻る) だけ。pixiv はその値のページを並べている。
  * 同じグリッドを描き直されても変えない。Next.js の router state は自分の `replaceState` では
- * 動かないので、描き直しは pixiv が最後に遷移したクエリ (= この値) で起きる (infinite-sync.js)。
+ * 動かないので、描き直しは pixiv が最後に遷移したクエリ (= この値) で起きる。(infinite-sync.js)
  *
  * `?p=` をそのまま使えないのは、継ぎ足しに合わせて自分で書き換えているため。
  * 撤去して張り直す (オフ→オンなど) と、グリッドには pixiv が並べたぶんしか残らない
@@ -176,8 +176,8 @@ function isViewingOwnWork() {
  * 起動と停止とページ切り替えを 1 か所で扱う。ページが変わったら必ず作り直すのが要点で、
  * 同じ購読を使い回すと page (userId やタグ絞り込みの有無) が初回の値で固定され、
  * グリッドの端で別人の作品一覧へ飛んでしまう。
- * 設定は boot() が読み終えてから呼ばれ、以後は watchSettings が更新し続けるので、ここでは読まない
- * (同期関数なので、遷移の通知の中で呼んでも await をまたいだ再入は起きない)。
+ * 設定は boot() が読み終えてから呼ばれ、以後は watchSettings が更新し続けるので、ここでは読まない。
+ * (同期関数なので、遷移の通知の中で呼んでも await をまたいだ再入は起きない)
  * @returns {void}
  */
 function apply() {
@@ -255,8 +255,8 @@ function syncPickup() {
 
 /**
  * 無限スクロールの対象として読めるページか。
- * 作品グリッドの 3 タブ以外は対象外 (ホーム・タグ絞り込み・ブックマークには
- * pixiv 本体のページャが無く、profile/all と並びも一致しない)。
+ * 作品グリッドの 3 タブ以外は対象外。(ホーム・タグ絞り込み・ブックマークには
+ * pixiv 本体のページャが無く、profile/all と並びも一致しない)
  * @param {string} path location.pathname
  * @returns {import('./page.js').UserPage|null} 対象でなければ null
  */
@@ -278,7 +278,7 @@ function gridKeyOf(page) {
  * 最後に見た ul が DOM から外れたか。
  * pixiv がグリッドを描き直すと、継ぎ足したカードも sentinel もろとも外れ、
  * 見張っている sentinel が二度と画面に入らないまま継ぎ足しが黙って止まる。
- * この場合は張り直しが要る (基準ページは変えない。infiniteBasePage の説明を参照)。
+ * この場合は張り直しが要る。(基準ページは変えない。infiniteBasePage の説明を参照)
  * @returns {boolean} 外れていれば true
  */
 function isGridDetached() {
@@ -286,7 +286,7 @@ function isGridDetached() {
 }
 
 /**
- * ul にある画像の数。張れなかった ul が描き進んだかを見る手掛かり (infiniteListImages)。
+ * ul にある画像の数。張れなかった ul が描き進んだかを見る手掛かり。(infiniteListImages)
  * @param {Element} ul グリッドの ul
  * @returns {number} img の数。数えられなければ -1
  */
@@ -346,8 +346,8 @@ function syncPageParam() {
 /**
  * 無限スクロールを今の設定と URL に合わせる。
  *
- * ビュワーの入切とは独立に効かせる。ビュワーを使わない人も無限スクロールだけ使える
- * (ピックアップ非表示と同じ扱い)。
+ * ビュワーの入切とは独立に効かせる。ビュワーを使わない人も無限スクロールだけ使える。
+ * (ピックアップ非表示と同じ扱い)
  * @returns {void}
  */
 function syncInfinite() {
@@ -409,7 +409,7 @@ function syncInfiniteOnce() {
 		basePage: infiniteBasePage,
 	});
 	if (decision.changedGrid) {
-		// 別のグリッドを見始めた (対象外のページへ出た場合も含む)。前のグリッドの記憶を捨てる
+		// 別のグリッドを見始めた。(対象外のページへ出た場合も含む) 前のグリッドの記憶を捨てる
 		infiniteList = null;
 		infiniteListImages = -1;
 	}
@@ -421,7 +421,7 @@ function syncInfiniteOnce() {
 		// 同じグリッドに張ったまま見続けている。設定の変更はモードの差し替えだけで追従する。
 		// ここで作り直すと、継ぎ足したカードが消えて読み進めた場所を失う
 		infinite?.setMode(wanted);
-		// pixiv が ?p= を基準ページへ戻しただけ (モーダルを閉じた直後等)。今の位置へ書き直す
+		// pixiv が ?p= を基準ページへ戻しただけ。(モーダルを閉じた直後等) 今の位置へ書き直す
 		if (decision.action === SYNC_ACTIONS.RESTORE_PARAM) syncPageParam();
 		return;
 	}
@@ -446,7 +446,7 @@ function syncInfiniteOnce() {
 		});
 		// 雛形が採れない / sentinel を置けないと inactiveHandle が返る。
 		// 掴んだのが描き途中の ul だっただけかもしれないので、ul と画像の数を覚えておき、
-		// 別の ul が現れるか画像が増えたときだけ試し直す (hasGridChanged)。
+		// 別の ul が現れるか画像が増えたときだけ試し直す。(hasGridChanged)
 		// 基準ページは触らない。まだ 1 件も継ぎ足していないので、グリッドの中身は変わっていない
 		if (!infinite.isActive()) infiniteListImages = countGridImages(ul);
 	} catch (error) {
@@ -460,7 +460,7 @@ function syncInfiniteOnce() {
 
 /**
  * 見えているページに合わせて ?p= を書き換える。
- * 上へ戻れば小さい値も書く (画面と URL を常に一致させる)。
+ * 上へ戻れば小さい値も書く。(画面と URL を常に一致させる)
  * 再読み込みや共有で同じ場所へ戻れるようにするための追従なので、履歴は積まない。
  * モーダルが開いている間は書かない。その間 URL は /artworks/{id} で router.js の持ち物。
  * @param {number} page ページ番号
@@ -544,8 +544,8 @@ function startNavigationWatch() {
 	window.addEventListener(NAV_EVENTS.NAVIGATE, onNavigate);
 	window.addEventListener('popstate', onPopState);
 
-	// 保険の経路。無限スクロールで数千回走るので、ここは pathname の比較だけに留める
-	// (グリッドの出現の検出には使わない)。
+	// 保険の経路。無限スクロールで数千回走るので、ここは pathname の比較だけに留める。
+	// (グリッドの出現の検出には使わない)
 	// タイマが動いている間は何もしないので、再描画が続いても確認は間隔ごとに 1 回で済む
 	const observer = new MutationObserver(() => {
 		if (checkTimer) return;
@@ -558,8 +558,8 @@ function startNavigationWatch() {
 			}
 			// URL は変わっていないが、ページを直接開いたときは content script のほうが
 			// React の描画より早く、継ぎ足す先の ul がここで初めて現れる。
-			// この経路が無いと、直接開いたページで無限スクロールが始まらない
-			// (URL が変わらないので handleLocationChange() が来ない)。
+			// この経路が無いと、直接開いたページで無限スクロールが始まらない。
+			// (URL が変わらないので handleLocationChange() が来ない)
 			// グリッドを描き直されて張り先が外れたときも、ここで張り直す。
 			// 張れているうちは何もしないので、費用は間隔ごとに判定 1 回で済む
 			if (!infinite?.isActive() || isGridDetached()) syncInfinite();

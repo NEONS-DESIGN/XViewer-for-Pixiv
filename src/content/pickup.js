@@ -28,7 +28,7 @@ ${PICKUP_SECTION_SELECTOR} {
 /**
  * ピックアップ欄を隠す CSS の出し入れを受け持つ。
  * 作った時点では何もせず、setActive(true) で初めて差し込む。
- * 失敗しても欄が隠れないだけでページは読めるので、投げずに戻る (style-injector が受ける)。
+ * 失敗しても欄が隠れないだけでページは読めるので、投げずに戻る。(style-injector が受ける)
  * @param {Document} doc 対象のドキュメント
  * @returns {{setActive: (active: boolean) => void, isActive: () => boolean, dispose: () => void}} 出し入れ
  */

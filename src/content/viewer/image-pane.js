@@ -2,7 +2,7 @@
  * 画像の表示とページ切替。
  *
  * ページ一覧は /pages から取る。ここが 404 のときは表示できない作品なので、
- * 呼び出し側が可視判定で先に弾いている前提 (SITE_SPEC §6)。
+ * 呼び出し側が可視判定で先に弾いている前提。(SITE_SPEC §6)
  */
 import { getJson } from '../../pixiv/client.js';
 import { illustPagesUrl, safeCdnUrl } from '../../pixiv/endpoints.js';
@@ -188,8 +188,8 @@ export function createImagePane(deps) {
 
 	/**
 	 * 原寸表示を開く。
-	 * 開いた先でページを送られたら、こちらの表示も合わせる
-	 * (閉じたときに違うページが出ていると、見ていた場所を見失う)。
+	 * 開いた先でページを送られたら、こちらの表示も合わせる。
+	 * (閉じたときに違うページが出ていると、見ていた場所を見失う)
 	 * @param {string} alt 画像の代替文言 (作品名)
 	 * @returns {void}
 	 */

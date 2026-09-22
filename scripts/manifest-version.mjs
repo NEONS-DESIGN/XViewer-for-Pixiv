@@ -2,7 +2,7 @@
  * package.json の version を Chrome 拡張の manifest が受け付ける形へ整える。
  *
  * ビルド本体 (build.mjs) は import した時点で走ってしまい単体で確かめられないので、
- * 判断だけをここへ切り出してある (SPEC.md §15)。
+ * 判断だけをここへ切り出してある。(SPEC.md §15)
  *
  * manifest の version の規則 (developer.chrome.com/docs/extensions/reference/manifest/version):
  *   - 1 個から 4 個の整数をドットで繋いだもの
@@ -91,7 +91,7 @@ export function applyVersion(manifest, packageVersion) {
 
 /**
  * manifest の内容に minimum_chrome_version を差し込む。
- * 出どころは scripts/targets.mjs (esbuild の target と同じ値)。雛形に書いてあったら止める。
+ * 出どころは scripts/targets.mjs。(esbuild の target と同じ値) 雛形に書いてあったら止める。
  * @param {object} manifest manifest の内容 (minimum_chrome_version を持たない)
  * @param {string} minimumChromeVersion 差し込む値 ("120" のようなメジャーバージョン)
  * @returns {object} 差し込んだ manifest

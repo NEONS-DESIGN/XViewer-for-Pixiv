@@ -24,10 +24,10 @@ const NON_JSON_BODY = '<!DOCTYPE html>';
 
 /**
  * fetch の偽物を作る。呼ばれた内容を記録する。
- * 応答は json() と text() の両方を持つ (client.js は text() で読んでから JSON.parse する)。
+ * 応答は json() と text() の両方を持つ。(client.js は text() で読んでから JSON.parse する)
  * @param {{status?: number, json?: unknown, text?: string, throws?: boolean|Error}} [options] 応答の指定。
  *   json を省くと JSON として読めない応答 (HTML 等) になる。text で本文を直接指定してもよい。
- *   throws に Error を渡すとそれを投げる (cause の検証用)。true なら TypeError を投げる
+ *   throws に Error を渡すとそれを投げる。(cause の検証用) true なら TypeError を投げる
  * @returns {{impl: Function, calls: Array<{url: string, init: object}>}} 偽の fetch と呼び出しの記録
  */
 export function fakeFetch(options = {}) {

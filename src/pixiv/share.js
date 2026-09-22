@@ -1,6 +1,6 @@
 /**
  * 作品のシェア先を組み立てる。
- * 文言もパラメータの並びも pixiv 本体のシェアメニューの実測値に合わせている (SITE_SPEC §4)。
+ * 文言もパラメータの並びも pixiv 本体のシェアメニューの実測値に合わせている。(SITE_SPEC §4)
  * 通信はしない純粋関数だけを置く。
  */
 import { PIXIV_ORIGIN, artworkPath } from './endpoints.js';
@@ -43,7 +43,7 @@ export function shareText(detail) {
  * シェア先を並べる。
  *
  * パラメータは URLSearchParams ではなく encodeURIComponent で組む。
- * URLSearchParams は空白を + にするので、pixiv 本体が作る URL と文字列が変わる (実測確認済み)。
+ * URLSearchParams は空白を + にするので、pixiv 本体が作る URL と文字列が変わる。(実測確認済み)
  * @param {{id: string, title: string, userName: string}} detail 正規化した作品詳細
  * @returns {ShareTarget[]} シェア先。pixiv 本体と同じ並び
  */

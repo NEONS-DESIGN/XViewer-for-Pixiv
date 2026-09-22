@@ -36,7 +36,7 @@ export function planSkipTargets(card, mode, links = [...card.querySelectorAll(AR
 /**
  * サムネイルのリンクが読み上げ名を既に持っているか。
  * 実機の img の alt は作品サマリの alt (「#タグ タイトル - 作者のイラスト」) なので、
- * alt があれば作品名は読み上げられる (SITE_SPEC §3)。そこへ aria-label を足すと alt を上書きし、
+ * alt があれば作品名は読み上げられる。(SITE_SPEC §3) そこへ aria-label を足すと alt を上書きし、
  * タグと作者名が読み上げから消える。
  * @param {Element} thumb サムネイルのリンク
  * @returns {boolean} 名前が取れるなら true

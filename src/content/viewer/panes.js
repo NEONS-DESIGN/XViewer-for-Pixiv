@@ -72,18 +72,18 @@ export function planPanes(detail, session, settings) {
  * @property {HTMLElement} stage 主役の描画先 (.stage)
  * @property {HTMLElement} sidebar サイドバーの描画先 (.sidebar)
  * @property {{open: (pages: object) => void}} [zoom] 原寸表示のレイヤ (zoom.js)。画像ペインだけが使う
- * @property {(userId: string) => Promise<object>} [fetchUser] 作者情報の取得 (サイドバーとアクションの両方へ渡す)。テストから通信させないために使う
+ * @property {(userId: string) => Promise<object>} [fetchUser] 作者情報の取得。(サイドバーとアクションの両方へ渡す) テストから通信させないために使う
  */
 
 /**
  * 判断に従ってペインを組み立てる。
- * 呼ぶ前に disposeAll() を済ませておくこと (取得を待つ前に解体するのが決まり)。
+ * 呼ぶ前に disposeAll() を済ませておくこと。(取得を待つ前に解体するのが決まり)
  *
  * サイドバーの中身 (本文・コメント・アクション) は主役の取得を待たずに先に作る。
  * うごイラの zip や /pages の往復を待ってからでは、コメントとボタンが数秒出ない。
  * await をまたがずに全ペインを作り終えるので、別の作品へ移ったあとに
- * 古い作品のコメントやいいねを新しいサイドバーへ差し込む事故も起きない
- * (いいねは取り消せないので、対象を間違えると実害が出る)。
+ * 古い作品のコメントやいいねを新しいサイドバーへ差し込む事故も起きない。
+ * (いいねは取り消せないので、対象を間違えると実害が出る)
  * @param {object} detail 正規化した作品詳細
  * @param {{isLoggedIn: boolean, self: object|null}} session セッション
  * @param {object} settings 設定

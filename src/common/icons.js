@@ -1,6 +1,6 @@
 /**
  * アイコンを DOM へ起こす役。図形データは icon-shapes.js が持つ。
- * アイコンは常に装飾で、意味は親のテキストか aria-label が持つ (UI_DESIGN_KIT §5)。
+ * アイコンは常に装飾で、意味は親のテキストか aria-label が持つ。(UI_DESIGN_KIT §5)
  */
 import { ICON_SHAPES } from './icon-shapes.js';
 import { warn } from './log.js';
@@ -13,7 +13,7 @@ const EMPTY_VIEW_BOX = '0 0 24 24';
 
 /**
  * アイコンの svg 要素を作る。
- * viewBox は図形ごとの値をそのまま使う (Material Symbols は 0 -960 960 960)。
+ * viewBox は図形ごとの値をそのまま使う。(Material Symbols は 0 -960 960 960)
  * 返す svg は寸法を持たない。大きさは使う側の CSS が決める約束。
  * @param {Document} doc 対象のドキュメント
  * @param {string} name ICON_SHAPES のキー

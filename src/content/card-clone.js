@@ -3,7 +3,7 @@
  *
  * 自分でカードを描かずに本体の li を cloneNode するのは、styled-components の
  * ハッシュクラスを再現せずに見た目を完全に一致させるため。掴んでよいのは
- * 計測用の data 属性と位置関係だけで、クラス名は読まない (SPEC §2)。
+ * 計測用の data 属性と位置関係だけで、クラス名は読まない。(SPEC §2)
  */
 import {
 	ARTWORK_LINK_SELECTOR,
@@ -32,7 +32,7 @@ export function hexToRgb(hex) {
 }
 
 /**
- * ブックマーク済みの色として扱う表記。hex は定数、rgb() はそこから導く (片方だけ変わる事故を防ぐ)。
+ * ブックマーク済みの色として扱う表記。hex は定数、rgb() はそこから導く。(片方だけ変わる事故を防ぐ)
  * @type {Set<string>}
  */
 const BOOKMARKED_FILLS = new Set([BOOKMARKED_FILL, hexToRgb(BOOKMARKED_FILL)].filter(Boolean).map((fill) => fill.toLowerCase()));
@@ -75,7 +75,7 @@ export function paintHeart(card, bookmarked) {
 
 /**
  * カードが複数枚バッジを持つか。
- * バッジはサムネリンクのオーバーレイ層にだけ現れる数字 (SITE_SPEC §3)。
+ * バッジはサムネリンクのオーバーレイ層にだけ現れる数字。(SITE_SPEC §3)
  * @param {object} card カード (li)
  * @returns {object|null} バッジのノード。無ければ null
  */
@@ -101,8 +101,8 @@ export function findBadge(card) {
 
 /**
  * カードの並びから single / multi の 2 枚を選ぶ。
- * accept を満たすカードだけを見て、単枚とバッジ付きが揃った時点で切り上げる
- * (getComputedStyle を並び全部に呼ばないため)。
+ * accept を満たすカードだけを見て、単枚とバッジ付きが揃った時点で切り上げる。
+ * (getComputedStyle を並び全部に呼ばないため)
  * @param {object[]} cards 候補のカード (li)
  * @param {(card: object) => boolean} accept 雛形にしてよいか
  * @returns {{single: object, multi: object|null}|null} 雛形。採れなければ null
@@ -128,12 +128,12 @@ function pickTemplates(cards, accept) {
 /**
  * サムネのオーバーレイ層にある、雛形の作品に紐づいたラベルを集める。
  *
- * 「R-18」「非公開」のような表示で、**複数枚バッジと同じ層に、バッジより前に並ぶ**
- * (SITE_SPEC §3 で実測)。雛形を cloneNode するとこれも付いてくるので、
+ * 「R-18」「非公開」のような表示で、**複数枚バッジと同じ層に、バッジより前に並ぶ**。
+ * (SITE_SPEC §3 で実測) 雛形を cloneNode するとこれも付いてくるので、
  * 組み立てのときに落とす。残すと別の作品に他人のラベルが付く。
  *
  * 掴み方は findBadge と同じく「祖先の祖先が thumb」。そこから画像の入れ物 (文字を持たない) と
- * バッジ (数字だけ) を除いたものがラベルになる。クラス名は読まない (SPEC §2-2)。
+ * バッジ (数字だけ) を除いたものがラベルになる。クラス名は読まない。(SPEC §2-2)
  * @param {object} card カード (li)
  * @returns {object[]} ラベルのノード
  */
@@ -209,7 +209,7 @@ function stripTabSkipMarks(card) {
 /**
  * 1 作品ぶんのカードを組む。
  *
- * 画像 URL が pximg でなければカードを作らない。API の値をそのまま img へ渡さないため (SPEC §9.2)。
+ * 画像 URL が pximg でなければカードを作らない。API の値をそのまま img へ渡さないため。(SPEC §9.2)
  * @param {{single: object, multi: object|null}} templates 雛形
  * @param {object} work 作品サマリ (profile/illusts の 1 件)
  * @param {{loggedIn: boolean}} deps セッションの状態
@@ -253,7 +253,7 @@ export function buildCard(templates, work, deps) {
 			if (count) count.textContent = String(work.pageCount);
 		}
 
-		// 自分のユーザーページでは雛形にハートが無い (SITE_SPEC §4)。塗る先も外す先も無いだけで、
+		// 自分のユーザーページでは雛形にハートが無い。(SITE_SPEC §4) 塗る先も外す先も無いだけで、
 		// カードは組める。ブックマーク ID も書かない (押せるハートが無いので使い道がない)
 		const heartBox = card.querySelector(BOOKMARK_BUTTON_SELECTOR);
 		if (!deps.loggedIn) heartBox?.remove();

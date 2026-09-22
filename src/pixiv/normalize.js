@@ -79,7 +79,7 @@ function tagNames(tags) {
 /**
  * 作品を今のユーザーが見られるか。
  * 表示できるかどうかは error フラグでも urls でも判定できない。
- * 作品の xRestrict とユーザー設定の xRestrict を比べるのが唯一の正攻法 (SITE_SPEC §6)。
+ * 作品の xRestrict とユーザー設定の xRestrict を比べるのが唯一の正攻法。(SITE_SPEC §6)
  * @param {{xRestrict: number}} work 対象の作品
  * @param {{xRestrict: number}|null} self ログイン中のユーザー設定。未ログインなら null
  * @returns {boolean} 見られるなら true
@@ -93,10 +93,10 @@ export function canView(work, self) {
  * その作品が今ログインしているユーザー自身のものか。
  *
  * 自分の作品にはいいね・ブックマーク・フォローのどれもできない。pixiv 本体もこの 3 つを
- * 描かず、代わりに「作品を編集」を出す (SITE_SPEC §4)。押せば必ず失敗するボタンは出さない。
+ * 描かず、代わりに「作品を編集」を出す。(SITE_SPEC §4) 押せば必ず失敗するボタンは出さない。
  *
- * 判定材料は ID の一致だけ。どちらかが読めなければ「自分ではない」に倒す
- * (空同士を一致とみなすと、他人の作品まで操作できなくなる)。
+ * 判定材料は ID の一致だけ。どちらかが読めなければ「自分ではない」に倒す。
+ * (空同士を一致とみなすと、他人の作品まで操作できなくなる)
  * @param {{userId: string}|null|undefined} work 対象の作品
  * @param {{id: string|null}|null|undefined} self ログイン中のユーザー。未ログインなら null
  * @returns {boolean} 自分の作品なら true

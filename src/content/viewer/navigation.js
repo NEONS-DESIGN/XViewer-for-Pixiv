@@ -37,7 +37,7 @@ import { warn } from '../../common/log.js';
 /**
  * 修飾キーが押されているか。
  * Alt+← (ブラウザの「戻る」) や Ctrl+← (OS の操作) をビュワーが潰さないための判定。
- * Shift は含めない (Shift+Tab は逆向きの巡回として focusNext が扱う)。
+ * Shift は含めない。(Shift+Tab は逆向きの巡回として focusNext が扱う)
  * @param {KeyboardEvent} event キー
  * @returns {boolean} Alt / Ctrl / Meta のどれかが押されていれば true
  */
@@ -72,8 +72,8 @@ export function createNavigation(deps) {
 
 	/**
 	 * 並びを全作品へ広げる。
-	 * 広げた並びに今の作品が含まれていなければ差し替えない (差し替えると next も prev も
-	 * null になり、元の並びで戻れたはずの上キーまで効かなくなる)。
+	 * 広げた並びに今の作品が含まれていなければ差し替えない。(差し替えると next も prev も
+	 * null になり、元の並びで戻れたはずの上キーまで効かなくなる)
 	 * 待っている間に閉じたり別の作品へ移ったりしていたら、結果は捨てる。
 	 * @returns {Promise<boolean>} 並びを差し替えたら true
 	 */
@@ -127,7 +127,7 @@ export function createNavigation(deps) {
 	/**
 	 * キーボード操作。
 	 * IME の変換中と修飾キー付き (Escape を除く) は奪わない。
-	 * 作品移動はキーリピートでは動かさない (リピートごとに通信と replaceState が走るため)。
+	 * 作品移動はキーリピートでは動かさない。(リピートごとに通信と replaceState が走るため)
 	 * @param {KeyboardEvent} event キー
 	 * @returns {void}
 	 */

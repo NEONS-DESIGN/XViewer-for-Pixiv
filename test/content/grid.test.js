@@ -22,7 +22,7 @@ const ORIGIN = 'https://www.pixiv.net';
 const DOCUMENT_NODE = 9;
 
 /**
- * プロフィールのホームの代わり。ピックアップ欄 (section の中の ul > li) の後に作品グリッドが並ぶ (SITE_SPEC §3)。
+ * プロフィールのホームの代わり。ピックアップ欄 (section の中の ul > li) の後に作品グリッドが並ぶ。(SITE_SPEC §3)
  * @param {{pickup?: string[], grid?: string[], header?: string[]}} [options] 各所に置く作品 ID
  * @returns {{doc: object, ul: object|null}} document の代わりとグリッドの ul
  */

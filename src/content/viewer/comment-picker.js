@@ -27,13 +27,13 @@ const TABS = Object.freeze([
 
 /**
  * タブを移るキー。選ばれていないタブは Tab の巡回から外してあるので、
- * これが無いとキーボードではスタンプのタブへ辿り着けない (UI_DESIGN_KIT §4.3)。
+ * これが無いとキーボードではスタンプのタブへ辿り着けない。(UI_DESIGN_KIT §4.3)
  */
 const TAB_KEYS = Object.freeze({ PREV: 'ArrowLeft', NEXT: 'ArrowRight' });
 
 /**
  * 読み上げでタブと中身を結ぶための id。
- * パネルは 1 枚しか作らないので固定値でよい (Shadow DOM の中なのでページ側とも衝突しない)。
+ * パネルは 1 枚しか作らないので固定値でよい。(Shadow DOM の中なのでページ側とも衝突しない)
  */
 const IDS = Object.freeze({
 	GRID: 'comment-picker-grid',
@@ -240,7 +240,7 @@ export function createCommentPicker(deps) {
 	 *
 	 * 既定は上。一覧に重なるだけで済み、一覧を押し下げるより読みやすい。
 	 * ただし入力欄が上端に貼り付いていると上には収まらず、タブごと外へ出てしまう。
-	 * そのときだけ下へ回す。**差し込んだ直後に呼ぶこと** (文書の中でないと位置を測れない)。
+	 * そのときだけ下へ回す。**差し込んだ直後に呼ぶこと**。(文書の中でないと位置を測れない)
 	 * @returns {void}
 	 */
 	function applyDirection() {
@@ -312,7 +312,7 @@ export function createCommentPicker(deps) {
 		 *
 		 * Escape で閉じ、タブにフォーカスがあるときだけ左右キーでタブを移る。
 		 * **ビュワーは document の捕捉フェーズで全キーを取っている** ので、タブ側に
-		 * keydown を付けても届かない。ここで奪わないと左右キーが作品のページ送りになる (§10.5)。
+		 * keydown を付けても届かない。ここで奪わないと左右キーが作品のページ送りになる。(§10.5)
 		 * 本文を書いている最中の左右キー (キャレットの移動) は奪わない。
 		 * @param {KeyboardEvent} event キー
 		 * @returns {boolean} 食い止めたなら true

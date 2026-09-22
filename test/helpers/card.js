@@ -60,13 +60,13 @@ export function el(tag, attrs = {}) {
 			return result;
 		},
 		/**
-		 * 押す。dispatchEvent と同じく購読者の戻り値を返す (本物は undefined)。
+		 * 押す。dispatchEvent と同じく購読者の戻り値を返す。(本物は undefined)
 		 * @returns {*} 購読者の戻り値
 		 */
 		click() { return node.dispatchEvent({ type: 'click' }); },
 		/**
 		 * 出来事を起こし、自分から祖先 (最後に ownerDocument) へ向けて購読者を呼ぶ。
-		 * capture と bubble の順序は区別しない (拡張は capture でしか購読しないため)。
+		 * capture と bubble の順序は区別しない。(拡張は capture でしか購読しないため)
 		 * 戻り値は最後に値を返した購読者のもの。非同期の購読者をテストから await するために返す。
 		 * @param {string} type 出来事の種類
 		 * @param {object} [init] 出来事に足す値 (shiftKey や preventDefault など)
@@ -171,7 +171,7 @@ function matches(node, selector) {
  * 作品カード 1 枚を組む。
  * @param {{id?: string, userId?: string, title?: string, pages?: number, loaded?: boolean,
  *   bookmarked?: boolean, tabSkipped?: boolean, heart?: boolean, label?: string|null}} [options] カードの内容。
- *   heart: false でブックマークボタンごと落とす (自分のユーザーページ。SITE_SPEC §4)。
+ *   heart: false でブックマークボタンごと落とす。(自分のユーザーページ。SITE_SPEC §4)
  *   label で公開範囲・年齢制限のラベル ('R-18' / '非公開') をオーバーレイ層に足す (SITE_SPEC §3)
  * @returns {object} li の代わり
  */

@@ -10,7 +10,7 @@ import { ICON_OUTPUTS, buildIconSvg, iconFileName } from './icon-svg.mjs';
 /** 出力先のディレクトリ。 */
 const OUT_DIR = 'src/icons';
 
-/** 角の外側を透明で残す (アイコン自身が角丸の背景を持つため)。 */
+/** 角の外側を透明で残す。(アイコン自身が角丸の背景を持つため) */
 const TRANSPARENT = 'rgba(0, 0, 0, 0)';
 
 /**

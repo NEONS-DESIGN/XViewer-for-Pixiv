@@ -41,7 +41,7 @@ const FALLBACK_DELAY = 100;
 
 /**
  * 遅れを取り戻すときに一気に進めてよい上限 (ミリ秒)。
- * タブが非可視の間は requestAnimationFrame が止まる (SITE_SPEC §8)。戻ってきたときに
+ * タブが非可視の間は requestAnimationFrame が止まる。(SITE_SPEC §8) 戻ってきたときに
  * 止まっていた時間ぶんを全部コマ送りすると一瞬で数十フレーム飛ぶので、
  * これを超える遅れは捨てて今の時刻から数え直す。
  */
@@ -113,7 +113,7 @@ export function advanceFrame({ now, startedAt, index, timings }) {
  * @property {Document} doc
  * @property {HTMLElement} container 描画先 (.stage)
  * @property {object} settings 設定
- * @property {(message: string) => void} [onError] 使わない。失敗はペインの中の .pane-error に出す (image-pane と同じ)。
+ * @property {(message: string) => void} [onError] 使わない。失敗はペインの中の .pane-error に出す。(image-pane と同じ)
  *   呼び出し側の配線が残っている間だけ受け取る
  * @property {typeof fetch} [fetchImpl] 通信 (meta と zip) の差し替え。テストから pixiv を叩かないために使う
  * @property {() => HTMLImageElement} [createImage] フレーム用 Image の差し替え。Node には Image が無い

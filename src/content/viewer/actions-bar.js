@@ -9,11 +9,11 @@
  * 逆にすると意味が入れ替わって見える。
  *
  * **自分の作品には 3 つとも出さない。** pixiv は自分にいいね・ブックマーク・フォローをさせず、
- * 本体の UI もこの 3 つを描かない (SITE_SPEC §4)。押せば必ず失敗するので、そもそも出さない。
+ * 本体の UI もこの 3 つを描かない。(SITE_SPEC §4) 押せば必ず失敗するので、そもそも出さない。
  * 判定は `isOwnWork(detail, session.self)` = 作者 ID と `userData.self.id` の一致だけ。
  *
  * **いいねとブックマークは独立したボタンを持たない。** サイドバーのカウンタ
- * (.count-like / .count-bookmark) をボタンへ差し替え、数字そのものを押させる (X.com と同じ形)。
+ * (.count-like / .count-bookmark) をボタンへ差し替え、数字そのものを押させる。(X.com と同じ形)
  * 押す対象と結果が同じ場所にあるので、押した後に数字が動くのが分かる。
  * 差し替えないままなら押せない表示として残るので、未ログインでも件数は読める。
  *
@@ -21,7 +21,7 @@
  * 描画先が 2 つに分かれるので container (カウンタの行) と followContainer を別々に受け取る。
  *
  * フォロー状態は作品詳細 (/ajax/illust/{id}) には入っておらず、
- * /ajax/user/{id}?full=1 を別に引く (SITE_SPEC §4)。覚えるのは pixiv/user.js の 1 か所で、
+ * /ajax/user/{id}?full=1 を別に引く。(SITE_SPEC §4) 覚えるのは pixiv/user.js の 1 か所で、
  * 自分でフォロー / 解除したときは patchUser で書き戻す。ここに別のキャッシュは持たない。
  * pixiv 本体のヘッダで変えた場合はページを再読み込みするまで追従しない。
  */
@@ -51,7 +51,7 @@ const MESSAGES = Object.freeze({
 	FOLLOW_FAILED: 'フォローを変更できませんでした',
 });
 
-/** ブックマークを非公開で入れる操作の手掛かり。title にだけ添える (画面には出ない)。 */
+/** ブックマークを非公開で入れる操作の手掛かり。title にだけ添える。(画面には出ない) */
 export const BOOKMARK_PRIVATE_HINT = '(Shift + クリックで非公開)';
 
 /**
@@ -126,7 +126,7 @@ export function createActionsBar(deps) {
 	 *
 	 * 成功は画面に出さない。押した結果はボタン自身の見た目 (ラベル・disabled・is-on) が
 	 * 既に伝えているので、下に文言が出るとカウンタの位置が動くだけで邪魔になる。
-	 * 読み上げには渡したいので要素は残し、CSS で見えなくしている (viewer.css の .action-status)。
+	 * 読み上げには渡したいので要素は残し、CSS で見えなくしている。(viewer.css の .action-status)
 	 * 失敗だけはボタンの見た目に出ないので、目にも見えるようにする。
 	 * @param {string} message 文言
 	 * @param {string} [kind] 種別 (STATUS_KINDS)。error だけ画面に出す
@@ -140,7 +140,7 @@ export function createActionsBar(deps) {
 
 	/**
 	 * 更新系の失敗を伝える。
-	 * 401 はログインが切れている (別タブでログアウトした等)。
+	 * 401 はログインが切れている。(別タブでログアウトした等)
 	 * 覚えているセッションを捨て、通信失敗とは別の文言で知らせる。
 	 * __NEXT_DATA__ は初期 HTML のもので SPA 遷移では更新されないので (SITE_SPEC §0)、
 	 * ログインし直しただけでは新しい CSRF トークンを読めない。文言で再読み込みまで案内する
@@ -161,7 +161,7 @@ export function createActionsBar(deps) {
 
 	/**
 	 * 文言付きのボタンを作る。
-	 * 文言が見えているので aria-label は付けない (可視テキストと重複して二度読まれる)。
+	 * 文言が見えているので aria-label は付けない。(可視テキストと重複して二度読まれる)
 	 * @param {string} iconName アイコン名
 	 * @param {string} label ラベル
 	 * @param {(event: MouseEvent) => void} onClick 押されたとき
@@ -344,7 +344,7 @@ export function createActionsBar(deps) {
 			}
 
 			// 自分の作品には、いいね・ブックマーク・フォローのどれもできない。
-			// pixiv 本体もこの 3 つを描かない (SITE_SPEC §4)。押せば必ず失敗するボタンを出さない。
+			// pixiv 本体もこの 3 つを描かない。(SITE_SPEC §4) 押せば必ず失敗するボタンを出さない。
 			// カウンタは押せない表示のまま残るので件数は読めるし、作者は自分の名前なので
 			// なぜ押せないかは画面から分かる (案内の文言は足さない)
 			if (isOwnWork(detail, session.self)) return;
@@ -365,7 +365,7 @@ export function createActionsBar(deps) {
 				if (liked) return;
 				likeButton.disabled = true;
 				try {
-					// 戻り値は「送信前に既にいいね済みだったか」(別タブで先に押していた等)。
+					// 戻り値は「送信前に既にいいね済みだったか」。(別タブで先に押していた等)
 					// 済みなら pixiv 側の件数は増えないので、手元の足し込みも見送る
 					const alreadyLiked = await api.likeIllust(detail.id, readSession(doc).csrfToken);
 					if (disposed) return;

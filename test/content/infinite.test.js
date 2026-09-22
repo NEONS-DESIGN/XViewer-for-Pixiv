@@ -403,7 +403,7 @@ test('再試行ボタンを押すと読み直し、成功したら表示が消�
 
 /**
  * 作品は返るのに 1 枚も組めない供給で継ぎ足しを組み立てる。
- * 画像 URL が pximg でなければ buildCard が null を返す (SPEC §9.2)。
+ * 画像 URL が pximg でなければ buildCard が null を返す。(SPEC §9.2)
  * @param {{onPageChange?: Function}} [options] 上書き
  * @returns {{ul: object, wrap: object, loaded: number[], observer: object}} 材料一式
  */
@@ -576,7 +576,7 @@ function setupSlowPrefetch() {
 }
 
 test('先読みの間は読み込み中を出さず、並べ終えた時点で表示を戻す', async () => {
-	// 先読みは黙って読む (SPEC §6.8)。手元の作品を並べるだけのときにスピナーと
+	// 先読みは黙って読む。(SPEC §6.8) 手元の作品を並べるだけのときにスピナーと
 	// 「作品を読み込んでいます」の読み上げを出さない
 	const { wrap, observer, reached, release } = setupSlowPrefetch();
 	const pending = observer.trigger();
@@ -744,7 +744,7 @@ test('sentinel を置けなければページャを隠さない', () => {
 });
 
 test('雛形が採れたら継ぎ足したカードの display を取り戻す CSS が入る', () => {
-	// pixiv のグリッドは 1 ページぶんより先の li を display:none にする (SITE_SPEC §3)。
+	// pixiv のグリッドは 1 ページぶんより先の li を display:none にする。(SITE_SPEC §3)
 	// 打ち消さないと、継ぎ足したカードが DOM にだけ積み上がって画面に出ない
 	const { doc } = setup();
 	const styles = stylesIn(doc, CARD_STYLE_ID);

@@ -4,7 +4,7 @@
  * 本体の ul の直後に sentinel を置き、見えたら次のページを継ぎ足す。
  * 継ぎ足し先は本体の ul そのもの。別のコンテナへ足すと、1 ページ目の最終行が
  * 途中で終わっているときに空白ができて地続きにならない。
- * React は外から append した li を消さない前提で組む (SITE_SPEC §3 の tabindex の扱いと同じ)。
+ * React は外から append した li を消さない前提で組む。(SITE_SPEC §3 の tabindex の扱いと同じ)
  */
 import { captureTemplates, buildCard, paintHeart, heartPaths } from './card-clone.js';
 import { readSession, clearSessionCache } from './session.js';
@@ -27,10 +27,10 @@ import {
 
 /**
  * sentinel が示す状態。
- * idle は何も出さない。それ以外は sentinel の中に表示を出す (設計 §5.1)。
+ * idle は何も出さない。それ以外は sentinel の中に表示を出す。(設計 §5.1)
  * error は通信の失敗、buildFailed は「作品は返ったのに 1 枚も組めなかった」。
- * どちらも再試行ボタンを出すが、文言を分けるのは原因が違うため (後者は再試行しても
- * 同じ結果になりやすい)。
+ * どちらも再試行ボタンを出すが、文言を分けるのは原因が違うため。(後者は再試行しても
+ * 同じ結果になりやすい)
  */
 const SENTINEL_STATE = Object.freeze({
 	IDLE: 'idle',
@@ -58,7 +58,7 @@ const FAILURE_TEXT = Object.freeze({
 	[SENTINEL_STATE.BUILD_FAILED]: SENTINEL_TEXT.BUILD_FAILED,
 });
 
-/** sentinel の中の部品のクラス名。pixiv 側と衝突しないよう xv- を付ける (UI_DESIGN_KIT §10)。 */
+/** sentinel の中の部品のクラス名。pixiv 側と衝突しないよう xv- を付ける。(UI_DESIGN_KIT §10) */
 const SENTINEL_CLASS = Object.freeze({
 	TEXT: 'xv-sentinel-text',
 	ERROR: 'xv-sentinel-error',
@@ -75,8 +75,8 @@ export const PAGER_STYLE_ID = 'xviewer-hide-pager';
 /**
  * 本体のページャを隠す CSS。
  * 継ぎ足しが動いている間はページ送りのリンクが要らないので消す。
- * pickup.js と同じく、要素を消したり属性を足したりはせず style を 1 枚差し込むだけにする
- * (pixiv は React で何度も描き直すので、JS で当てる方式だと描き直しのたびに一瞬見えてしまう)。
+ * pickup.js と同じく、要素を消したり属性を足したりはせず style を 1 枚差し込むだけにする。
+ * (pixiv は React で何度も描き直すので、JS で当てる方式だと描き直しのたびに一瞬見えてしまう)
  * pixiv 側の指定に競り負けないよう !important を付け、規則はこの 1 本だけに留める。
  */
 export const PAGER_HIDE_CSS = `
@@ -91,8 +91,8 @@ export const CARD_STYLE_ID = 'xviewer-show-cards';
 /**
  * 継ぎ足したカードの display を取り戻す CSS。
  *
- * pixiv のグリッドは li 自身に「ページ 1 枚ぶんより先は出さない」規則を持っている
- * (`li:nth-child(n+61) { display: none }`。閾値は幅で変わる。SITE_SPEC §3)。
+ * pixiv のグリッドは li 自身に「ページ 1 枚ぶんより先は出さない」規則を持っている。
+ * (`li:nth-child(n+61) { display: none }`。閾値は幅で変わる。SITE_SPEC §3)
  * ここは同じ ul へ 48 枚ずつ足すので、この規則に当たったカードは DOM にだけ積み上がり、
  * 画面には 1 枚も出ない。グリッドの高さも増えないので sentinel が画面内に居座り、
  * 少しスクロールし直すたびに ?p= だけが進む。
@@ -277,7 +277,7 @@ export function attachInfiniteScroll(doc, options) {
 	/** doc にハートの購読を張ったか。dispose() で外すときの目印 */
 	let heartBound = false;
 	/**
-	 * sentinel の見た目。入れられなくても継ぎ足し自体は動く (文言は素の見た目で出る)。
+	 * sentinel の見た目。入れられなくても継ぎ足し自体は動く。(文言は素の見た目で出る)
 	 * dispose() で外す。「オフにしたら元へ戻す」をページャ隠しと揃える
 	 */
 	const sentinelStyle = createStyleHandle(doc, SENTINEL_STYLE_ID, SENTINEL_CSS, 'infinite scroll');
@@ -318,7 +318,7 @@ export function attachInfiniteScroll(doc, options) {
 	 * rootMargin は IntersectionObserver を作るときにしか決められないので、
 	 * モードを変えたら作り直すしかない。
 	 * observe() は初回に必ず今の交差状態を通知するので、sentinel が見えている状態で
-	 * 作り直すとその場で 1 ページ読む (下端に留まって止まっていた人にはむしろ都合がよい)。
+	 * 作り直すとその場で 1 ページ読む。(下端に留まって止まっていた人にはむしろ都合がよい)
 	 * @returns {void}
 	 */
 	function startObserving() {
@@ -343,7 +343,7 @@ export function attachInfiniteScroll(doc, options) {
 	 * 中の段落には role を付けない。失敗の段落へ role="alert" を持たせると
 	 * role="status" の内側で live region が入れ子になり、実装によっては
 	 * 外側の polite 領域も鳴って二重に読み上げられる余地が残る。
-	 * 失敗を強く伝えるのは sentinel 側の aria-live の切り替えで行う (showState)。
+	 * 失敗を強く伝えるのは sentinel 側の aria-live の切り替えで行う。(showState)
 	 * @param {string} text 文言
 	 * @param {boolean} [isError] 失敗の文言か (色を変えるためだけに使う)
 	 * @returns {void}
@@ -356,7 +356,7 @@ export function attachInfiniteScroll(doc, options) {
 	}
 
 	/**
-	 * sentinel の中身を今の状態に合わせて作り直す (設計 §5.1)。
+	 * sentinel の中身を今の状態に合わせて作り直す。(設計 §5.1)
 	 * 失敗したときだけ再試行ボタンを出す。自動では読み直さない。
 	 * sentinel 自身は入れ替えない。読み上げの領域は作り直すと鳴らなくなる。
 	 * @param {string} next SENTINEL_STATE のいずれか
@@ -368,7 +368,7 @@ export function attachInfiniteScroll(doc, options) {
 		try {
 			// live region の強さは中身を変える前に決める。後から変えると
 			// 変更前の値で読み上げられることがある。失敗だけは気づいてほしいので
-			// assertive、それ以外は polite (UI_DESIGN_KIT §6)。
+			// assertive、それ以外は polite。(UI_DESIGN_KIT §6)
 			// 中に role="alert" の段落を入れる手は採らない (appendMessage の注記)
 			sentinel.setAttribute('aria-live', RETRYABLE_STATES.has(next) ? 'assertive' : 'polite');
 			// innerHTML は使わない。textContent = '' で子をまとめて落とす
@@ -457,7 +457,7 @@ export function attachInfiniteScroll(doc, options) {
 	/**
 	 * 作品を並べる。既に並んでいる作品は飛ばし、組めなかった作品も飛ばす。
 	 * そのページで最初に並べたカードは `?p=` を決める印として覚える。
-	 * 1 枚も並ばなかったページは印を持たない (画面に出ていないので `?p=` にも現れない)。
+	 * 1 枚も並ばなかったページは印を持たない。(画面に出ていないので `?p=` にも現れない)
 	 * @param {object[]} works 作品サマリ
 	 * @param {number} page ページ番号 (1 始まり)
 	 * @returns {{added: number, skipped: number}} 並べた数と、既にあったので飛ばした数。
@@ -501,8 +501,8 @@ export function attachInfiniteScroll(doc, options) {
 
 	/**
 	 * 次のページを黙って読み始める。読み込み中の表示は出さず、loading にも含めない。
-	 * 終わったときにまだ同じ先読みが期待されていれば持ち分にする
-	 * (待っている間に setMode / dispose / finish が入っていたら捨てる)。
+	 * 終わったときにまだ同じ先読みが期待されていれば持ち分にする。
+	 * (待っている間に setMode / dispose / finish が入っていたら捨てる)
 	 * @param {number} page ページ番号 (1 始まり)
 	 * @returns {void}
 	 */
@@ -522,8 +522,8 @@ export function attachInfiniteScroll(doc, options) {
 	 * 今どのページを見ているかを呼び出し側へ知らせる。
 	 *
 	 * 知らせるのは「読み込んだ最後のページ」ではなく「画面に出ているページ」。
-	 * 上へ戻れば戻ったぶんだけ小さくなる。値が前回と同じなら黙る
-	 * (知らせるたびに replaceState が走るため)。
+	 * 上へ戻れば戻ったぶんだけ小さくなる。値が前回と同じなら黙る。
+	 * (知らせるたびに replaceState が走るため)
 	 * URL (?p=) は router.js の持ち物なので、ここでは history を触らない。
 	 * ビュワーのモーダルが開いている間は書かない、といった判断も呼び出し側が持つ。
 	 * @returns {void}
@@ -562,7 +562,7 @@ export function attachInfiniteScroll(doc, options) {
 
 	/**
 	 * スクロールと画面の大きさの変化を見張り始める。
-	 * 見張れなくても継ぎ足しは動く (`?p=` が画面に追いつかなくなるだけ)。
+	 * 見張れなくても継ぎ足しは動く。(`?p=` が画面に追いつかなくなるだけ)
 	 * @returns {void}
 	 */
 	function bindScroll() {
@@ -596,15 +596,15 @@ export function attachInfiniteScroll(doc, options) {
 	 * 次のページを読んで並べる。読み切ったら監視をやめる。
 	 * 失敗しても自動では繰り返さない。もう一度下まで来たら読み直す。
 	 * 作品が返っても 1 枚も組めなかったときは失敗として扱い、ページは進めない。
-	 * 全件が既に並んでいたページは「進んだ」扱いにして、続けて次のページを読む
-	 * (カードが増えないと sentinel が動かず、IntersectionObserver が二度と鳴らないため)。
+	 * 全件が既に並んでいたページは「進んだ」扱いにして、続けて次のページを読む。
+	 * (カードが増えないと sentinel が動かず、IntersectionObserver が二度と鳴らないため)
 	 * @returns {Promise<void>}
 	 */
 	async function advance() {
 		if (loading || done || disposed) return;
 		loading = true;
 		try {
-			// 先読みの持ち分があれば通信を待たないので、読み込み中も出さない (黙って読む)。
+			// 先読みの持ち分があれば通信を待たないので、読み込み中も出さない。(黙って読む)
 			// 先読みがまだ走っていれば、読み直さずにその終わりを待つ
 			let held = prefetched;
 			prefetched = null;
@@ -636,8 +636,8 @@ export function attachInfiniteScroll(doc, options) {
 					return;
 				}
 				const { added, skipped } = render(works, next);
-				// 作品は返ってきたのに 1 枚も組めなかった (画像 URL が全て safeCdnUrl を
-				// 通らない等)。カードが増えないと sentinel も動かず、IntersectionObserver は
+				// 作品は返ってきたのに 1 枚も組めなかった。(画像 URL が全て safeCdnUrl を
+				// 通らない等) カードが増えないと sentinel も動かず、IntersectionObserver は
 				// 交差が変わったときにしか鳴らないので、放っておくと idle のまま黙って止まる。
 				// 失敗として見せて再試行ボタンを残し、lastPage も ?p= も進めない
 				// (1 枚も出ていないのにページだけ進むと、記憶と画面がずれる)
@@ -673,7 +673,7 @@ export function attachInfiniteScroll(doc, options) {
 	 * 継ぎ足したカードのハートを押したときの処理。
 	 *
 	 * clone した button は React のハンドラを持たないので、ここで自前に受ける。
-	 * 本体のカードのハートには触らない (React が持っているので、preventDefault すると本来の動作を壊す)。
+	 * 本体のカードのハートには触らない。(React が持っているので、preventDefault すると本来の動作を壊す)
 	 * 削除の反映は数秒遅れるため、押した見た目を先に変えて再取得では確かめない。
 	 * @param {MouseEvent} event クリック
 	 * @returns {Promise<void>|undefined} 送信の待ち。対象外なら undefined
@@ -748,7 +748,7 @@ export function attachInfiniteScroll(doc, options) {
 		} catch (error) {
 			if (disposed) return;
 			restoreHeart(card, bookmarkId);
-			// 401 はログインが切れている (別タブでログアウトした等)。覚えたセッションを捨てる
+			// 401 はログインが切れている。(別タブでログアウトした等) 覚えたセッションを捨てる
 			if (error?.kind === PIXIV_ERROR_KINDS.UNAUTHORIZED) clearSessionCache();
 			warn('bookmark failed', error);
 		} finally {
@@ -775,7 +775,7 @@ export function attachInfiniteScroll(doc, options) {
 		sentinelStyle.show();
 		// 継ぎ足したカードのハートを受ける。カードごとに張ると 48 枚ぶん増えるので doc で 1 本。
 		// React より先に受けたいので capture で張る。
-		// 押せるハートが無いなら購読も張らない (全クリックで空振りするだけ)。
+		// 押せるハートが無いなら購読も張らない。(全クリックで空振りするだけ)
 		// 未ログインでは buildCard がボタンごと外し、自分のユーザーページでは
 		// そもそも雛形にハートが無い (pixiv が自分の作品に描かない。SITE_SPEC §4)
 		if (loggedIn && heartPaths(templates.single).length > 0) {
@@ -784,9 +784,9 @@ export function attachInfiniteScroll(doc, options) {
 		}
 		sentinel = doc.createElement('div');
 		sentinel.setAttribute(SENTINEL_ATTR, '');
-		// 読み上げの領域は「空のものが先にあって、後から中身が変わる」形でないと鳴らない
-		// (中身入りで差し込むと status は読まれない)。永続する sentinel 自身に持たせ、
-		// 中の要素だけを差し替える (UI_DESIGN_KIT §6)。
+		// 読み上げの領域は「空のものが先にあって、後から中身が変わる」形でないと鳴らない。
+		// (中身入りで差し込むと status は読まれない) 永続する sentinel 自身に持たせ、
+		// 中の要素だけを差し替える。(UI_DESIGN_KIT §6)
 		// 領域はここ 1 つだけ。中に role="alert" を入れて入れ子にはしない。
 		// 強さ (polite / assertive) は状態に応じて showState が切り替える
 		sentinel.setAttribute('role', 'status');
@@ -827,8 +827,8 @@ export function attachInfiniteScroll(doc, options) {
 		 */
 		isActive: () => !disposed,
 		/**
-		 * モードを切り替える。継ぎ足したカードには触らない
-		 * (設定を切り替えただけで読み進めた場所を失わせないため)。
+		 * モードを切り替える。継ぎ足したカードには触らない。
+		 * (設定を切り替えただけで読み進めた場所を失わせないため)
 		 * @param {string} next INFINITE_SCROLL のいずれか
 		 * @returns {void}
 		 */
@@ -849,7 +849,7 @@ export function attachInfiniteScroll(doc, options) {
 		},
 		/**
 		 * 今画面に出ているページ番号。
-		 * 呼び出し側が URL の ?p= を合わせ直すときに読む (pixiv が ?p= を戻したあと等)。
+		 * 呼び出し側が URL の ?p= を合わせ直すときに読む。(pixiv が ?p= を戻したあと等)
 		 * 測れなければ最後に知らせた値を返す。
 		 * @returns {number} ページ番号 (1 以上)
 		 */
