@@ -499,6 +499,11 @@ code {
 	padding: 26px;
 }
 
+/* 段の最後に 1 枚だけ余るのを避ける。問い合わせ先は行いっぱいに広げて帯にする */
+.card.wide {
+	grid-column: 1 / -1;
+}
+
 .card h3 {
 	font-size: 17px;
 	margin-bottom: 10px;

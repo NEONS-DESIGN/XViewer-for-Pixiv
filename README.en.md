@@ -170,6 +170,11 @@ own setting.
 These follow the "Guidelines for registered trademarks &gt; Use in applications and services" section of
 the [pixiv Inc. Terms of Service](https://policies.pixiv.net/).
 
+## Bugs, questions and requests
+
+Send bug reports, questions and feature requests through the **[contact form](https://forms.gle/aWmu45UCpBqxuvqC9)**.
+The form is in Japanese. If you prefer GitHub, [Issues](https://github.com/NEONS-DESIGN/XViewer-for-Pixiv/issues) work too.
+
 ## Development
 
 | Command | What it does |
