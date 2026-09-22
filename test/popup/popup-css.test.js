@@ -15,7 +15,7 @@ import { getArtwork } from '../../scripts/icon-svg.mjs';
  * **改行を揃えるのは必須。** このリポジトリは `.gitattributes` を持たず、Windows の
  * `core.autocrlf=true` では作業ツリーの CSS が CRLF になる。`block()` は選択子を
  * 改行込みの文字列 (`:root,` の次の行が `:host {`) で探すので、CRLF のままだと
- * 1 つも見つからず、チェックアウト直後だけテストが落ちる (実際に踏んだ)。
+ * 1 つも見つからず、チェックアウト直後だけテストが落ちる。(実際に踏んだ)
  * 見張りたいのは宣言の中身であって改行の種類ではないので、読み込みの時点で潰す。
  * @param {string} relative このファイルから見た CSS の場所
  * @returns {Promise<string>} LF に揃えてコメントを落とした CSS
@@ -188,7 +188,7 @@ test('フォーカスの輪郭は --focus-ring の 1 本だけ', () => {
 
 test('ビュワーのフォーカスの輪郭は 1 本にまとめる', () => {
 	// 部品ごとに :focus-visible を書くと、新しく足したリンクやボタンだけ輪郭が抜け、
-	// ブラウザ既定の白っぽい 1px が出る (作者リンク・タグ・作品ページへのリンクで実際に起きた)。
+	// ブラウザ既定の白っぽい 1px が出る。(作者リンク・タグ・作品ページへのリンクで実際に起きた)
 	// 共通の 1 本にしておけば、部品が増えても自動で揃う
 	const selectors = [...viewer.matchAll(/([^{}]*:focus-visible[^{}]*)\{/g)]
 		.map((match) => match[1].replace(/\s+/g, ' ').trim());
@@ -206,7 +206,7 @@ test('ビュワーのフォーカスの輪郭は 1 本にまとめる', () => {
 });
 
 test('保存の失敗の通知に --danger を使わない', () => {
-	// --danger は取り消せない操作専用 (UI_DESIGN_KIT §2)。保存の失敗はやり直せる
+	// --danger は取り消せない操作専用。(UI_DESIGN_KIT §2) 保存の失敗はやり直せる
 	assert.ok(!block(popup, '.notice').includes('--danger'));
 });
 
@@ -255,8 +255,8 @@ test('原寸表示のクリック領域は左右で同じ幅', () => {
 });
 
 test('原寸表示の幕は透けない', () => {
-	// --backdrop (92%) をそのまま使うと、背後のサイドバーの文字が読めてしまう
-	// (0.24.0 の実機確認で判明)。原寸表示は画像だけを見るための画面なので不透明にする
+	// --backdrop (92%) をそのまま使うと、背後のサイドバーの文字が読めてしまう。
+	// (0.24.0 の実機確認で判明) 原寸表示は画像だけを見るための画面なので不透明にする
 	assert.ok(block(viewer, '.zoom').includes('background: var(--zoom-backdrop)'), '専用の幕を使っていない');
 	const value = variable(block(viewer, ':host'), '--zoom-backdrop');
 	assert.ok(value, '--zoom-backdrop が無い');

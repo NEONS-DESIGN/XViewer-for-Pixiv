@@ -62,7 +62,7 @@ function makeCardWithoutHeart(id) {
 }
 
 /**
- * node が ancestor の子孫かどうか (自分自身は含めない)。
+ * node が ancestor の子孫かどうか。(自分自身は含めない)
  * @param {object} node 調べたい要素
  * @param {object} ancestor 祖先の候補
  * @returns {boolean} 子孫なら true
@@ -147,7 +147,7 @@ test('ハートを持つカードがあれば、ハート無しのカードは�
 });
 
 test('どのカードにもハートが無ければ、ハート無しのまま雛形にする', () => {
-	// 自分のユーザーページ。pixiv が自分の作品にブックマークボタンを描かない (SITE_SPEC §4)。
+	// 自分のユーザーページ。pixiv が自分の作品にブックマークボタンを描かない。(SITE_SPEC §4)
 	// ここで諦めると自分のページだけ無限スクロールが起動しない
 	const { ul } = makeGrid([makeCardWithoutHeart('1'), makeCardWithoutHeart('2')]);
 	const templates = captureTemplates(ul, { computedStyle: fakeComputedStyle });
@@ -302,7 +302,7 @@ test('ブックマーク済みならハートを ff4060 にする', () => {
 });
 
 test('未ブックマークならハートに色を書かない (本体の CSS に任せる)', () => {
-	// 未ブックマークの色はテーマで変わる (SITE_SPEC §3)。inline で焼き付けると
+	// 未ブックマークの色はテーマで変わる。(SITE_SPEC §3) inline で焼き付けると
 	// テーマを切り替えたときに継ぎ足したカードだけ前の色で残る
 	const templates = capture([makeCard({ id: '1' })]);
 	const card = buildCard(templates, work(), { loggedIn: true });

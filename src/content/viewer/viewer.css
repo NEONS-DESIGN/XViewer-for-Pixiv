@@ -1,16 +1,16 @@
 /* hidden 属性を必ず効かせる。
    この中の部品は display: flex / inline-flex を持つものが多く、
    そのままだと利用者エージェント既定の [hidden] { display: none } に勝ってしまい、
-   hidden = true を立てても消えない (1 枚絵で左右の矢印が出たままになる)。
+   hidden = true を立てても消えない。(1 枚絵で左右の矢印が出たままになる)
    Shadow DOM の中なので、ホストページの reset は届かない。 */
 [hidden] {
 	display: none !important;
 }
 
 /*
- * フォーカスの輪郭はここ 1 本で全部品に当てる (UI_DESIGN_KIT §6)。
+ * フォーカスの輪郭はここ 1 本で全部品に当てる。(UI_DESIGN_KIT §6)
  * 部品ごとに書くと、新しく足したリンクやボタンだけ輪郭が抜けて、
- * ブラウザ既定の白っぽい 1px が出る (作者リンク・タグ・作品ページへのリンクで実際に起きた)。
+ * ブラウザ既定の白っぽい 1px が出る。(作者リンク・タグ・作品ページへのリンクで実際に起きた)
  * 値は tokens.css の --focus-ring。例外は 2 つだけで、どちらも下に選択子付きで置く:
  *   .share-item  ... 縁が隣と接しているので内側に出す
  *   .overlay / .zoom ... どちらもダイアログ本体で、Tab の巡回先ではないので出さない
@@ -31,15 +31,15 @@
 :host {
 	/* pixiv 本体 (charcoal) のブランド色。--charcoal-brand の実測値そのもので、
 	   テーマで変わらない。本体と同じ見え方にすると決めた部品だけがこれを使う:
-	   フォローボタン・コメントの送信ボタン・投稿者のラベル (SITE_SPEC.md)。
-	   白文字との比は約 3.1:1 で AA には届かないが、本体に揃える判断
-	   (docs/DECISIONS.md)。それ以外の塗りつぶしは --accent / --on-accent のまま */
+	   フォローボタン・コメントの送信ボタン・投稿者のラベル。(SITE_SPEC.md)
+	   白文字との比は約 3.1:1 で AA には届かないが、本体に揃える判断。
+	   (docs/DECISIONS.md) それ以外の塗りつぶしは --accent / --on-accent のまま */
 	--brand-bg: #0096fa;
 	/* --charcoal-brand-hover */
 	--brand-bg-hover: #1fa3fb;
 	/* ラベルの文字。本体の実測値。「あなた」も「作者」も白 */
 	--brand-fg: #ffffff;
-	/* 「あなた」のラベルだけ地が緑 (本体の実測値。--charcoal-success の #b1cc29 とは別の値)。
+	/* 「あなた」のラベルだけ地が緑。(本体の実測値。--charcoal-success の #b1cc29 とは別の値)
 	   --charcoal-brand と同じくテーマで変わらない (ライトでも同じ値なのを実測) */
 	--label-self-bg: #68d62a;
 	/* ボタンの文字。本体はラベルより僅かに落とした値を使っている (実測) */
@@ -61,14 +61,14 @@
 	--like: var(--accent);
 	--bookmark: #ff4060;
 	/* サイドバーのスクロールバーだけ、画面の端から空ける隙間。
-	   窓の縁に貼り付いて見えないようにするためのもの (コメント一覧側には使わない)。
+	   窓の縁に貼り付いて見えないようにするためのもの。(コメント一覧側には使わない)
 	   太さ (--scrollbar-size) と色は tokens.css */
 	--scrollbar-inset: 5px;
 
 	/* 画像の後ろに敷く幕。pixiv 本体より濃くして画像に集中させる */
 	--backdrop: rgba(0, 0, 0, 0.92);
 	/* 原寸表示の幕。こちらは不透明。--backdrop (92%) を使うと背後のサイドバーの文字が
-	   読めてしまい、画像だけを見るための画面にならない (0.24.0 の実機確認で判明)。
+	   読めてしまい、画像だけを見るための画面にならない。(0.24.0 の実機確認で判明)
 	   ライトでも暗いままにするのは --backdrop と同じ理由 (画像の見え方を安定させる) */
 	--zoom-backdrop: #000000;
 	/* 浮いている部品 (シェアメニュー) の影。ライトでは薄くしないと白地の上で重い */
@@ -300,7 +300,7 @@
 
 /*
  * 原寸表示 (zoom.js)。overlay の直下に敷き、サイドバーの上も覆う。
- * 画像は縮めずに置き、はみ出す分はこの層自身をスクロールさせる (pixiv 本体と同じ)。
+ * 画像は縮めずに置き、はみ出す分はこの層自身をスクロールさせる。(pixiv 本体と同じ)
  */
 .zoom {
 	/* 左右のクリック領域の幅。pixiv 本体は上下 (前 20% / 次 40%) だが、この拡張では左右に置く。
@@ -447,7 +447,7 @@
 	object-fit: cover;
 }
 
-/* 取得前・取得失敗のアバター (sidebar.js の createAvatar)。
+/* 取得前・取得失敗のアバター。(sidebar.js の createAvatar)
    コメント一覧の投稿者アイコンも同じ仕組みに寄せられるよう、両方に当てておく */
 .author-avatar.is-pending,
 .comment-avatar.is-pending {
@@ -550,7 +550,7 @@
 	color: var(--fg);
 }
 
-/* いいね済みは押せない (pixiv の仕様上取り消せない)。
+/* いいね済みは押せない。(pixiv の仕様上取り消せない)
    数字は情報なので薄くしない。押せないことは色と cursor で示す */
 .count-action:disabled { cursor: default; }
 
@@ -825,7 +825,7 @@
    ことで、見出しだけでなく入力欄も一緒に残る。
 
    margin は 0 にして padding へ移すこと。margin の分だけ下がって貼り付き、
-   その隙間をコメントが素通りする (背景は margin には塗られない)。
+   その隙間をコメントが素通りする。(背景は margin には塗られない)
    貼り付く先はサイドバー。sticky は近い方のスクロール領域を基準にする */
 :host([data-sidebar-scroll='whole']) .comments-header {
 	position: sticky;
@@ -928,7 +928,7 @@ a.comment-name:hover {
 }
 
 /* 本文に混ざる絵文字。実体は 56x56 の png。
-   大きさと沈み込みは pixiv 本体のコメント欄の実測値に合わせてある (24px / -6px)。
+   大きさと沈み込みは pixiv 本体のコメント欄の実測値に合わせてある。(24px / -6px)
    本文と同じ 14px / line-height 1.6 の行に載る前提 */
 .comment-emoji {
 	width: 24px;
@@ -1033,8 +1033,8 @@ a.comment-name:hover {
    (直値で焼き付けるとテーマ切替に追従しない) */
 /* 入力欄一式は border-box で組む。Shadow DOM にはホストページの reset が届かず、
    この CSS も全体には box-sizing を敷いていないので、既定の content-box のままだと
-   width と padding が足し算になる (.comment-form-input が width: 100% + 左右 40px の
-   padding で、入れ物より 40px 広くなって送信ボタンの下へ潜り込んでいた)。
+   width と padding が足し算になる。(.comment-form-input が width: 100% + 左右 40px の
+   padding で、入れ物より 40px 広くなって送信ボタンの下へ潜り込んでいた)
    全体に敷かないのは、.close / .arrow / .ugoira-toggle / .action の外寸が 2px 縮み、
    .comment-picker には絵文字 8 列が入らなくなるため。
    子孫まで当てておけば、後からこの中に部品を足しても同じ罠を踏まない */
@@ -1092,7 +1092,7 @@ a.comment-name:hover {
 	   「サイドバーごと送る」設定では上端に貼り付く。青天井だと長文を書いている間
 	   コメント一覧が最小の 3 件まで潰れ、入力欄がサイドバーを覆ってしまう。
 	   ここを超えた分だけ中がスクロールする。
-	   lh は行の高さそのもの (Chrome 109+。下限は 120 なので使える)。
+	   lh は行の高さそのもの。(Chrome 109+。下限は 120 なので使える)
 	   box-sizing: border-box なので上下の padding を足す */
 	max-height: calc(10lh + 6px * 2);
 	overflow-y: auto;
@@ -1189,7 +1189,7 @@ a.comment-name:hover {
 	background: var(--brand-bg-hover);
 }
 
-/* 送れる中身が無いときは押せない (空の投稿を止める)。
+/* 送れる中身が無いときは押せない。(空の投稿を止める)
    半透明にはしない。.action:disabled / .more:disabled / .comment-replies:disabled は
    opacity: 0.5 で透過して無効を示すが、ここは意図的に異なる扱い。
    塗りつぶしたボタンを透過させると、ユーザーからは「送信ボタンが何故か半透明」に見えて
@@ -1224,10 +1224,10 @@ a.comment-name:hover {
 	text-decoration: underline;
 }
 
-/* 投稿者のラベル。名前の直後に置く (pixiv 本体と同じ並び)。
+/* 投稿者のラベル。名前の直後に置く。(pixiv 本体と同じ並び)
    地と文字は本体の実測値。ここは「本体に揃える」と決めた部品なので
-   --accent ではなく --brand-* / --label-self-bg を使う (フォローボタンと同じ扱い)。
-   **本体は「あなた」と「作者」で地の色を変えている** (緑と青)。
+   --accent ではなく --brand-* / --label-self-bg を使う。(フォローボタンと同じ扱い)
+   **本体は「あなた」と「作者」で地の色を変えている**。(緑と青)
    既定を「作者」の青に置き、「あなた」だけ is-self で緑へ差し替える */
 .comment-label {
 	display: inline-block;

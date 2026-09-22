@@ -1,6 +1,6 @@
 /**
  * コメントに貼れるスタンプの一覧。
- * pixiv 本体は API で引かず、グループ番号から ID を組み立てている (SITE_SPEC §4 実測)。
+ * pixiv 本体は API で引かず、グループ番号から ID を組み立てている。(SITE_SPEC §4 実測)
  * 画像の URL は endpoints.js の stampUrl() が組み立てる。
  */
 

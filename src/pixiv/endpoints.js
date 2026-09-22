@@ -51,7 +51,7 @@ export function tagWorksPath(tag) {
 }
 
 /**
- * 更新系 API の URL。フォローだけ /ajax ではなく旧来の PHP (SITE_SPEC §4)。
+ * 更新系 API の URL。フォローだけ /ajax ではなく旧来の PHP。(SITE_SPEC §4)
  * 使うのは pixiv/actions.js だけだが、URL の出どころをここに揃える。
  */
 export const ACTION_URLS = Object.freeze({
@@ -68,7 +68,7 @@ export const ACTION_URLS = Object.freeze({
 
 /**
  * 画像と zip を読み込んでよいホスト。
- * pixiv の CDN は画像・うごイラ zip の i.pximg.net と静的ファイルの s.pximg.net (SITE_SPEC §2)。
+ * pixiv の CDN は画像・うごイラ zip の i.pximg.net と静的ファイルの s.pximg.net。(SITE_SPEC §2)
  */
 const CDN_HOSTS = Object.freeze(['i.pximg.net', 's.pximg.net']);
 
@@ -96,7 +96,7 @@ export function safeCdnUrl(url) {
 
 /**
  * pixiv が絵文字・スタンプの画像を置いている場所。
- * どちらも s.pximg.net の静的ファイルで、年齢制限も認証も掛かっていない (SITE_SPEC 実測)。
+ * どちらも s.pximg.net の静的ファイルで、年齢制限も認証も掛かっていない。(SITE_SPEC 実測)
  */
 const COMMON_IMAGES = 'https://s.pximg.net/common/images/';
 
@@ -134,7 +134,7 @@ export function illustUrl(illustId) {
 }
 
 /**
- * 作品の全ページ。R-18 を表示できないときは 404 が返る (異常ではない)。
+ * 作品の全ページ。R-18 を表示できないときは 404 が返る。(異常ではない)
  * @param {string} illustId 作品 ID
  * @returns {string} URL
  */
@@ -164,7 +164,7 @@ export function commentRootsUrl(illustId, offset, limit) {
 
 /**
  * ルートコメントへの返信。
- * offset/limit ではなく 1 始まりの page で送る (SITE_SPEC §4 実測)。
+ * offset/limit ではなく 1 始まりの page で送る。(SITE_SPEC §4 実測)
  * @param {string} commentId ルートコメントの ID
  * @param {number} page ページ番号。1 始まり
  * @returns {string} URL
@@ -195,7 +195,7 @@ export function userProfileAllUrl(userId) {
  * ID を並べて作品サマリを一括取得する。
  * sensitiveFilterMode は userSetting 以外を受け付けず、省略しても結果が同じなので付けない。
  * work_category は pixiv 本体と同じ値を送る。イラスト / 漫画タブなら illust / manga、
- * 両方を並べる artworks タブなら illustManga (SITE_SPEC §3 実測)。
+ * 両方を並べる artworks タブなら illustManga。(SITE_SPEC §3 実測)
  * @param {string} userId ユーザー ID
  * @param {string[]} ids 作品 ID の配列
  * @param {boolean} isFirstPage 一覧の 1 ページ目か

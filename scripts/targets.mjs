@@ -14,5 +14,5 @@ export const MINIMUM_CHROME_MAJOR = 120;
 /** esbuild の target。構文の変換をこの版に合わせる。 */
 export const ESBUILD_TARGET = `chrome${MINIMUM_CHROME_MAJOR}`;
 
-/** manifest の minimum_chrome_version。ビルド時に差し込む (src/manifest.json には書かない)。 */
+/** manifest の minimum_chrome_version。ビルド時に差し込む。(src/manifest.json には書かない) */
 export const MINIMUM_CHROME_VERSION = String(MINIMUM_CHROME_MAJOR);

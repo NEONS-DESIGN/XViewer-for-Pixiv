@@ -79,7 +79,7 @@ test('applyVersion は落とすものが無ければ version_name を付けな�
 });
 
 test('applyVersion は雛形に version が残っていたら止める', () => {
-	// 出どころは package.json 1 か所 (CLAUDE.md)。黙って上書きすると書き戻した人が気づけない
+	// 出どころは package.json 1 か所。(CLAUDE.md) 黙って上書きすると書き戻した人が気づけない
 	assert.throws(() => applyVersion({ version: '9.9.9' }, '0.3.0'), /version を書かないでください/);
 	assert.throws(() => applyVersion({ version_name: '9.9.9-beta' }, '0.3.0'), /version_name を書かないでください/);
 });

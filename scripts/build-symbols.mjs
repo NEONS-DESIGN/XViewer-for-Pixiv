@@ -1,7 +1,7 @@
 /**
  * Material Symbols と Font Awesome (ブランドロゴ) から必要な図形だけを抜き出し、
  * 自前で描いた図形と混ぜて icon-shapes.js を生成する。
- * 生成物はコミットする。src/ を素の import で読めるようにするため (UI_DESIGN_KIT §5)。
+ * 生成物はコミットする。src/ を素の import で読めるようにするため。(UI_DESIGN_KIT §5)
  */
 import { readFile, writeFile } from 'node:fs/promises';
 
@@ -42,8 +42,8 @@ const BRAND_SOURCES = {
 /**
  * Material Symbols に無い図形。自前で描いてここに置く。
  *
- * like: pixiv の「いいね」は顔 (目 2 つ + 笑った口) で、ハートはブックマークを指す
- *       (SITE_SPEC §8)。Material Symbols の mood は顔を丸い枠で囲っていて別物に見えるため、
+ * like: pixiv の「いいね」は顔 (目 2 つ + 笑った口) で、ハートはブックマークを指す。
+ *       (SITE_SPEC §8) Material Symbols の mood は顔を丸い枠で囲っていて別物に見えるため、
  *       pixiv と同じ「枠の無い顔」を比率だけ合わせて描き起こす。
  *       塗りは svg 側の fill=currentColor に任せ、口だけ線で描く。
  */
@@ -73,8 +73,8 @@ const DEFAULT_VIEW_BOX = '0 0 24 24';
 
 /**
  * SVG の中のコメント。Font Awesome は各ファイルの先頭に帰属のコメントを持つ。
- * 帰属は HEADER と NOTICE に書いてあるので、図形データには残さない
- * (残すと createIcon のたびに innerHTML でコメントノードが注入され、生成物も膨らむ)。
+ * 帰属は HEADER と NOTICE に書いてあるので、図形データには残さない。
+ * (残すと createIcon のたびに innerHTML でコメントノードが注入され、生成物も膨らむ)
  */
 const SVG_COMMENT_PATTERN = /<!--[\s\S]*?-->/g;
 

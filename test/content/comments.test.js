@@ -129,7 +129,7 @@ const REPLY = Object.freeze({
 /** コメント区画へ渡す作品詳細の代わり。 */
 const DETAIL = Object.freeze({ id: '149425016', commentOff: false, commentCount: 1 });
 
-/** コメント区画へ渡す作品詳細の代わり (投稿に作者 ID が要る)。 */
+/** コメント区画へ渡す作品詳細の代わり。(投稿に作者 ID が要る) */
 const POST_DETAIL = Object.freeze({ id: '149425016', userId: '54734418', commentOff: false, commentCount: 1 });
 
 /** 自分のセッション。投稿できる状態 */
@@ -885,7 +885,7 @@ test('投稿を待っている間に別の作品へ移ったら画面へは足�
 });
 
 test('投稿を待っている間に同じ作品を描き直したら画面へは足さない', async () => {
-	// 作品が同じだと workId では気付けない。一覧そのものも世代の印にする (loadMore() と同じ)。
+	// 作品が同じだと workId では気付けない。一覧そのものも世代の印にする。(loadMore() と同じ)
 	// 気付かないと組み直した一覧へ差し込まれ、件数も二重に増える
 	const { container, notified } = await postThenReload(POST_DETAIL);
 	assert.equal(find(container, '.comment-list').children.length, 1);
@@ -1438,7 +1438,7 @@ test('件数の数え直しはブラウザのキャッシュを外して引く',
 });
 
 test('「あなた」のラベルだけ印を付けて色を分ける', async () => {
-	// pixiv 本体は「あなた」が緑、「作者」が青 (実測)。地の色は CSS が is-self で切り替える
+	// pixiv 本体は「あなた」が緑、「作者」が青。(実測) 地の色は CSS が is-self で切り替える
 	const { container, comments } = buildPostable({
 		fetchJson: async () => ({
 			comments: [

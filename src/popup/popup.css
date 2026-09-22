@@ -29,7 +29,7 @@
 }
 
 body {
-	/* Chrome 拡張の popup は幅を固定する (UI_DESIGN_KIT §10)。
+	/* Chrome 拡張の popup は幅を固定する。(UI_DESIGN_KIT §10)
 	   中身に合わせると、説明の長さで画面ごとに幅が変わる */
 	width: 320px;
 	margin: 0;
@@ -120,7 +120,7 @@ h1 {
 	display: flex;
 	align-items: center;
 	gap: 8px;
-	/* クリック領域は 30px を下回らない (UI_DESIGN_KIT §6)。
+	/* クリック領域は 30px を下回らない。(UI_DESIGN_KIT §6)
 	   スイッチ 16px とテキスト行だけでは 22px ほどにしかならず、
 	   セレクト (30px) とも高さが揃わない */
 	min-height: 30px;
@@ -178,7 +178,7 @@ button.danger:hover {
 }
 
 /* チェックボックスは pixiv 本体 (charcoal) のスイッチと同じ見た目にする。
-   寸法・動き・色はすべて実測値 (SITE_SPEC.md「スイッチ」)。
+   寸法・動き・色はすべて実測値。(SITE_SPEC.md「スイッチ」)
    28x16 の外周のうち 2px は透明な枠で、内側 24x12 の中を 12px のノブが
    左端と右端 (translateX(12px)) の間を動く */
 input[type='checkbox'] {
@@ -226,7 +226,7 @@ input[type='checkbox']:checked::after {
 	}
 }
 
-/* すべての操作部品に同じ輪郭を出す (UI_DESIGN_KIT §6)。1 規則にまとめて出方を 1 種類に保つ。
+/* すべての操作部品に同じ輪郭を出す。(UI_DESIGN_KIT §6) 1 規則にまとめて出方を 1 種類に保つ。
    offset は外側 (+2px)。KIT の -2px (内側) だと 16px のスイッチでは輪郭が本体に埋もれる */
 :is(button, select, input[type='checkbox'], .panel, .license a):focus-visible {
 	outline: var(--focus-ring);
@@ -260,8 +260,8 @@ option {
 }
 
 /* ここから下は `appearance: base-select` に対応した環境だけで効く。
-   非対応の環境では ::picker(select) が読めず、その宣言ブロックごと捨てられる
-   (選択子の一覧に 1 つでも読めないものがあると規則全体が無効になる規則)。
+   非対応の環境では ::picker(select) が読めず、その宣言ブロックごと捨てられる。
+   (選択子の一覧に 1 つでも読めないものがあると規則全体が無効になる規則)
    そのため対応・非対応のどちらでも、上の素の select の見た目が土台として残る。 */
 select,
 select::picker(select) {
@@ -285,7 +285,7 @@ select > button:hover { background: transparent; }
 
 select::picker(select) {
 	/* ピッカーは中身に合わせて広がるため、放っておくと最長の説明の幅になり
-	   popup の外へはみ出す (popup は窓の幅で切られるので、はみ出した分は読めない)。
+	   popup の外へはみ出す。(popup は窓の幅で切られるので、はみ出した分は読めない)
 	   セレクトと同じ幅に留め、収まらない説明は折り返させる */
 	box-sizing: border-box;
 	width: anchor-size(width);
@@ -400,7 +400,7 @@ select selectedcontent [data-role='option-hint'] {
 
 .tab:hover { background: var(--hover); }
 
-/* 選択状態は aria-selected だけで持つ (UI_DESIGN_KIT §4.3)。クラスと二重に持たない */
+/* 選択状態は aria-selected だけで持つ。(UI_DESIGN_KIT §4.3) クラスと二重に持たない */
 .tab[aria-selected='true'] {
 	color: var(--fg);
 	border-bottom-color: var(--accent);

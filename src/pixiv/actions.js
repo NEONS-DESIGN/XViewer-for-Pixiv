@@ -70,8 +70,8 @@ export async function deleteBookmark(bookmarkId, token, deps) {
 /**
  * ユーザーをフォローする。
  *
- * 応答は /ajax/* の {error, message, body} ではなく**素の配列**で、空なら成功
- * (中身があるときはエラー文言。SITE_SPEC §4-5)。pixiv 本体も長さだけで成否を決めている。
+ * 応答は /ajax/* の {error, message, body} ではなく**素の配列**で、空なら成功。
+ * (中身があるときはエラー文言。SITE_SPEC §4-5) pixiv 本体も長さだけで成否を決めている。
  * @param {string} userId ユーザー ID
  * @param {string} token CSRF トークン
  * @param {ClientDeps} [deps] テスト用の依存
@@ -100,7 +100,7 @@ export async function followUser(userId, token, deps) {
 /**
  * フォローを外す。追加とはエンドポイントもパラメータ名も違う。
  *
- * 応答は {user_id} で、送った ID が返れば成功 (SITE_SPEC §4-6)。
+ * 応答は {user_id} で、送った ID が返れば成功。(SITE_SPEC §4-6)
  * こちらも {error, message, body} では包まれない。
  * @param {string} userId ユーザー ID
  * @param {string} token CSRF トークン
@@ -121,7 +121,7 @@ export async function unfollowUser(userId, token, deps) {
 	}
 }
 
-/** 投稿の種類。同じエンドポイントを type で振り分ける (SITE_SPEC §4)。 */
+/** 投稿の種類。同じエンドポイントを type で振り分ける。(SITE_SPEC §4) */
 const COMMENT_TYPES = Object.freeze({ TEXT: 'comment', STAMP: 'stamp' });
 
 /**
@@ -137,7 +137,7 @@ const COMMENT_TYPES = Object.freeze({ TEXT: 'comment', STAMP: 'stamp' });
  * コメントを投稿して、投稿された 1 件を返す。
  *
  * 応答の値は snake_case なので、ここで画面側の語彙へそろえる。
- * アバターの URL は応答に入らない (pixiv 本体も自分のセッションの値を使う)。
+ * アバターの URL は応答に入らない。(pixiv 本体も自分のセッションの値を使う)
  * @param {Record<string, string>} params 送るパラメータ
  * @param {string} token CSRF トークン
  * @param {ClientDeps} [deps] テスト用の依存
@@ -213,12 +213,12 @@ export function postStamp(illustId, authorUserId, stampId, parentId, token, deps
 /**
  * コメントか返信を削除する。
  *
- * pixiv の仕様上、消せるのは一覧の `editable` が true の 1 件だけ
- * (自分のコメントと、自分の作品に付いたコメント)。呼び出し側で出し分けること。
+ * pixiv の仕様上、消せるのは一覧の `editable` が true の 1 件だけ。
+ * (自分のコメントと、自分の作品に付いたコメント) 呼び出し側で出し分けること。
  * **削除は取り消せない。** UI 側で誤爆を防ぐこと。
  *
  * 応答は {error, message, body} で包まれる。pixiv 本体も投稿と同じ口へ通しており、
- * その口は body が無ければ例外にするので、body は必ず付いてくる (SITE_SPEC §4)。
+ * その口は body が無ければ例外にするので、body は必ず付いてくる。(SITE_SPEC §4)
  * 中身は使わないので読まない。
  * @param {string} illustId 作品 ID
  * @param {string} commentId 消すコメントの ID

@@ -1,11 +1,11 @@
 /**
  * ページに埋め込まれた #__NEXT_DATA__ からセッション情報を読む。
  *
- * DOM を触るのはここだけにし、解析そのものは pixiv/session.js の純粋関数に任せる
- * (pixiv/ は DOM を知らない、という境界を守るため)。
+ * DOM を触るのはここだけにし、解析そのものは pixiv/session.js の純粋関数に任せる。
+ * (pixiv/ は DOM を知らない、という境界を守るため)
  *
- * __NEXT_DATA__ は Pages Router が初期 HTML に埋めるもので、SPA 遷移では更新されない
- * (SITE_SPEC §0)。数百 KB の JSON を作品ごと・ボタン押下ごとに解析し直す意味は無いので、
+ * __NEXT_DATA__ は Pages Router が初期 HTML に埋めるもので、SPA 遷移では更新されない。
+ * (SITE_SPEC §0) 数百 KB の JSON を作品ごと・ボタン押下ごとに解析し直す意味は無いので、
  * 解析結果を覚えて使い回す。
  */
 import { parseNextData } from '../pixiv/session.js';

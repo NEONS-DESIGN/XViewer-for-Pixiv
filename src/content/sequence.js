@@ -4,7 +4,7 @@
  *
  * 並びの出どころは 2 つある:
  *   - グリッドの DOM 順 (確実に画面と一致する)
- *   - profile/all の全 ID を数値降順に並べたもの (端を越えて移動するため)。
+ *   - profile/all の全 ID を数値降順に並べたもの。(端を越えて移動するため)
  *     取得とキャッシュは pixiv/pages.js が持つ
  */
 import { loadAllWorkIds } from '../pixiv/pages.js';

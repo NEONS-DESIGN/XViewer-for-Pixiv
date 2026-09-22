@@ -204,7 +204,7 @@ export function createViewer(deps) {
 		overlay.setAttribute('aria-label', MESSAGES.DIALOG_LABEL);
 		// 開いたときのフォーカスの受け皿。ダイアログを名乗る以上、開いたら中へフォーカスを
 		// 入れないと読み上げが文脈を失う。中のボタンではなく本体で受けるので、
-		// 十字キーを押したときにどのボタンにも輪郭が出ない (§10.4)。
+		// 十字キーを押したときにどのボタンにも輪郭が出ない。(§10.4)
 		// tabindex="-1" なので FOCUSABLE_SELECTOR には入らず、Tab の巡回先にはならない
 		overlay.setAttribute('tabindex', '-1');
 
@@ -278,8 +278,8 @@ export function createViewer(deps) {
 	 * ホストページのスクロールを止める。
 	 *
 	 * overflow: hidden でスクロールバーが消えると、背後のページがその幅だけ広がって見える。
-	 * 消える前のスクロールバーの幅を測り、同じだけ padding-right を足して横幅を動かさない
-	 * (X.com と同じ補正)。測れない環境 (偽の DOM) では 0 として扱う。
+	 * 消える前のスクロールバーの幅を測り、同じだけ padding-right を足して横幅を動かさない。
+	 * (X.com と同じ補正) 測れない環境 (偽の DOM) では 0 として扱う。
 	 * @returns {void}
 	 */
 	function lockBody() {
@@ -380,7 +380,7 @@ export function createViewer(deps) {
 	 * キーボード操作。
 	 *
 	 * キーは手前に出ているものから順に使わせる。
-	 * 原寸表示 (画面全体を覆う) が最優先で、次がサイドバーの部品 (シェアメニュー・コメント欄)。
+	 * 原寸表示 (画面全体を覆う) が最優先で、次がサイドバーの部品。(シェアメニュー・コメント欄)
 	 * 開いているメニューを閉じたつもりでモーダルごと閉じる、メニューの項目を
 	 * 下キーで送ったつもりで次の作品へ移る、を防ぐ。
 	 * @param {KeyboardEvent} event キー
@@ -432,7 +432,7 @@ export function createViewer(deps) {
 	}
 
 	/**
-	 * 作品を開く (内部)。
+	 * 作品を開く。(内部)
 	 * @param {string} workId 作品 ID
 	 * @returns {Promise<void>}
 	 */
@@ -455,13 +455,13 @@ export function createViewer(deps) {
 		}
 
 		// 古いペインは取得を待つ前に必ず捨てる。
-		// 読み込み中のサイドバーの見え方も設定どおりにしておく (renderWork でも改めて設定する)。
+		// 読み込み中のサイドバーの見え方も設定どおりにしておく。(renderWork でも改めて設定する)
 		// 原寸表示も一緒に閉じる。開いたまま作品を移ると、次の作品の原寸画像を毎回読むことになる
 		zoomLayer?.close();
 		disposeAll();
 		// 開いた直後のキー操作がモーダルへ届くようにする。
 		// 作品を送ったときは押していたボタンがペインごと消えてフォーカスが body へ落ちるので、
-		// 中に無くなっていたらダイアログ本体へ戻す (読み上げが文脈を失わないように)。
+		// 中に無くなっていたらダイアログ本体へ戻す。(読み上げが文脈を失わないように)
 		// 閉じるボタンなど中の部品へ当てないこと。次にキーを押した瞬間に :focus-visible が立ち、
 		// 十字キーでフォーカスが動いたように見える (§10.4)
 		if (!shadow.activeElement) overlay?.focus();

@@ -2,14 +2,14 @@
  * 作品のシェアメニュー。pixiv 本体のシェアボタンと同じ形にする。
  *
  * 中身 (どこへ何を渡すか) は pixiv/share.js が決める。ここは開閉と描画だけを持つ。
- * Shadow DOM の中に置かれるので、外側クリックの判定は composedPath() で見る
- * (シャドウ境界の外では event.target がホスト要素へ付け替えられるため)。
+ * Shadow DOM の中に置かれるので、外側クリックの判定は composedPath() で見る。
+ * (シャドウ境界の外では event.target がホスト要素へ付け替えられるため)
  *
  * role="menu" を名乗るので WAI-ARIA の menu パターンに従う: 開いたら最初の項目へフォーカスし、
  * 上下キーで項目を移動、Home / End で端へ、Escape で閉じてボタンへ戻す。
- * Tab で項目の外へ出たら閉じる (focusout)。
+ * Tab で項目の外へ出たら閉じる。(focusout)
  * キーは consumeKey() で受ける。ビュワー本体が document の捕捉フェーズで
- * 上下キーを作品の移動に使っているため、要素側のリスナでは間に合わない (SPEC §10.5)。
+ * 上下キーを作品の移動に使っているため、要素側のリスナでは間に合わない。(SPEC §10.5)
  */
 import { createIcon } from '../../common/icons.js';
 import { buildShareTargets } from '../../pixiv/share.js';
@@ -191,7 +191,7 @@ export function createShareMenu(deps) {
 	element.append(button, list);
 
 	/**
-	 * フォーカスがメニューの外へ出たら閉じる (Tab で抜けたとき)。
+	 * フォーカスがメニューの外へ出たら閉じる。(Tab で抜けたとき)
 	 * relatedTarget が無い (見出しの文字を押した・窓が非アクティブになった) ときは閉じない。
 	 * 外側のクリックは pointerdown 側が受け持つ
 	 * @param {FocusEvent} event フォーカスの移動

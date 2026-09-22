@@ -12,7 +12,7 @@ import { parseArtworkPath } from './page.js';
 
 /**
  * 作品グリッドではない入れ物。
- * プロフィールのホームではピックアップ欄 (section) が ul > li で組まれ、グリッドより先に並ぶ (SITE_SPEC §3)。
+ * プロフィールのホームではピックアップ欄 (section) が ul > li で組まれ、グリッドより先に並ぶ。(SITE_SPEC §3)
  * 先頭のカードを起点にするとピックアップの ul を掴んでしまうので、この中のカードは飛ばす。
  * ページ全体で section はこの 1 個だけ (作品グリッドは div) なので、これで十分に見分けられる。
  */
@@ -40,7 +40,7 @@ export function workIdFromLink(href, origin) {
 /**
  * 作品グリッドの ul を探す。
  * 「カード (li) の中にある作品リンク」を起点に、その li の親を返す。
- * ピックアップ欄の中のカードは飛ばす (NON_GRID_CONTAINER_SELECTOR)。
+ * ピックアップ欄の中のカードは飛ばす。(NON_GRID_CONTAINER_SELECTOR)
  * @param {Document|ParentNode} doc 対象のドキュメント
  * @returns {Element|null} グリッドの ul。まだ描かれていなければ null
  */
@@ -83,7 +83,7 @@ export function collectWorkIds(root, origin) {
 
 /**
  * グリッドのクリックを購読する。
- * 修飾キー付きのクリックと中クリックは拾わない (新しいタブで開きたい操作を邪魔しないため)。
+ * 修飾キー付きのクリックと中クリックは拾わない。(新しいタブで開きたい操作を邪魔しないため)
  * 拾うのはカード (li) の中の作品リンクだけ。ヘッダの通知などに出る作品リンクは本体に任せる。
  * @param {Document} doc 対象のドキュメント
  * @param {(workId: string) => void} onOpen 作品リンクが押されたときに呼ばれる

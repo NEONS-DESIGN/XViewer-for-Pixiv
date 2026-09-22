@@ -5,7 +5,7 @@ import { clearSessionCache } from '../../../src/content/session.js';
 import { KEYS } from '../../../src/common/constants.js';
 import { fakeElement, fakeDoc as fakeDocBase, find, findAll, flush } from '../../helpers/dom.js';
 
-// viewer.js は viewer.css と common/tokens.css を import する (esbuild が文字列にする)。
+// viewer.js は viewer.css と common/tokens.css を import する。(esbuild が文字列にする)
 // node はそのままでは .css を読めないので、空文字を返す読み込みフックを先に登録してから
 // 動的 import で読む (静的 import は巻き上げられてフックより先に走る)
 register(`data:text/javascript,${encodeURIComponent(`
@@ -51,7 +51,7 @@ function rawDetail(id, overrides = {}) {
 }
 
 /**
- * ビュワーの設定の代わり。サイドバーは出さない (作者情報の取得で通信させないため)。
+ * ビュワーの設定の代わり。サイドバーは出さない。(作者情報の取得で通信させないため)
  * @param {object} [overrides] 上書きする値
  * @returns {object} settings の代わり
  */

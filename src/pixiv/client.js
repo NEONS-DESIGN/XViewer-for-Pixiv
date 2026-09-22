@@ -43,7 +43,7 @@ function parseJson(text) {
  * pixiv の {error, message, body} 形までは求めない。
  * 順序: 本文を読む → ステータス → JSON の形。
  * ステータスを JSON 解析より先に見るのは、ログイン失効時のログインページ (HTML) や
- * ranking.php の 403 (HTML) を PARSE に化けさせないため (SITE_SPEC §6)。
+ * ranking.php の 403 (HTML) を PARSE に化けさせないため。(SITE_SPEC §6)
  * @param {Response} response fetch の応答
  * @param {string} url 例外メッセージ用
  * @returns {Promise<object>} 読めた JSON (配列を含む)
@@ -68,7 +68,7 @@ async function readJson(response, url) {
 }
 
 /**
- * 応答を読み、{error, body} を展開する。/ajax/* はすべてこの形 (SITE_SPEC §4)。
+ * 応答を読み、{error, body} を展開する。/ajax/* はすべてこの形。(SITE_SPEC §4)
  * この形を返さない旧 PHP エンドポイント (フォロー系) には使わないこと。
  * @param {Response} response fetch の応答
  * @param {string} url 例外メッセージ用
@@ -161,8 +161,8 @@ export function postJson(url, payload, token, deps = {}) {
  * urlencoded を POST し、応答の JSON を展開せずそのまま返す。
  * フォロー (/bookmark_add.php) とフォロー解除 (/rpc_group_setting.php) で使う。
  *
- * この 2 つは /ajax/* ではない旧 PHP エンドポイントで、{error, message, body} で包まない
- * (フォローは素の配列、フォロー解除は {user_id}。SITE_SPEC §4-5/6)。
+ * この 2 つは /ajax/* ではない旧 PHP エンドポイントで、{error, message, body} で包まない。
+ * (フォローは素の配列、フォロー解除は {user_id}。SITE_SPEC §4-5/6)
  * unwrap() に通すと body が無いため成功しても PARSE になるので、読み方を分けている。
  * 成功か失敗かの判定は応答の形を知っている actions.js が行う。
  * 同じ urlencoded でも {error, body} を展開する版は postForm()。
@@ -185,7 +185,7 @@ export function postFormRaw(url, params, token, deps = {}) {
  *
  * 同じ urlencoded でも postFormRaw() とは読み方が違う。
  * フォロー系の旧 PHP は {error, message, body} で包まないので展開してはいけないが、
- * post_comment.php は旧 RPC でありながら /ajax/* と同じ形で包んで返す (SITE_SPEC §4 実測)。
+ * post_comment.php は旧 RPC でありながら /ajax/* と同じ形で包んで返す。(SITE_SPEC §4 実測)
  * @param {string} url URL
  * @param {Record<string, string>} params 送るパラメータ
  * @param {string} token CSRF トークン

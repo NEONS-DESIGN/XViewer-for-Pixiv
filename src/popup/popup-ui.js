@@ -2,7 +2,7 @@
  * 設定画面の描画。
  * 画面の中身はすべて sections.js の定義表から組み立てる。項目を足すときは表へ 1 行足すだけで済む。
  *
- * 保存ボタンは作らず、変更のたびに保存する (UI_DESIGN_KIT §4.4)。
+ * 保存ボタンは作らず、変更のたびに保存する。(UI_DESIGN_KIT §4.4)
  * 見た目の反映は保存の完了を待たない。待つと押した手応えが遅れるため。
  */
 import { createIcon } from '../common/icons.js';
@@ -116,7 +116,7 @@ function renderToggle(doc, field, settings, onChange) {
 
 	const input = doc.createElement('input');
 	input.type = 'checkbox';
-	// 見た目は pixiv 本体のスイッチに合わせてある (popup.css)。
+	// 見た目は pixiv 本体のスイッチに合わせてある。(popup.css)
 	// 形が変わる以上、読み上げの役割も checkbox ではなく switch にする。
 	// 入りと切りは type=checkbox の checked がそのまま伝わるので aria-checked は置かない
 	input.setAttribute('role', 'switch');

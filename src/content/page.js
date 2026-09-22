@@ -58,7 +58,7 @@ export function parseArtworkPath(pathname) {
  * ブックマークやフォロー中は作品グリッドと別のキーにする。並んでいるのが他人の作品なので、
  * 掴んだままにすると「この作者の全作品」へ広げる判断が居座ってしまう。
  *
- * タグ名を含めないのは、絞り込み中は並びを広げないから (canExtendSequence が false)。
+ * タグ名を含めないのは、絞り込み中は並びを広げないから。(canExtendSequence が false)
  * タグ違い同士では組み直しても同じものを作り直すだけになる。
  * 絞り込み中も並びを広げるようにしたら、タグ名がページの一部になるのでここも変えること。
  * @param {string} pathname location.pathname
@@ -83,7 +83,7 @@ export function isViewerTarget(pathname) {
 /**
  * プロフィールのホームタブか。
  * 「ピックアップ」欄が出るのはこのパスだけなので、欄を隠す CSS もここでだけ効かせる。
- * /users/{id}/artworks のような下位のタブには欄自体が無い (SITE_SPEC §3)。
+ * /users/{id}/artworks のような下位のタブには欄自体が無い。(SITE_SPEC §3)
  * @param {string} pathname location.pathname
  * @returns {boolean} ホームタブなら true
  */
@@ -107,7 +107,7 @@ const PAGE_PARAM_PATTERN = /^\d+$/;
 /**
  * URL のクエリから ?p= のページ番号を読む。
  * 数として読めない値 (数でない / 0 以下 / 小数) は、ページ指定なしと同じ 1 として扱う。
- * pixiv のページャは 1 始まりなので、下限は 1 になる (SITE_SPEC §3)。
+ * pixiv のページャは 1 始まりなので、下限は 1 になる。(SITE_SPEC §3)
  * 受けるのは 10 進の数字だけ。Number() は '1e2' や '0x10' も整数に読むが、
  * pixiv 側が同じ解釈をする保証は無く、URL と基準ページが食い違う入口になる。
  * @param {string} search location.search ('?p=3' の形。先頭の ? は有っても無くてもよい)

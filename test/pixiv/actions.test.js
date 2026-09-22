@@ -18,7 +18,7 @@ function fakeFetch(body) {
 
 /**
  * フォロー系の旧 PHP エンドポイント用の偽 fetch。
- * これらは {error, message, body} で包まず、値をそのまま返す (SITE_SPEC §4-5/6)。
+ * これらは {error, message, body} で包まず、値をそのまま返す。(SITE_SPEC §4-5/6)
  * @param {unknown} json 応答そのもの
  * @returns {{impl: Function, calls: Array<{url: string, init: object}>}} 偽の fetch と呼び出しの記録
  */
@@ -139,7 +139,7 @@ test('addBookmark は数値の ID を文字列にして返す', async () => {
 	assert.equal(await addBookmark('1', false, 'T', { fetchImpl: impl }), '38764433361');
 });
 
-/** 投稿 API が返す body の実測値 (SITE_SPEC §4)。 */
+/** 投稿 API が返す body の実測値。(SITE_SPEC §4) */
 const POSTED = Object.freeze({
 	user_id: '54734418',
 	user_name: 'NEONS',

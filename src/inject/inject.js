@@ -2,9 +2,9 @@
  * page world (manifest の world: "MAIN") で動く注入スクリプト。
  *
  * content script は isolated world で動くため、そちらで history.pushState を包んでも
- * pixiv 本体のルーターが呼ぶ pushState は捕まらない (world ごとにラッパを共有しない)。
+ * pixiv 本体のルーターが呼ぶ pushState は捕まらない。(world ごとにラッパを共有しない)
  * SPA 遷移を確実に捕まえるには、サイト本体と同じ world で history そのものを包む必要がある。
- * 捕まえた結果は DOM イベントで isolated world へ渡す (SITE_SPEC §0)。
+ * 捕まえた結果は DOM イベントで isolated world へ渡す。(SITE_SPEC §0)
  *
  * ここはサイト本体の動作の経路に割り込む。壊さないことを最優先にし、
  * 元の戻り値をそのまま返す・例外を外へ出さない・外せるようにする、の 3 点を守る。
@@ -29,7 +29,7 @@ function notify() {
 }
 
 /**
- * history を包む。既に包まれていたら何もしない (二重注入のガード)。
+ * history を包む。既に包まれていたら何もしない。(二重注入のガード)
  * 退避した元のメソッドは window 上のフラグに持たせ、
  * 同じスクリプトが 2 回走っても書き戻す先を見失わないようにする。
  * @returns {void}

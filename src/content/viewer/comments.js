@@ -58,7 +58,7 @@ const MESSAGES = Object.freeze({
 
 /**
  * 投稿者に付けるラベルの文言。
- * pixiv 本体と同じく名前の直後に出す (SITE_SPEC §4)。
+ * pixiv 本体と同じく名前の直後に出す。(SITE_SPEC §4)
  */
 const LABELS = Object.freeze({
 	SELF: 'あなた',
@@ -157,7 +157,7 @@ export function normalizeComment(raw) {
  * 投稿者に付けるラベルを決める。
  *
  * **自分が最優先。** 自分の作品に自分でコメントすると両方に当てはまるが、
- * pixiv 本体は「あなた」だけを出す (実測)。
+ * pixiv 本体は「あなた」だけを出す。(実測)
  * ID が読めなかったときに空文字どうしが一致して無関係なコメントへラベルが付かないよう、
  * 比べる前に両側が揃っていることを確かめる。
  * @param {{userId: string}} comment コメント
@@ -175,7 +175,7 @@ export function commentLabel(comment, selfId, authorId) {
 
 /**
  * 投稿した時刻を一覧の日時と同じ形にする。
- * 応答に日時は入らないので手元の時計を使う (pixiv 本体も同じ)。
+ * 応答に日時は入らないので手元の時計を使う。(pixiv 本体も同じ)
  * 形は API の commentDate に合わせた 'YYYY-MM-DD HH:mm'。
  * @param {Date} at 時刻
  * @returns {string} 'YYYY-MM-DD HH:mm'
@@ -281,7 +281,7 @@ export function createComments(deps) {
 	let detailRef = null;
 
 	/**
-	 * 要素の外側の高さ (margin 込み)。
+	 * 要素の外側の高さ。(margin 込み)
 	 * flex の中では上下の margin が相殺されないので、そのまま足せる。
 	 * @param {HTMLElement} el 測る要素
 	 * @returns {number} 高さ (px)
@@ -424,7 +424,7 @@ export function createComments(deps) {
 
 	/**
 	 * 更新系の失敗を文言にする。投稿にも削除にも使う。
-	 * 401 はログインが切れている (別タブでログアウトした等)。覚えているセッションを捨て、
+	 * 401 はログインが切れている。(別タブでログアウトした等) 覚えているセッションを捨て、
 	 * 再読み込みまで案内する。__NEXT_DATA__ は SPA 遷移で変わらないので捨てても
 	 * 新しいトークンは得られない (SPEC §9.4)
 	 * @param {unknown} error 失敗の中身
@@ -529,7 +529,7 @@ export function createComments(deps) {
 		const avatar = createAvatar(doc, 'comment-avatar');
 		showAvatar(avatar, comment.avatarUrl);
 
-		// アイコンもリンクにする (押せる範囲が広いほうが誤操作が減る)。
+		// アイコンもリンクにする。(押せる範囲が広いほうが誤操作が減る)
 		// ただし名前と飛び先が同じなので、読み上げと Tab の巡回からは外して 1 件 1 リンクに見せる
 		let avatarNode = avatar;
 		if (userPage) {
@@ -551,7 +551,7 @@ export function createComments(deps) {
 		if (userPage) name.href = userPage;
 		name.textContent = comment.userName;
 
-		// 名前の直後にラベルを置く (pixiv 本体と同じ並び)。付かないコメントには要素ごと作らない
+		// 名前の直後にラベルを置く。(pixiv 本体と同じ並び) 付かないコメントには要素ごと作らない
 		const label = commentLabel(comment, readSession(doc).self?.id ?? null, detailRef?.userId ?? null);
 		let labelNode = null;
 		if (label) {
@@ -591,8 +591,8 @@ export function createComments(deps) {
 	 * 削除の導線を 1 件のコメントに付ける。ルートにも返信にも同じものを使う。
 	 *
 	 * **削除は取り消せないので、一度目の押下では消さずに文言を聞き返しに変える。**
-	 * 別のモーダルを出さないのは、ビュワー自体がモーダルの中だから
-	 * (二重に重ねるとどれを閉じているのか分からなくなる)。
+	 * 別のモーダルを出さないのは、ビュワー自体がモーダルの中だから。
+	 * (二重に重ねるとどれを閉じているのか分からなくなる)
 	 * フォーカスが外れたら聞き返しをやめる。押しっぱなしの確認を残すと、
 	 * 別のコメントを消すつもりで押し直したときに誤爆する。
 	 * @param {Comment} comment 消す対象
@@ -676,7 +676,7 @@ export function createComments(deps) {
 				// 最後の 1 件だったら「まだコメントはありません」へ戻す。
 				// 戻さないと見出しだけが残って、読み込みに失敗したように見える
 				if (list && list.children.length === 0) showEmpty();
-				// 受け手がいなければ数え直しも走らない (?.() は引数も評価しない)。
+				// 受け手がいなければ数え直しも走らない。(?.() は引数も評価しない)
 				// 件数を出していない呼び出し元に無駄な通信をさせないので、これでよい
 				deps.onDeleted?.(await countAfterDelete(illustId));
 				applyFloor();
@@ -864,7 +864,7 @@ export function createComments(deps) {
 		return {
 			/**
 			 * 投稿できた返信を返信一覧の末尾へ足す。
-			 * 畳んでいるときは足さず、「返信を表示」を出すだけにする (開けば取り直される)。
+			 * 畳んでいるときは足さず、「返信を表示」を出すだけにする。(開けば取り直される)
 			 * @param {object} posted actions.js が返した 1 件
 			 * @returns {void}
 			 */
@@ -880,8 +880,8 @@ export function createComments(deps) {
 	/**
 	 * 返信を書く導線を 1 件のコメントに付ける。
 	 *
-	 * 「返信を表示」の左に置く。押すたびに入力欄を出し入れし、畳んだら DOM ごと捨てる
-	 * (開いたまま残すとコメントの多い作品で入力欄が積み上がる)。
+	 * 「返信を表示」の左に置く。押すたびに入力欄を出し入れし、畳んだら DOM ごと捨てる。
+	 * (開いたまま残すとコメントの多い作品で入力欄が積み上がる)
 	 * @param {Comment} comment ルートコメント
 	 * @param {HTMLElement} body 入力欄をぶら下げる先 (.comment-body)
 	 * @param {HTMLElement} meta 下段。ボタンをここの先頭へ差し込む
@@ -915,7 +915,7 @@ export function createComments(deps) {
 				avatarUrl: readSession(doc).self?.profileImg ?? null,
 				onPosted: (posted) => { onReplied(posted); },
 			});
-			// 返信一覧より前、コメントの直下に出す (pixiv 本体と同じ位置)。
+			// 返信一覧より前、コメントの直下に出す。(pixiv 本体と同じ位置)
 			// 返信の下に置くと、返信が多いコメントほど書く場所が遠くなる
 			const area = body.querySelector('.comment-replies-area');
 			if (area) body.insertBefore(form.element, area);
@@ -931,7 +931,7 @@ export function createComments(deps) {
 	/**
 	 * ルートコメント 1 件を導線ごと組み立てる。
 	 *
-	 * 返信を読む導線と書く導線はルートにだけ付ける (pixiv 側も入れ子は 1 段まで)。
+	 * 返信を読む導線と書く導線はルートにだけ付ける。(pixiv 側も入れ子は 1 段まで)
 	 * 一覧から読んだ 1 件も投稿直後の 1 件もここを通し、同じ形にする。
 	 * @param {Comment} comment ルートコメント
 	 * @returns {HTMLElement} 一覧へ入れる 1 件 (.comment-item)
@@ -970,7 +970,7 @@ export function createComments(deps) {
 
 	/**
 	 * 投稿できたコメントを一覧の先頭へ差し込む。
-	 * 取り直さないのは offset がずれ、読み進めた位置も飛ぶため (pixiv 本体も同じ)。
+	 * 取り直さないのは offset がずれ、読み進めた位置も飛ぶため。(pixiv 本体も同じ)
 	 * @param {object} posted actions.js が返した 1 件
 	 * @returns {void}
 	 */
@@ -1008,8 +1008,8 @@ export function createComments(deps) {
 	 *
 	 * **手元で 1 を引くだけでは合わない。** ルートを消すとぶら下がっていた返信も
 	 * 道連れになり (SITE_SPEC §4-8 実測)、開いていない返信の数は分からないため。
-	 * 削除の反映は即時で、消した直後に引いても正しい値が返ることを実測で確認している
-	 * (ブックマークの削除と違って遅れない)。
+	 * 削除の反映は即時で、消した直後に引いても正しい値が返ることを実測で確認している。
+	 * (ブックマークの削除と違って遅れない)
 	 * 引けなかったときは null を返し、呼び出し側が手元で 1 を引く側へ倒す。
 	 * @param {string} illustId 作品 ID
 	 * @returns {Promise<number|null>} 新しい件数。引けなければ null
@@ -1017,7 +1017,7 @@ export function createComments(deps) {
 	async function countAfterDelete(illustId) {
 		try {
 			// 同じ URL を作品を開いた時点で引いているため、そのまま引き直すと
-			// ブラウザのキャッシュが**削除前の件数**を返すことがある (実機で確認)。
+			// ブラウザのキャッシュが**削除前の件数**を返すことがある。(実機で確認)
 			// 数え直しの意味が消えるので、毎回違う URL にして必ず取り直す
 			const body = await fetchJson(`${illustUrl(illustId)}&${CACHE_BUSTER}=${Date.now()}`);
 			const count = body?.commentCount;

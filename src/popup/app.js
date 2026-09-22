@@ -1,7 +1,7 @@
 /**
  * 設定画面の組み立てと保存の橋渡し。
  * 設定を読んで popup-ui に描かせ、変更をそのまま保存する。
- * エントリ (popup.js) は import した時点で走るので、試せるように依存を引数で受ける形にここへ出した (SPEC §15)。
+ * エントリ (popup.js) は import した時点で走るので、試せるように依存を引数で受ける形にここへ出した。(SPEC §15)
  */
 import { loadSettings as loadSettingsImpl, saveSetting as saveSettingImpl, resetSettings as resetSettingsImpl } from '../common/storage.js';
 import { logError } from '../common/log.js';
@@ -79,7 +79,7 @@ export async function main({
 
 	/**
 	 * 設定を読み直して描き直す。
-	 * 利用者の現在地 (開いているタブ・フォーカス) は描き直しの外で持って復元する (UI_DESIGN_KIT §7)。
+	 * 利用者の現在地 (開いているタブ・フォーカス) は描き直しの外で持って復元する。(UI_DESIGN_KIT §7)
 	 * 描画の例外はここで受けて記録する。呼び出し側は結果を待たないので、放すと素の unhandled rejection になる
 	 * @param {{focusRole?: string|null}} [options] 描き直した後にフォーカスを戻す要素の data-role
 	 * @returns {Promise<void>} 完了

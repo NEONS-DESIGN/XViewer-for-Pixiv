@@ -6,7 +6,7 @@
  * tokens.css は popup.html も <link> で読むので、静的ファイルとして dist/common/ にも置く。
  *
  * version の出どころは package.json 1 か所。src/manifest.json は version を持たず、
- * ここで差し込む (CLAUDE.md「バージョン管理」)。minimum_chrome_version も同様に
+ * ここで差し込む。(CLAUDE.md「バージョン管理」) minimum_chrome_version も同様に
  * scripts/targets.mjs から差し込む。
  */
 import { build as bundle, context } from 'esbuild';
@@ -85,7 +85,7 @@ async function readJson(path) {
 
 /**
  * package.json の version を読んで検証する。
- * esbuild より前に呼び、不正な version で束ね終わってから落ちるのを避ける (fail fast)。
+ * esbuild より前に呼び、不正な version で束ね終わってから落ちるのを避ける。(fail fast)
  * @returns {Promise<string>} package.json の version (semver のまま)
  * @throws {Error} version が manifest の規則に合わないとき
  */
@@ -110,7 +110,7 @@ async function writeManifest(packageVersion) {
 }
 
 /**
- * 静的ファイルを dist へ置く。manifest は version を差し込むので別 (writeManifest)。
+ * 静的ファイルを dist へ置く。manifest は version を差し込むので別。(writeManifest)
  * @returns {Promise<void>}
  */
 async function copyStatic() {

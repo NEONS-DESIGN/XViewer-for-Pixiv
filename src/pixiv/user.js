@@ -60,7 +60,7 @@ export function fetchUserProfile(userId, deps = {}) {
 
 /**
  * 覚えたユーザー情報に差分を重ねる。フォロー切替後に isFollowed を書き換えるために使う。
- * 取得中なら完了後の内容に重ねる。覚えていなければ何もしない (次の取得で最新が入る)。
+ * 取得中なら完了後の内容に重ねる。覚えていなければ何もしない。(次の取得で最新が入る)
  * @param {string} userId ユーザー ID
  * @param {object} patch 上書きするフィールド
  * @returns {boolean} 書き換えたら true。覚えていなければ false

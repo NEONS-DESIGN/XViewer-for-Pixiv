@@ -6,13 +6,13 @@
 /** 作品リンクを拾うためのセレクタ。pixiv の CSS クラス名は当てにならないのでこれだけを使う。 */
 export const ARTWORK_LINK_SELECTOR = 'a[href^="/artworks/"]';
 
-/** カードのサムネリンク。pixiv の計測用属性で、クラス名より寿命が長い (SITE_SPEC §3 実測)。 */
+/** カードのサムネリンク。pixiv の計測用属性で、クラス名より寿命が長い。(SITE_SPEC §3 実測) */
 export const THUMB_LINK_SELECTOR = 'a[data-ga4-label="thumbnail_link"]';
 
 /** カードのブックマークボタンの入れ物。 */
 export const BOOKMARK_BUTTON_SELECTOR = '[data-ga4-label="bookmark_button"]';
 
-/** ブックマーク済みのハートの色 (SITE_SPEC §3 実測)。未ブックマーク側はテーマで変わるので雛形から採る。 */
+/** ブックマーク済みのハートの色。(SITE_SPEC §3 実測) 未ブックマーク側はテーマで変わるので雛形から採る。 */
 export const BOOKMARKED_FILL = '#ff4060';
 
 /** 自分が継ぎ足したカードの目印。撤去と重複判定とクリック判定に使う。 */
@@ -23,7 +23,7 @@ export const XV_BOOKMARK_ID_ATTR = 'data-xv-bookmark-id';
 
 /**
  * グリッドのカード 1 枚を指す要素と、その中のブックマークボタン。
- * pixiv のグリッドは ul > li で、ボタンは li の中の button 1 つだけ (SITE_SPEC §3 実測)。
+ * pixiv のグリッドは ul > li で、ボタンは li の中の button 1 つだけ。(SITE_SPEC §3 実測)
  * 構造の前提なので、散らさずここで持つ。
  */
 export const CARD_SELECTOR = 'li';
@@ -38,8 +38,8 @@ export const TAB_SKIP_LABEL_ATTR = 'data-xv-label';
 
 /**
  * プロフィールのホームに出る「ピックアップ」欄を指すセレクタ。
- * 実測ではホームの `section` はこの 1 個だけで、作品グリッドは `div` なので掛からない
- * (SITE_SPEC §3)。見出しの文言は表示言語で変わるため当てにしない。
+ * 実測ではホームの `section` はこの 1 個だけで、作品グリッドは `div` なので掛からない。
+ * (SITE_SPEC §3) 見出しの文言は表示言語で変わるため当てにしない。
  * 作品リンクを持つことまで求めるのは、pixiv が作品と無関係な section を足したときに
  * 巻き込まないため。
  */
@@ -64,7 +64,7 @@ export const USER_TAG_PATH_PATTERN = /^\/users\/\d+\/(?:artworks|illustrations|m
  * ユーザーページのうち、その人自身の作品グリッドを出すパス。
  * ブックマーク (/users/{id}/bookmarks/artworks) やフォロー中 (/users/{id}/following) にも
  * 作品リンクは並ぶが、そこに出ているのは他人の作品なので、
- * 「この作者の全作品」へ並びを広げてはいけない (SITE_SPEC §3)。
+ * 「この作者の全作品」へ並びを広げてはいけない。(SITE_SPEC §3)
  */
 export const USER_WORKS_PATH_PATTERN = /^\/users\/\d+(?:\/(?:artworks|illustrations|manga)(?:\/.*)?)?\/?$/;
 
@@ -76,7 +76,7 @@ export const USER_WORKS_CATEGORY_PATTERN = /^\/users\/\d+\/(illustrations|manga)
 
 /**
  * ユーザーページのうち、プロフィールのホームタブ。
- * 「ピックアップ」欄が出るのはここだけで、/users/{id}/artworks などには出ない (SITE_SPEC §3)。
+ * 「ピックアップ」欄が出るのはここだけで、/users/{id}/artworks などには出ない。(SITE_SPEC §3)
  */
 export const PROFILE_HOME_PATH_PATTERN = /^\/users\/\d+\/?$/;
 
@@ -104,7 +104,7 @@ export const WORK_CATEGORY_BY_TAB = Object.freeze({
 });
 
 /**
- * 作品の種別から profile/illusts の work_category クエリの値を引く (SITE_SPEC §3)。
+ * 作品の種別から profile/illusts の work_category クエリの値を引く。(SITE_SPEC §3)
  * profile/all の応答キー (illusts) とは綴りが違うので、そのまま送らずここで変換する。
  */
 export const WORK_CATEGORY_QUERY = Object.freeze({
@@ -141,7 +141,7 @@ export const NAV_HOOK_FLAG = '__xviewerNavHooked';
 export const LOCATION_CHECK_DELAY_MS = 200;
 
 /**
- * ログイン情報が読めないときの閲覧設定 (R-18 を出さない)。
+ * ログイン情報が読めないときの閲覧設定。(R-18 を出さない)
  * SITE_SPEC §6 の xRestrict の値と同じ尺度で、0 は全年齢のみ。
  */
 export const DEFAULT_X_RESTRICT = 0;
@@ -152,14 +152,14 @@ export const IMAGE_QUALITY = Object.freeze({
 	ORIGINAL: 'original',
 });
 
-/** 先読みする枚数の選択肢。昇順に並べる (設定画面はこの並びで選択肢を出す)。 */
+/** 先読みする枚数の選択肢。昇順に並べる。(設定画面はこの並びで選択肢を出す) */
 export const PREFETCH_CHOICES = Object.freeze([0, 1, 3]);
 
 /**
  * 先読みの既定値。前後 1 枚。
- * 切り替えの速さより、端末と回線への負担の少なさを既定に置く
- * (高解像度の作品を 3 枚先まで取ると、送るだけで通信量が膨らむ)。
- * 値は PREFETCH_CHOICES から引く (選択肢に無い既定を書けないようにするため)。
+ * 切り替えの速さより、端末と回線への負担の少なさを既定に置く。
+ * (高解像度の作品を 3 枚先まで取ると、送るだけで通信量が膨らむ)
+ * 値は PREFETCH_CHOICES から引く。(選択肢に無い既定を書けないようにするため)
  */
 export const DEFAULT_PREFETCH = PREFETCH_CHOICES[PREFETCH_CHOICES.indexOf(1)];
 
@@ -172,7 +172,7 @@ export const TAB_SKIP_REFRESH_MS = 200;
 /**
  * グリッドで Tab を送ったときに、何をフォーカス順から外すか。
  * pixiv のカードは「サムネ → ブックマーク → タイトル」の 3 ステップで 1 作品なので、
- * 外さないと次の作品まで 3 回押すことになる (SITE_SPEC 参照)。
+ * 外さないと次の作品まで 3 回押すことになる。(SITE_SPEC 参照)
  */
 export const GRID_TAB_SKIP = Object.freeze({
 	/** ブックマークボタンとタイトルリンクの両方 */
@@ -183,7 +183,7 @@ export const GRID_TAB_SKIP = Object.freeze({
 	NONE: 'none',
 });
 
-/** 1 ページに並ぶ作品の数。pixiv 本体のページャと同じ数 (SITE_SPEC §3 実測)。 */
+/** 1 ページに並ぶ作品の数。pixiv 本体のページャと同じ数。(SITE_SPEC §3 実測) */
 export const WORKS_PER_PAGE = 48;
 
 /**
@@ -205,8 +205,8 @@ export const SENTINEL_ATTR = 'data-xv-sentinel';
 /**
  * モードごとの sentinel の見張り範囲 (IntersectionObserver の rootMargin)。
  *
- * 2 つのモードの差はここだけで決まるので、値は 1 か所にまとめて取り違えを防ぐ
- * (0.22.1 までは割り当てが逆で、「下まで来たら」のほうが早く読み始めていた)。
+ * 2 つのモードの差はここだけで決まるので、値は 1 か所にまとめて取り違えを防ぐ。
+ * (0.22.1 までは割り当てが逆で、「下まで来たら」のほうが早く読み始めていた)
  *
  * - onReach は 0。「一番下に着いてから読む」と案内している以上、手前から読み始めない。
  *   下端でスピナーが出て少し待つのがこのモードの正しい見え方 (通信は最小で済む)
@@ -224,8 +224,8 @@ export const SENTINEL_MARGIN = Object.freeze({
 
 /**
  * pixiv 本体のページャ (1 2 3 ... 次へ)。ページ番号のリンクを含む nav で掴む。
- * ページ内の nav はタブ行とページャの 2 つだけで、?p= を持つのはページャだけ
- * (SITE_SPEC §3「ページャ」実測)。クラス名 (sc-xxxx) は版ごとに変わるので掴まない。
+ * ページ内の nav はタブ行とページャの 2 つだけで、?p= を持つのはページャだけ。
+ * (SITE_SPEC §3「ページャ」実測) クラス名 (sc-xxxx) は版ごとに変わるので掴まない。
  * 作品が 1 ページに収まるページャは描かれないが、その場合は当たる nav が無いだけで害は無い。
  *
  * 探すのは "p=" ではなく "?p=" (クエリの先頭)。実機のページャのリンクは
@@ -249,7 +249,7 @@ export const SIDEBAR_SCROLL = Object.freeze({
 /**
  * popup の配色。
  * SYSTEM は OS の設定 (prefers-color-scheme) に従う。
- * 明示の選択 (DARK / LIGHT) は常に OS より優先する (UI_DESIGN_KIT §10)。
+ * 明示の選択 (DARK / LIGHT) は常に OS より優先する。(UI_DESIGN_KIT §10)
  */
 export const POPUP_THEMES = Object.freeze({
 	SYSTEM: 'system',
@@ -262,7 +262,7 @@ export const POPUP_THEMES = Object.freeze({
  * アイコンと文言を「次の状態」で揃えるのは、ボタンは押した結果を示すものであり、
  * 今の状態は画面の配色そのものが伝えているため。
  * SYSTEM は「今見えている配色」ではないのでキーに現れない。
- * 解決済みの DARK / LIGHT だけを引く (popup-ui.js の resolveTheme を通す)。
+ * 解決済みの DARK / LIGHT だけを引く。(popup-ui.js の resolveTheme を通す)
  */
 export const THEME_TOGGLE = Object.freeze({
 	[POPUP_THEMES.DARK]: Object.freeze({
@@ -304,7 +304,7 @@ export const KEYS = Object.freeze({
 
 /**
  * モーダルの中で Tab を巡回させる対象。
- * role="dialog" を名乗る以上、フォーカスは中に閉じ込める (UI_DESIGN_KIT §6)。
+ * role="dialog" を名乗る以上、フォーカスは中に閉じ込める。(UI_DESIGN_KIT §6)
  */
 export const FOCUSABLE_SELECTOR = [
 	'a[href]',
@@ -333,6 +333,6 @@ export const INERT_ATTRIBUTE = 'inert';
 /**
  * inert が付いている要素。フォーカスの巡回から外すために使う。
  * inert の中の要素は focus() が無言で失敗するので、巡回の対象に残すと
- * そこで Tab が止まったように見える (原寸表示中のステージとサイドバーがこれに当たる)。
+ * そこで Tab が止まったように見える。(原寸表示中のステージとサイドバーがこれに当たる)
  */
 export const INERT_SELECTOR = `[${INERT_ATTRIBUTE}]`;

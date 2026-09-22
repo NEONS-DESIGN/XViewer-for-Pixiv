@@ -1,8 +1,8 @@
 /**
  * 設定画面の文言と定義表。
- * 画面に出る文字列はすべてここに置き、描画側 (popup-ui.js) は表を回すだけにする (UI_DESIGN_KIT §7)。
- * 項目を足すときは SECTIONS へ 1 行足す。キーは SETTINGS_DEFAULTS と 1 対 1 に対応させる
- * (対応は test/popup/popup-ui.test.js が見張る)。
+ * 画面に出る文字列はすべてここに置き、描画側 (popup-ui.js) は表を回すだけにする。(UI_DESIGN_KIT §7)
+ * 項目を足すときは SECTIONS へ 1 行足す。キーは SETTINGS_DEFAULTS と 1 対 1 に対応させる。
+ * (対応は test/popup/popup-ui.test.js が見張る)
  */
 import {
 	IMAGE_QUALITY,
@@ -149,7 +149,7 @@ export const SECTIONS = Object.freeze([
 				kind: 'toggle',
 				key: 'clickZoom',
 				label: 'クリックで原寸表示',
-				description: '画像を押すと、原寸のまま画面いっぱいに開きます (pixiv の作品ページと同じ)。左右の端を押すか ← → でページを送り、もう一度押すか Esc で戻ります。上の解像度の指定にかかわらず原寸の画像を読み込みます。',
+				description: '画像を押すと、原寸のまま画面いっぱいに開きます。(pixiv の作品ページと同じ) 左右の端を押すか ← → でページを送り、もう一度押すか Esc で戻ります。上の解像度の指定にかかわらず原寸の画像を読み込みます。',
 			}),
 		]),
 	}),

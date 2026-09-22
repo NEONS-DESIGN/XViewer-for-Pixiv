@@ -3,7 +3,7 @@
  *
  * グリッドのフォーカス枠・ピックアップ欄の非表示・sentinel の見た目・ページャ隠しは
  * どれも「id 付きの style を head に 1 枚入れ、dispose で外す」だけなので、ここに集める。
- * 失敗しても呼び出し側を巻き込まない (見た目が素になるだけで機能は続く)。
+ * 失敗しても呼び出し側を巻き込まない。(見た目が素になるだけで機能は続く)
  */
 import { warn } from './log.js';
 
@@ -36,7 +36,7 @@ export function createStyleHandle(doc, id, css, label) {
 			if (style) return;
 			style = doc.createElement('style');
 			style.id = id;
-			// innerHTML は使わない (SPEC §13)。CSS は textContent で入る
+			// innerHTML は使わない。(SPEC §13) CSS は textContent で入る
 			style.textContent = css;
 			root.appendChild(style);
 		} catch (error) {

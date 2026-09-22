@@ -30,7 +30,7 @@ const MESSAGES = Object.freeze({
 
 /**
  * アバターがまだ表示できない (取得前・取得失敗) ことを示すクラス。
- * 見た目は viewer.css が持つ (枠だけ残して中身を隠す)。
+ * 見た目は viewer.css が持つ。(枠だけ残して中身を隠す)
  */
 /** 読み上げにだけ渡す文字に付けるクラス。見た目は viewer.css の .visually-hidden。 */
 const VISUALLY_HIDDEN_CLASS = 'visually-hidden';
@@ -113,8 +113,8 @@ function decodeEntities(text) {
 
 /**
  * href がリンクとして安全かを確かめ、絶対 URL にして返す。
- * 投稿文には /users/123 のような相対リンクが入るので、base を渡して解決する
- * (渡さないと相対リンクが全て弾かれ、本文テキストに落ちてしまう)。
+ * 投稿文には /users/123 のような相対リンクが入るので、base を渡して解決する。
+ * (渡さないと相対リンクが全て弾かれ、本文テキストに落ちてしまう)
  * 返すのは絶対 URL。Shadow DOM の中では相対 URL の解決基準が分かりにくいため正規化する。
  * @param {string} href 投稿文の中の href
  * @returns {string|null} 使ってよい絶対 URL。安全でなければ null
@@ -213,10 +213,10 @@ export function createSidebar(deps) {
 	let comments = null;
 	/**
 	 * 今出しているコメントの件数。投稿のたびに手元で増やす。
-	 * 取り直さないのは、投稿の反映に間があり、直後に引くと古い数字が返るため
-	 * (いいね・ブックマークと同じ方針。SPEC §10.12)。
-	 * **削除だけは例外で、数え直した値で置き換える** (ルートを消すと返信も道連れになり、
-	 * 手元では引く数が決まらないため。SPEC §10.11)。
+	 * 取り直さないのは、投稿の反映に間があり、直後に引くと古い数字が返るため。
+	 * (いいね・ブックマークと同じ方針。SPEC §10.12)
+	 * **削除だけは例外で、数え直した値で置き換える**。(ルートを消すと返信も道連れになり、
+	 * 手元では引く数が決まらないため。SPEC §10.11)
 	 * @type {number}
 	 */
 	let commentCount = 0;
@@ -433,8 +433,8 @@ export function createSidebar(deps) {
 
 		/**
 		 * コメントの件数を手元で増減する。
-		 * 取り直さないのは、投稿の反映に間があり、直後に引くと古い数字が返るため
-		 * (いいね・ブックマークと同じ方針。SPEC §10.12)。
+		 * 取り直さないのは、投稿の反映に間があり、直後に引くと古い数字が返るため。
+		 * (いいね・ブックマークと同じ方針。SPEC §10.12)
 		 * render() より前や dispose() の後に呼ばれても何もしない。
 		 * @param {number} delta 増やす数 (減らすときは負数)
 		 * @returns {void}
@@ -447,8 +447,8 @@ export function createSidebar(deps) {
 		 * コメントの件数を数え直した値で置き換える。
 		 *
 		 * 手元で足し引きできないときだけ使う。**ルートのコメントを消すと返信も道連れになり**、
-		 * 開いていない返信の数は分からないので、削除のあとは pixiv から引き直した値を入れる
-		 * (SPEC §10.11)。投稿のように 1 件と分かっているときは bumpCommentCount() を使う。
+		 * 開いていない返信の数は分からないので、削除のあとは pixiv から引き直した値を入れる。
+		 * (SPEC §10.11) 投稿のように 1 件と分かっているときは bumpCommentCount() を使う。
 		 * @param {number} next 新しい件数
 		 * @returns {void}
 		 */
@@ -467,7 +467,7 @@ export function createSidebar(deps) {
 		},
 
 		/**
-		 * キー操作をシェアメニューに先に使わせる (Escape / 上下 / Home / End)。
+		 * キー操作をシェアメニューに先に使わせる。(Escape / 上下 / Home / End)
 		 * true なら本体は反応しない。開いたメニューで下キーを押して次の作品へ移らないように
 		 * @param {KeyboardEvent} event キー
 		 * @returns {boolean} 食い止めたなら true
