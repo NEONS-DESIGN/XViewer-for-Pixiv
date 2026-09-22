@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://xviewer.neonsdesign.com/sitemap.xml

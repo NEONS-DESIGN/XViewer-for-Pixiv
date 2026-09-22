@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+
+	<url>
+		<loc>https://xviewer.neonsdesign.com/</loc>
+		<lastmod>2026-09-22</lastmod>
+		<xhtml:link rel="alternate" hreflang="ja" href="https://xviewer.neonsdesign.com/"/>
+		<xhtml:link rel="alternate" hreflang="en" href="https://xviewer.neonsdesign.com/en/"/>
+		<xhtml:link rel="alternate" hreflang="x-default" href="https://xviewer.neonsdesign.com/"/>
+	</url>
+
+	<url>
+		<loc>https://xviewer.neonsdesign.com/privacy.html</loc>
+		<lastmod>2026-09-22</lastmod>
+		<xhtml:link rel="alternate" hreflang="ja" href="https://xviewer.neonsdesign.com/privacy.html"/>
+		<xhtml:link rel="alternate" hreflang="en" href="https://xviewer.neonsdesign.com/en/privacy.html"/>
+		<xhtml:link rel="alternate" hreflang="x-default" href="https://xviewer.neonsdesign.com/privacy.html"/>
+	</url>
+
+	<url>
+		<loc>https://xviewer.neonsdesign.com/en/</loc>
+		<lastmod>2026-09-22</lastmod>
+		<xhtml:link rel="alternate" hreflang="ja" href="https://xviewer.neonsdesign.com/"/>
+		<xhtml:link rel="alternate" hreflang="en" href="https://xviewer.neonsdesign.com/en/"/>
+		<xhtml:link rel="alternate" hreflang="x-default" href="https://xviewer.neonsdesign.com/"/>
+	</url>
+
+	<url>
+		<loc>https://xviewer.neonsdesign.com/en/privacy.html</loc>
+		<lastmod>2026-09-22</lastmod>
+		<xhtml:link rel="alternate" hreflang="ja" href="https://xviewer.neonsdesign.com/privacy.html"/>
+		<xhtml:link rel="alternate" hreflang="en" href="https://xviewer.neonsdesign.com/en/privacy.html"/>
+		<xhtml:link rel="alternate" hreflang="x-default" href="https://xviewer.neonsdesign.com/privacy.html"/>
+	</url>
+
+</urlset>
