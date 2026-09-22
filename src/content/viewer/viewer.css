@@ -60,6 +60,26 @@
 	   テーマで変えない (docs/DECISIONS.md) */
 	--like: var(--accent);
 	--bookmark: #ff4060;
+	/* サイドバーの文字色。読み物 (作者名・タイトル・投稿文・タグ・カウンタ) は
+	   pixiv の作品ページ (/artworks/) と同じ階調にする。隣にビュワーを開いた本体の
+	   ページが見えている以上、同じ役割の文字が違う濃さだと拡張だけ浮く。
+	   値は charcoal のトークンの実測値 (SITE_SPEC.md §6)。
+	   --side-fg = --charcoal-text1 / --side-body = --charcoal-text2 (投稿文) /
+	   --side-sub = --charcoal-text3 (投稿日・カウンタ・ユーザー ID。両テーマ共通)。
+	   拡張の既定 (--fg / --muted) は青寄りの灰で、pixiv の中間色と食い違っていた。
+	   差し替えは .sidebar の中だけ。ビュワーの操作部品 (閉じる・矢印・枚数) は
+	   画像の上に乗るので拡張側の値のまま (docs/DECISIONS.md 0.30.3) */
+	--side-fg: #f5f5f5;
+	--side-body: #d6d6d6;
+	--side-sub: #858585;
+	/* 投稿文とタグのリンク。作品ページのリンクの実測値そのもの。
+	   ブランド色 (--accent / #0096fa) より沈んだ青で、本体も読み物の中のリンクだけは
+	   この色を使い、ボタン類にはブランド色を使い分けている。ここも同じ切り分けにする。
+	   (押せる導線 = シェア・作品ページを開く・いいね は --accent のまま)
+	   テーマで変えない。本体が両テーマともこの値を直書きしているため。
+	   地 #1f1f1f との比は 3.35:1 で AA に届かないが、本体と同じ見え方を優先した判断
+	   (--accent と同じ扱い。docs/DECISIONS.md 0.30.3) */
+	--side-link: #3d7699;
 	/* サイドバーのスクロールバーだけ、画面の端から空ける隙間。
 	   窓の縁に貼り付いて見えないようにするためのもの。(コメント一覧側には使わない)
 	   太さ (--scrollbar-size) と色は tokens.css */
@@ -92,6 +112,11 @@
 	/* ブランド色の地 (--charcoal-brand) はテーマ非依存なので差し替えない。
 	   ホバーと「フォロー中」だけライトの値へ (--charcoal-brand-hover / --charcoal-surface3) */
 	--brand-bg-hover: #0090f0;
+	/* サイドバーの文字色のライト側。charcoal のライトの text1 / text2。
+	   --side-sub (#858585) と --side-link (#3d7699) は本体が両テーマ共通で持つ値なので
+	   差し替えない (SITE_SPEC.md §6) */
+	--side-fg: #1f1f1f;
+	--side-body: #474747;
 	--follow-on-bg: rgba(0, 0, 0, 0.04);
 	--follow-on-bg-hover: rgba(0, 0, 0, 0.0784);
 	/* 幕はライトでも暗いままにする。画像の見え方を安定させるため */
@@ -150,6 +175,12 @@
    コメント側を 0 まで潰しても収まらないので、そのときだけここがスクロールする。
    ふだんは中身が必ず収まるので、このスクロールバーは出ない */
 .sidebar {
+	/* この中の文字だけ pixiv の作品ページと同じ階調にする (--side-*)。
+	   ここは継承で決まる文字 (タイトル・コメント本文・カウンタの数値) の分。
+	   色を明示している規則は個別に --side-fg / --side-sub を引く。
+	   --accent は差し替えない。読み物の中のリンクだけが --side-link で、
+	   押せる導線 (シェア・作品ページを開く・いいね) は本体と同じくブランド色のまま */
+	color: var(--side-fg);
 	/* --sidebar-width を見た目の幅そのものにする。
 	   境界線と、スクロールバーを内側へ寄せる帯を内訳に含めるため */
 	box-sizing: border-box;
@@ -218,6 +249,11 @@
 .status {
 	color: var(--muted);
 	text-align: center;
+}
+
+/* 同じ class をステージ側でも使う。サイドバーに出るぶんだけ本体の補助色へ寄せる */
+.sidebar .status {
+	color: var(--side-sub);
 }
 
 .status[data-kind='error'] {
@@ -432,7 +468,7 @@
 	align-items: center;
 	gap: 8px;
 	min-width: 0;
-	color: var(--fg);
+	color: var(--side-fg);
 	text-decoration: none;
 }
 
@@ -471,7 +507,7 @@
 /* 名前の真下。名前より一段小さく、薄い色で添える */
 .author-id {
 	overflow: hidden;
-	color: var(--muted);
+	color: var(--side-sub);
 	font-size: 11px;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -489,13 +525,19 @@
 	line-height: 1.4;
 }
 
+/* 投稿文。本体の作品ページと同じく、見出し (--side-fg) より一段落とした色で置く。
+   長い文章なので、白のままだと画面の中で一番強い要素になってしまう */
 .comment {
 	margin: 0 0 12px;
-	color: var(--fg);
+	color: var(--side-body);
 	word-break: break-word;
 }
 
-.comment a { color: var(--accent); }
+/* 投稿文の中のリンクとタグ。本体の読み物と同じ沈んだ青にする。
+   ホバーで色は変えない。本体も下線だけで、暗い地の上で更に暗くすると読みにくくなる */
+.comment a { color: var(--side-link); }
+
+.comment a:hover { text-decoration: underline; }
 
 .tags {
 	display: flex;
@@ -507,7 +549,7 @@
 }
 
 .tags a {
-	color: var(--accent);
+	color: var(--side-link);
 	font-size: 13px;
 	text-decoration: none;
 }
@@ -523,7 +565,7 @@
 	gap: 6px;
 	padding: 8px 0;
 	border-top: 1px solid var(--divider);
-	color: var(--muted);
+	color: var(--side-sub);
 	font-size: 13px;
 }
 
@@ -547,7 +589,7 @@
 
 .count-action:hover:not(:disabled) {
 	background: var(--hover);
-	color: var(--fg);
+	color: var(--side-fg);
 }
 
 /* いいね済みは押せない。(pixiv の仕様上取り消せない)
@@ -587,7 +629,7 @@
 /* 投稿日時。読み物 (投稿文・タグ) の締めくくりとして、カウンタの罫線の上に置く */
 .date {
 	margin: 0 0 12px;
-	color: var(--muted);
+	color: var(--side-sub);
 	font-size: 12px;
 }
 
@@ -665,7 +707,7 @@
 .share-menu-heading {
 	margin: 0;
 	padding: 4px 12px 8px;
-	color: var(--muted);
+	color: var(--side-sub);
 	font-size: 12px;
 }
 
@@ -678,7 +720,7 @@
 	padding: 8px 12px;
 	border: 0;
 	background: transparent;
-	color: var(--fg);
+	color: var(--side-fg);
 	font: inherit;
 	font-size: 13px;
 	text-align: left;
@@ -702,7 +744,7 @@
 .share-status {
 	margin: 0;
 	padding: 0 12px;
-	color: var(--muted);
+	color: var(--side-sub);
 	font-size: 12px;
 }
 
@@ -908,7 +950,7 @@
 }
 
 .comment-name {
-	color: var(--muted);
+	color: var(--side-sub);
 	font-size: 12px;
 }
 
@@ -956,7 +998,7 @@ a.comment-name:hover {
 
 .comment-date {
 	margin-left: auto;
-	color: var(--muted);
+	color: var(--side-sub);
 	font-size: 11px;
 }
 
@@ -1082,7 +1124,7 @@ a.comment-name:hover {
 	border: 0;
 	border-radius: 4px;
 	background: var(--field-bg);
-	color: var(--fg);
+	color: var(--side-fg);
 	font: inherit;
 	font-size: 13px;
 	line-height: 1.6;
@@ -1099,7 +1141,7 @@ a.comment-name:hover {
 }
 
 .comment-form-input::placeholder {
-	color: var(--muted);
+	color: var(--side-sub);
 }
 
 .comment-form-input:hover {
@@ -1129,12 +1171,12 @@ a.comment-name:hover {
 	border: 0;
 	border-radius: 4px;
 	background: transparent;
-	color: var(--muted);
+	color: var(--side-sub);
 	cursor: pointer;
 }
 
 .comment-form-pick:hover {
-	color: var(--fg);
+	color: var(--side-fg);
 }
 
 /* 選んだスタンプの確認。本体と違って送信で確定するので、取り消す口を添える */
@@ -1162,12 +1204,12 @@ a.comment-name:hover {
 	border: 0;
 	border-radius: 50%;
 	background: transparent;
-	color: var(--muted);
+	color: var(--side-sub);
 	cursor: pointer;
 }
 
 .comment-form-stamp-clear:hover {
-	color: var(--fg);
+	color: var(--side-fg);
 }
 
 .comment-form-submit {
@@ -1198,7 +1240,7 @@ a.comment-name:hover {
    「押せない」を色で示す形にした。透過ではなく色を変えるほうが、意図が視覚的に伝わる */
 .comment-form-submit:disabled {
 	background: var(--field-bg);
-	color: var(--muted);
+	color: var(--side-sub);
 	cursor: default;
 }
 
@@ -1273,7 +1315,7 @@ a.comment-name:hover {
 }
 
 .comment-delete:disabled {
-	color: var(--muted);
+	color: var(--side-sub);
 	cursor: default;
 }
 
@@ -1334,7 +1376,7 @@ a.comment-name:hover {
 	border: 0;
 	border-radius: 999px;
 	background: transparent;
-	color: var(--muted);
+	color: var(--side-sub);
 	font: inherit;
 	font-size: 12px;
 	cursor: pointer;
@@ -1342,7 +1384,7 @@ a.comment-name:hover {
 
 .comment-picker-tab[aria-selected='true'] {
 	background: var(--field-bg);
-	color: var(--fg);
+	color: var(--side-fg);
 }
 
 .comment-picker-grid {
@@ -1396,7 +1438,7 @@ a.comment-name:hover {
 	border: 1px solid var(--control-border);
 	border-radius: 6px;
 	background: var(--control-bg);
-	color: var(--fg);
+	color: var(--side-fg);
 	cursor: pointer;
 }
 
@@ -1412,7 +1454,7 @@ a.comment-name:hover {
 	border: 1px solid var(--control-border);
 	border-radius: 6px;
 	background: var(--control-bg);
-	color: var(--fg);
+	color: var(--side-fg);
 	font-size: 13px;
 	cursor: pointer;
 }
@@ -1445,7 +1487,7 @@ a.comment-name:hover {
 .action-follow.is-on {
 	border-color: var(--control-border);
 	background: var(--follow-on-bg);
-	color: var(--fg);
+	color: var(--side-fg);
 	font-weight: 400;
 }
 
