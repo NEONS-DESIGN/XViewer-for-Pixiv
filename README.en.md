@@ -172,8 +172,8 @@ the [pixiv Inc. Terms of Service](https://policies.pixiv.net/).
 
 ## Bugs, questions and requests
 
-Send bug reports, questions and feature requests through the **[contact form](https://forms.gle/aWmu45UCpBqxuvqC9)**.
-The form is in Japanese. If you prefer GitHub, [Issues](https://github.com/NEONS-DESIGN/XViewer-for-Pixiv/issues) work too.
+Send bug reports, questions and feature requests through the **[contact form](https://forms.gle/C7AWaUHWmwnoeDV66)**.
+If you prefer GitHub, [Issues](https://github.com/NEONS-DESIGN/XViewer-for-Pixiv/issues) work too.
 
 ## Development
 
