@@ -27,7 +27,7 @@ const COLOR = Object.freeze({
 	fg: '#eff0f4',
 	muted: '#9aa0b4',
 	border: '#2b3140',
-	accent: '#4ea3d6',
+	accent: '#0096fa',
 });
 
 /** 見出しと本文の書体。Windows に載っているものを順に指定する。 */

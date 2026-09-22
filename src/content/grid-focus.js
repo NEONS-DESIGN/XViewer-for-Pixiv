@@ -13,7 +13,7 @@ import { createStyleHandle } from '../common/style-injector.js';
 export const FOCUS_STYLE_ID = 'xviewer-grid-focus';
 
 /** 枠の色。UI_DESIGN_KIT の --accent (ダーク側)。絵の上に乗るのでテーマでは変えない。 */
-const FOCUS_COLOR = '#4ea3d6';
+const FOCUS_COLOR = '#0096fa';
 
 /** 枠の外側に敷く縁の色。明るい絵でも輪郭が沈まないようにする。 */
 const FOCUS_EDGE_COLOR = 'rgba(0, 0, 0, 0.75)';

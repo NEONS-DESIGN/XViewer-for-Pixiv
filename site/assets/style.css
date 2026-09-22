@@ -1,6 +1,7 @@
 /*
  * XViewer for Pixiv 紹介サイトの配色と体裁。
  * 配色トークンの名前と値は拡張本体の UI_DESIGN_KIT.md §2 に合わせてある。
+ * --accent / --on-accent は pixiv 本体のブランド色 (#0096fa + 白文字) で、両テーマ共通。
  * 色は必ずここの変数で決め、個々の規則に直書きしない。
  */
 
@@ -13,9 +14,9 @@
 	--muted: #9aa0b4;
 	--border: #262b38;
 	--divider: rgba(255, 255, 255, 0.12);
-	--accent: #4ea3d6;
-	--on-accent: #04121a;
-	--accent-soft: rgba(78, 163, 214, 0.14);
+	--accent: #0096fa;
+	--on-accent: #ffffff;
+	--accent-soft: rgba(0, 150, 250, 0.14);
 	--hover: rgba(255, 255, 255, 0.08);
 	--shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
 
@@ -42,9 +43,9 @@
 		--muted: #5c6275;
 		--border: #d6d9e0;
 		--divider: rgba(0, 0, 0, 0.12);
-		--accent: #1a6b9e;
+		--accent: #0096fa;
 		--on-accent: #ffffff;
-		--accent-soft: rgba(26, 107, 158, 0.10);
+		--accent-soft: rgba(0, 150, 250, 0.10);
 		--hover: rgba(0, 0, 0, 0.05);
 		--shadow: 0 18px 50px rgba(20, 24, 35, 0.14);
 	}
@@ -60,9 +61,9 @@
 	--muted: #5c6275;
 	--border: #d6d9e0;
 	--divider: rgba(0, 0, 0, 0.12);
-	--accent: #1a6b9e;
+	--accent: #0096fa;
 	--on-accent: #ffffff;
-	--accent-soft: rgba(26, 107, 158, 0.10);
+	--accent-soft: rgba(0, 150, 250, 0.10);
 	--hover: rgba(0, 0, 0, 0.05);
 	--shadow: 0 18px 50px rgba(20, 24, 35, 0.14);
 }

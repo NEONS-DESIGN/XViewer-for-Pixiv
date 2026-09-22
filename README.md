@@ -6,10 +6,10 @@
 
 **pixiv のユーザーページに、X.com のメディア閲覧に近い画像ビュワーを追加する Chrome 拡張機能**
 
-[![version](https://img.shields.io/github/package-json/v/NEONS-DESIGN/XViewer-for-Pixiv?color=4ea3d6)](package.json)
-[![license](https://img.shields.io/github/license/NEONS-DESIGN/XViewer-for-Pixiv?color=4ea3d6)](LICENSE)
-![manifest](https://img.shields.io/badge/manifest-v3-4ea3d6)
-![tests](https://img.shields.io/badge/tests-920%20passing-4ea3d6)
+[![version](https://img.shields.io/github/package-json/v/NEONS-DESIGN/XViewer-for-Pixiv?color=0096fa)](package.json)
+[![license](https://img.shields.io/github/license/NEONS-DESIGN/XViewer-for-Pixiv?color=0096fa)](LICENSE)
+![manifest](https://img.shields.io/badge/manifest-v3-0096fa)
+![tests](https://img.shields.io/badge/tests-920%20passing-0096fa)
 
 **[紹介サイト](https://xviewer.neonsdesign.com/)** ・
 [プライバシーポリシー](https://xviewer.neonsdesign.com/privacy.html) ・
