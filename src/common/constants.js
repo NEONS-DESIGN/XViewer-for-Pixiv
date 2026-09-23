@@ -384,3 +384,9 @@ export const INERT_SELECTOR = `[${INERT_ATTRIBUTE}]`;
  * 言語にも画面にも依らないのでここに置く。(言語ごとのカタログが参照する)
  */
 export const DISPLAY_TIME_ZONE = 'Asia/Tokyo';
+
+/**
+ * DISPLAY_TIME_ZONE の UTC からのずれ。Asia/Tokyo は夏時間が無いので固定値でよい。
+ * 時差を持たない日時 (コメントの commentDate 'YYYY-MM-DD HH:mm') を Date に読むときに使う。
+ */
+export const DISPLAY_TIME_ZONE_OFFSET = '+09:00';

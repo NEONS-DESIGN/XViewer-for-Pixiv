@@ -15,6 +15,18 @@ const DATE_TIME_FORMAT = new Intl.DateTimeFormat('en-US', {
 	hourCycle: 'h23',
 });
 
+/**
+ * 日時を画面の表記にする。投稿日とコメントの日時で共用する。
+ * @param {Date} date 表示する日時
+ * @returns {string} 'Sep 23, 2026 13:05' の形
+ */
+function formatDateTime(date) {
+	const parts = Object.fromEntries(
+		DATE_TIME_FORMAT.formatToParts(date).map(({ type, value }) => [type, value]),
+	);
+	return `${parts.month} ${parts.day}, ${parts.year} ${parts.hour}:${parts.minute}`;
+}
+
 export default {
 	viewer: {
 		DIALOG_LABEL: 'Artwork viewer',
@@ -40,17 +52,7 @@ export default {
 		BOOKMARK: 'Bookmarks',
 		VIEWS: 'Views',
 		COMMENTS: 'Comments',
-		/**
-		 * 日時を画面の表記にする。
-		 * @param {Date} date 表示する日時
-		 * @returns {string} 'Sep 23, 2026 13:05' の形
-		 */
-		formatDateTime(date) {
-			const parts = Object.fromEntries(
-				DATE_TIME_FORMAT.formatToParts(date).map(({ type, value }) => [type, value]),
-			);
-			return `${parts.month} ${parts.day}, ${parts.year} ${parts.hour}:${parts.minute}`;
-		},
+		formatDateTime,
 	},
 	actionsBar: {
 		messages: {
@@ -99,6 +101,8 @@ export default {
 		MORE: 'Show more',
 		RETRY: 'Retry',
 		DELETED_USER: 'Deleted user',
+		/** コメントの日時。英語は投稿日と同じ書式にする */
+		formatDateTime,
 		STAMP_PLACEHOLDER: '[Stamp]',
 		STAMP_ALT: 'Stamp',
 		REPLIES_SHOW: 'Show replies',
