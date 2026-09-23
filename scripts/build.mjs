@@ -47,6 +47,11 @@ const STATIC_FILES = [
 	// ここだけは pixiv の表示言語ではなくブラウザの UI 言語に従う (chrome.i18n の仕様)
 	['src/_locales/ja/messages.json', `${OUT_DIR}/_locales/ja/messages.json`],
 	['src/_locales/en/messages.json', `${OUT_DIR}/_locales/en/messages.json`],
+	// ライセンス文。配布する zip は dist をそのまま固めるので、ここに無いと受け取った人に届かない。
+	// Apache-2.0 §4(a) は本文の写しを渡すことを求める (Material Symbols の図形を同梱しているため)
+	['LICENSE', `${OUT_DIR}/LICENSE`],
+	['NOTICE', `${OUT_DIR}/NOTICE`],
+	['LICENSES/Apache-2.0.txt', `${OUT_DIR}/LICENSES/Apache-2.0.txt`],
 ];
 
 /** @type {import('esbuild').BuildOptions} */

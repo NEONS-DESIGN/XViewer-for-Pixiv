@@ -156,7 +156,7 @@ export default {
 		},
 		notes: {
 			'Material Symbols': 'Icon shapes used throughout the interface',
-			'Font Awesome Free': 'Brand logos in the share menu. Each logo is a trademark of its respective owner',
+			'Font Awesome Free': 'Brand logos in the share menu. Only the shapes are extracted from the SVG files; the shapes themselves are unmodified. Each logo is a trademark of its respective owner',
 		},
 	},
 	popup: {

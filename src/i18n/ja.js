@@ -182,7 +182,7 @@ export default {
 		},
 		notes: {
 			'Material Symbols': '画面のアイコンの図形データ',
-			'Font Awesome Free': 'シェアメニューのブランドロゴ。各ロゴはそれぞれの権利者の商標です',
+			'Font Awesome Free': 'シェアメニューのブランドロゴ。SVG から図形だけを抜き出して使っています。(形は変えていません) 各ロゴはそれぞれの権利者の商標です',
 		},
 	},
 	popup: {
