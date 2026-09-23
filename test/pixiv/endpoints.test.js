@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+	langParam,
 	illustUrl,
 	illustPagesUrl,
 	ugoiraMetaUrl,
@@ -18,6 +19,26 @@ import {
 	tagWorksPath,
 } from '../../src/pixiv/endpoints.js';
 import { WORK_CATEGORY } from '../../src/common/constants.js';
+
+test('langParam は検証済みの言語だけを送る', () => {
+	assert.equal(langParam('ja'), 'lang=ja');
+	assert.equal(langParam('en'), 'lang=en');
+});
+
+test('langParam は綴りが未検証の言語を送らない', () => {
+	// pixiv が lang= に期待する綴りを ja / en 以外で実測できていない。
+	// 外すと API 呼び出しそのものが壊れるので、既定へ倒す
+	assert.equal(langParam('ko'), 'lang=ja');
+	assert.equal(langParam('zh'), 'lang=ja');
+	assert.equal(langParam(''), 'lang=ja');
+	assert.equal(langParam(undefined), 'lang=ja');
+});
+
+test('URL ビルダーが言語をそのまま反映する', () => {
+	assert.match(illustUrl('1', 'en'), /lang=en$/);
+	assert.match(illustPagesUrl('1', 'ja'), /lang=ja$/);
+	assert.match(userUrl('11', 'en'), /lang=en$/);
+});
 
 test('作品まわりの URL を組み立てる', () => {
 	assert.equal(illustUrl('149425016'), '/ajax/illust/149425016?lang=ja');

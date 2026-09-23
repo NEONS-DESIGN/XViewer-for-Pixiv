@@ -294,7 +294,7 @@ export function createUgoiraPlayer(deps) {
 			container.appendChild(wrapper);
 
 			try {
-				const meta = await getJson(ugoiraMetaUrl(detail.id), { fetchImpl });
+				const meta = await getJson(ugoiraMetaUrl(detail.id, strings.lang), { fetchImpl });
 				if (disposed) return;
 
 				// API が返した値をそのまま外部オリジンへ投げない

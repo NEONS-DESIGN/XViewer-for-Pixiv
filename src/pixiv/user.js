@@ -44,15 +44,16 @@ function remember(userId, promise) {
 /**
  * ユーザー情報を取る。同じ ID は覚えて使い回す。
  * @param {string} userId ユーザー ID
+ * @param {string} lang 言語サブタグ (strings.lang)
  * @param {UserDeps} [deps] テスト用の依存
  * @returns {Promise<object>} /ajax/user/{id}?full=1 の body
  */
-export function fetchUserProfile(userId, deps = {}) {
+export function fetchUserProfile(userId, lang, deps = {}) {
 	const cached = cache.get(userId);
 	if (cached) return cached;
 	const getJsonImpl = deps.getJsonImpl ?? getJson;
 	// 差し替えが同期的に投げても失敗として返せるよう、必ず Promise に包んでから覚える
-	const pending = Promise.resolve().then(() => getJsonImpl(userUrl(userId)));
+	const pending = Promise.resolve().then(() => getJsonImpl(userUrl(userId, lang)));
 	if (cache.size >= USER_PROFILE_CACHE_LIMIT) cache.delete(cache.keys().next().value);
 	remember(userId, pending);
 	return pending;

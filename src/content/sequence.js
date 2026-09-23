@@ -54,13 +54,14 @@ export function createDomSequence(ids) {
  * 画面のグリッドに無い種別の作品へ飛んでしまう。
  * @param {Sequence} fallback 取得に失敗したときに返す並び
  * @param {string} userId ユーザー ID
- * @param {string|null} [category] 絞り込む種別 (WORK_CATEGORY)。null なら両方
+ * @param {string|null} category 絞り込む種別 (WORK_CATEGORY)。null なら両方
+ * @param {string} lang 言語サブタグ (strings.lang)
  * @param {{getJsonImpl?: Function}} [deps] テスト用の依存
  * @returns {Promise<Sequence>} 全作品の並び。失敗したら fallback
  */
-export async function extendWithAllWorks(fallback, userId, category = null, deps = {}) {
+export async function extendWithAllWorks(fallback, userId, category, lang, deps = {}) {
 	try {
-		const ids = await loadAllWorkIds(userId, category, deps);
+		const ids = await loadAllWorkIds(userId, category, lang, deps);
 		if (ids.length === 0) return fallback;
 		return createDomSequence(ids);
 	} catch {

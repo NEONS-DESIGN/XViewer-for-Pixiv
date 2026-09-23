@@ -750,7 +750,7 @@ export function createComments(deps) {
 			toggle.disabled = true;
 			if (replyMore) replyMore.disabled = true;
 			try {
-				const responseBody = await fetchJson(commentRepliesUrl(comment.id, page));
+				const responseBody = await fetchJson(commentRepliesUrl(comment.id, page, strings.lang));
 				// 待っている間に別の作品へ移っていたら捨てる
 				if (workId !== requestedWorkId) return;
 				// 畳まれていたら並べない
@@ -978,7 +978,7 @@ export function createComments(deps) {
 			// 同じ URL を作品を開いた時点で引いているため、そのまま引き直すと
 			// ブラウザのキャッシュが**削除前の件数**を返すことがある。(実機で確認)
 			// 数え直しの意味が消えるので、毎回違う URL にして必ず取り直す
-			const body = await fetchJson(`${illustUrl(illustId)}&${CACHE_BUSTER}=${Date.now()}`);
+			const body = await fetchJson(`${illustUrl(illustId, strings.lang)}&${CACHE_BUSTER}=${Date.now()}`);
 			const count = body?.commentCount;
 			return typeof count === 'number' ? count : null;
 		} catch (error) {
@@ -1031,7 +1031,7 @@ export function createComments(deps) {
 		const focused = button !== null && isFocused(doc, button);
 		if (button) button.disabled = true;
 		try {
-			const body = await fetchJson(commentRootsUrl(requestedWorkId, offset, COMMENT_PAGE_SIZE));
+			const body = await fetchJson(commentRootsUrl(requestedWorkId, offset, COMMENT_PAGE_SIZE, strings.lang));
 			// 待っている間に破棄されたか、別の作品へ移ったか、描き直されていたら捨てる
 			if (workId !== requestedWorkId || !list || list !== requestedList) return;
 			const comments = (body?.comments ?? []).map((raw) => normalizeComment(raw, strings));
