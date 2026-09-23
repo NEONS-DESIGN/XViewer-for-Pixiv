@@ -10,11 +10,26 @@ import { WORK_CATEGORY_QUERY, WORK_CATEGORY_QUERY_BOTH } from '../common/constan
 const AJAX = '/ajax';
 
 /**
- * 応答の言語。日本語固定。
- * pageProps.lang にページの言語はあるが、この拡張は UI の文言が日本語のみなので
- * タグの翻訳や日付文言もそれに揃える。
+ * pixiv API へ渡してよいと実測で確認できている言語。
+ *
+ * **綴りが未検証の言語を送らない。** 表示言語が繁体字中国語のとき documentElement.lang が
+ * zh-TW なのか zh-Hant なのかも、pixiv の lang= が zh_tw なのか zh-tw なのかも実測できていない。
+ * 綴りを外すと API 呼び出しが壊れる。英語の文言が出るより悪い結果になるので、確認できた値だけを送る。
+ * (SITE_SPEC の「未検証事項」を参照。3 言語目へ広げるときに実測してから増やす)
  */
-const LANG = 'lang=ja';
+const API_LANGUAGES = Object.freeze(['ja', 'en']);
+
+/** 未検証の言語のときに送る値。 */
+const DEFAULT_API_LANGUAGE = 'ja';
+
+/**
+ * API へ渡す言語のクエリを組む。
+ * @param {string} lang 言語サブタグ (strings.lang)
+ * @returns {string} 'lang=ja' の形
+ */
+export function langParam(lang) {
+	return `lang=${API_LANGUAGES.includes(lang) ? lang : DEFAULT_API_LANGUAGE}`;
+}
 
 /** pixiv 本体のオリジン。投稿文の相対リンクを解決する基準に使う。 */
 export const PIXIV_ORIGIN = 'https://www.pixiv.net';
@@ -142,28 +157,31 @@ export function stampUrl(stampId) {
 /**
  * 作品詳細。
  * @param {string} illustId 作品 ID
+ * @param {string} lang 言語サブタグ (strings.lang)
  * @returns {string} URL
  */
-export function illustUrl(illustId) {
-	return `${AJAX}/illust/${illustId}?${LANG}`;
+export function illustUrl(illustId, lang) {
+	return `${AJAX}/illust/${illustId}?${langParam(lang)}`;
 }
 
 /**
  * 作品の全ページ。R-18 を表示できないときは 404 が返る。(異常ではない)
  * @param {string} illustId 作品 ID
+ * @param {string} lang 言語サブタグ (strings.lang)
  * @returns {string} URL
  */
-export function illustPagesUrl(illustId) {
-	return `${AJAX}/illust/${illustId}/pages?${LANG}`;
+export function illustPagesUrl(illustId, lang) {
+	return `${AJAX}/illust/${illustId}/pages?${langParam(lang)}`;
 }
 
 /**
  * うごイラのフレーム情報と zip の場所。illustType === 2 のみ有効。
  * @param {string} illustId 作品 ID
+ * @param {string} lang 言語サブタグ (strings.lang)
  * @returns {string} URL
  */
-export function ugoiraMetaUrl(illustId) {
-	return `${AJAX}/illust/${illustId}/ugoira_meta?${LANG}`;
+export function ugoiraMetaUrl(illustId, lang) {
+	return `${AJAX}/illust/${illustId}/ugoira_meta?${langParam(lang)}`;
 }
 
 /**
@@ -171,10 +189,11 @@ export function ugoiraMetaUrl(illustId) {
  * @param {string} illustId 作品 ID
  * @param {number} offset 取得開始位置
  * @param {number} limit 取得件数
+ * @param {string} lang 言語サブタグ (strings.lang)
  * @returns {string} URL
  */
-export function commentRootsUrl(illustId, offset, limit) {
-	return `${AJAX}/illusts/comments/roots?illust_id=${illustId}&offset=${offset}&limit=${limit}&${LANG}`;
+export function commentRootsUrl(illustId, offset, limit, lang) {
+	return `${AJAX}/illusts/comments/roots?illust_id=${illustId}&offset=${offset}&limit=${limit}&${langParam(lang)}`;
 }
 
 /**
@@ -182,28 +201,31 @@ export function commentRootsUrl(illustId, offset, limit) {
  * offset/limit ではなく 1 始まりの page で送る。(SITE_SPEC §4 実測)
  * @param {string} commentId ルートコメントの ID
  * @param {number} page ページ番号。1 始まり
+ * @param {string} lang 言語サブタグ (strings.lang)
  * @returns {string} URL
  */
-export function commentRepliesUrl(commentId, page) {
-	return `${AJAX}/illusts/comments/replies?comment_id=${commentId}&page=${page}&${LANG}`;
+export function commentRepliesUrl(commentId, page, lang) {
+	return `${AJAX}/illusts/comments/replies?comment_id=${commentId}&page=${page}&${langParam(lang)}`;
 }
 
 /**
  * ユーザー情報。
  * @param {string} userId ユーザー ID
+ * @param {string} lang 言語サブタグ (strings.lang)
  * @returns {string} URL
  */
-export function userUrl(userId) {
-	return `${AJAX}/user/${userId}?full=1&${LANG}`;
+export function userUrl(userId, lang) {
+	return `${AJAX}/user/${userId}?full=1&${langParam(lang)}`;
 }
 
 /**
  * ユーザーの全作品 ID。値は null で、キーだけが意味を持つ。
  * @param {string} userId ユーザー ID
+ * @param {string} lang 言語サブタグ (strings.lang)
  * @returns {string} URL
  */
-export function userProfileAllUrl(userId) {
-	return `${AJAX}/user/${userId}/profile/all?${LANG}`;
+export function userProfileAllUrl(userId, lang) {
+	return `${AJAX}/user/${userId}/profile/all?${langParam(lang)}`;
 }
 
 /**
@@ -214,14 +236,15 @@ export function userProfileAllUrl(userId) {
  * @param {string} userId ユーザー ID
  * @param {string[]} ids 作品 ID の配列
  * @param {boolean} isFirstPage 一覧の 1 ページ目か
- * @param {string|null} [category] 絞り込む種別 (WORK_CATEGORY)。null なら両方
+ * @param {string|null} category 絞り込む種別 (WORK_CATEGORY)。null なら両方
+ * @param {string} lang 言語サブタグ (strings.lang)
  * @returns {string} URL
  */
-export function userProfileIllustsUrl(userId, ids, isFirstPage, category = null) {
+export function userProfileIllustsUrl(userId, ids, isFirstPage, category, lang) {
 	const query = ids.map((id) => `ids%5B%5D=${id}`).join('&');
 	const firstPage = isFirstPage ? 1 : 0;
 	// 知らない値 (null / undefined を含む) は両方扱いへ倒す。値は WORK_CATEGORY_BY_TAB 経由でしか来ない
 	const workCategory = WORK_CATEGORY_QUERY[category] ?? WORK_CATEGORY_QUERY_BOTH;
 	return `${AJAX}/user/${userId}/profile/illusts?${query}`
-		+ `&work_category=${workCategory}&is_first_page=${firstPage}&${LANG}`;
+		+ `&work_category=${workCategory}&is_first_page=${firstPage}&${langParam(lang)}`;
 }

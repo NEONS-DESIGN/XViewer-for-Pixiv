@@ -224,7 +224,7 @@ function apply() {
 		// 「この作者の全作品」へ広げると画面と無関係な作品へ飛んでしまう。
 		// タグ絞り込み中も profile/all と並びが一致しないので広げない
 		canExtendSequence: () => Boolean(currentPage) && currentPage.isWorksGrid && !currentPage.isTagFiltered,
-		extendSequence: (current) => extendWithAllWorks(current, currentPage.userId, currentPage.category),
+		extendSequence: (current) => extendWithAllWorks(current, currentPage.userId, currentPage.category, strings.lang),
 	});
 	gridListener = attachGridListener(document, handleOpen);
 	// カード 1 枚につき 3 回 Tab を押さずに済むよう、作品を開く導線以外をフォーカス順から外す
@@ -447,7 +447,7 @@ function syncInfiniteOnce() {
 		infinite = attachInfiniteScroll(document, {
 			ul,
 			strings,
-			source: createPageSource(page.userId, page.category),
+			source: createPageSource(page.userId, page.category, strings.lang),
 			mode: wanted,
 			loggedIn: readSession(document).isLoggedIn,
 			// グリッドに並んでいるのは基準ページのぶんだけ。続きはその次から読む

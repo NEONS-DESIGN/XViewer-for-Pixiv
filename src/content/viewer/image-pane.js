@@ -256,7 +256,7 @@ export function createImagePane(deps) {
 			if (detail.pageCount <= 1) return;
 
 			try {
-				const pages = await getJson(illustPagesUrl(detail.id), { fetchImpl });
+				const pages = await getJson(illustPagesUrl(detail.id, strings.lang), { fetchImpl });
 				if (disposed) return;
 				urls = pickPageUrls(pages, deps.settings.imageQuality);
 				originalUrls = pickPageUrls(pages, IMAGE_QUALITY.ORIGINAL);

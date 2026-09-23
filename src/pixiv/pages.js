@@ -44,14 +44,15 @@ export function sortIdsDesc(ids) {
 /**
  * profile/all の応答本体を取る。失敗は覚えない。
  * @param {string} userId ユーザー ID
+ * @param {string} lang 言語サブタグ (strings.lang)
  * @param {Function} get getJson の差し替え
  * @returns {Promise<object>} 応答の body
  */
-function loadProfileAll(userId, get) {
+function loadProfileAll(userId, lang, get) {
 	const hit = profileCache.get(userId);
 	if (hit) return hit;
 	const task = Promise.resolve()
-		.then(() => get(userProfileAllUrl(userId)))
+		.then(() => get(userProfileAllUrl(userId, lang)))
 		.catch((error) => {
 			// 失敗は覚えない。次に呼ばれたらもう一度取りに行く。
 			// 自分が入れた Promise がまだキャッシュに居るときだけ消す。
@@ -67,13 +68,14 @@ function loadProfileAll(userId, get) {
 /**
  * 作者の全作品 ID を数値降順で取る。
  * @param {string} userId ユーザー ID
- * @param {string|null} [category] 絞り込む種別 (WORK_CATEGORY)。null なら両方
+ * @param {string|null} category 絞り込む種別 (WORK_CATEGORY)。null なら両方
+ * @param {string} lang 言語サブタグ (strings.lang)
  * @param {{getJsonImpl?: Function}} [deps] テスト用の依存
  * @returns {Promise<string[]>} ID の並び
  */
-export async function loadAllWorkIds(userId, category = null, deps = {}) {
+export async function loadAllWorkIds(userId, category, lang, deps = {}) {
 	const get = deps.getJsonImpl ?? getJson;
-	const body = await loadProfileAll(userId, get);
+	const body = await loadProfileAll(userId, lang, get);
 	const categories = category ? [category] : Object.values(WORK_CATEGORY);
 	return sortIdsDesc(categories.flatMap((name) => Object.keys(body?.[name] ?? {})));
 }
@@ -82,22 +84,23 @@ export async function loadAllWorkIds(userId, category = null, deps = {}) {
  * 1 ページぶんの作品を供給する口を作る。
  * @param {string} userId ユーザー ID
  * @param {string|null} category 絞り込む種別 (WORK_CATEGORY)。null なら両方
+ * @param {string} lang 言語サブタグ (strings.lang)
  * @param {{getJsonImpl?: Function}} [deps] テスト用の依存
  * @returns {{pageCount: () => Promise<number>, loadPage: (page: number) => Promise<object[]>}} ページ供給
  */
-export function createPageSource(userId, category, deps = {}) {
+export function createPageSource(userId, category, lang, deps = {}) {
 	const get = deps.getJsonImpl ?? getJson;
 	return {
 		async pageCount() {
-			const ids = await loadAllWorkIds(userId, category, deps);
+			const ids = await loadAllWorkIds(userId, category, lang, deps);
 			return Math.ceil(ids.length / WORKS_PER_PAGE);
 		},
 		async loadPage(page) {
 			if (page < 1) return [];
-			const ids = await loadAllWorkIds(userId, category, deps);
+			const ids = await loadAllWorkIds(userId, category, lang, deps);
 			const slice = ids.slice((page - 1) * WORKS_PER_PAGE, page * WORKS_PER_PAGE);
 			if (slice.length === 0) return [];
-			const body = await get(userProfileIllustsUrl(userId, slice, page === 1, category));
+			const body = await get(userProfileIllustsUrl(userId, slice, page === 1, category, lang));
 			const works = body?.works ?? {};
 			// 応答は ID をキーにした Map で順序を持たない。渡した順に並べ直す。
 			// 応答に無い ID (非公開になった作品など) は落とす

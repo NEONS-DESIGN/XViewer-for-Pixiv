@@ -273,7 +273,7 @@ export function createSidebar(deps) {
 		// fetchUser が同期で投げることもあるので、ここで Promise に揃える
 		let pending;
 		try {
-			pending = Promise.resolve(fetchUser(detail.userId));
+			pending = Promise.resolve(fetchUser(detail.userId, strings.lang));
 		} catch (error) {
 			pending = Promise.reject(error);
 		}

@@ -465,7 +465,7 @@ export function createViewer(deps) {
 
 		let detail;
 		try {
-			const raw = await fetchJson(illustUrl(workId));
+			const raw = await fetchJson(illustUrl(workId, strings.lang));
 			// 待っている間に新しい要求が来ていたら捨てる。
 			// 同じ作品を開き直したときも古い応答を捨てられるよう、ID ではなく世代で見る
 			if (token !== requestToken) return;

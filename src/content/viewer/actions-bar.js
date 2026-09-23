@@ -257,7 +257,7 @@ export function createActionsBar(deps) {
 	 * @returns {Promise<boolean>} フォロー済みか
 	 */
 	async function resolveFollowing(userId) {
-		const body = await fetchUser(userId);
+		const body = await fetchUser(userId, strings.lang);
 		return body?.isFollowed === true;
 	}
 
