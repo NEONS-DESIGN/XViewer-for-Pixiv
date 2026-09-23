@@ -40,7 +40,7 @@ let blockedPane = null;
  * @property {boolean} sidebar サイドバーを出すか
  * @property {boolean} comments コメント区画を作るか (中の「受け付けていません」の出し分けは comments.js)
  * @property {boolean} actions いいね等のアクションを出すか
- * @property {{kind: string, message: string}|null} reason 見られない理由。見られるなら null
+ * @property {{kind: 'login'|'setting'}|null} reason 見られない理由 (blocked.js の BLOCK_KINDS)。文言は描画側で引く。見られるなら null
  */
 
 /**
@@ -178,23 +178,13 @@ export function disposeAll() {
 }
 
 /**
- * Escape をサイドバーに使わせる。
+ * キー操作を手前に出ているものへ先に使わせる。
  *
- * ビュワー本体は Escape でモーダルを閉じる。シェアメニューのように
- * 「まず自分が閉じたい」部品はここで先に食い止める。
+ * ビュワー本体は Escape でモーダルを閉じ、上下キーで作品を移る。シェアメニューのように
+ * 「まず自分が閉じたい」「項目送りに上下 / Home / End を使いたい」部品はここで先に食い止める。
+ * コメントの入力欄も同様で、ピッカーを開いていたり書きかけの文章があれば Escape を自分で使う。
  * keydown は document の捕捉フェーズで受けており、後から登録したリスナでは
  * 本体より先に処理できないので、本体側から順番に聞く形にしている。
- * @returns {boolean} 食い止めたなら true (本体は反応してはいけない)
- */
-export function consumeEscape() {
-	return sidebarPane?.consumeEscape() === true;
-}
-
-/**
- * キー操作を手前に出ているものへ先に使わせる。
- * consumeEscape() の一般形。開いたシェアメニューは Escape だけでなく上下 / Home / End も
- * 自分で使うので、本体が作品の移動に使う前にここで聞く。コメントの入力欄も同様で、
- * ピッカーを開いていたり書きかけの文章があれば Escape を自分で使う。
  * @param {KeyboardEvent} event キー
  * @returns {boolean} 食い止めたなら true (本体は反応してはいけない)
  */

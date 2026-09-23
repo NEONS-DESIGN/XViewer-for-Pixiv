@@ -12,10 +12,12 @@ import { PixivError, PIXIV_ERROR_KINDS } from './errors.js';
 const RESTRICT_PUBLIC = 0;
 const RESTRICT_PRIVATE = 1;
 
-/** フォロー系の応答が予期しない形だったときの文言。console にしか出ないので日本語にしない。 */
-const FOLLOW_REJECTED = 'follow was rejected';
-const FOLLOW_UNEXPECTED = 'follow returned an unexpected body';
-const UNFOLLOW_REJECTED = 'unfollow was not applied';
+/** 応答が予期しない形だったときの文言。開発者向け (errors.js の方針どおり日本語)。 */
+const FOLLOW_REJECTED = 'フォローが拒否されました';
+const FOLLOW_UNEXPECTED = 'フォローの応答が配列ではありません';
+const UNFOLLOW_REJECTED = 'フォロー解除が反映されませんでした';
+const BOOKMARK_ADD_NO_ID = 'ブックマーク追加の応答に last_bookmark_id がありません';
+const POST_COMMENT_NO_ID = 'コメント投稿の応答に comment_id がありません';
 
 /**
  * 作品にいいねする。
@@ -49,7 +51,7 @@ export async function addBookmark(illustId, isPrivate, token, deps) {
 	}, token, deps);
 	const bookmarkId = body?.last_bookmark_id;
 	if (bookmarkId === null || bookmarkId === undefined || bookmarkId === '') {
-		throw new PixivError(PIXIV_ERROR_KINDS.API, 'bookmark add returned no last_bookmark_id');
+		throw new PixivError(PIXIV_ERROR_KINDS.API, BOOKMARK_ADD_NO_ID);
 	}
 	return String(bookmarkId);
 }
@@ -148,7 +150,7 @@ async function submitComment(params, token, deps) {
 	const body = await postForm(ACTION_URLS.POST_COMMENT, params, token, deps);
 	const id = body?.comment_id;
 	if (id === null || id === undefined || id === '') {
-		throw new PixivError(PIXIV_ERROR_KINDS.API, 'post comment returned no comment_id');
+		throw new PixivError(PIXIV_ERROR_KINDS.API, POST_COMMENT_NO_ID);
 	}
 	const stampId = body.stamp_id;
 	return {

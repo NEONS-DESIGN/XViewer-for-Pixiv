@@ -20,7 +20,7 @@ const SUBMIT_KEY = 'Enter';
  * @param {Document} deps.doc document
  * @param {string} deps.placeholder 空のときに出す文言
  * @param {string|null} [deps.avatarUrl] 左に出すアバター。省略すると出さない
- * @param {object} [deps.picker] 絵文字とスタンプのピッカー。省略すると選ぶボタンを出さない
+ * @param {object} [deps.picker] 絵文字とスタンプのピッカー (comment-picker.js の形。`open` / `close` / `isOpen` / `isOpenIn`)。省略すると選ぶボタンを出さない
  * @param {(value: {text: string, stampId: string|null}) => Promise<void>} deps.onSubmit 送信
  * @param {(error: unknown) => string} [deps.errorMessage] 失敗時の文言。省略すると既定の文言
  * @param {object} deps.strings 文言のカタログ (src/i18n)
@@ -123,6 +123,22 @@ export function createCommentForm(deps) {
 	}
 
 	/**
+	 * 本文のキャレット位置に文字を差し込む。選択範囲があればそれを置き換える。
+	 * 絵文字は文字として入る。表示側の parseCommentText() が画像へ戻す。
+	 * キャレットの位置が取れない相手 (テスト用の DOM) では末尾へ足す
+	 * @param {string} token 差し込む文字 ('(heaven)' の形)
+	 * @returns {void}
+	 */
+	function insertAtCaret(token) {
+		const start = typeof input.selectionStart === 'number' ? input.selectionStart : input.value.length;
+		const end = typeof input.selectionEnd === 'number' ? input.selectionEnd : start;
+		input.value = `${input.value.slice(0, start)}${token}${input.value.slice(end)}`;
+		// value を入れ直すとキャレットは末尾へ飛ぶ。差し込んだ直後へ戻す
+		const caret = start + token.length;
+		if (typeof input.setSelectionRange === 'function') input.setSelectionRange(caret, caret);
+	}
+
+	/**
 	 * 送信ボタンの状態を今の中身に合わせる。
 	 * @returns {void}
 	 */
@@ -213,9 +229,8 @@ export function createCommentForm(deps) {
 				: { text: '', stampId });
 			clearError();
 			input.value = '';
+			// 伸びたままにすると、空の入力欄が長文のときの高さで残る。clearStamp() が測り直す
 			clearStamp();
-			// 伸びたままにすると、空の入力欄が長文のときの高さで残る
-			syncHeight();
 		} catch (error) {
 			// 本文は消さない。消すと打ち直しになる
 			showError(error);
@@ -259,9 +274,13 @@ export function createCommentForm(deps) {
 				// 閉じるときにフォーカスを返す先。項目ごと消えて body へ落ちるのを防ぐ
 				opener: pick,
 				onEmoji: (name) => {
-					// 絵文字は文字として入る。表示側の parseCommentText() が画像へ戻す
-					input.value = `${input.value}(${name})`;
+					// 絵文字は本文。スタンプとは両立しないので、選んでいれば取り消して本文へ戻す。
+					// 戻さないと hidden の textarea に書かれ、スタンプの送信で黙って消える
+					if (stampId !== null) clearStamp();
+					insertAtCaret(`(${name})`);
 					syncSubmit();
+					// 1 行増えることがある
+					syncHeight();
 					input.focus();
 				},
 				onStamp: (id) => { selectStamp(id); },
@@ -296,11 +315,12 @@ export function createCommentForm(deps) {
 		},
 
 		/**
-		 * 入力欄を片付ける。開いていればピッカーも閉じる。
+		 * 入力欄を片付ける。この欄で開いているピッカーも閉じる。
+		 * ピッカーは 1 枚を共有しているので、別の欄で開いているものは閉じない
 		 * @returns {void}
 		 */
 		dispose() {
-			picker?.close();
+			if (picker?.isOpenIn(element)) picker.close();
 			clearError();
 			element.remove();
 		},

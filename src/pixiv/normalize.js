@@ -6,6 +6,7 @@
 
 import { DEFAULT_X_RESTRICT } from '../common/constants.js';
 import { safeCdnUrl } from './endpoints.js';
+import { PixivError, PIXIV_ERROR_KINDS } from './errors.js';
 
 /** 作品の種別。SITE_SPEC の実測値。 */
 export const ILLUST_TYPES = Object.freeze({
@@ -114,8 +115,13 @@ export function isOwnWork(work, self) {
  * 数値カウンタは欠けていれば 0、タグは null 要素を落として返す。
  * @param {object} raw /ajax/illust/{id} の body
  * @returns {WorkDetail} 正規化した詳細
+ * @throws {PixivError} body がオブジェクトでない (client.js の unwrap() は null を通す) か、illustId が無いとき。
+ *   TypeError で落とすと呼び出し側が種別で分岐できない。id の無い WorkDetail を黙って返すのも同様
  */
 export function normalizeDetail(raw) {
+	if (!raw || typeof raw !== 'object' || !raw.illustId) {
+		throw new PixivError(PIXIV_ERROR_KINDS.PARSE, '作品詳細に illustId がありません');
+	}
 	const urls = sanitizeUrls(raw.urls);
 	return {
 		id: raw.illustId,

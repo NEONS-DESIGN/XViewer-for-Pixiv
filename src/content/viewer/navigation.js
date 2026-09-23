@@ -110,12 +110,10 @@ export function createNavigation(deps) {
 		if (!sequence || !currentWorkId) return;
 		let target = neighbor(direction);
 
-		// 端に来た。全作品の並びへ広げられるなら広げてもう一度
+		// 端に来た。全作品の並びへ広げられるなら広げてもう一度。
+		// 待っている間に別の作品へ移っていたら extend() が false を返すので、ここでは確かめ直さない
 		if (!target && !extended && !extending && deps.canExtendSequence()) {
-			const from = currentWorkId;
 			if (!(await extend())) return;
-			// 待っている間に上キーで戻っていたら、完了を理由に勝手に進めない
-			if (currentWorkId !== from) return;
 			target = neighbor(direction);
 		}
 		if (!target) return;

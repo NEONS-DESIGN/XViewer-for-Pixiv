@@ -109,8 +109,6 @@ export function advanceFrame({ now, startedAt, index, timings }) {
  * @property {HTMLElement} container 描画先 (.stage)
  * @property {object} settings 設定
  * @property {object} strings 文言のカタログ (src/i18n)
- * @property {(message: string) => void} [onError] 使わない。失敗はペインの中の .pane-error に出す。(image-pane と同じ)
- *   呼び出し側の配線が残っている間だけ受け取る
  * @property {typeof fetch} [fetchImpl] 通信 (meta と zip) の差し替え。テストから pixiv を叩かないために使う
  * @property {() => HTMLImageElement} [createImage] フレーム用 Image の差し替え。Node には Image が無い
  * @property {(callback: FrameRequestCallback) => number} [requestAnimationFrame] コマ送りの差し替え
@@ -151,7 +149,7 @@ export function createUgoiraPlayer(deps) {
 	let disposed = false;
 	/** @type {HTMLElement|null} 自分が作った要素。dispose で外す */
 	let root = null;
-	/** zip の取得を途中で止めるためのもの。dispose で abort する */
+	/** meta と zip の取得を途中で止めるためのもの。dispose で abort する */
 	const aborter = new AbortController();
 
 	/**
@@ -294,7 +292,8 @@ export function createUgoiraPlayer(deps) {
 			container.appendChild(wrapper);
 
 			try {
-				const meta = await getJson(ugoiraMetaUrl(detail.id, strings.lang), { fetchImpl });
+				// meta の要求も dispose で止める。(zip と同じ signal)
+				const meta = await getJson(ugoiraMetaUrl(detail.id, strings.lang), { fetchImpl, signal: aborter.signal });
 				if (disposed) return;
 
 				// API が返した値をそのまま外部オリジンへ投げない

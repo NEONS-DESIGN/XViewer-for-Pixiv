@@ -1,6 +1,10 @@
 /**
  * pixiv API のエラー種別。
  * 呼び出し側はこの種別で分岐する。message は利用者向けの文言ではない。
+ *
+ * message の言語: pixiv 層 (src/pixiv/*) が自分で組む message は**日本語**で書く。
+ * console と警告ログにしか出ない開発者向けの文言で、利用者向けの表示は呼び出し側が
+ * kind を見て i18n のカタログから引く。pixiv の応答に入っていた message はそのまま通す。
  */
 export const PIXIV_ERROR_KINDS = Object.freeze({
 	/** 通信そのものが失敗した */

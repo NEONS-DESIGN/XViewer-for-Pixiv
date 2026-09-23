@@ -13,12 +13,11 @@ import {
 	XV_CARD_ATTR,
 	XV_BOOKMARK_ID_ATTR,
 	CARD_SELECTOR,
-	TAB_SKIP_MARK_ATTR,
-	TAB_SKIP_LABEL_ATTR,
 } from '../common/constants.js';
 import { warn } from '../common/log.js';
 import { currentLocalePrefix } from '../common/locale.js';
 import { safeCdnUrl, artworkPath } from '../pixiv/endpoints.js';
+import { stripTabSkipMarks } from './tab-skip.js';
 
 /**
  * #rrggbb を getComputedStyle が返す rgb(r, g, b) の形にする。
@@ -190,24 +189,6 @@ export function captureTemplates(ul, deps = {}) {
 }
 
 /**
- * tab-skip.js が雛形へ書き込んだ印を落とす。
- * tabindex="-1" は残すとビュワーを切った後に組んだカードだけ Tab 順が違ってしまい、
- * aria-label は残すと読み上げが全部同じ作品名になる。tab-skip が生きていれば次の当て直しで付け直される。
- * @param {object} card 組み立て中のカード (li)
- * @returns {void}
- */
-function stripTabSkipMarks(card) {
-	for (const el of card.querySelectorAll(`[${TAB_SKIP_MARK_ATTR}]`)) {
-		el.removeAttribute('tabindex');
-		el.removeAttribute(TAB_SKIP_MARK_ATTR);
-	}
-	for (const el of card.querySelectorAll(`[${TAB_SKIP_LABEL_ATTR}]`)) {
-		el.removeAttribute('aria-label');
-		el.removeAttribute(TAB_SKIP_LABEL_ATTR);
-	}
-}
-
-/**
  * 1 作品ぶんのカードを組む。
  *
  * 画像 URL が pximg でなければカードを作らない。API の値をそのまま img へ渡さないため。(SPEC §9.2)
@@ -234,6 +215,9 @@ export function buildCard(templates, work, deps) {
 			if (link.getAttribute('data-gtm-value')) link.setAttribute('data-gtm-value', String(work.id));
 			if (link.getAttribute('data-gtm-user-id')) link.setAttribute('data-gtm-user-id', String(work.userId));
 		}
+		// 雛形は tab-skip.js が当てた後に採られることが多い。印 (tabindex="-1" / aria-label) を
+		// 残すと、ビュワーを切った後に組んだカードだけ Tab 順が違い、読み上げが全部同じ作品名になる。
+		// tab-skip が生きていれば次の当て直しで付け直される
 		stripTabSkipMarks(card);
 
 		const img = card.querySelector('img');

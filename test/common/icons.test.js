@@ -3,24 +3,10 @@ import assert from 'node:assert/strict';
 import { createIcon } from '../../src/common/icons.js';
 import { ICON_SHAPES } from '../../src/common/icon-shapes.js';
 import { LOG_PREFIX } from '../../src/common/log.js';
+import { fakeDoc, fakeElement } from '../helpers/dom.js';
 
-/**
- * createElementNS だけを持つ最小の Document の代わり。
- * jsdom を入れずに済ませるため、必要な口だけを備えた偽物を使う。
- * @returns {object} doc の代わり
- */
-function fakeDoc() {
-	return {
-		createElementNS(_ns, tag) {
-			return {
-				tagName: tag,
-				attributes: {},
-				innerHTML: '',
-				setAttribute(name, value) { this.attributes[name] = value; },
-			};
-		},
-	};
-}
+/** 図形が見つからないときに createIcon が使う空の描画領域。(icons.js の EMPTY_VIEW_BOX と同じ値) */
+const EMPTY_VIEW_BOX = '0 0 24 24';
 
 test('ICON_SHAPES に必要な図形が入っている', () => {
 	assert.ok(ICON_SHAPES.close.viewBox);
@@ -33,6 +19,7 @@ test('createIcon は viewBox をそのまま使う', () => {
 	assert.equal(svg.attributes.fill, 'currentColor');
 	assert.equal(svg.attributes['aria-hidden'], 'true');
 	assert.equal(svg.attributes.focusable, 'false');
+	assert.equal(svg.innerHTML, ICON_SHAPES.close.markup);
 });
 
 test('createIcon は未知の名前でも空の svg を返し、warn で名前を残す', () => {
@@ -40,7 +27,7 @@ test('createIcon は未知の名前でも空の svg を返し、warn で名前�
 	const warn = mock.method(console, 'warn', () => {});
 	try {
 		const svg = createIcon(fakeDoc(), 'no-such-icon');
-		assert.equal(svg.attributes.viewBox, '0 0 24 24');
+		assert.equal(svg.attributes.viewBox, EMPTY_VIEW_BOX);
 		assert.equal(svg.innerHTML, '');
 		assert.equal(warn.mock.callCount(), 1);
 		assert.ok(String(warn.mock.calls[0].arguments[0]).startsWith(LOG_PREFIX));
@@ -60,19 +47,25 @@ test('createIcon は知っている名前では warn を出さない', () => {
 	}
 });
 
-test('createIcon は innerHTML が投げても落ちない', () => {
-	// Trusted Types を強制するページでは innerHTML への代入が TypeError になる
-	const doc = {
-		createElementNS() {
-			return {
-				attributes: {},
-				set innerHTML(_v) { throw new TypeError('Trusted Types'); },
-				get innerHTML() { return ''; },
-				setAttribute(name, value) { this.attributes[name] = value; },
-			};
-		},
+test('createIcon は innerHTML が投げても空の svg で続行する', () => {
+	// Trusted Types を強制するページでは innerHTML への代入が TypeError になる。
+	// 落とさないだけでなく、属性の付いた svg を返して UI 構築を続けられること (SPEC §12)
+	const doc = fakeDoc();
+	doc.createElementNS = (_ns, tag) => {
+		const element = fakeElement(tag);
+		Object.defineProperty(element, 'innerHTML', {
+			get() { return ''; },
+			set() { throw new TypeError('Trusted Types'); },
+		});
+		return element;
 	};
-	assert.doesNotThrow(() => createIcon(doc, 'close'));
+	let svg = null;
+	assert.doesNotThrow(() => { svg = createIcon(doc, 'close'); });
+	assert.equal(svg.tag, 'svg');
+	assert.equal(svg.attributes.viewBox, ICON_SHAPES.close.viewBox);
+	assert.equal(svg.attributes['aria-hidden'], 'true');
+	assert.equal(svg.attributes.focusable, 'false');
+	assert.equal(svg.innerHTML, '');
 });
 
 test('ICON_SHAPES に自前の like (pixiv 式の顔) が入っている', () => {

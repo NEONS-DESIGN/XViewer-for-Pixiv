@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { stampIds, STAMP_GROUPS, STAMPS_PER_GROUP } from '../../src/pixiv/stamps.js';
+import { stampUrl } from '../../src/pixiv/endpoints.js';
 
 test('スタンプは 4 グループ 10 個ずつの 40 個', () => {
 	const ids = stampIds();
@@ -24,6 +25,7 @@ test('本体が隠しているグループは持たない', () => {
 	assert.equal(ids.some((id) => id.startsWith('6') || id.startsWith('7')), false);
 });
 
-test('すべて stampUrl に通る数字の並び', () => {
-	assert.equal(stampIds().every((id) => /^\d+$/.test(id)), true);
+test('すべて stampUrl に通る', () => {
+	// stampUrl は数字でない ID を null にする。一覧の ID がその関門を通らないと画像が出ない
+	assert.equal(stampIds().every((id) => stampUrl(id) !== null), true);
 });

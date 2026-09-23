@@ -18,14 +18,21 @@ import { loadAllWorkIds } from '../pixiv/pages.js';
  */
 
 /**
- * ID の配列から並びを作る。
+ * ID の配列から並びを作る。出どころ (DOM 順 / profile/all) は問わない。
+ * 同じ ID が 2 回入っていたら最初の位置だけを残す。(後ろで上書きすると next() が 2 回目の位置から進む)
  * @param {string[]} ids 並べたい順の ID
  * @returns {Sequence} 並び
  */
-export function createDomSequence(ids) {
-	const list = [...ids];
+export function createSequence(ids) {
+	/** @type {string[]} 重複を除いた並び */
+	const list = [];
 	/** @type {Map<string, number>} ID から添字。広げた並びは数千件になるので毎回 indexOf しない */
-	const indexOf = new Map(list.map((id, index) => [id, index]));
+	const indexOf = new Map();
+	for (const id of ids) {
+		if (indexOf.has(id)) continue;
+		indexOf.set(id, list.length);
+		list.push(id);
+	}
 	/**
 	 * 指定した ID から相対位置の ID を返す。
 	 * @param {string} id 基準の ID
@@ -63,7 +70,7 @@ export async function extendWithAllWorks(fallback, userId, category, lang, deps 
 	try {
 		const ids = await loadAllWorkIds(userId, category, lang, deps);
 		if (ids.length === 0) return fallback;
-		return createDomSequence(ids);
+		return createSequence(ids);
 	} catch {
 		// 端で止まるだけで、閲覧そのものは続けられる
 		return fallback;

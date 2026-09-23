@@ -36,13 +36,12 @@ test('langParam は翻訳が確認できていない言語を既定へ倒す', (
 	assert.equal(langParam(undefined), 'lang=ja');
 });
 
-test('langParam は繁体字中国語を簡体字へ倒す (既知の制限)', () => {
+test('langParam は zh_tw を受け取っても既定へ倒す (既知の制限)', () => {
 	// pixiv 側は zh_tw (アンダースコア) でないと繁体字の翻訳を返さないが、
 	// normalizeLanguage (common/language.js) が zh-TW を zh へ切り詰めるため
-	// langParam には zh_tw が渡ってこない。結果として繁体字の利用者には
-	// 簡体字の翻訳が返る。直すなら normalizeLanguage 側から見直す必要がある
-	assert.equal(langParam('zh'), 'lang=zh');
-	assert.notEqual(langParam('zh'), 'lang=zh_tw');
+	// langParam には zh_tw が渡ってこない。API_LANGUAGES にも入れていないので、
+	// 万一渡ってきても既定 (ja) へ倒れる。繁体字を出すなら normalizeLanguage 側から見直す
+	assert.equal(langParam('zh_tw'), 'lang=ja');
 });
 
 test('URL ビルダーが言語をそのまま反映する', () => {

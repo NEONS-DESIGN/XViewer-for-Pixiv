@@ -10,8 +10,7 @@ import {
 import { clearSessionCache } from '../../src/content/session.js';
 import { PixivError, PIXIV_ERROR_KINDS } from '../../src/pixiv/errors.js';
 import { createStrings } from '../../src/i18n/index.js';
-import { find } from '../helpers/dom.js';
-import { fakeElement, fakeDoc as fakeDocWith, iconName, flush as settle } from '../helpers/dom.js';
+import { find, fakeElement, fakeDoc as fakeDocWith, iconName, flush as settle } from '../helpers/dom.js';
 import { buildNextData } from '../helpers/pixiv.js';
 
 /** このファイルの既定の表示言語。文言は日本語のまま揃える。 */
@@ -58,11 +57,15 @@ test('countLabel は英語では助数詞を付けない', () => {
 
 /**
  * ログイン済みの __NEXT_DATA__ を返す document の代わり。
+ * readSession() は解析結果をモジュールに覚えるので、前のテストの値が残らないよう毎回捨てる。
+ * (テストの並びや単独実行で挙動が変わらないようにする)
+ * @param {object} [self] 自分のユーザー情報の上書き
  * @returns {object} doc の代わり
  */
-function fakeDoc() {
+function fakeDoc(self = {}) {
+	clearSessionCache();
 	return fakeDocWith({
-		nextData: buildNextData({ token: 'csrf-token', self: { xRestrict: 1, hideAiWorks: false } }),
+		nextData: buildNextData({ token: 'csrf-token', self: { xRestrict: 1, hideAiWorks: false, ...self } }),
 	});
 }
 
@@ -248,7 +251,7 @@ test('ブックマークの応答を待つ間に破棄されたら、外れた�
 });
 
 test('未ログインならカウンタを差し替えず案内だけ出す', () => {
-	// 他のテストが覚えたログイン済みのセッションを捨てる
+	// 他のテストが覚えたログイン済みのセッションを捨てる (fakeDoc() を通らないので自前で)
 	clearSessionCache();
 	const container = fakeCounts();
 	const bar = createActionsBar({
@@ -265,7 +268,6 @@ test('未ログインならカウンタを差し替えず案内だけ出す', ()
 	// 押せるものが無いので、結果を読み上げる領域も作らない
 	assert.equal(find(container, '.action-status'), null);
 	bar.dispose();
-	clearSessionCache();
 });
 
 test('フォローボタンは作者行の枠へ描く', () => {
@@ -379,14 +381,11 @@ test('自分の作品ではカウンタを差し替えずフォローも出さ�
 	// 自分にはいいね・ブックマーク・フォローのどれもできない。
 	// pixiv 本体も自分の作品では 3 つとも描かない。(SITE_SPEC §4)
 	// 押せば必ず失敗するボタンを出さないのが正しい
-	clearSessionCache();
 	const container = fakeCounts();
 	const followContainer = fakeElement('div');
 	const calls = [];
 	const bar = createActionsBar({
-		doc: fakeDocWith({
-			nextData: buildNextData({ token: 'csrf-token', self: { id: DETAIL.userId, xRestrict: 1 } }),
-		}),
+		doc: fakeDoc({ id: DETAIL.userId }),
 		container,
 		followContainer,
 		// 呼ばれたら「自分かどうか」を見ずにフォロー状態を引きに行っている
@@ -403,18 +402,14 @@ test('自分の作品ではカウンタを差し替えずフォローも出さ�
 	// 自分の作品なら /ajax/user も引かない
 	assert.deepEqual(calls, []);
 	bar.dispose();
-	clearSessionCache();
 });
 
 test('他人の作品なら self.id があってもボタンを出す', () => {
 	// 判定は ID の一致だけ。ログイン済みなら他人の作品はこれまでどおり押せる
-	clearSessionCache();
 	const container = fakeCounts();
 	const followContainer = fakeElement('div');
 	const bar = createActionsBar({
-		doc: fakeDocWith({
-			nextData: buildNextData({ token: 'csrf-token', self: { id: '16343044', xRestrict: 1 } }),
-		}),
+		doc: fakeDoc({ id: '16343044' }),
 		container,
 		followContainer,
 		fetchUser: async () => ({ isFollowed: false }),
@@ -425,5 +420,4 @@ test('他人の作品なら self.id があってもボタンを出す', () => {
 	assert.equal(container.querySelector('.count-like').tag, 'button');
 	assert.equal(followContainer.children.length, 1);
 	bar.dispose();
-	clearSessionCache();
 });

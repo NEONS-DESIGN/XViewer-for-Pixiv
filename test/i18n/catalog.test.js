@@ -69,15 +69,28 @@ test('未知の言語は既定の言語のカタログになる', () => {
 	assert.equal(createStrings(undefined).lang, DEFAULT_LANGUAGE);
 });
 
-test('カタログは凍結されている', () => {
-	assert.ok(Object.isFrozen(createStrings('ja')));
+test('カタログは入れ子まで凍結されている', () => {
+	// deepFreeze の要点は入れ子。最上位だけ見ても浅い凍結と区別がつかない
+	for (const lang of SUPPORTED_LANGUAGES) {
+		const strings = createStrings(lang);
+		assert.ok(Object.isFrozen(strings), `${lang}: 最上位`);
+		assert.ok(Object.isFrozen(strings.popup.fields.enabled), `${lang}: popup.fields.enabled`);
+		assert.ok(Object.isFrozen(strings.licenses.disclaimer.body), `${lang}: licenses.disclaimer.body (配列)`);
+		assert.ok(Object.isFrozen(strings.actionsBar.messages), `${lang}: actionsBar.messages`);
+	}
 });
 
-test('日時の書式が言語ごとに違う', () => {
-	const iso = '2026-09-23T13:05:00+09:00';
-	const ja = createStrings('ja').sidebar.formatDateTime(new Date(iso));
-	const en = createStrings('en').sidebar.formatDateTime(new Date(iso));
-	assert.equal(ja, '2026年9月23日 13:05');
-	assert.notEqual(en, ja);
-	assert.match(en, /2026/);
+test('日時の書式は言語ごとの形で、時は 24 時間制の 2 桁', () => {
+	// hourCycle: 'h23' と hour: '2-digit' の要点は「0 時が 24:05 にならない」「1 桁の時が 3:05 にならない」。
+	// ICU の版で変わりやすい箇所なので、境界の値ごとに固定する
+	const cases = [
+		['2026-09-23T13:05:00+09:00', '2026年9月23日 13:05', 'Sep 23, 2026 13:05'],
+		['2026-09-23T03:05:00+09:00', '2026年9月23日 03:05', 'Sep 23, 2026 03:05'],
+		['2026-09-23T00:05:00+09:00', '2026年9月23日 00:05', 'Sep 23, 2026 00:05'],
+		['2026-01-02T13:05:00+09:00', '2026年1月2日 13:05', 'Jan 2, 2026 13:05'],
+	];
+	for (const [iso, ja, en] of cases) {
+		assert.equal(createStrings('ja').sidebar.formatDateTime(new Date(iso)), ja, `ja: ${iso}`);
+		assert.equal(createStrings('en').sidebar.formatDateTime(new Date(iso)), en, `en: ${iso}`);
+	}
 });

@@ -146,8 +146,6 @@ export function createViewer(deps) {
 	let stage = null;
 	/** @type {HTMLElement|null} */
 	let sidebar = null;
-	/** @type {HTMLButtonElement|null} 閉じるボタン。開いた直後のフォーカス先 */
-	let closeButton = null;
 	/** @type {ReturnType<typeof createZoomLayer>|null} 原寸表示のレイヤ。ホストと一緒に作る */
 	let zoomLayer = null;
 	/** 開く要求の世代。await をまたいで古い応答を捨てるために使う */
@@ -205,7 +203,8 @@ export function createViewer(deps) {
 		stage = doc.createElement('div');
 		stage.className = 'stage';
 
-		closeButton = doc.createElement('button');
+		// 閉じるボタン。開いた直後のフォーカス先ではない (フォーカスは overlay が受ける。§10.4)
+		const closeButton = doc.createElement('button');
 		closeButton.className = 'close';
 		closeButton.type = 'button';
 		// アイコンだけのボタンには必ず両方付ける (UI_DESIGN_KIT §6)
@@ -325,17 +324,19 @@ export function createViewer(deps) {
 	 * Tab のフォーカスを Shadow DOM の中だけで巡回させる。
 	 * FOCUSABLE_SELECTOR が disabled を除いているので、ここでは
 	 * 隠れているものと inert の中のもの (原寸表示中の背後) だけを外す。
+	 * 巡回先が無くても (原寸表示で 1 枚の作品はクリック領域が hidden) Tab は素通しさせない。
+	 * 背後は inert でページ内に行き先が無く、素通しすると文書の外 (アドレスバー) へ抜ける
 	 * @param {KeyboardEvent} event キー
 	 * @returns {void}
 	 */
 	function trapFocus(event) {
 		if (!shadow) return;
+		event.preventDefault();
 		const focusable = Array.from(shadow.querySelectorAll(FOCUSABLE_SELECTOR))
 			.filter((element) => !element.closest(HIDDEN_SELECTOR)
 				&& !element.closest(INERT_SELECTOR)
 				&& isRendered(element));
 		if (focusable.length === 0) return;
-		event.preventDefault();
 		const step = event.shiftKey ? -1 : 1;
 		const current = focusable.indexOf(shadow.activeElement);
 		// 中にフォーカスが無ければ端から入れる。端まで来たら折り返して外へ出さない
@@ -505,7 +506,6 @@ export function createViewer(deps) {
 		overlay = null;
 		stage = null;
 		sidebar = null;
-		closeButton = null;
 		// 元いたサムネイルへ戻す。差し替えで消えていることがあるので繋がりを確かめる
 		if (previousFocus && doc.contains(previousFocus)) previousFocus.focus?.();
 		previousFocus = null;

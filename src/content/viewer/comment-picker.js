@@ -43,7 +43,7 @@ const CLIPPING_OVERFLOW = Object.freeze(['auto', 'scroll', 'hidden', 'clip']);
 /**
  * ピッカーを作る。
  * @param {{doc: Document, strings: object}} deps 依存。strings は文言のカタログ (src/i18n)
- * @returns {{open: Function, close: () => void, isOpen: () => boolean, consumeKey: (event: KeyboardEvent) => boolean, dispose: () => void}} ピッカー
+ * @returns {{open: Function, close: () => void, isOpen: () => boolean, isOpenIn: (element: HTMLElement) => boolean, consumeKey: (event: KeyboardEvent) => boolean, dispose: () => void}} ピッカー
  */
 export function createCommentPicker(deps) {
 	const { doc, strings } = deps;
@@ -66,6 +66,8 @@ export function createCommentPicker(deps) {
 	let unwatchOutside = null;
 	/** @type {HTMLElement|null} 開いたボタン。閉じるときにフォーカスを返す先 */
 	let opener = null;
+	/** @type {HTMLElement|null} 今差し込んでいる先。どの入力欄で開いているかの判断に使う */
+	let currentSlot = null;
 
 	/**
 	 * 項目を 1 つ作る。
@@ -254,6 +256,7 @@ export function createCommentPicker(deps) {
 		const returnFocus = panel !== null && opener !== null && hasFocusWithin(doc, panel);
 		panel?.remove();
 		handlers = null;
+		currentSlot = null;
 		unwatchOutside?.();
 		unwatchOutside = null;
 		if (returnFocus) opener.focus();
@@ -272,6 +275,7 @@ export function createCommentPicker(deps) {
 			panel ??= buildPanel();
 			handlers = next;
 			opener = next.opener ?? null;
+			currentSlot = slot;
 			syncTabs();
 			renderGrid();
 			slot.appendChild(panel);
@@ -297,6 +301,18 @@ export function createCommentPicker(deps) {
 		 * @returns {boolean} 開いていれば true
 		 */
 		isOpen() { return handlers !== null; },
+
+		/**
+		 * その要素の中で開いているか。
+		 * 1 枚を複数の入力欄で使い回すので、入力欄を畳むときに「自分のピッカーか」を確かめるのに使う。
+		 * (別の欄で開いているピッカーまで閉じないため)
+		 * @param {HTMLElement} element 入れ物 (入力欄の .comment-form 等)
+		 * @returns {boolean} 開いていて、差し込み先がその中にあれば true
+		 */
+		isOpenIn(element) {
+			if (handlers === null || currentSlot === null) return false;
+			return element === currentSlot || (typeof element.contains === 'function' && element.contains(currentSlot));
+		},
 
 		/**
 		 * キー操作を先に使う。開いていなければ何もしない。

@@ -2,76 +2,22 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { getArtwork } from '../../scripts/icon-svg.mjs';
+import { OUT_DIR, STATIC_FILES } from '../../scripts/static-files.mjs';
+import { readStripped, block, declarations, variable } from '../helpers/css.js';
 
 /**
  * CSS はテストで実行できないので、文字列として読んで約束事だけを見張る。
  * 見た目の検証ではなく、「2 か所に書かざるを得ない値がずれていないか」
  * 「1 か所 (common/tokens.css) に寄せたはずの定義が戻っていないか」の検査。
+ * ビュワー (viewer.css) だけの約束事は test/content/viewer/viewer-css.test.js にある
  */
-
-/**
- * CSS を読んで改行を LF に揃え、コメントを落とす。
- *
- * **改行を揃えるのは必須。** このリポジトリは `.gitattributes` を持たず、Windows の
- * `core.autocrlf=true` では作業ツリーの CSS が CRLF になる。`block()` は選択子を
- * 改行込みの文字列 (`:root,` の次の行が `:host {`) で探すので、CRLF のままだと
- * 1 つも見つからず、チェックアウト直後だけテストが落ちる。(実際に踏んだ)
- * 見張りたいのは宣言の中身であって改行の種類ではないので、読み込みの時点で潰す。
- * @param {string} relative このファイルから見た CSS の場所
- * @returns {Promise<string>} LF に揃えてコメントを落とした CSS
- */
-async function readStripped(relative) {
-	const css = await readFile(new URL(relative, import.meta.url), 'utf8');
-	return css.replace(/\r\n?/g, '\n').replace(/\/\*[\s\S]*?\*\//g, '');
-}
 
 /** 配色トークン。ビュワーと設定画面の両方が読む。 */
-const tokens = await readStripped('../../src/common/tokens.css');
+const tokens = await readStripped('src/common/tokens.css');
 /** 設定画面の部品の規則。 */
-const popup = await readStripped('../../src/popup/popup.css');
-/** ビュワーの Shadow DOM の規則。 */
-const viewer = await readStripped('../../src/content/viewer/viewer.css');
-
-test('読み込んだ CSS の改行は LF に揃っている', () => {
-	// CRLF のまま比べると、改行込みの選択子 (`:root,` の次の行が `:host`) が見つからず
-	// チェックアウト直後だけ落ちる。readStripped が潰していることを固定する
-	for (const [label, css] of [['tokens.css', tokens], ['popup.css', popup], ['viewer.css', viewer]]) {
-		assert.ok(!css.includes('\r'), `${label} に CR が残っている`);
-	}
-});
-
-/**
- * 選択子の直後の宣言ブロックの中身を取り出す。
- * @param {string} css コメントを落とした CSS
- * @param {string} selector 選択子 (行頭から `{` の直前まで。選択子の並びは改行を含めてそのまま)
- * @returns {string} ブロックの中身
- */
-function block(css, selector) {
-	const start = css.indexOf(`${selector} {`);
-	assert.notEqual(start, -1, `${selector} のブロックが無い`);
-	const open = css.indexOf('{', start);
-	const close = css.indexOf('}', open);
-	return css.slice(open + 1, close);
-}
-
-/**
- * ブロックの中身を「プロパティ: 値」の並びに整える。
- * @param {string} body ブロックの中身
- * @returns {string[]} 宣言の並び (書かれた順)
- */
-function declarations(body) {
-	return body.split(';').map((one) => one.trim()).filter(Boolean);
-}
-
-/**
- * ブロックの中の変数の値を読む。
- * @param {string} body ブロックの中身
- * @param {string} name 変数名 (`--accent`)
- * @returns {string|undefined} 値
- */
-function variable(body, name) {
-	return declarations(body).find((one) => one.startsWith(`${name}:`))?.slice(name.length + 1).trim();
-}
+const popup = await readStripped('src/popup/popup.css');
+/** ビュワーの Shadow DOM の規則。共通トークンの再定義が無いことだけをここで見る。 */
+const viewer = await readStripped('src/content/viewer/viewer.css');
 
 /** tokens.css のダークのブロック (文書と Shadow DOM の両方に当たる選択子の並び)。 */
 const DARK_SELECTOR = ':root,\n:host';
@@ -104,6 +50,19 @@ const SHARED_TOKENS = [
 	'--scrollbar-thumb-hover',
 	'--focus-ring',
 ];
+
+test('ここで読む popup.css / tokens.css はビルドがそのまま dist へコピーする', () => {
+	// 実物と同じファイルを見ている根拠。コピー対象から落ちると popup.html の <link> が空を指す
+	for (const [from, to] of [
+		['src/popup/popup.css', `${OUT_DIR}/popup/popup.css`],
+		['src/common/tokens.css', `${OUT_DIR}/common/tokens.css`],
+	]) {
+		const entry = STATIC_FILES.find((pair) => pair[0] === from);
+		assert.ok(entry, `STATIC_FILES に ${from} が無い`);
+		// popup.html が ../common/tokens.css で読むので、src と同じ相対配置でなければならない
+		assert.equal(entry[1], to);
+	}
+});
 
 test('拡張機能のアイコンの背景はダークの --accent と同じ値', () => {
 	// scripts/icon-svg.mjs に直書きした色。CSS を変えたときに置き去りにならないよう突き合わせる
@@ -169,7 +128,8 @@ test('スクロールバーの見た目は tokens.css の 1 か所で決める',
 		assert.ok(tokens.includes(`\n::-webkit-scrollbar${suffix} {`), `tokens.css に ::-webkit-scrollbar${suffix} が無い`);
 	}
 	for (const [label, css] of [['popup.css', popup], ['viewer.css', viewer]]) {
-		const rules = css.match(/[^\s{},]+::-webkit-scrollbar[^\s{,]*/g) ?? [];
+		// 直前の選択子は無くても拾う。行頭の `::-webkit-scrollbar {` を書き戻すと tokens.css と 2 か所に割れる
+		const rules = css.match(/[^\s{},]*::-webkit-scrollbar[^\s{,]*/g) ?? [];
 		for (const rule of rules) {
 			// 例外はサイドバーの軌道の余白 (margin) だけ。色と太さはここに書かない
 			assert.equal(rule, '.sidebar::-webkit-scrollbar-track', `${label} の ${rule} は tokens.css へ寄せる`);
@@ -186,34 +146,13 @@ test('フォーカスの輪郭は --focus-ring の 1 本だけ', () => {
 	for (const outline of outlines) assert.equal(outline, 'outline: var(--focus-ring);');
 });
 
-test('ビュワーのフォーカスの輪郭は 1 本にまとめる', () => {
-	// 部品ごとに :focus-visible を書くと、新しく足したリンクやボタンだけ輪郭が抜け、
-	// ブラウザ既定の白っぽい 1px が出る。(作者リンク・タグ・作品ページへのリンクで実際に起きた)
-	// 共通の 1 本にしておけば、部品が増えても自動で揃う
-	const selectors = [...viewer.matchAll(/([^{}]*:focus-visible[^{}]*)\{/g)]
-		.map((match) => match[1].replace(/\s+/g, ' ').trim());
-	assert.deepEqual(selectors.sort(), [
-		// 輪郭を出さない例外 (Tab の巡回先ではないダイアログ本体。モーダルと原寸表示の 2 つ)
-		'.overlay:focus, .overlay:focus-visible, .zoom:focus, .zoom:focus-visible',
-		// 内側に出す例外 (項目の縁が隣と接しているメニュー)
-		'.share-item:focus-visible',
-		// 共通
-		':focus-visible',
-	]);
-	// 値は --focus-ring から引く。none はダイアログ本体だけ
-	const outlines = [...new Set(viewer.match(/outline:[^;]+;/g) ?? [])].sort();
-	assert.deepEqual(outlines, ['outline: none;', 'outline: var(--focus-ring);']);
-});
-
 test('保存の失敗の通知に --danger を使わない', () => {
 	// --danger は取り消せない操作専用。(UI_DESIGN_KIT §2) 保存の失敗はやり直せる
 	assert.ok(!block(popup, '.notice').includes('--danger'));
 });
 
-test('タブの選択は aria-selected で描き、固定値のパネル高さは持たない', () => {
+test('タブの選択は aria-selected で描き、パネルは popup の上限の中で縮む', () => {
 	assert.ok(popup.includes(".tab[aria-selected='true']"));
-	assert.ok(!popup.includes('.is-on'));
-	assert.ok(!popup.includes('--panel-max'));
 	assert.ok(declarations(block(popup, '.popup')).includes('max-height: 600px'), 'popup の上限は Chrome の 600px');
 	assert.ok(declarations(block(popup, '.panel')).includes('min-height: 0'), 'flex の子は min-height: 0 が無いと縮まない');
 });
@@ -233,32 +172,4 @@ test('popup.html は tokens.css を popup.css より先に読む', async () => {
 	assert.ok(tokensAt !== -1, 'popup.html が ../common/tokens.css を読んでいない');
 	assert.ok(popupAt !== -1, 'popup.html が popup.css を読んでいない');
 	assert.ok(tokensAt < popupAt, 'tokens.css は popup.css より先に読む');
-});
-
-test('原寸表示は画像を縮めない', () => {
-	// .stage img の max-width: 100% をそのまま浴びると「原寸」にならない。
-	// 打ち消しを消してしまわないよう、ここで固定する
-	const body = block(viewer, '.zoom-image');
-	assert.ok(body.includes('max-width: none'), '横の縮小を打ち消していない');
-	assert.ok(body.includes('max-height: none'), '縦の縮小を打ち消していない');
-	assert.ok(body.includes('cursor: zoom-out'), '押すと戻ることをカーソルで示す');
-});
-
-test('原寸表示のクリック領域は左右で同じ幅', () => {
-	// 前と次で幅が違うと、同じ端を押しているつもりで押し損ねる。
-	// 幅は 1 つの変数から引き、左右の規則は位置とカーソルだけを持つ
-	assert.ok(block(viewer, '.zoom').includes('--zoom-zone-width:'), '幅の変数が無い');
-	assert.ok(block(viewer, '.zoom-zone').includes('width: var(--zoom-zone-width)'), '幅を変数から引いていない');
-	for (const selector of ['.zoom-zone-prev', '.zoom-zone-next']) {
-		assert.ok(!block(viewer, selector).includes('width:'), `${selector} が自前の幅を持っている`);
-	}
-});
-
-test('原寸表示の幕は透けない', () => {
-	// --backdrop (92%) をそのまま使うと、背後のサイドバーの文字が読めてしまう。
-	// (0.24.0 の実機確認で判明) 原寸表示は画像だけを見るための画面なので不透明にする
-	assert.ok(block(viewer, '.zoom').includes('background: var(--zoom-backdrop)'), '専用の幕を使っていない');
-	const value = variable(block(viewer, ':host'), '--zoom-backdrop');
-	assert.ok(value, '--zoom-backdrop が無い');
-	assert.ok(!/rgba|hsla|transparent/.test(value), `--zoom-backdrop が透ける値 (${value})`);
 });

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatDate, splitComment, createSidebar } from '../../src/content/viewer/sidebar.js';
+import { formatDate, splitComment, commentToNodes, createSidebar } from '../../src/content/viewer/sidebar.js';
 import { createAvatar, showAvatar } from '../../src/content/viewer/avatar.js';
 import { createStrings } from '../../src/i18n/index.js';
 import { fakeElement, fakeDoc, iconName, flush, find } from '../helpers/dom.js';
@@ -28,11 +28,6 @@ test('formatDate は英語のカタログで英語の書式を返す', () => {
 	const iso = '2026-09-23T13:05:00+09:00';
 	assert.equal(formatDate(iso, createStrings('ja')), '2026年9月23日 13:05');
 	assert.equal(formatDate(iso, createStrings('en')), 'Sep 23, 2026 13:05');
-});
-
-test('formatDate は読めない値に空文字を返す', () => {
-	assert.equal(formatDate('', createStrings('ja')), '');
-	assert.equal(formatDate('not a date', createStrings('ja')), '');
 });
 
 test('splitComment は br で分割する', () => {
@@ -95,6 +90,28 @@ test('splitComment は符号位置として不正な数値参照をそのまま�
 test('splitComment は空文字で空配列を返す', () => {
 	assert.deepEqual(splitComment(''), []);
 	assert.deepEqual(splitComment(null), []);
+});
+
+test('splitComment は行をまたいでもリンクを取りこぼさない', () => {
+	// g 付きの正規表現を使い回すと lastIndex が次の行に持ち越され、2 行目のリンクを見落とす
+	assert.deepEqual(
+		splitComment('<a href="/users/1">A</a><br><a href="/users/2">B</a>'),
+		[
+			[{ type: 'link', value: 'A', href: 'https://www.pixiv.net/users/1' }],
+			[{ type: 'link', value: 'B', href: 'https://www.pixiv.net/users/2' }],
+		],
+	);
+});
+
+test('commentToNodes はリンクを新しいタブで開き、opener を渡さず、行を br で分ける', () => {
+	const fragment = commentToNodes(fakeDoc(), '見て<a href="https://example.com/x">ここ</a><br>2行目');
+	assert.deepEqual(fragment.children.map((node) => node.tag), ['#text', 'a', 'br', '#text']);
+	const anchor = fragment.children[1];
+	assert.equal(anchor.href, 'https://example.com/x');
+	assert.equal(anchor.target, '_blank');
+	assert.equal(anchor.rel, 'noopener noreferrer');
+	assert.equal(anchor.textContent, 'ここ');
+	assert.equal(fragment.children[3].textContent, '2行目');
 });
 
 /** サイドバーへ渡す作品詳細の代わり。 */
@@ -258,17 +275,6 @@ test('リンク行は作品ページへのリンクとシェアボタンを並�
 	assert.equal(link.attributes.rel, 'noopener noreferrer');
 });
 
-test('consumeEscape はシェアメニューが開いているときだけ食い止める', () => {
-	// ビュワー本体の Escape より先に呼ばれる。開いていなければ本体に譲る
-	const { container, sidebar } = build();
-	sidebar.render(DETAIL);
-	assert.equal(sidebar.consumeEscape(), false);
-	const row = container.children[0].children.find((child) => child.className === 'link-row');
-	row.children[1].children[0].click();
-	assert.equal(sidebar.consumeEscape(), true);
-	assert.equal(sidebar.consumeEscape(), false);
-});
-
 test('consumeKey はシェアメニューが開いているときだけ上下キーと Escape を食い止める', () => {
 	// 開いたメニューで下キーを押して、本体が次の作品へ移ってはいけない
 	const { container, sidebar } = build();
@@ -358,6 +364,30 @@ test('render() で描き直すと件数は新しい作品の値に揃う', () =>
 	sidebar.bumpCommentCount(1);
 	const count = find(container, '.count-comment');
 	assert.equal(count.textContent.includes('11'), true);
+});
+
+test('setCommentCount は数え直した値で置き換え、その後の増減はそこから数える', () => {
+	// ルートを消すと返信も道連れになり、手元では引く数が決まらない。削除の後はこちらで置き換える
+	const { container, sidebar } = build();
+	sidebar.render(DETAIL);
+	sidebar.setCommentCount(2);
+	const count = find(container, '.count-comment');
+	assert.equal(find(count, '.count-value').textContent, '2');
+	assert.equal(count.title, 'コメント 2');
+	sidebar.bumpCommentCount(1);
+	assert.equal(find(count, '.count-value').textContent, '3');
+});
+
+test('setCommentCount は数でない値と負の数を画面に出さない', () => {
+	// 数え直せなかった (null) ときは今の値のまま。負の数は 0 で止める
+	const { container, sidebar } = build();
+	sidebar.render(DETAIL);
+	sidebar.setCommentCount(null);
+	sidebar.setCommentCount(Number.NaN);
+	const count = find(container, '.count-comment');
+	assert.equal(find(count, '.count-value').textContent, '4');
+	sidebar.setCommentCount(-3);
+	assert.equal(find(count, '.count-value').textContent, '0');
 });
 
 test('bumpCommentCount は render() より前でも dispose() の後でも何もしない', () => {

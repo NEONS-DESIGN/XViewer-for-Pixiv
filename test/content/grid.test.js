@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { workIdFromLink, collectWorkIds, attachGridListener, findGridList } from '../../src/content/grid.js';
+import { CARD_SELECTOR } from '../../src/common/constants.js';
 import { el, makeCard, makeGrid } from '../helpers/card.js';
 
 /**
@@ -145,7 +146,7 @@ function fakeClick(href, overrides = {}) {
 	const { inCard = true, ...rest } = overrides;
 	const link = href === null ? null : {
 		getAttribute: () => href,
-		closest: (selector) => (selector === 'li' && inCard ? { tag: 'li' } : null),
+		closest: (selector) => (selector === CARD_SELECTOR && inCard ? { tag: CARD_SELECTOR } : null),
 	};
 	const event = {
 		button: 0,

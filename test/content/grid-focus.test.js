@@ -2,33 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ensureFocusStyle, FOCUS_STYLE_ID, GRID_FOCUS_CSS } from '../../src/content/grid-focus.js';
 import { LOCALE_PREFIXES } from '../../src/common/constants.js';
-
-/**
- * document の代わり。head への出し入れだけを持つ。
- * @returns {object} doc の代わり
- */
-function fakeDoc() {
-	const head = {
-		children: [],
-		appendChild(el) { this.children.push(el); return el; },
-	};
-	return {
-		head,
-		createElement(tagName) {
-			const el = {
-				tagName: tagName.toUpperCase(),
-				id: '',
-				textContent: '',
-				remove() {
-					const index = head.children.indexOf(el);
-					if (index >= 0) head.children.splice(index, 1);
-				},
-			};
-			return el;
-		},
-		getElementById(id) { return head.children.find((el) => el.id === id) ?? null; },
-	};
-}
+import { fakeDoc } from '../helpers/dom.js';
 
 test('ensureFocusStyle は head に style を 1 枚入れる', () => {
 	const doc = fakeDoc();
@@ -40,7 +14,8 @@ test('ensureFocusStyle は head に style を 1 枚入れる', () => {
 });
 
 test('既に同じ id の style があれば足さず、dispose でそれを外す', () => {
-	// 別の経路で残った style を掴み直す (二重注入の防止と後片付けの両方)
+	// 別の経路で残った style を掴み直す (二重注入の防止と後片付けの両方)。
+	// SPA 遷移で apply() が何度も走るので、2 回呼んでも増えないことが要点
 	const doc = fakeDoc();
 	const first = ensureFocusStyle(doc);
 	const second = ensureFocusStyle(doc);
@@ -60,21 +35,6 @@ test('appendChild が投げても投げずに戻り、dispose も投げない', 
 	assert.equal(warn.mock.callCount(), 1);
 });
 
-test('ensureFocusStyle を 2 回呼んでも style は増えない', () => {
-	// SPA 遷移で apply() が何度も走るため
-	const doc = fakeDoc();
-	ensureFocusStyle(doc);
-	ensureFocusStyle(doc);
-	assert.equal(doc.head.children.length, 1);
-});
-
-test('dispose で style が消える', () => {
-	const doc = fakeDoc();
-	const handle = ensureFocusStyle(doc);
-	handle.dispose();
-	assert.equal(doc.head.children.length, 0);
-});
-
 test('dispose を 2 回呼んでも投げない', () => {
 	const doc = fakeDoc();
 	const handle = ensureFocusStyle(doc);
@@ -82,9 +42,11 @@ test('dispose を 2 回呼んでも投げない', () => {
 	assert.doesNotThrow(() => handle.dispose());
 });
 
-test('head が無くても投げない', () => {
+test('head も body も無くても投げない', () => {
+	// 共通の偽 doc は body を持つ。head だけ消すと本物と同じく body へ入るので、両方消して「入れ先が無い」経路を踏む
 	const doc = fakeDoc();
 	doc.head = null;
+	doc.body = null;
 	let handle;
 	assert.doesNotThrow(() => { handle = ensureFocusStyle(doc); });
 	assert.doesNotThrow(() => handle.dispose());

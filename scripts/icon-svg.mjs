@@ -80,12 +80,12 @@ const ARTWORKS = {
 };
 
 /** 出力する PNG のサイズと、そこで使う図形。Chrome が使う 4 サイズ。 */
-export const ICON_OUTPUTS = [
+export const ICON_OUTPUTS = Object.freeze([
 	{ size: 16, variant: 'compact' },
 	{ size: 32, variant: 'compact' },
 	{ size: 48, variant: 'full' },
 	{ size: 128, variant: 'full' },
-];
+]);
 
 /**
  * PNG のファイル名。生成 (build-icons) / 配置 (build) / manifest の検査で同じ名前を使う。

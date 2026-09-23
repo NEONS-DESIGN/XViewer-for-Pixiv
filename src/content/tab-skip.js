@@ -18,6 +18,16 @@ import {
 import { warn } from '../common/log.js';
 
 /**
+ * 何かをフォーカス順から外す設定か。
+ * `none` と、設定が壊れて知らない値になったときの両方で false。当てる側と予約する側で判定を揃える
+ * @param {string} mode GRID_TAB_SKIP のいずれか (のはずの値)
+ * @returns {boolean} both / title なら true
+ */
+function isSkippingMode(mode) {
+	return mode === GRID_TAB_SKIP.BOTH || mode === GRID_TAB_SKIP.TITLE;
+}
+
+/**
  * カードの中で、フォーカス順から外す要素を選ぶ。
  * 1 本目の作品リンクはサムネイル (作品を開く導線) なので決して外さない。
  * @param {ParentNode} card 作品カード (li)
@@ -26,7 +36,7 @@ import { warn } from '../common/log.js';
  * @returns {Element[]} 外す要素。mode が不明なら空
  */
 export function planSkipTargets(card, mode, links = [...card.querySelectorAll(ARTWORK_LINK_SELECTOR)]) {
-	if (mode !== GRID_TAB_SKIP.BOTH && mode !== GRID_TAB_SKIP.TITLE) return [];
+	if (!isSkippingMode(mode)) return [];
 	// 2 本目以降が作品タイトルのリンク。サムネイルと同じ href を指す
 	const targets = links.slice(1);
 	if (mode === GRID_TAB_SKIP.BOTH) targets.push(...card.querySelectorAll(CARD_BUTTON_SELECTOR));
@@ -45,6 +55,25 @@ function hasAccessibleName(thumb) {
 	if (thumb.hasAttribute('aria-label')) return true;
 	const alt = thumb.querySelector?.('img')?.getAttribute('alt') ?? '';
 	return alt.trim() !== '';
+}
+
+/**
+ * 自分が書き込んだ印 (tabindex="-1" と aria-label) を、root の下から取り除く。
+ * pixiv 側が元から持たせていた tabindex / aria-label には目印が無いので触らない。
+ * attachTabSkip の後片付けと、card-clone.js が雛形から印を落とすときの両方から呼ぶ。
+ * (雛形に残すと、tab-skip が居ない間に組んだカードだけ Tab 順が違い、読み上げが全部同じ作品名になる)
+ * @param {ParentNode} root 探す起点 (document やカードの li)
+ * @returns {void}
+ */
+export function stripTabSkipMarks(root) {
+	for (const el of root.querySelectorAll(`[${TAB_SKIP_MARK_ATTR}]`)) {
+		el.removeAttribute('tabindex');
+		el.removeAttribute(TAB_SKIP_MARK_ATTR);
+	}
+	for (const el of root.querySelectorAll(`[${TAB_SKIP_LABEL_ATTR}]`)) {
+		el.removeAttribute('aria-label');
+		el.removeAttribute(TAB_SKIP_LABEL_ATTR);
+	}
 }
 
 /**
@@ -116,7 +145,7 @@ export function attachTabSkip(doc, mode, deps = {}) {
 	 * @returns {void}
 	 */
 	const apply = (roots) => {
-		if (current === GRID_TAB_SKIP.NONE) return;
+		if (!isSkippingMode(current)) return;
 		try {
 			const done = new Set();
 			for (const root of roots) {
@@ -139,14 +168,7 @@ export function attachTabSkip(doc, mode, deps = {}) {
 	 */
 	const restore = () => {
 		try {
-			for (const el of doc.querySelectorAll(`[${TAB_SKIP_MARK_ATTR}]`)) {
-				el.removeAttribute('tabindex');
-				el.removeAttribute(TAB_SKIP_MARK_ATTR);
-			}
-			for (const el of doc.querySelectorAll(`[${TAB_SKIP_LABEL_ATTR}]`)) {
-				el.removeAttribute('aria-label');
-				el.removeAttribute(TAB_SKIP_LABEL_ATTR);
-			}
+			stripTabSkipMarks(doc);
 		} catch (error) {
 			warn('tab skip restore failed', error);
 		}
@@ -164,9 +186,10 @@ export function attachTabSkip(doc, mode, deps = {}) {
 		apply(roots);
 	};
 
-	// 何も外さない設定では予約すら入れない。無限スクロールの再描画ごとに空振りのタイマを積まないため
+	// 何も外さない設定 (none と、planSkipTargets が何もしない不明な値) では予約すら入れない。
+	// 無限スクロールの再描画ごとに空振りのタイマを積まないため
 	const observer = createObserver((records) => {
-		if (current === GRID_TAB_SKIP.NONE) return;
+		if (!isSkippingMode(current)) return;
 		for (const record of records ?? []) {
 			for (const node of record.addedNodes ?? []) pendingRoots.add(node);
 		}

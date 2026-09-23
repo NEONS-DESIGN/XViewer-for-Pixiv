@@ -1,26 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { main } from '../../src/popup/app.js';
 import { SETTINGS_DEFAULTS } from '../../src/common/constants.js';
 import { createStrings } from '../../src/i18n/index.js';
-import { fakeElement, fakeDoc as fakeDocWith, flush } from '../helpers/dom.js';
+import { renderPopup } from '../../src/popup/popup-ui.js';
+import { findRole, flush } from '../helpers/dom.js';
+import { bootPopup as boot } from '../helpers/popup.js';
 
 const { SAVE_FAILED, RESET_FAILED } = createStrings('ja').popup;
-
-/**
- * data-role で要素を探す。
- * @param {object} node 探し始める要素
- * @param {string} role 探す data-role
- * @returns {object|null} 見つかった要素
- */
-function findRole(node, role) {
-	if (node.dataset?.role === role) return node;
-	for (const child of node.children ?? []) {
-		const found = findRole(child, role);
-		if (found) return found;
-	}
-	return null;
-}
 
 /**
  * 後から決着させられる Promise。保存の完了のタイミングを試験側で握る。
@@ -30,75 +16,6 @@ function deferred() {
 	let resolve;
 	const promise = new Promise((done) => { resolve = done; });
 	return { promise, resolve };
-}
-
-/**
- * 画面を起動する。storage と描画を偽物にし、呼び出しを記録する。
- * @param {object} [options] 差し替え
- * @param {boolean|(() => Promise<boolean>)} [options.save] saveSetting の結果 (関数なら都度呼ぶ)
- * @param {boolean} [options.reset] resetSettings の結果
- * @param {boolean} [options.hasRoot] #app が存在するか
- * @param {Function} [options.renderPopup] 描画の差し替え
- * @returns {Promise<object>} 記録
- */
-async function boot(options = {}) {
-	const { save = true, reset = true, hasRoot = true } = options;
-	const doc = fakeDocWith();
-	// app.js が doc.documentElement.lang を書き換えるので、実物の <html> の代わりを用意する
-	doc.documentElement = fakeElement('html');
-	const root = fakeElement('main');
-	root.dataset.role = 'app';
-	// 共通の偽物は属性セレクタを解さないので、app.js が使う [data-role="x"] だけ受ける
-	root.querySelector = (selector) => findRole(root, /\[data-role="([^"]+)"\]/.exec(selector)[1]);
-	doc.getElementById = (id) => (hasRoot && id === 'app' ? root : null);
-
-	const stored = { ...SETTINGS_DEFAULTS };
-	const renders = [];
-	const loads = [];
-	const reports = [];
-	let tab = 'settings';
-
-	const deps = {
-		doc,
-		loadSettings: async () => {
-			loads.push({ ...stored });
-			return { ...stored };
-		},
-		saveSetting: async (key, value) => {
-			const ok = typeof save === 'function' ? await save(key, value) : save;
-			if (ok) stored[key] = value;
-			return ok;
-		},
-		resetSettings: async () => {
-			if (reset) Object.assign(stored, SETTINGS_DEFAULTS);
-			return reset;
-		},
-		renderPopup: options.renderPopup ?? ((args) => {
-			renders.push(args);
-			// 描いたものの代わり。フォーカスの戻り先になる要素だけ置く
-			const parts = [...Object.keys(SETTINGS_DEFAULTS), 'reset'].map((role) => {
-				const element = fakeElement('button');
-				element.dataset.role = role;
-				return element;
-			});
-			args.root.replaceChildren(...parts);
-			return { currentTab: () => tab };
-		}),
-		report: (...args) => reports.push(args),
-	};
-
-	await main(deps);
-	return {
-		root,
-		stored,
-		renders,
-		loads,
-		reports,
-		setTab: (id) => { tab = id; },
-		last: () => renders.at(-1),
-		change: (patch) => renders.at(-1).onChange(patch),
-		resetNow: () => renders.at(-1).onReset(),
-	};
 }
 
 test('起動時に設定を読んで通知なしで描く', async () => {
@@ -133,12 +50,48 @@ test('保存に失敗したら通知を出して保存済みの値で描き直�
 	assert.equal(last().settings.enabled, true);
 });
 
+test('保存が reject しても失敗として通知を出し、記録も残す', async () => {
+	// saveSetting は false を返す契約だが、差し替えた実装が投げたときにログだけで終わると
+	// 画面は変えたままの値を出し続ける
+	const failure = new Error('storage が壊れた');
+	const { renders, last, reports, change } = await boot({ save: async () => { throw failure; } });
+	change({ enabled: false });
+	await flush();
+	assert.equal(renders.length, 2);
+	assert.equal(last().notice, SAVE_FAILED);
+	assert.equal(reports.length, 1);
+	assert.match(reports[0][0], /保存に失敗/);
+	assert.equal(reports[0][1], failure);
+});
+
+test('変更が 1 項目でなければ保存せず記録する', async () => {
+	// イベントハンドラの中で素の例外を投げると report を通らない
+	const { stored, reports, change } = await boot();
+	change({});
+	change({ enabled: false, showSidebar: false });
+	await flush();
+	assert.deepEqual(stored, { ...SETTINGS_DEFAULTS });
+	assert.equal(reports.length, 2);
+	for (const report of reports) assert.match(report[0], /1 項目ずつ/);
+});
+
 test('失敗の描き直しでは変えた項目へフォーカスを戻す', async () => {
 	// 丸ごと作り直すとフォーカスが body へ落ち、キーボードの現在地が失われる
 	const { root, change } = await boot({ save: false });
 	change({ showSidebar: false });
 	await flush();
 	assert.equal(findRole(root, 'showSidebar').focused, true);
+});
+
+test('テーマ切り替えの保存に失敗しても切り替えボタンへフォーカスが戻る (実物の描画)', async () => {
+	// 偽の描画は設定キーごとに data-role を生やすので、実物のボタンの data-role がキーと違っても
+	// 上の検査は通ってしまう。実物の renderPopup で見出しのボタンまで確かめる
+	const { root, reports } = await boot({ save: false, renderPopup });
+	findRole(root, 'popupTheme').dispatch('click');
+	await flush();
+	assert.deepEqual(reports, []);
+	assert.equal(findRole(root, 'notice').textContent, SAVE_FAILED);
+	assert.equal(findRole(root, 'popupTheme').focused, true);
 });
 
 test('失敗の通知は次の保存が成功したときに消える', async () => {

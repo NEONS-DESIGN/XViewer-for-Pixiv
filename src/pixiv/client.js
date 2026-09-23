@@ -15,6 +15,12 @@ const CONTENT_TYPE_JSON = 'application/json; charset=utf-8';
 const CONTENT_TYPE_FORM = 'application/x-www-form-urlencoded; charset=utf-8';
 const ACCEPT_JSON = 'application/json';
 
+/** urlencoded の POST に共通のヘッダ。postForm() と postFormRaw() は同じものを送り、応答の読み方だけが違う。 */
+const FORM_HEADERS = Object.freeze({
+	[HEADER_ACCEPT]: ACCEPT_JSON,
+	[HEADER_CONTENT_TYPE]: CONTENT_TYPE_FORM,
+});
+
 /** fetch が中断されたときに投げる例外の name (DOMException)。 */
 const ABORT_ERROR_NAME = 'AbortError';
 
@@ -173,10 +179,7 @@ export function postJson(url, payload, token, deps = {}) {
  * @returns {Promise<object>} 応答の JSON そのもの (配列を含む)
  */
 export function postFormRaw(url, params, token, deps = {}) {
-	return post(url, {
-		[HEADER_ACCEPT]: ACCEPT_JSON,
-		[HEADER_CONTENT_TYPE]: CONTENT_TYPE_FORM,
-	}, new URLSearchParams(params).toString(), token, deps, readJson);
+	return post(url, FORM_HEADERS, new URLSearchParams(params).toString(), token, deps, readJson);
 }
 
 /**
@@ -193,10 +196,7 @@ export function postFormRaw(url, params, token, deps = {}) {
  * @returns {Promise<unknown>} body
  */
 export function postForm(url, params, token, deps = {}) {
-	return post(url, {
-		[HEADER_ACCEPT]: ACCEPT_JSON,
-		[HEADER_CONTENT_TYPE]: CONTENT_TYPE_FORM,
-	}, new URLSearchParams(params).toString(), token, deps);
+	return post(url, FORM_HEADERS, new URLSearchParams(params).toString(), token, deps);
 }
 
 /**

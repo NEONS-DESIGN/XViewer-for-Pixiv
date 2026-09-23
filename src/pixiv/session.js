@@ -61,7 +61,9 @@ export function parseNextData(text) {
 	// preloadedState は JSON 文字列として二重に入っている
 	try {
 		const preloaded = JSON.parse(pageProps.serverSerializedPreloadedState);
-		session.csrfToken = preloaded?.api?.token ?? null;
+		// 文字列でない・空の token は「無い」と同じ。client.js の post() が !token で UNAUTHORIZED に倒す
+		const token = preloaded?.api?.token;
+		session.csrfToken = typeof token === 'string' && token !== '' ? token : null;
 		const self = preloaded?.userData?.self;
 		if (self) {
 			// 作品詳細の userId は文字列なので型をそろえる。空文字は「読めなかった」と同じ扱い

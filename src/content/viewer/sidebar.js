@@ -20,10 +20,6 @@ const SAFE_SCHEMES = ['http:', 'https:'];
 /** ユーザー ID の見出し。数字だけだと何の番号か分からないので前に置く。 */
 const USER_ID_PREFIX = 'ID: ';
 
-/**
- * アバターがまだ表示できない (取得前・取得失敗) ことを示すクラス。
- * 見た目は viewer.css が持つ。(枠だけ残して中身を隠す)
- */
 /** 読み上げにだけ渡す文字に付けるクラス。見た目は viewer.css の .visually-hidden。 */
 const VISUALLY_HIDDEN_CLASS = 'visually-hidden';
 
@@ -46,6 +42,18 @@ const NUMERIC_ENTITY_PATTERN = /&#(x[0-9a-f]+|\d+);/gi;
 
 /** 名前付きの実体参照。ENTITIES のキーと同じ範囲。 */
 const NAMED_ENTITY_PATTERN = /&(?:amp|lt|gt|quot);/g;
+
+/** 投稿文の br。この前後で行を分ける。 */
+const LINE_BREAK_PATTERN = /<br\s*\/?>/i;
+
+/**
+ * 投稿文の a。1 番目の捕捉が href、2 番目が中身。
+ * g フラグ付きは lastIndex を持つので、使うときは行ごとに `new RegExp()` で複製する
+ */
+const ANCHOR_PATTERN = /<a\b[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/gis;
+
+/** 残すタグ以外の全てのタグ。中身のテキストだけ残すために消す。 */
+const ANY_TAG_PATTERN = /<[^>]*>/g;
 
 /**
  * ISO 8601 の日時を画面の表記にする。
@@ -118,23 +126,24 @@ function resolveSafeHref(href) {
 export function splitComment(html) {
 	if (!html) return [];
 	return html
-		.split(/<br\s*\/?>/i)
+		.split(LINE_BREAK_PATTERN)
 		.map((line) => {
 			const parts = [];
-			const pattern = /<a\b[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/gis;
+			// g 付きの正規表現は lastIndex を持ち回るので、行ごとに複製して使う
+			const pattern = new RegExp(ANCHOR_PATTERN);
 			let cursor = 0;
 			let matched;
 			while ((matched = pattern.exec(line)) !== null) {
 				const before = line.slice(cursor, matched.index);
-				if (before) parts.push({ type: 'text', value: decodeEntities(before.replace(/<[^>]*>/g, '')) });
-				const label = decodeEntities(matched[2].replace(/<[^>]*>/g, ''));
+				if (before) parts.push({ type: 'text', value: decodeEntities(before.replace(ANY_TAG_PATTERN, '')) });
+				const label = decodeEntities(matched[2].replace(ANY_TAG_PATTERN, ''));
 				const href = resolveSafeHref(decodeEntities(matched[1]));
 				// 危険なスキームはリンクにせず本文として出す
 				parts.push(href ? { type: 'link', value: label, href } : { type: 'text', value: label });
 				cursor = matched.index + matched[0].length;
 			}
 			const rest = line.slice(cursor);
-			if (rest) parts.push({ type: 'text', value: decodeEntities(rest.replace(/<[^>]*>/g, '')) });
+			if (rest) parts.push({ type: 'text', value: decodeEntities(rest.replace(ANY_TAG_PATTERN, '')) });
 			return parts;
 		});
 }
@@ -177,7 +186,7 @@ export function commentToNodes(doc, html) {
 /**
  * サイドバーを作る。
  * @param {SidebarDeps} deps 依存
- * @returns {{render: (detail: object) => void, followSlot: () => HTMLElement, countsSlot: () => HTMLElement, commentsSlot: () => HTMLElement, bumpCommentCount: (delta: number) => void, setCommentCount: (next: number) => void, consumeEscape: () => boolean, consumeKey: (event: KeyboardEvent) => boolean, dispose: () => void}}
+ * @returns {{render: (detail: object) => void, followSlot: () => HTMLElement, countsSlot: () => HTMLElement, commentsSlot: () => HTMLElement, bumpCommentCount: (delta: number) => void, setCommentCount: (next: number) => void, consumeKey: (event: KeyboardEvent) => boolean, dispose: () => void}}
  */
 export function createSidebar(deps) {
 	const { doc, container, strings } = deps;
@@ -438,16 +447,8 @@ export function createSidebar(deps) {
 		},
 
 		/**
-		 * Escape をシェアメニューに使わせる。
-		 * ビュワー本体がモーダルを閉じるより先に呼ばれ、true なら本体は反応しない。
-		 * @returns {boolean} 食い止めたなら true
-		 */
-		consumeEscape() {
-			return shareMenu?.consumeEscape() === true;
-		},
-
-		/**
 		 * キー操作をシェアメニューに先に使わせる。(Escape / 上下 / Home / End)
+		 * ビュワー本体がモーダルを閉じたり作品を移ったりするより先に呼ばれ、
 		 * true なら本体は反応しない。開いたメニューで下キーを押して次の作品へ移らないように
 		 * @param {KeyboardEvent} event キー
 		 * @returns {boolean} 食い止めたなら true

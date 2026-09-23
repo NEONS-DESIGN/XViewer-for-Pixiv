@@ -14,6 +14,7 @@ import { SUPPORTED_LANGUAGES } from '../../src/common/language.js';
 import { createSections } from '../../src/popup/sections.js';
 import { THEME_TOGGLE } from '../../src/common/constants.js';
 import { THIRD_PARTY } from '../../src/common/licenses.js';
+import { SENTINEL_TEXT_KEYS } from '../../src/content/infinite.js';
 
 /**
  * 2 つの集合が一致することを確かめる。
@@ -59,13 +60,11 @@ test('THIRD_PARTY の name が strings.licenses.notes のキーと一致する',
 	}
 });
 
-test('strings.infinite が infinite.js の失敗状態と対応するキーを持つ', () => {
-	// FAILURE_TEXT_KEY は infinite.js の非公開の定数なので export しない。
-	// 代わりに、sentinel が実際に引くキー (ERROR / BUILD_FAILED / LOADING / RETRY / DONE) が
-	// 過不足なく揃っていることを両言語で確かめる。(src/content/infinite.js を参照)
-	const expectedKeys = ['ERROR', 'BUILD_FAILED', 'LOADING', 'RETRY', 'DONE'];
+test('strings.infinite が infinite.js の sentinel が引くキーと一致する', () => {
+	// 他の 3 本と同じく、コード側 (SENTINEL_TEXT_KEYS) を基準にする。
+	// 手書きの写しだと infinite.js で使わなくなったキーがカタログに残っても検出できない
 	for (const lang of SUPPORTED_LANGUAGES) {
 		const strings = createStrings(lang);
-		assertSameKeySet(Object.keys(strings.infinite), expectedKeys, `[${lang}] infinite`);
+		assertSameKeySet(Object.keys(strings.infinite), SENTINEL_TEXT_KEYS, `[${lang}] infinite`);
 	}
 });

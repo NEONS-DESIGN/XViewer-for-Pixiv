@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeComment, renderCommentText, renderStamp, createComments, commentsFloorHeight, isHeadingStuck, formatPostedDate, commentLabel } from '../../src/content/viewer/comments.js';
+import { normalizeComment, renderCommentText, renderStamp, createComments, formatPostedDate, commentLabel } from '../../src/content/viewer/comments.js';
+import { commentsFloorHeight, isHeadingStuck } from '../../src/content/viewer/comments-layout.js';
+import { createConfirmRegistry } from '../../src/content/viewer/comments-delete.js';
 import { fakeElement, fakeDoc, find, findAll, iconName, flush } from '../helpers/dom.js';
 import { clearSessionCache } from '../../src/content/session.js';
 import { PixivError, PIXIV_ERROR_KINDS } from '../../src/pixiv/errors.js';
@@ -396,13 +398,16 @@ test('返信の開閉ボタンは開いているかが分かるアイコンを�
 	assert.equal(iconName(mark.children[0]), 'expandLess');
 });
 
-test('コメントの下段は返信ボタンが左、日時が右', async () => {
+test('コメントの下段は返信ボタンが左、返信を表示がその隣、日時が右', async () => {
+	// 返信を書く導線が左端、返信を読む導線がその隣、日時が右端
 	const { container, comments } = build(async () => ({ comments: [ROOT], hasNext: false }));
 	await comments.load(DETAIL);
 	const body = find(container, '.comment-body');
 	assert.deepEqual(body.children.map((child) => child.className), ['comment-name', 'comment-text', 'comment-meta']);
 	const meta = find(container, '.comment-meta');
 	assert.deepEqual(meta.children.map((child) => child.className), ['comment-reply-toggle', 'comment-replies-slot', 'comment-date']);
+	assert.equal(meta.children[0].textContent, '返信');
+	assert.equal(meta.children[0].type, 'button');
 	assert.equal(meta.children[1].children[0].className, 'comment-replies');
 });
 
@@ -435,10 +440,12 @@ test('読み込みに失敗したら再試行できるようにボタンを残�
 
 	// もう一度失敗しても表示は 1 つのまま
 	await more.dispatch('click');
+	await flush();
 	assert.equal(container.children.filter((child) => child.className === 'status').length, 1);
 
 	fail = false;
 	await more.dispatch('click');
+	await flush();
 	assert.equal(container.children.filter((child) => child.className === 'status').length, 0);
 	assert.equal(find(container, '.comment-list').children.length, 1);
 	assert.equal(more.hidden, true);
@@ -591,11 +598,14 @@ test('返信の失敗表示は 1 つだけで、読み直せたら消す', async
 	await comments.load(DETAIL);
 	const toggle = find(container, '.comment-replies');
 	await toggle.click();
+	await flush();
 	await toggle.click();
+	await flush();
 	// 2 回失敗しても積み上げない
 	assert.equal(findAll(container, '.reply-error').length, 1);
 	fail = false;
 	await toggle.click();
+	await flush();
 	assert.equal(findAll(container, '.reply-error').length, 0);
 	assert.equal(find(container, '.comment-reply-list').children.length, 1);
 });
@@ -610,12 +620,15 @@ test('返信を畳んだら失敗の表示も消す', async () => {
 	await comments.load(DETAIL);
 	const toggle = find(container, '.comment-replies');
 	await toggle.click();
+	await flush();
 	assert.equal(findAll(container, '.reply-error').length, 1);
 	// 開き直して読めたあと畳む
 	fail = false;
 	await toggle.click();
+	await flush();
 	assert.equal(findAll(container, '.reply-error').length, 0);
 	await toggle.click();
+	await flush();
 	assert.equal(find(container, '.comment-replies-area'), null);
 	assert.equal(findAll(container, '.reply-error').length, 0);
 });
@@ -632,8 +645,10 @@ test('2 ページ目以降の返信に失敗しても、見えている返信は
 	await comments.load(DETAIL);
 	const toggle = find(container, '.comment-replies');
 	await toggle.click();
+	await flush();
 	const more = find(container, '.reply-more');
 	await more.click();
+	await flush();
 	assert.equal(find(container, '.comment-reply-list').children.length, 1);
 	assert.equal(toggle.getAttribute('aria-expanded'), 'true');
 	assert.equal(toggle.children[1].textContent, '返信を隠す');
@@ -643,6 +658,7 @@ test('2 ページ目以降の返信に失敗しても、見えている返信は
 	// 押し直せば同じページから読み直し、文言を戻す
 	failNext = false;
 	await more.click();
+	await flush();
 	assert.equal(find(container, '.comment-reply-list').children.length, 2);
 	assert.equal(find(container, '.reply-error'), null);
 	assert.equal(find(container, '.reply-more'), null);
@@ -664,11 +680,13 @@ test('キーボードで押した返信ボタンへ読み込み後にフォー�
 	const toggle = find(container, '.comment-replies');
 	toggle.focus();
 	await toggle.click();
+	await flush();
 	assert.equal(toggle.focused, true);
 
 	const more = find(container, '.reply-more');
 	more.focus();
 	await more.click();
+	await flush();
 	assert.equal(more.focused, true);
 });
 
@@ -687,9 +705,11 @@ test('フォーカスが無いボタンには読み込み後もフォーカス�
 	await comments.load(DETAIL);
 	const toggle = find(container, '.comment-replies');
 	await toggle.click();
+	await flush();
 	assert.equal(toggle.focused, false);
 	const more = find(container, '.more');
 	await more.click();
+	await flush();
 	assert.equal(more.focused, false);
 });
 
@@ -710,6 +730,7 @@ test('「もっと見る」をキーボードで押したら読み込み後に�
 	const more = find(container, '.more');
 	more.focus();
 	await more.click();
+	await flush();
 	assert.equal(more.focused, true);
 });
 
@@ -974,18 +995,6 @@ test('投稿には CSRF トークンを渡す', async () => {
 	assert.deepEqual(tokens, ['csrf-token']);
 });
 
-test('返信ボタンは「返信を表示」の左に並ぶ', async () => {
-	// 返信を書く導線が左端、返信を読む導線がその隣、日時が右端
-	const { container, comments } = buildPostable();
-	await comments.load(POST_DETAIL);
-	const meta = find(container, '.comment-meta');
-	assert.deepEqual(meta.children.map((child) => child.className), [
-		'comment-reply-toggle', 'comment-replies-slot', 'comment-date',
-	]);
-	assert.equal(meta.children[0].textContent, '返信');
-	assert.equal(meta.children[0].type, 'button');
-});
-
 test('返信ボタンは押すたびに入力欄を出し入れする', async () => {
 	const { container, comments } = buildPostable();
 	await comments.load(POST_DETAIL);
@@ -1104,7 +1113,7 @@ test('返信欄を閉じたら書きかけごと捨てて Escape を渡す', asy
 	const toggle = find(item, '.comment-reply-toggle');
 	await toggle.click();
 	const input = find(replyForm(item), '.comment-form-input');
-	await input.dispatch('focus', {});
+	input.focus();
 	input.value = '書きかけ';
 	await input.dispatch('input', {});
 	assert.equal(comments.consumeKey({ key: 'Escape' }), true);
@@ -1209,6 +1218,8 @@ test('自分のコメントには「あなた」、作者には「作者」が�
 	// 名前のすぐ後ろに置く (pixiv 本体と同じ並び)
 	const body = find(items[0], '.comment-body');
 	assert.deepEqual(body.children.slice(0, 2).map((child) => child.className), ['comment-name', 'comment-label is-self']);
+	// pixiv 本体は「あなた」が緑、「作者」が青。(実測) 印を付けるのは「あなた」だけで、地の色は CSS が is-self で切り替える
+	assert.equal(find(items[1], '.comment-label').classList.contains('is-self'), false);
 });
 
 test('削除できるコメントにだけ削除ボタンを出す', async () => {
@@ -1269,7 +1280,7 @@ test('確認中にフォーカスが外れたら元に戻す', async () => {
 });
 
 test('削除できたら一覧から外して件数を数え直す', async () => {
-	let delta = null;
+	let count = null;
 	const { container, comments } = buildPostable({
 		fetchJson: async (url) => (url.includes('/ajax/illust/')
 			// ルートを消すと返信も道連れになるので、件数は引き直した値で置き換える
@@ -1282,7 +1293,7 @@ test('削除できたら一覧から外して件数を数え直す', async () =>
 				hasNext: false,
 			}),
 		actions: { deleteComment: async () => {} },
-		onDeleted: (count) => { delta = count; },
+		onDeleted: (next) => { count = next; },
 	});
 	await comments.load(POST_DETAIL);
 	const button = find(container, '.comment-delete');
@@ -1290,15 +1301,15 @@ test('削除できたら一覧から外して件数を数え直す', async () =>
 	await button.click();
 	await flush();
 	assert.equal(findAll(container, '.comment-item').length, 1);
-	assert.equal(delta, 7);
+	assert.equal(count, 7);
 });
 
 test('削除に失敗したら行を残して知らせる', async () => {
-	let delta = 'よばれていない';
+	let count = 'よばれていない';
 	const { container, comments } = buildPostable({
 		fetchJson: async () => ({ comments: [{ ...ROOT, editable: true, hasReplies: false }], hasNext: false }),
 		actions: { deleteComment: async () => { throw new Error('失敗'); } },
-		onDeleted: (count) => { delta = count; },
+		onDeleted: (next) => { count = next; },
 	});
 	await comments.load(POST_DETAIL);
 	const button = find(container, '.comment-delete');
@@ -1307,7 +1318,7 @@ test('削除に失敗したら行を残して知らせる', async () => {
 	await flush();
 	// 消せていないのに画面から消すと、読み直したときに戻ってくる
 	assert.equal(findAll(container, '.comment-item').length, 1);
-	assert.equal(delta, 'よばれていない');
+	assert.equal(count, 'よばれていない');
 	const error = find(container, '.comment-error');
 	assert.equal(error.getAttribute('role'), 'alert');
 	assert.equal(error.textContent, 'コメントを削除できませんでした');
@@ -1329,7 +1340,8 @@ test('投稿した直後の 1 件も自分で消せる', async () => {
 	assert.equal(find(first, '.comment-label').textContent, 'あなた');
 });
 
-test('返信も削除できる', async () => {
+test('返信にも削除ボタンが付く', async () => {
+	// 実際に消す経路は「返信を消すと返信一覧から外れ…」が見る
 	const { container, comments } = buildPostable({
 		fetchJson: async (url) => (url.includes('replies')
 			? { comments: [{ ...REPLY, editable: true }], hasNext: false }
@@ -1453,22 +1465,201 @@ test('件数の数え直しはブラウザのキャッシュを外して引く',
 	assert.match(counted, /[?&]_=\d+/);
 });
 
-test('「あなた」のラベルだけ印を付けて色を分ける', async () => {
-	// pixiv 本体は「あなた」が緑、「作者」が青。(実測) 地の色は CSS が is-self で切り替える
+test('削除で空に戻した作品へ投稿すると案内が消える', async () => {
+	// 最後の 1 件を消すと一覧を残したまま「まだコメントはありません」が出る。
+	// そこへ投稿したとき、一覧があることを理由に案内を消し忘れると 1 件と案内が並ぶ
+	const { container, comments } = buildPostable({
+		fetchJson: async (url) => (url.includes('/ajax/illust/')
+			? { commentCount: 0 }
+			: { comments: [{ ...ROOT, editable: true, hasReplies: false }], hasNext: false }),
+		actions: {
+			deleteComment: async () => {},
+			postComment: async () => ({ id: '900', userId: '99', userName: '自分', text: 'また来ます', stampId: null }),
+		},
+	});
+	await comments.load(POST_DETAIL);
+	const button = find(container, '.comment-delete');
+	await button.click();
+	await button.click();
+	await flush();
+	assert.equal(find(container, '.status').textContent, 'まだコメントはありません');
+
+	await submitText(find(find(container, '.comments-header'), '.comment-form'), 'また来ます');
+	assert.equal(find(container, '.status'), null);
+	assert.deepEqual(container.children.map((child) => child.className), ['comments-header', 'comment-scroll']);
+	assert.equal(findAll(container, '.comment-item').length, 1);
+});
+
+test('数え直しを待つ間に別の作品へ移ったら前の作品の件数を渡さない', async () => {
+	// onDeleted の先はサイドバーの件数。前の作品の値を新しい作品に書いてしまう
+	let releaseCount;
+	const counts = [];
+	const { container, comments } = buildPostable({
+		fetchJson: (url) => {
+			if (url.includes('/ajax/illust/')) return new Promise((resolve) => { releaseCount = resolve; });
+			return Promise.resolve({ comments: [{ ...ROOT, editable: true, hasReplies: false }], hasNext: false });
+		},
+		actions: { deleteComment: async () => {} },
+		onDeleted: (count) => { counts.push(count); },
+	});
+	await comments.load(POST_DETAIL);
+	const button = find(container, '.comment-delete');
+	await button.click();
+	await button.click();
+	await flush();
+	// 数え直しの応答を待たせたまま別の作品へ
+	await comments.load({ ...POST_DETAIL, id: '149425017' });
+	releaseCount({ commentCount: 42 });
+	await flush();
+	assert.deepEqual(counts, []);
+});
+
+test('数え直した件数を受け取る側が投げても削除の失敗にはしない', async () => {
+	// 行は既に外している。失敗の表示を出すと「消えたのに消せなかった」と読める
+	const { container, comments } = buildPostable({
+		fetchJson: async (url) => (url.includes('/ajax/illust/')
+			? { commentCount: 0 }
+			: { comments: [{ ...ROOT, editable: true, hasReplies: false }], hasNext: false }),
+		actions: { deleteComment: async () => {} },
+		onDeleted: () => { throw new Error('受け手が落ちた'); },
+	});
+	await comments.load(POST_DETAIL);
+	const button = find(container, '.comment-delete');
+	await button.click();
+	await button.click();
+	await flush();
+	assert.equal(findAll(container, '.comment-item').length, 0);
+	assert.equal(find(container, '.comment-error'), null);
+});
+
+test('フォーカスのあるボタンで消したら次の行の削除ボタンへフォーカスを移す', async () => {
+	// 行ごと消えるとフォーカスが body へ落ち、Tab の起点を失う
 	const { container, comments } = buildPostable({
 		fetchJson: async () => ({
 			comments: [
-				{ ...ROOT, id: 'a', userId: '99', userName: '自分', hasReplies: false },
-				{ ...ROOT, id: 'b', userId: '54734418', userName: '作者さん', hasReplies: false },
+				{ ...ROOT, id: 'a', editable: true, hasReplies: false },
+				{ ...ROOT, id: 'b', hasReplies: false },
+				{ ...ROOT, id: 'c', editable: true, hasReplies: false },
 			],
 			hasNext: false,
 		}),
+		actions: { deleteComment: async () => {} },
 	});
 	await comments.load(POST_DETAIL);
-	const labels = findAll(container, '.comment-label');
-	assert.deepEqual(labels.map((one) => one.textContent), ['あなた', '作者']);
-	assert.equal(labels[0].classList.contains('is-self'), true);
-	assert.equal(labels[1].classList.contains('is-self'), false);
+	const buttons = findAll(container, '.comment-delete');
+	buttons[0].focus();
+	await buttons[0].click();
+	await buttons[0].click();
+	await flush();
+	// 間の行 (b) には削除ボタンが無い。その次の c へ
+	assert.equal(buttons[1].focused, true);
+});
+
+test('消した行の後ろに削除ボタンが無ければ見出しへフォーカスを移す', async () => {
+	const { container, comments } = buildPostable({
+		fetchJson: async () => ({
+			comments: [
+				{ ...ROOT, id: 'a', hasReplies: false },
+				{ ...ROOT, id: 'b', editable: true, hasReplies: false },
+			],
+			hasNext: false,
+		}),
+		actions: { deleteComment: async () => {} },
+	});
+	await comments.load(POST_DETAIL);
+	const button = find(container, '.comment-delete');
+	button.focus();
+	await button.click();
+	await button.click();
+	await flush();
+	const heading = find(container, '.comments-heading');
+	// Tab の巡回には入れず、プログラムからだけ置けるようにする
+	assert.equal(heading.getAttribute('tabindex'), '-1');
+	assert.equal(heading.focused, true);
+});
+
+test('フォーカスの無いボタンで消したときはフォーカスを動かさない', async () => {
+	const { container, comments } = buildPostable({
+		fetchJson: async () => ({
+			comments: [
+				{ ...ROOT, id: 'a', editable: true, hasReplies: false },
+				{ ...ROOT, id: 'b', editable: true, hasReplies: false },
+			],
+			hasNext: false,
+		}),
+		actions: { deleteComment: async () => {} },
+	});
+	await comments.load(POST_DETAIL);
+	const buttons = findAll(container, '.comment-delete');
+	await buttons[0].click();
+	await buttons[0].click();
+	await flush();
+	assert.equal(buttons[1].focused, false);
+	assert.equal(find(container, '.comments-heading').focused, false);
+});
+
+test('返信欄を開いたままのルートを消したら、その欄は Escape を食い止めなくなる', async () => {
+	// 行ごと消えた入力欄が forms に残ると、見えない書きかけが Escape を食い止め続ける
+	const { container, comments } = buildPostable({
+		fetchJson: async () => ({ comments: [{ ...ROOT, editable: true, hasReplies: false }], hasNext: false }),
+		actions: { deleteComment: async () => {} },
+	});
+	await comments.load(POST_DETAIL);
+	const item = find(container, '.comment-item');
+	await find(item, '.comment-reply-toggle').click();
+	const input = find(replyForm(item), '.comment-form-input');
+	input.value = '書きかけ';
+	await input.dispatch('input', {});
+	// その欄でピッカーも開いておく
+	await find(replyForm(item), '.comment-form-pick').click();
+	assert.ok(find(item, '.comment-picker'));
+
+	const button = find(container, '.comment-delete');
+	await button.click();
+	await button.click();
+	await flush();
+	assert.equal(findAll(container, '.comment-item').length, 0);
+	assert.equal(comments.consumeKey({ key: 'Escape' }), false);
+});
+
+test('破棄した後に押された投稿は送らない', async () => {
+	const { container, comments, posted } = buildPostable();
+	await comments.load(POST_DETAIL);
+	const form = find(find(container, '.comments-header'), '.comment-form');
+	const input = find(form, '.comment-form-input');
+	input.value = 'いいですね';
+	await input.dispatch('input', {});
+	comments.dispose();
+	await find(form, '.comment-form-submit').click();
+	await flush();
+	assert.deepEqual(posted, []);
+	// 落とさず、失敗の表示も出さない
+	assert.equal(find(form, '.comment-form-error'), null);
+});
+
+test('聞き返しの台帳は同時に 1 つだけ覚え、Escape で畳める', () => {
+	const registry = createConfirmRegistry();
+	const cancelled = [];
+	const first = () => cancelled.push('first');
+	const second = () => cancelled.push('second');
+	assert.equal(registry.cancel(), false);
+	registry.claim(first);
+	// 別のボタンが聞き返しを始めたら前のは畳む
+	registry.claim(second);
+	assert.deepEqual(cancelled, ['first']);
+	// 同じボタンの claim では畳まない
+	registry.claim(second);
+	assert.deepEqual(cancelled, ['first']);
+	// 別のボタンの release は無視する
+	registry.release(first);
+	assert.equal(registry.cancel(), true);
+	assert.deepEqual(cancelled, ['first', 'second']);
+	// 畳んだあと (release 済み相当) の cancel は何もしない
+	registry.release(second);
+	assert.equal(registry.cancel(), false);
+	registry.claim(first);
+	registry.clear();
+	assert.equal(registry.cancel(), false);
 });
 
 test('英語のカタログでコメント欄の文言が英語になる', async () => {

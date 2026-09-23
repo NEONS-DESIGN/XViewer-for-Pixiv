@@ -58,6 +58,8 @@ export function createZoomLayer(deps) {
 
 	/** @type {HTMLElement|null} レイヤ本体 (スクロールする器)。閉じているときは null */
 	let layer = null;
+	/** @type {HTMLElement|null} 画像の入れ物 (.zoom-canvas)。読めないページの文言の置き場 */
+	let canvas = null;
 	/** @type {HTMLImageElement|null} */
 	let image = null;
 	/** @type {HTMLElement|null} */
@@ -123,11 +125,22 @@ export function createZoomLayer(deps) {
 
 	/**
 	 * 今のページを描く。
+	 * URL が空のページ (safeCdnUrl で弾かれた) は真っ黒な画面になるだけなので、
+	 * 画像ペインの読み込み失敗と同じ文言を画像の入れ物に出す。(1 枚目が空なら open() が開かない)
 	 * @returns {void}
 	 */
 	function paint() {
 		if (!layer) return;
-		image.src = urls[index] ?? '';
+		const url = urls[index] ?? '';
+		image.src = url;
+		canvas.querySelector('.pane-error')?.remove();
+		if (!url) {
+			const line = doc.createElement('p');
+			line.className = 'pane-error';
+			line.setAttribute('role', 'alert');
+			line.textContent = strings.imagePane.IMAGE_FAILED;
+			canvas.appendChild(line);
+		}
 		if (counter) {
 			counter.textContent = `${index + 1}/${urls.length}`;
 			counter.hidden = urls.length <= 1;
@@ -167,6 +180,7 @@ export function createZoomLayer(deps) {
 		image.src = '';
 		layer.remove();
 		layer = null;
+		canvas = null;
 		image = null;
 		counter = null;
 		zones = {};
@@ -202,7 +216,7 @@ export function createZoomLayer(deps) {
 			layer.setAttribute('aria-modal', 'true');
 			layer.setAttribute('aria-label', `${pages.alt ?? ''} - ${strings.zoom.LABEL}`.trim());
 
-			const canvas = doc.createElement('div');
+			canvas = doc.createElement('div');
 			canvas.className = 'zoom-canvas';
 
 			image = doc.createElement('img');

@@ -9,9 +9,13 @@ test('ユーザーページの各タブを認識する', () => {
 	assert.deepEqual(parseUserPage('/users/54734418/artworks'), works);
 	assert.deepEqual(parseUserPage('/users/54734418/illustrations'), { ...works, category: WORK_CATEGORY.ILLUST });
 	assert.deepEqual(parseUserPage('/users/54734418/manga'), { ...works, category: WORK_CATEGORY.MANGA });
-	// ブックマークもユーザーページだが、並んでいるのは他人の作品なので作品グリッドではない
-	assert.deepEqual(parseUserPage('/users/54734418/bookmarks/artworks'),
-		{ userId: '54734418', isWorksGrid: false, isTagFiltered: false, category: null });
+	// 絞り込み中も作品グリッドではある (広げるかどうかは isTagFiltered が決める)
+	assert.deepEqual(parseUserPage('/users/54734418/artworks/東方'), { ...works, isTagFiltered: true });
+	// ブックマーク・フォロー中・リクエストもユーザーページだが、並んでいるのは他人の作品なので作品グリッドではない
+	const others = { userId: '54734418', isWorksGrid: false, isTagFiltered: false, category: null };
+	assert.deepEqual(parseUserPage('/users/54734418/bookmarks/artworks'), others);
+	assert.deepEqual(parseUserPage('/users/54734418/following'), others);
+	assert.deepEqual(parseUserPage('/users/54734418/request'), others);
 });
 
 test('タグ絞り込み中のユーザーページを見分ける', () => {
@@ -57,17 +61,6 @@ test('pageKey は作品グリッド以外を別のキーにする', () => {
 	assert.notEqual(pageKey('/users/1'), pageKey('/users/1/bookmarks/artworks'));
 	assert.notEqual(pageKey('/users/1'), pageKey('/users/1/following'));
 	assert.notEqual(pageKey('/users/1'), pageKey('/users/1/mypixiv'));
-});
-
-test('parseUserPage は作品グリッドかどうかを見分ける', () => {
-	assert.equal(parseUserPage('/users/1').isWorksGrid, true);
-	assert.equal(parseUserPage('/users/1/artworks').isWorksGrid, true);
-	assert.equal(parseUserPage('/users/1/manga').isWorksGrid, true);
-	// 絞り込み中も作品グリッドではある (広げるかどうかは isTagFiltered が決める)
-	assert.equal(parseUserPage('/users/1/artworks/東方').isWorksGrid, true);
-	assert.equal(parseUserPage('/users/1/bookmarks/artworks').isWorksGrid, false);
-	assert.equal(parseUserPage('/users/1/following').isWorksGrid, false);
-	assert.equal(parseUserPage('/users/1/request').isWorksGrid, false);
 });
 
 test('イラストタブと漫画タブでは作品の種別を返す', () => {

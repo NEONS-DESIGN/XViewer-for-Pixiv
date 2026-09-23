@@ -3,24 +3,7 @@ import assert from 'node:assert/strict';
 import { createNavigation } from '../../../src/content/viewer/navigation.js';
 import { KEYS } from '../../../src/common/constants.js';
 import { flush } from '../../helpers/dom.js';
-
-/**
- * ID の配列から並びの代わりを作る。
- * @param {string[]} ids 作品 ID
- * @returns {{next: (id: string) => string|null, prev: (id: string) => string|null, has: (id: string) => boolean}} 並びの代わり
- */
-function fakeSequence(ids) {
-	const at = (id, offset) => {
-		const index = ids.indexOf(id);
-		if (index < 0) return null;
-		return ids[index + offset] ?? null;
-	};
-	return {
-		next: (id) => at(id, 1),
-		prev: (id) => at(id, -1),
-		has: (id) => ids.includes(id),
-	};
-}
+import { fakeSequence } from '../../helpers/sequence.js';
 
 /**
  * 依存の代わりを作る。呼ばれた内容を記録する。

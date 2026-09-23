@@ -156,7 +156,7 @@ function metaResponse(body) {
  * @param {Function} [options.fetchImpl] 通信の代わり。省くと meta と zip を返す
  * @param {boolean} [options.holdImages] true なら Image の load を releaseImages() まで止める
  * @param {object} [options.strings] 文言のカタログ。省くと日本語
- * @returns {object} container / player / 作った Image / rAF のコールバック / 描いたコマ / zip fetch の init / releaseImages
+ * @returns {object} container / player / 作った Image / rAF のコールバック / 取り消した rAF の ID / 描いたコマ / zip fetch の init / releaseImages
  */
 function build({ sizes = [10, 10, 10], fetchImpl, holdImages = false, strings = STRINGS } = {}) {
 	const doc = fakeDoc();
@@ -172,6 +172,8 @@ function build({ sizes = [10, 10, 10], fetchImpl, holdImages = false, strings = 
 	const container = fakeElement('div');
 	const images = [];
 	const rafCallbacks = [];
+	/** cancelAnimationFrame に渡された ID。rAF の ID は予約した順の 1 始まり */
+	const cancelled = [];
 	const zipInits = [];
 	/** 止めている load を出す関数の一覧 */
 	const pendingLoads = [];
@@ -206,9 +208,9 @@ function build({ sizes = [10, 10, 10], fetchImpl, holdImages = false, strings = 
 			return image;
 		},
 		requestAnimationFrame: (callback) => { rafCallbacks.push(callback); return rafCallbacks.length; },
-		cancelAnimationFrame: () => {},
+		cancelAnimationFrame: (id) => { cancelled.push(id); },
 	});
-	return { container, player, images, rafCallbacks, drawn, zipInits, releaseImages };
+	return { container, player, images, rafCallbacks, cancelled, drawn, zipInits, releaseImages };
 }
 
 test('render は静止画を先に出し、読めたら canvas に切り替えて再生を始める', async () => {
@@ -233,6 +235,35 @@ test('render は静止画を先に出し、読めたら canvas に切り替え�
 	rafCallbacks[1](1030);
 	assert.deepEqual(drawn, [images[0], images[1]]);
 	player.dispose();
+});
+
+test('dispose で Blob URL を全部 revoke し、rAF を止める', async (t) => {
+	// Blob URL は revoke しないとメモリに残る。rAF は止めないと捨てた canvas へ描き続ける (SPEC §10.8)
+	const revoke = t.mock.method(URL, 'revokeObjectURL');
+	const { player, cancelled } = build();
+	await player.render(DETAIL);
+	assert.equal(revoke.mock.callCount(), 0);
+	player.dispose();
+	assert.equal(revoke.mock.callCount(), 3, 'フレーム数ぶん revoke する');
+	assert.deepEqual(cancelled, [1], '再生開始で予約した rAF を取り消す');
+});
+
+test('dispose すると meta の要求も止める', async () => {
+	// zip だけでなく ugoira_meta の往復にも同じ signal を渡す
+	let signal = null;
+	const fetchImpl = (_url, init) => new Promise((_resolve, reject) => {
+		signal = init.signal;
+		signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true });
+	});
+	const { container, player } = build({ fetchImpl });
+	const rendering = player.render(DETAIL);
+	await flush();
+	assert.ok(signal);
+	assert.equal(signal.aborted, false);
+	player.dispose();
+	assert.equal(signal.aborted, true);
+	await rendering;
+	assert.equal(findAll(container, '.pane-error').length, 0);
 });
 
 test('壊れたコマは落として残りで再生する', async () => {
@@ -326,12 +357,13 @@ test('コマの読み込み中に dispose されたら描かない', async () =>
 });
 
 test('再生ボタンは押すと止まり、もう一度押すと動く', async () => {
-	const { container, player, rafCallbacks } = build();
+	const { container, player, rafCallbacks, cancelled } = build();
 	await player.render(DETAIL);
 	const toggle = find(container, '.ugoira-toggle');
 	assert.equal(toggle.getAttribute('aria-label'), '一時停止');
 	await toggle.click();
 	assert.equal(toggle.getAttribute('aria-label'), '再生');
+	assert.deepEqual(cancelled, [1], '止めたときに予約していた rAF を取り消す');
 	await toggle.click();
 	assert.equal(toggle.getAttribute('aria-label'), '一時停止');
 	assert.equal(rafCallbacks.length, 2);

@@ -153,11 +153,24 @@ export async function main({
 	 * @returns {void}
 	 */
 	function onChange(patch) {
-		const [[key, value]] = Object.entries(patch);
-		void track(saveSetting(key, value)).then((saved) => {
+		const entries = Object.entries(patch);
+		if (entries.length !== 1) {
+			// イベントハンドラの中で素の例外を投げると report を通らない
+			report('popup: 変更は 1 項目ずつ受け取る', patch);
+			return;
+		}
+		const [[key, value]] = entries;
+		// saveSetting は失敗を false で返す契約だが、差し替えた実装が reject しても失敗として畳む。
+		// ログだけ残して画面を変えたままにすると、利用者は保存できたと思って閉じてしまう
+		const saving = saveSetting(key, value).catch((error) => {
+			report('popup: 設定の保存に失敗しました', error);
+			return false;
+		});
+		void track(saving).then((saved) => {
 			if (saved && notice === null) return;
 			notice = saved ? null : strings.popup.SAVE_FAILED;
-			// 変えた項目へフォーカスを戻す。描き直しで body へ落ちると現在地が失われる
+			// 変えた項目へフォーカスを戻す。描き直しで body へ落ちると現在地が失われる。
+			// 見出しのテーマ切り替えも data-role に設定キー (popupTheme) を持つので同じ経路で戻る
 			return refresh({ focusRole: key });
 		}).catch((error) => report('popup: 設定の保存に失敗しました', error));
 	}

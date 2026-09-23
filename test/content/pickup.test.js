@@ -2,33 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { attachPickupHider, PICKUP_STYLE_ID, PICKUP_HIDE_CSS } from '../../src/content/pickup.js';
 import { ARTWORK_LINK_SELECTOR, PICKUP_SECTION_SELECTOR } from '../../src/common/constants.js';
-
-/**
- * document の代わり。head への出し入れだけを持つ。
- * @returns {object} doc の代わり
- */
-function fakeDoc() {
-	const head = {
-		children: [],
-		appendChild(el) { this.children.push(el); return el; },
-	};
-	return {
-		head,
-		createElement(tagName) {
-			const el = {
-				tagName: tagName.toUpperCase(),
-				id: '',
-				textContent: '',
-				remove() {
-					const index = head.children.indexOf(el);
-					if (index >= 0) head.children.splice(index, 1);
-				},
-			};
-			return el;
-		},
-		getElementById(id) { return head.children.find((el) => el.id === id) ?? null; },
-	};
-}
+import { fakeDoc } from '../helpers/dom.js';
 
 test('作っただけでは何も差し込まない', () => {
 	// 既定はオフ。設定を入れていない人のページへ CSS を足さない
@@ -88,9 +62,11 @@ test('dispose で style が消え、2 回呼んでも投げない', () => {
 	assert.doesNotThrow(() => hider.dispose());
 });
 
-test('head が無くても投げない', () => {
+test('head も body も無くても投げない', () => {
+	// 共通の偽 doc は body を持つ。head だけ消すと本物と同じく body へ入るので、両方消して「入れ先が無い」経路を踏む
 	const doc = fakeDoc();
 	doc.head = null;
+	doc.body = null;
 	const hider = attachPickupHider(doc);
 	assert.doesNotThrow(() => hider.setActive(true));
 	assert.equal(hider.isActive(), false);

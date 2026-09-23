@@ -42,8 +42,8 @@ export const PIXIV_ORIGIN = 'https://www.pixiv.net';
 /** pixiv の表示設定ページ。R-18 を表示できないときの案内先。 */
 export const VIEWING_SETTINGS_URL = `${PIXIV_ORIGIN}/settings/viewing`;
 
-/**
- * ページのパスを組むときの表示言語の接頭辞。
+/*
+ * ページのパス (artworkPath / userPath / tagWorksPath) に付ける表示言語の接頭辞 localePrefix について。
  *
  * 英語表示の pixiv はパスの先頭へ `/en` を挟む。(SITE_SPEC §3 実測)
  * 付けずに組むと、モーダルを開いた直後の URL もサイドバーのリンクも日本語ページを指し、

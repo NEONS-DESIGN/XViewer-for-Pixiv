@@ -71,7 +71,8 @@ function renderHeader(doc, initial, onChange, strings) {
 	const button = doc.createElement('button');
 	button.type = 'button';
 	button.className = 'theme-toggle';
-	button.dataset.role = 'theme-toggle';
+	// data-role は他の項目と同じく設定キー。app.js が保存の失敗後にこの値でフォーカスを戻す
+	button.dataset.role = 'popupTheme';
 
 	let theme = initial;
 
