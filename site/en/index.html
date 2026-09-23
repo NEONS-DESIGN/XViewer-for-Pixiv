@@ -27,6 +27,8 @@
 <script>
 	/* Apply the theme before paint so the page does not flash */
 	(function () {
+		/* Marks that JS runs, so the back-to-top button starts hidden (style.css) */
+		document.documentElement.setAttribute('data-js', '');
 		try {
 			var saved = window.localStorage.getItem('xviewer-site-theme');
 			if (saved === 'dark' || saved === 'light') document.documentElement.setAttribute('data-theme', saved);
@@ -83,7 +85,7 @@
 }
 </script>
 </head>
-<body>
+<body id="top">
 
 <a class="skip-link" href="#main">Skip to content</a>
 
@@ -508,6 +510,11 @@
 	</section>
 
 </main>
+
+<!-- Scroll to top. Hidden by site.js until the page has scrolled one screen. Icon: Material Symbols (Apache-2.0) -->
+<a class="to-top" href="#top" aria-label="Back to top" title="Back to top">
+	<svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M469-358q-5-2-10-7L261-563q-9-9-8.5-21.5T262-606q9-9 21.5-9t21.5 9l175 176 176-176q9-9 21-8.5t21 9.5q9 9 9 21.5t-9 21.5L501-365q-5 5-10 7t-11 2q-6 0-11-2Z"/></svg>
+</a>
 
 <footer class="site-footer">
 	<div class="wrap">
