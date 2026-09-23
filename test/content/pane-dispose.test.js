@@ -7,6 +7,7 @@ import { clearSessionCache } from '../../src/content/session.js';
 // fakeDoc は nextData を渡さない = __NEXT_DATA__ が無い = actions-bar から見て未ログイン
 import { fakeElement, fakeDoc, flush } from '../helpers/dom.js';
 import { buildNextData } from '../helpers/pixiv.js';
+import { createStrings } from '../../src/i18n/index.js';
 
 /** 未ログインのセッション。全年齢作品はこれでも見られる。 */
 const ANONYMOUS = Object.freeze({ isLoggedIn: false, self: null });
@@ -45,7 +46,12 @@ const SETTINGS = Object.freeze({ showSidebar: true, imageQuality: 'regular', pre
  */
 function fakeTargets() {
 	// fetchUser を差し込んで作者アイコンの取得で通信させない
-	return { stage: fakeElement('div'), sidebar: fakeElement('div'), fetchUser: async () => ({}) };
+	return {
+		stage: fakeElement('div'),
+		sidebar: fakeElement('div'),
+		fetchUser: async () => ({}),
+		strings: createStrings('ja'),
+	};
 }
 
 test('画像ペインは dispose で自分の枠を DOM から外す', async () => {
@@ -55,6 +61,7 @@ test('画像ペインは dispose で自分の枠を DOM から外す', async () 
 		container,
 		// 先読みを 0 にして Image を作らせない (node には Image が無い)
 		settings: { imageQuality: 'regular', prefetch: 0 },
+		strings: createStrings('ja'),
 	});
 	await pane.render(DETAIL);
 	assert.equal(container.querySelectorAll('.frame').length, 1);
@@ -76,8 +83,8 @@ test('サイドバーは dispose で中身を空にする', () => {
 });
 
 test('renderWork はサイドバーにコメント区画とアクションを作る', async () => {
-	const { stage, sidebar, fetchUser } = fakeTargets();
-	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc: fakeDoc(), stage, sidebar, fetchUser });
+	const { stage, sidebar, fetchUser, strings } = fakeTargets();
+	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc: fakeDoc(), stage, sidebar, fetchUser, strings });
 
 	assert.equal(sidebar.hidden, false);
 	assert.ok(sidebar.querySelectorAll('.comments')[0].children.length > 0);
@@ -91,7 +98,7 @@ test('renderWork はサイドバーにコメント区画とアクションを作
 test('renderWork は fetchUser をサイドバーとアクションの両方へ渡す', async () => {
 	// ログイン済みだとアクションがフォロー状態を引く。差し替え口が渡っていないと
 	// 既定の fetchUserProfile が本物の /ajax/user を叩きに行く (node では TypeError で失敗する)
-	const { stage, sidebar } = fakeTargets();
+	const { stage, sidebar, strings } = fakeTargets();
 	const asked = [];
 	const fetchUser = async (userId) => { asked.push(userId); return { isFollowed: true }; };
 	const doc = fakeDoc({
@@ -99,7 +106,7 @@ test('renderWork は fetchUser をサイドバーとアクションの両方へ�
 	});
 	// 前のテストが覚えた未ログインのセッションを捨て、この doc から読み直させる
 	clearSessionCache();
-	await renderWork(DETAIL, LOGGED_IN, SETTINGS, { doc, stage, sidebar, fetchUser });
+	await renderWork(DETAIL, LOGGED_IN, SETTINGS, { doc, stage, sidebar, fetchUser, strings });
 	await flush();
 	// サイドバー (作者アイコン) とアクション (フォロー状態) の両方から同じ差し替え口が呼ばれる
 	assert.deepEqual(asked, ['54734418', '54734418']);
@@ -112,15 +119,15 @@ test('サイドバーを OFF から ON へ戻すと hidden が下りる', async 
 	// Task 17 で実際に壊れた組み合わせ。hidden を立てる側しか書いていなかったため、
 	// 設定を戻して次の作品へ移ってもサイドバーが出てこなかった。
 	// 判断 (planPanes) ではなく、毎回明示的に代入する renderWork 側を見る必要がある
-	const { stage, sidebar, fetchUser } = fakeTargets();
+	const { stage, sidebar, fetchUser, strings } = fakeTargets();
 	const doc = fakeDoc();
 	const off = { ...SETTINGS, showSidebar: false };
 
-	await renderWork(DETAIL, ANONYMOUS, off, { doc, stage, sidebar, fetchUser });
+	await renderWork(DETAIL, ANONYMOUS, off, { doc, stage, sidebar, fetchUser, strings });
 	assert.equal(sidebar.hidden, true);
 
 	disposeAll();
-	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc, stage, sidebar, fetchUser });
+	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc, stage, sidebar, fetchUser, strings });
 	assert.equal(sidebar.hidden, false);
 	disposeAll();
 });
@@ -129,12 +136,13 @@ test('コメントとアクションは主役の描画を待たずに作る', as
 	// 主役 (画像ペイン) の await の前にサイドバーの中身を全部作り終える。
 	// await をまたがないので、別の作品へ移ったあとに古い作品のコメントや
 	// いいねを新しいサイドバーへ差し込むことがない (いいねは取り消せない)
-	const { stage, sidebar, fetchUser } = fakeTargets();
+	const { stage, sidebar, fetchUser, strings } = fakeTargets();
 	const rendering = renderWork(DETAIL, ANONYMOUS, SETTINGS, {
 		doc: fakeDoc(),
 		stage,
 		sidebar,
 		fetchUser,
+		strings,
 	});
 	// まだ主役の await を抜けていない時点で、コメント区画と案内が入っている
 	assert.ok(sidebar.querySelectorAll('.comments')[0].children.length > 0);
@@ -148,8 +156,8 @@ test('コメントとアクションは主役の描画を待たずに作る', as
 test('consumeEscape はシェアメニューが開いているときだけ true を返す', async () => {
 	// ビュワー本体の Escape (モーダルを閉じる) より先に呼ばれる。
 	// 開いていないのに true を返すと、Escape でモーダルが閉じられなくなる
-	const { stage, sidebar, fetchUser } = fakeTargets();
-	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc: fakeDoc(), stage, sidebar, fetchUser });
+	const { stage, sidebar, fetchUser, strings } = fakeTargets();
+	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc: fakeDoc(), stage, sidebar, fetchUser, strings });
 	assert.equal(consumeEscape(), false);
 
 	sidebar.querySelectorAll('.share-button')[0].click();
@@ -160,8 +168,8 @@ test('consumeEscape はシェアメニューが開いているときだけ true 
 
 test('consumeKey はシェアメニューが開いているときだけ上下キーを食い止める', async () => {
 	// 本体は上下キーを作品の移動に使う。開いたメニューの項目送りを横取りされないように先に聞く
-	const { stage, sidebar, fetchUser } = fakeTargets();
-	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc: fakeDoc(), stage, sidebar, fetchUser });
+	const { stage, sidebar, fetchUser, strings } = fakeTargets();
+	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc: fakeDoc(), stage, sidebar, fetchUser, strings });
 	const down = { key: 'ArrowDown', preventDefault() {} };
 	assert.equal(consumeKey(down), false);
 	sidebar.querySelectorAll('.share-button')[0].click();
@@ -171,8 +179,8 @@ test('consumeKey はシェアメニューが開いているときだけ上下キ
 });
 
 test('ペインを捨てた後の consumeEscape は false を返す', async () => {
-	const { stage, sidebar, fetchUser } = fakeTargets();
-	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc: fakeDoc(), stage, sidebar, fetchUser });
+	const { stage, sidebar, fetchUser, strings } = fakeTargets();
+	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc: fakeDoc(), stage, sidebar, fetchUser, strings });
 	sidebar.querySelectorAll('.share-button')[0].click();
 	disposeAll();
 	assert.equal(consumeEscape(), false);

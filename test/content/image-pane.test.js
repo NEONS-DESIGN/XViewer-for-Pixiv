@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { pickPageUrls, prefetchTargets, createImagePane } from '../../src/content/viewer/image-pane.js';
 import { fakeElement, fakeDoc, find, findAll, flush } from '../helpers/dom.js';
 import { fakeFetch, fakeApiFetch } from '../helpers/pixiv.js';
+import { createStrings } from '../../src/i18n/index.js';
 
 /** 実際の CDN と同じ形の URL を作る。安全側の関門を通す必要があるため。 */
 const cdn = (name) => `https://i.pximg.net/img-master/img/2026/09/10/00/00/00/${name}.jpg`;
@@ -87,9 +88,10 @@ function fakeZoom() {
  * @param {number} [options.prefetch] 先読みの枚数
  * @param {boolean} [options.clickZoom] クリックで原寸表示するか
  * @param {object} [options.zoom] 原寸レイヤの代わり
+ * @param {object} [options.strings] 文言のカタログ
  * @returns {{container: object, pane: object, created: object[], zoom: object}} 描画先・ペイン・作った先読み Image・原寸レイヤ
  */
-function build({ fetchImpl, prefetch = 0, clickZoom = false, zoom = fakeZoom() } = {}) {
+function build({ fetchImpl, prefetch = 0, clickZoom = false, zoom = fakeZoom(), strings = createStrings('ja') } = {}) {
 	const container = fakeElement('div');
 	const created = [];
 	const pane = createImagePane({
@@ -98,6 +100,7 @@ function build({ fetchImpl, prefetch = 0, clickZoom = false, zoom = fakeZoom() }
 		settings: { imageQuality: 'regular', prefetch, clickZoom },
 		zoom,
 		fetchImpl,
+		strings,
 		createImage: () => {
 			const img = fakeElement('img');
 			created.push(img);
@@ -284,4 +287,14 @@ test('原寸表示でページを送るとペインも追従する', async () =>
 	// 閉じたときに同じページが出ていないと、見ていた場所を見失う
 	assert.equal(find(container, 'img').src, cdn('r2'));
 	assert.equal(find(container, '.counter').textContent, '3/3');
+});
+
+test('英語のカタログで英語の文言が出る', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { container, pane } = build({ fetchImpl: impl, strings: createStrings('en') });
+	const rendering = pane.render(DETAIL);
+	// 1 枚目が読めなかったことにする
+	await find(container, 'img').dispatch('error');
+	assert.equal(find(container, '.pane-error').textContent, 'Could not load this image');
+	await rendering;
 });

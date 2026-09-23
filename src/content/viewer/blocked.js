@@ -22,35 +22,26 @@ export const BLOCK_KINDS = Object.freeze({
 });
 
 /**
- * 利用者に見せる文言。
- * 表示設定を変えても、覚えているセッション (__NEXT_DATA__) は SPA 遷移で更新されないので
- * (SITE_SPEC §0)、再読み込みまで案内する。
- */
-const MESSAGES = Object.freeze({
-	LOGIN_REQUIRED: 'この作品を見るには pixiv にログインしてください',
-	HIDDEN_BY_SETTING: 'pixiv の表示設定により非表示になっています',
-	RELOAD_AFTER_CHANGE: '変更後はページを再読み込みしてください',
-	CHANGE_SETTING: '表示設定を変更する',
-});
-
-/**
  * ブロックする理由を返す。
+ * 判断 (種別) だけを返す。文言への変換は表示側 (createBlocked) の責務にして、
+ * 純粋な判断関数であるここへ文言カタログを通す必要をなくす。
  * @param {{xRestrict: number}} work 作品
  * @param {{isLoggedIn: boolean, self: object|null}} session セッション
- * @returns {{kind: 'login'|'setting', message: string}|null} 見られるなら null
+ * @returns {{kind: 'login'|'setting'}|null} 見られるなら null
  */
 export function blockReason(work, session) {
 	if (canView(work, session.self)) return null;
 	if (!session.isLoggedIn) {
-		return { kind: BLOCK_KINDS.LOGIN, message: MESSAGES.LOGIN_REQUIRED };
+		return { kind: BLOCK_KINDS.LOGIN };
 	}
-	return { kind: BLOCK_KINDS.SETTING, message: MESSAGES.HIDDEN_BY_SETTING };
+	return { kind: BLOCK_KINDS.SETTING };
 }
 
 /**
  * @typedef {object} BlockedDeps
  * @property {Document} doc
  * @property {HTMLElement} container 描画先 (.stage)
+ * @property {object} strings 文言のカタログ (src/i18n)
  */
 
 /**
@@ -59,7 +50,7 @@ export function blockReason(work, session) {
  * @returns {{render: (detail: object, reason: object) => void, dispose: () => void}}
  */
 export function createBlocked(deps) {
-	const { doc, container } = deps;
+	const { doc, container, strings } = deps;
 	/** @type {HTMLElement|null} 自分が作った要素。dispose で外す */
 	let root = null;
 
@@ -83,7 +74,7 @@ export function createBlocked(deps) {
 		 * ブロック表示を描く。
 		 * ビュワーの状態表示 (.status) はビュワー自身が消すので、ここでは触らない。
 		 * @param {object} detail 正規化した作品詳細
-		 * @param {{kind: string, message: string}} reason 理由
+		 * @param {{kind: string}} reason 理由
 		 * @returns {void}
 		 */
 		render(detail, reason) {
@@ -100,7 +91,9 @@ export function createBlocked(deps) {
 
 			const message = doc.createElement('p');
 			message.className = 'blocked-message';
-			message.textContent = reason.message;
+			message.textContent = reason.kind === BLOCK_KINDS.LOGIN
+				? strings.blocked.LOGIN_REQUIRED
+				: strings.blocked.HIDDEN_BY_SETTING;
 			panel.appendChild(message);
 
 			if (reason.kind === BLOCK_KINDS.SETTING) {
@@ -109,12 +102,12 @@ export function createBlocked(deps) {
 				link.href = VIEWING_SETTINGS_URL;
 				link.target = '_blank';
 				link.rel = 'noopener noreferrer';
-				link.textContent = MESSAGES.CHANGE_SETTING;
+				link.textContent = strings.blocked.CHANGE_SETTING;
 				panel.appendChild(link);
 
 				const note = doc.createElement('p');
 				note.className = 'blocked-note';
-				note.textContent = MESSAGES.RELOAD_AFTER_CHANGE;
+				note.textContent = strings.blocked.RELOAD_AFTER_CHANGE;
 				panel.appendChild(note);
 			}
 

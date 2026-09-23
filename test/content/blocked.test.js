@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { blockReason, createBlocked, BLOCK_KINDS } from '../../src/content/viewer/blocked.js';
 import { fakeElement, fakeDoc, find } from '../helpers/dom.js';
+import { createStrings } from '../../src/i18n/index.js';
 
 /** ブロック表示へ渡す作品詳細の代わり。 */
 const DETAIL = Object.freeze({
@@ -14,11 +15,12 @@ const DETAIL = Object.freeze({
  * ブロック表示を描く。
  * @param {object} detail 作品詳細
  * @param {object} reason 理由
+ * @param {object} [strings] 文言のカタログ
  * @returns {{container: object, pane: object}} 描画先とペイン
  */
-function render(detail, reason) {
+function render(detail, reason, strings = createStrings('ja')) {
 	const container = fakeElement('div');
-	const pane = createBlocked({ doc: fakeDoc(), container });
+	const pane = createBlocked({ doc: fakeDoc(), container, strings });
 	pane.render(detail, reason);
 	return { container, pane };
 }
@@ -31,13 +33,11 @@ test('全年齢作品は誰でも見られる', () => {
 test('未ログインの R-18 はログインを促す', () => {
 	const reason = blockReason({ xRestrict: 1 }, { isLoggedIn: false, self: null });
 	assert.equal(reason.kind, 'login');
-	assert.match(reason.message, /ログイン/);
 });
 
 test('ログイン済みで設定が足りない R-18 は設定を促す', () => {
 	const reason = blockReason({ xRestrict: 1 }, { isLoggedIn: true, self: { xRestrict: 0 } });
 	assert.equal(reason.kind, 'setting');
-	assert.match(reason.message, /表示設定/);
 });
 
 test('R-18G は設定が 1 でも止まる', () => {
@@ -90,9 +90,15 @@ test('ブロック表示はビュワーの状態表示を消さない', () => {
 	const status = fakeElement('p');
 	status.className = 'status';
 	container.appendChild(status);
-	const pane = createBlocked({ doc: fakeDoc(), container });
+	const pane = createBlocked({ doc: fakeDoc(), container, strings: createStrings('ja') });
 	pane.render(DETAIL, blockReason(DETAIL, { isLoggedIn: false, self: null }));
 	assert.equal(container.children[0], status);
 	pane.dispose();
 	assert.deepEqual(container.children, [status]);
+});
+
+test('英語のカタログで英語の文言が出る', () => {
+	const reason = blockReason(DETAIL, { isLoggedIn: false, self: null });
+	const { container } = render(DETAIL, reason, createStrings('en'));
+	assert.match(find(container, '.blocked-message').textContent, /Log in to pixiv to view this artwork/);
 });

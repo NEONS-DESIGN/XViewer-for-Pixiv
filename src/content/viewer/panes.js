@@ -73,6 +73,7 @@ export function planPanes(detail, session, settings) {
  * @property {HTMLElement} sidebar サイドバーの描画先 (.sidebar)
  * @property {{open: (pages: object) => void}} [zoom] 原寸表示のレイヤ (zoom.js)。画像ペインだけが使う
  * @property {(userId: string) => Promise<object>} [fetchUser] 作者情報の取得。(サイドバーとアクションの両方へ渡す) テストから通信させないために使う
+ * @property {object} strings 文言のカタログ (src/i18n)
  */
 
 /**
@@ -91,7 +92,7 @@ export function planPanes(detail, session, settings) {
  * @returns {Promise<void>}
  */
 export async function renderWork(detail, session, settings, targets) {
-	const { doc, stage, sidebar } = targets;
+	const { doc, stage, sidebar, strings } = targets;
 	const plan = planPanes(detail, session, settings);
 
 	// hidden は毎回明示的に設定する。片方でしか触らないと、
@@ -137,7 +138,7 @@ export async function renderWork(detail, session, settings, targets) {
 	}
 
 	if (plan.main === MAIN_PANE.BLOCKED) {
-		blockedPane = createBlocked({ doc, container: stage });
+		blockedPane = createBlocked({ doc, container: stage, strings });
 		blockedPane.render(detail, plan.reason);
 		return;
 	}
@@ -147,7 +148,7 @@ export async function renderWork(detail, session, settings, targets) {
 		await ugoiraPane.render(detail);
 	} else {
 		// 原寸表示を開けるのは静止画だけ。うごイラ (canvas) と見られない作品には渡さない
-		imagePane = createImagePane({ doc, container: stage, settings, zoom: targets.zoom });
+		imagePane = createImagePane({ doc, container: stage, settings, zoom: targets.zoom, strings });
 		await imagePane.render(detail);
 	}
 }

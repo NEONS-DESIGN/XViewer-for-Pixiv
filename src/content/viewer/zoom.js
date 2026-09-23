@@ -11,21 +11,14 @@
 import { KEYS, INERT_ATTRIBUTE } from '../../common/constants.js';
 import { createIcon } from '../../common/icons.js';
 
-/** 画面に出す文言。 */
-const MESSAGES = Object.freeze({
-	LABEL: '原寸表示',
-	PREV_PAGE: '前のページ',
-	NEXT_PAGE: '次のページ',
-});
-
 /**
- * 左右のクリック領域の定義。
+ * 左右のクリック領域の見た目。
  * pixiv 本体は上下 (上 20% が前 / 下 40% が次) に置くが、この拡張では左右に置く。
- * 幅は viewer.css の --zoom-zone-width が持つ。
+ * 幅は viewer.css の --zoom-zone-width が持つ。ラベルは文言カタログ (strings.zoom) から引く
  */
-const ZONES = Object.freeze({
-	prev: Object.freeze({ label: MESSAGES.PREV_PAGE, key: '←', icon: 'chevronLeft', step: -1 }),
-	next: Object.freeze({ label: MESSAGES.NEXT_PAGE, key: '→', icon: 'chevronRight', step: 1 }),
+const ZONE_SHAPES = Object.freeze({
+	prev: Object.freeze({ messageKey: 'PREV_PAGE', key: '←', icon: 'chevronLeft', step: -1 }),
+	next: Object.freeze({ messageKey: 'NEXT_PAGE', key: '→', icon: 'chevronRight', step: 1 }),
 });
 
 /**
@@ -51,6 +44,7 @@ function hasModifier(event) {
  * @property {Document} doc 対象のドキュメント
  * @property {HTMLElement} container レイヤを置く先 (ビュワーの overlay)
  * @property {() => void} [restoreFocus] 閉じたときにフォーカスを戻す役
+ * @property {object} strings 文言のカタログ (src/i18n)
  */
 
 /**
@@ -60,7 +54,7 @@ function hasModifier(event) {
  * @returns {{open: (pages: ZoomPages) => void, close: () => void, isOpen: () => boolean, consumeKey: (event: KeyboardEvent) => boolean, dispose: () => void}}
  */
 export function createZoomLayer(deps) {
-	const { doc, container } = deps;
+	const { doc, container, strings } = deps;
 
 	/** @type {HTMLElement|null} レイヤ本体 (スクロールする器)。閉じているときは null */
 	let layer = null;
@@ -111,17 +105,18 @@ export function createZoomLayer(deps) {
 	 * @returns {HTMLButtonElement} ボタン
 	 */
 	function createZone(direction) {
-		const zone = ZONES[direction];
+		const shape = ZONE_SHAPES[direction];
+		const label = strings.zoom[shape.messageKey];
 		const button = doc.createElement('button');
 		button.type = 'button';
 		button.className = `zoom-zone zoom-zone-${direction}`;
-		button.setAttribute('aria-label', zone.label);
-		button.title = `${zone.label} (${zone.key})`;
-		button.appendChild(createIcon(doc, zone.icon));
+		button.setAttribute('aria-label', label);
+		button.title = `${label} (${shape.key})`;
+		button.appendChild(createIcon(doc, shape.icon));
 		button.addEventListener('click', (event) => {
 			// レイヤ本体の「押したら閉じる」まで伝わらせない
 			event.stopPropagation?.();
-			move(zone.step);
+			move(shape.step);
 		});
 		return button;
 	}
@@ -205,7 +200,7 @@ export function createZoomLayer(deps) {
 			layer.setAttribute('tabindex', '-1');
 			layer.setAttribute('role', 'dialog');
 			layer.setAttribute('aria-modal', 'true');
-			layer.setAttribute('aria-label', `${pages.alt ?? ''} - ${MESSAGES.LABEL}`.trim());
+			layer.setAttribute('aria-label', `${pages.alt ?? ''} - ${strings.zoom.LABEL}`.trim());
 
 			const canvas = doc.createElement('div');
 			canvas.className = 'zoom-canvas';
