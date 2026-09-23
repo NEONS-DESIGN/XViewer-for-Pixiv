@@ -20,9 +20,8 @@
 ---
 
 > [!NOTE]
-> **The extension itself is not available in English.**
-> Its interface — the viewer, the sidebar and the settings popup — is Japanese only.
 > This document is a translation of [README.md](README.md) for reference.
+> The extension itself is available in English. (See [Languages](#languages))
 
 ---
 
@@ -102,8 +101,12 @@ The extension follows the display language you have set on pixiv.
 | Japanese | Supported |
 | English | Supported |
 | Korean | On request |
+| Chinese (Simplified) | On request |
+| Chinese (Traditional) | On request |
+| Thai | On request |
+| Malay | On request |
 
-If pixiv is shown in a language not listed above, the extension falls back to English.
+The table covers the seven display languages pixiv offers. If pixiv is shown in a language marked "On request", the extension falls back to English.
 If you would like another language, please ask through "Bugs, questions and requests" below.
 
 ## Installing
