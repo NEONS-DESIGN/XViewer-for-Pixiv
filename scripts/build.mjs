@@ -43,6 +43,10 @@ const STATIC_FILES = [
 		`src/icons/${iconFileName(size)}`,
 		`${OUT_DIR}/icons/${iconFileName(size)}`,
 	]),
+	// manifest の name / description の訳。__MSG_*__ の解決に使うので dist/_locales に置く。
+	// ここだけは pixiv の表示言語ではなくブラウザの UI 言語に従う (chrome.i18n の仕様)
+	['src/_locales/ja/messages.json', `${OUT_DIR}/_locales/ja/messages.json`],
+	['src/_locales/en/messages.json', `${OUT_DIR}/_locales/en/messages.json`],
 ];
 
 /** @type {import('esbuild').BuildOptions} */
