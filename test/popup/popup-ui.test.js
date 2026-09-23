@@ -463,6 +463,17 @@ test('ライセンスタブに第三者の成果物が並ぶ', () => {
 	}
 });
 
+test('第三者の成果物のライセンス名は本文へのリンクになっている', () => {
+	// CC BY 4.0 §3(a)(1)(C) はライセンスの URI (かハイパーリンク) の表示を求める
+	const { root } = build();
+	const links = collect(find(root, 'panel-license'), 'a');
+	for (const item of THIRD_PARTY) {
+		const link = links.find((candidate) => candidate.href === item.licenseUrl);
+		assert.ok(link, `${item.name} のライセンス本文へのリンクが無い`);
+		assert.equal(link.textContent, item.license);
+	}
+});
+
 test('ライセンスタブにこの拡張自身のライセンスも出す', () => {
 	const { root } = build();
 	const text = find(root, 'panel-license').textContent;

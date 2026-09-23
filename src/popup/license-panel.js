@@ -11,12 +11,13 @@ import { createDescription } from './description.js';
  * popup から開くので必ず新しいタブにし、参照元を渡さない。(SPEC §13-3)
  * @param {Document} doc 対象のドキュメント
  * @param {string} url 行き先
+ * @param {string} [label] 表示する文字。省略すると URL をそのまま出す
  * @returns {HTMLAnchorElement} リンク
  */
-function createExternalLink(doc, url) {
+function createExternalLink(doc, url, label = url) {
 	const link = doc.createElement('a');
 	link.href = url;
-	link.textContent = url;
+	link.textContent = label;
 	link.setAttribute('target', '_blank');
 	link.setAttribute('rel', 'noopener noreferrer');
 	return link;
@@ -87,8 +88,9 @@ export function renderLicensePanel(doc, strings) {
 		const entry = doc.createElement('div');
 		entry.className = 'license-item';
 
+		// ライセンス名は本文へのリンクにする。(CC BY 4.0 が URI の表示を求めるため)
 		const terms = doc.createElement('p');
-		terms.textContent = `${item.license} / ${item.copyright}`;
+		terms.append(createExternalLink(doc, item.licenseUrl, item.license), doc.createTextNode(` / ${item.copyright}`));
 
 		const source = doc.createElement('p');
 		source.className = 'license-url';
