@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeComment, renderCommentText, renderStamp, createComments, formatPostedDate, commentLabel } from '../../src/content/viewer/comments.js';
+import { normalizeComment, renderCommentText, renderStamp, createComments, parseCommentDate, commentLabel } from '../../src/content/viewer/comments.js';
 import { commentsFloorHeight, isHeadingStuck } from '../../src/content/viewer/comments-layout.js';
 import { createConfirmRegistry } from '../../src/content/viewer/comments-delete.js';
 import { fakeElement, fakeDoc, find, findAll, iconName, flush } from '../helpers/dom.js';
@@ -30,7 +30,7 @@ test('コメントを共通の形にする', () => {
 		userName: 'キーー',
 		avatarUrl: 'https://s.pximg.net/common/images/no_profile.png',
 		text: 'タグに橘さんを入れるなwww',
-		date: '2026-09-10 09:20',
+		date: new Date('2026-09-10T09:20:00+09:00'),
 		isStamp: false,
 		stampId: null,
 		hasReplies: false,
@@ -981,10 +981,33 @@ test('書きかけがあるうちは Escape をビュワーへ渡さない', asy
 	assert.equal(find(container, '.comment-picker'), null);
 });
 
-test('投稿した時刻を一覧の日時と同じ形にする', () => {
-	// 応答に日時は入らないので手元の時計を使う。桁は一覧に合わせて 0 で埋める
-	assert.equal(formatPostedDate(new Date(2026, 8, 20, 9, 5)), '2026-09-20 09:05');
-	assert.equal(formatPostedDate(new Date(2026, 11, 31, 23, 59)), '2026-12-31 23:59');
+test('commentDate は実行環境のタイムゾーンに依らず JST の時刻として読む', () => {
+	// API は時差を持たない 'YYYY-MM-DD HH:mm' で返す。(SITE_SPEC 実測)
+	assert.equal(parseCommentDate('2026-09-10 09:20').toISOString(), '2026-09-10T00:20:00.000Z');
+	assert.equal(parseCommentDate('2026-01-01 08:59').toISOString(), '2025-12-31T23:59:00.000Z');
+});
+
+test('commentDate が読めなければ null にする', () => {
+	for (const value of ['', undefined, null, 20260910, '2026/09/10 09:20', '2026-09-10', '2026-13-40 09:20']) {
+		assert.equal(parseCommentDate(value), null, String(value));
+	}
+});
+
+test('コメントの日時は表示言語の書式で出す', async () => {
+	const load = async (strings) => {
+		const container = fakeElement('div');
+		const comments = createComments({ doc: loggedInDoc(), container, strings, fetchJson: async () => ({ comments: [ROOT], hasNext: false }) });
+		await comments.load(DETAIL);
+		return find(container, '.comment-date').textContent;
+	};
+	assert.equal(await load(createStrings('ja')), '2026-09-10 09:20');
+	assert.equal(await load(createStrings('en')), 'Sep 10, 2026 09:20');
+});
+
+test('日時が読めないコメントは日時を空にする', async () => {
+	const { container, comments } = build(async () => ({ comments: [{ ...ROOT, commentDate: 'unknown' }], hasNext: false }));
+	await comments.load(DETAIL);
+	assert.equal(find(container, '.comment-date').textContent, '');
 });
 
 test('投稿には CSRF トークンを渡す', async () => {

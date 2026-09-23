@@ -19,7 +19,7 @@ import { parseCommentText } from '../../pixiv/emoji.js';
 import { postComment, postStamp, deleteComment } from '../../pixiv/actions.js';
 import { PIXIV_ERROR_KINDS } from '../../pixiv/errors.js';
 import { readSession, clearSessionCache } from '../session.js';
-import { COMMENT_PAGE_SIZE, KEYS } from '../../common/constants.js';
+import { COMMENT_PAGE_SIZE, DISPLAY_TIME_ZONE_OFFSET, KEYS } from '../../common/constants.js';
 import { warn } from '../../common/log.js';
 
 /** 件数を数え直すときに付ける、キャッシュを外すためのパラメータ名。 */
@@ -28,6 +28,9 @@ const CACHE_BUSTER = '_';
 /** 返信の 1 ページ目。replies API は offset ではなく 1 始まりの page で送る。 */
 const FIRST_REPLY_PAGE = 1;
 
+/** API の commentDate の形。'YYYY-MM-DD HH:mm' で時差を持たない。(SITE_SPEC.md) */
+const COMMENT_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/;
+
 /**
  * @typedef {object} Comment
  * @property {string} id
@@ -35,7 +38,7 @@ const FIRST_REPLY_PAGE = 1;
  * @property {string} userName
  * @property {string} avatarUrl
  * @property {string} text
- * @property {string} date
+ * @property {Date|null} date 投稿日時。読めなければ null
  * @property {boolean} isStamp
  * @property {string|null} stampId スタンプの ID。スタンプでなければ null
  * @property {boolean} hasReplies
@@ -58,7 +61,7 @@ export function normalizeComment(raw, strings) {
 		avatarUrl: raw.img ?? '',
 		// スタンプのときは本文が空で届く。文字に置き換えず、描画側で画像にする
 		text: raw.comment ?? '',
-		date: raw.commentDate ?? '',
+		date: parseCommentDate(raw.commentDate),
 		isStamp,
 		stampId: isStamp ? String(raw.stampId) : null,
 		hasReplies: raw.hasReplies === true,
@@ -89,15 +92,19 @@ export function commentLabel(comment, selfId, authorId, strings) {
 }
 
 /**
- * 投稿した時刻を一覧の日時と同じ形にする。
- * 応答に日時は入らないので手元の時計を使う。(pixiv 本体も同じ)
- * 形は API の commentDate に合わせた 'YYYY-MM-DD HH:mm'。
- * @param {Date} at 時刻
- * @returns {string} 'YYYY-MM-DD HH:mm'
+ * API の commentDate を Date にする。
+ * 時差を持たない 'YYYY-MM-DD HH:mm' で届くので、表示と同じ DISPLAY_TIME_ZONE の時刻として読む。
+ * 書式は言語ごとに違うので、ここでは文字列にせず描画のときにカタログへ渡す。
+ * @param {unknown} value commentDate
+ * @returns {Date|null} 日時。形が違う・存在しない日付なら null
  */
-export function formatPostedDate(at) {
-	const pad = (value) => String(value).padStart(2, '0');
-	return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())} ${pad(at.getHours())}:${pad(at.getMinutes())}`;
+export function parseCommentDate(value) {
+	if (typeof value !== 'string') return null;
+	const match = COMMENT_DATE_PATTERN.exec(value);
+	if (!match) return null;
+	const [, year, month, day, hour, minute] = match;
+	const date = new Date(`${year}-${month}-${day}T${hour}:${minute}:00${DISPLAY_TIME_ZONE_OFFSET}`);
+	return Number.isNaN(date.getTime()) ? null : date;
 }
 
 /**
@@ -481,7 +488,7 @@ export function createComments(deps) {
 		repliesSlot.className = 'comment-replies-slot';
 		const date = doc.createElement('span');
 		date.className = 'comment-date';
-		date.textContent = comment.date;
+		date.textContent = comment.date ? strings.comments.formatDateTime(comment.date) : '';
 		meta.append(repliesSlot, date);
 
 		body.append(name, ...(labelNode ? [labelNode] : []), text, meta);
@@ -746,7 +753,8 @@ export function createComments(deps) {
 			userName: posted.userName || self?.name || strings.comments.DELETED_USER,
 			avatarUrl: self?.profileImg ?? '',
 			text: posted.text,
-			date: formatPostedDate(new Date()),
+			// 応答に日時は入らないので手元の時計を使う。(pixiv 本体も同じ)
+			date: new Date(),
 			isStamp: posted.stampId !== null,
 			stampId: posted.stampId,
 			hasReplies: false,

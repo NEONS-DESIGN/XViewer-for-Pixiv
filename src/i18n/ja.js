@@ -21,6 +21,27 @@ const DATE_TIME_FORMAT = new Intl.DateTimeFormat('ja-JP', {
 	hourCycle: 'h23',
 });
 
+/** コメントの日時の書式。一覧は詰めて見せたいので、年月日も 2 桁の数値にする。 */
+const COMMENT_DATE_TIME_FORMAT = new Intl.DateTimeFormat('ja-JP', {
+	timeZone: DISPLAY_TIME_ZONE,
+	year: 'numeric',
+	month: '2-digit',
+	day: '2-digit',
+	hour: '2-digit',
+	minute: '2-digit',
+	hourCycle: 'h23',
+});
+
+/**
+ * Intl の書式で日時を部品に分ける。
+ * @param {Intl.DateTimeFormat} format 書式
+ * @param {Date} date 日時
+ * @returns {Record<string, string>} year / month / day / hour / minute などの部品
+ */
+function toParts(format, date) {
+	return Object.fromEntries(format.formatToParts(date).map(({ type, value }) => [type, value]));
+}
+
 export default {
 	viewer: {
 		DIALOG_LABEL: '作品ビュワー',
@@ -52,9 +73,7 @@ export default {
 		 * @returns {string} '2026年9月23日 13:05' の形
 		 */
 		formatDateTime(date) {
-			const parts = Object.fromEntries(
-				DATE_TIME_FORMAT.formatToParts(date).map(({ type, value }) => [type, value]),
-			);
+			const parts = toParts(DATE_TIME_FORMAT, date);
 			return `${parts.year}年${parts.month}月${parts.day}日 ${parts.hour}:${parts.minute}`;
 		},
 	},
@@ -105,6 +124,15 @@ export default {
 		MORE: 'もっと見る',
 		RETRY: '再試行',
 		DELETED_USER: '退会したユーザー',
+		/**
+		 * コメントの日時を画面の表記にする。
+		 * @param {Date} date 表示する日時
+		 * @returns {string} '2026-09-23 13:05' の形
+		 */
+		formatDateTime(date) {
+			const parts = toParts(COMMENT_DATE_TIME_FORMAT, date);
+			return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
+		},
 		STAMP_PLACEHOLDER: '[スタンプ]',
 		STAMP_ALT: 'スタンプ',
 		REPLIES_SHOW: '返信を表示',
