@@ -9,12 +9,14 @@
 		"watch": "node scripts/build.mjs --watch",
 		"build:symbols": "node scripts/build-symbols.mjs",
 		"build:icons": "node scripts/build-icons.mjs",
+		"build:site-images": "node scripts/build-site-images.mjs",
 		"test": "node --test \"test/**/*.test.js\""
 	},
 	"devDependencies": {
 		"@fortawesome/fontawesome-free": "^7.3.1",
 		"@material-symbols/svg-400": "^0.47.2",
 		"@resvg/resvg-js": "^2.6.2",
-		"esbuild": "^0.28.2"
+		"esbuild": "^0.28.2",
+		"sharp": "^0.35.4"
 	}
 }
