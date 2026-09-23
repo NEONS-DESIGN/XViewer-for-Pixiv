@@ -28,7 +28,7 @@ function defaultArea() {
  * @returns {Promise<T>} 結果
  */
 async function withArea(deps, run, fallback) {
-	const area = deps.area ?? defaultArea();
+	const area = deps.area === undefined ? defaultArea() : deps.area;
 	if (!area) return fallback;
 	try {
 		return await run(area);
