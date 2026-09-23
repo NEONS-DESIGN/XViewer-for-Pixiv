@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { register } from 'node:module';
 import { clearSessionCache } from '../../../src/content/session.js';
 import { KEYS } from '../../../src/common/constants.js';
+import { createStrings } from '../../../src/i18n/index.js';
 import { fakeElement, fakeDoc as fakeDocBase, find, findAll, flush } from '../../helpers/dom.js';
 
 // viewer.js は viewer.css と common/tokens.css を import する。(esbuild が文字列にする)
@@ -122,6 +123,7 @@ function setup(options = {}) {
 	const viewer = createViewer({
 		doc,
 		settings: options.settings ?? settings(),
+		strings: options.strings ?? createStrings('ja'),
 		onRequestClose: () => { closeRequests += 1; },
 		onNavigate: () => {},
 		canExtendSequence: () => false,
@@ -320,6 +322,16 @@ test('overlay の aria-label に作品名が乗る', async () => {
 	const { viewer, shadow } = setup();
 	await viewer.open('1');
 	assert.equal(find(shadow(), '.overlay').getAttribute('aria-label'), '作品 1 - 作品ビュワー');
+});
+
+test('createViewer は strings を子へ渡す', async () => {
+	const strings = createStrings('en');
+	const { viewer, doc, shadow } = setup({ strings });
+	await viewer.open('1');
+	// ダイアログの読み上げ名は英語カタログの値になる。ホストの lang も揃える
+	assert.equal(find(shadow(), '.overlay').getAttribute('aria-label'), `作品 1 - ${strings.viewer.DIALOG_LABEL}`);
+	assert.equal(doc.body.children[0].lang, strings.lang);
+	viewer.dispose();
 });
 
 test('描画に効く設定が変わったら通信せずに描き直す', async () => {

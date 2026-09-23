@@ -30,6 +30,9 @@ import {
 	INFINITE_SCROLL,
 	PAGE_KEY_SEPARATOR,
 } from '../common/constants.js';
+import { readPageLanguage, uiLanguage } from '../common/language.js';
+import { savePageLanguage } from '../common/language-store.js';
+import { createStrings } from '../i18n/index.js';
 
 /** 今の購読。ページから離れるときに解除する。 */
 let gridListener = null;
@@ -99,6 +102,11 @@ let infiniteOwnPage = null;
 let syncingInfinite = false;
 let router = null;
 let settings = null;
+/**
+ * @type {object|null} 文言のカタログ。boot() で 1 回だけ決める。
+ * 表示言語の変更はフルリロードを伴うので、SPA 遷移の途中で変わることはない
+ */
+let strings = null;
 let viewer = null;
 /**
  * @type {import('./page.js').UserPage|null} 作品を開いたときに見ていたユーザーページ。
@@ -206,6 +214,7 @@ function apply() {
 	viewer = createViewer({
 		doc: document,
 		settings,
+		strings,
 		// 閉じたい合図は履歴を戻すことに集約する。実際に閉じるのは popstate 側
 		onRequestClose: () => router.close(),
 		// 作品を切り替えたら URL だけ差し替える。履歴は積まない
@@ -437,6 +446,7 @@ function syncInfiniteOnce() {
 	try {
 		infinite = attachInfiniteScroll(document, {
 			ul,
+			strings,
 			source: createPageSource(page.userId, page.category),
 			mode: wanted,
 			loggedIn: readSession(document).isLoggedIn,
@@ -609,6 +619,10 @@ function stopNavigationWatch() {
  * @returns {Promise<void>}
  */
 async function boot() {
+	const pageLanguage = readPageLanguage(document);
+	strings = createStrings(uiLanguage(pageLanguage));
+	// popup は pixiv のページを持たないので、見た言語をここで残す。失敗しても先へ進む
+	void savePageLanguage(strings.lang);
 	settings = await loadSettings();
 	// ビュワーの入切とは独立して効かせる。ピックアップ非表示や無限スクロールだけを使う人もいる
 	pickupHider = attachPickupHider(document);
