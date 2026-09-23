@@ -12,12 +12,17 @@ const AJAX = '/ajax';
 /**
  * pixiv API へ渡してよいと実測で確認できている言語。
  *
- * **綴りが未検証の言語を送らない。** 表示言語が繁体字中国語のとき documentElement.lang が
- * zh-TW なのか zh-Hant なのかも、pixiv の lang= が zh_tw なのか zh-tw なのかも実測できていない。
- * 綴りを外すと API 呼び出しが壊れる。英語の文言が出るより悪い結果になるので、確認できた値だけを送る。
- * (SITE_SPEC の「未検証事項」を参照。3 言語目へ広げるときに実測してから増やす)
+ * pixiv は lang= に未知の値を渡してもエラーにせず、常に 200 で黙って英語の翻訳へ倒す。
+ * だから綴りを外しても API 呼び出しは壊れない。ただし**英語になってしまう**ので、
+ * 実測で翻訳が返ると確かめられた値だけをここへ足す。(2026-09-23 実測: ja / en / ko / zh は効く。
+ * zh_tw もアンダースコア区切りなら効くが、ハイフン形や th / ru / es などその他の言語は英語へ倒れる)
+ *
+ * **繁体字中国語は含めない。** pixiv 側は `zh_tw` でないと効かないが、documentElement.lang
+ * から取った値は normalizeLanguage (common/language.js) が `zh` へ切り詰めてしまうため、
+ * ここへ `zh_tw` を足しても呼び出し元から渡ってこない。結果として繁体字の利用者には
+ * 簡体字の翻訳が返る。これは既知の制限で、normalizeLanguage 側を直さない限り解消しない。
  */
-const API_LANGUAGES = Object.freeze(['ja', 'en']);
+const API_LANGUAGES = Object.freeze(['ja', 'en', 'ko', 'zh']);
 
 /** 未検証の言語のときに送る値。 */
 const DEFAULT_API_LANGUAGE = 'ja';
