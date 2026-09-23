@@ -92,6 +92,20 @@ Any Chromium-based browser with Manifest V3 support. (Chrome / Brave / Edge and 
 (It uses `"world": "MAIN"` content scripts, `color-mix()` and CSS nesting)
 Firefox and Safari are not supported.
 
+## Languages
+
+The extension follows the display language you have set on pixiv.
+(The settings popup follows the language of the last pixiv page you opened)
+
+| Language | Status |
+| --- | --- |
+| Japanese | Supported |
+| English | Supported |
+| Korean | On request |
+
+If pixiv is shown in a language not listed above, the extension falls back to English.
+If you would like another language, please ask through "Bugs, questions and requests" below.
+
 ## Installing
 
 It is not published in the store yet. Build it and load it yourself.
