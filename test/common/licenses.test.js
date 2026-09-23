@@ -1,10 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { DISCLAIMER, PROJECT_LICENSE, THIRD_PARTY } from '../../src/common/licenses.js';
+import { PROJECT_LICENSE, THIRD_PARTY } from '../../src/common/licenses.js';
+import { createStrings } from '../../src/i18n/index.js';
 
 const NOTICE = await readFile(new URL('../../NOTICE', import.meta.url), 'utf8');
 const LICENSE = await readFile(new URL('../../LICENSE', import.meta.url), 'utf8');
+// NOTICE は日本語のままなので、比較は日本語カタログに対して行う
+const DISCLAIMER = createStrings('ja').licenses.disclaimer;
+const NOTES = createStrings('ja').licenses.notes;
 
 test('免責の本文は商標ガイドラインが求める 2 つの表記を含む', () => {
 	const body = DISCLAIMER.body.join('\n');
@@ -23,9 +27,10 @@ test('同梱しているのは Material Symbols と Font Awesome Free', () => {
 
 test('第三者の成果物は名前・権利者・ライセンス・出どころ・用途をすべて持つ', () => {
 	for (const item of THIRD_PARTY) {
-		for (const key of ['name', 'copyright', 'license', 'url', 'note']) {
+		for (const key of ['name', 'copyright', 'license', 'url']) {
 			assert.ok(item[key]?.length > 0, `${item.name} の ${key} が無い`);
 		}
+		assert.ok(NOTES[item.name]?.length > 0, `${item.name} の note が無い`);
 	}
 });
 

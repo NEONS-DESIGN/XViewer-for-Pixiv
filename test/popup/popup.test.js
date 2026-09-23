@@ -1,8 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { main, SAVE_FAILED, RESET_FAILED } from '../../src/popup/app.js';
+import { main } from '../../src/popup/app.js';
 import { SETTINGS_DEFAULTS } from '../../src/common/constants.js';
+import { createStrings } from '../../src/i18n/index.js';
 import { fakeElement, fakeDoc as fakeDocWith, flush } from '../helpers/dom.js';
+
+const { SAVE_FAILED, RESET_FAILED } = createStrings('ja').popup;
 
 /**
  * data-role で要素を探す。

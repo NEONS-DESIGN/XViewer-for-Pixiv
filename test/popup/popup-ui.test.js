@@ -1,9 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderPopup, resolveTheme } from '../../src/popup/popup-ui.js';
-import { SECTIONS } from '../../src/popup/sections.js';
+import { createSections } from '../../src/popup/sections.js';
 import { SETTINGS_DEFAULTS, POPUP_THEMES, PREFETCH_CHOICES } from '../../src/common/constants.js';
 import { PROJECT_LICENSE, THIRD_PARTY } from '../../src/common/licenses.js';
+import { createStrings } from '../../src/i18n/index.js';
 import { fakeElement, fakeDoc as fakeDocWith, iconName } from '../helpers/dom.js';
 
 /**
@@ -54,7 +55,7 @@ function collect(node, tag) {
  * @returns {object} doc / root / changes / resets をまとめたもの
  */
 function build(overrides = {}) {
-	const { settings = {}, rich = false, prefersLight = false, ...rest } = overrides;
+	const { settings = {}, rich = false, prefersLight = false, strings = createStrings('ja'), ...rest } = overrides;
 	const doc = fakeDoc({ rich, prefersLight });
 	const root = fakeElement('main');
 	const changes = [];
@@ -63,6 +64,7 @@ function build(overrides = {}) {
 		doc,
 		root,
 		settings: { ...SETTINGS_DEFAULTS, ...settings },
+		strings,
 		onChange: (patch) => changes.push(patch),
 		onReset: () => { resets += 1; },
 		...rest,
@@ -72,13 +74,15 @@ function build(overrides = {}) {
 
 test('定義表のキーは popupTheme を除く全設定と 1 対 1 に対応する', () => {
 	// タイポしたキーで saveSetting が成功し、読み込み側は既定へ倒すので誰も気づけない
-	const keys = SECTIONS.flatMap((section) => section.fields.map((field) => field.key));
-	assert.equal(new Set(keys).size, keys.length, 'キーが重複している');
-	assert.deepEqual(new Set([...keys, 'popupTheme']), new Set(Object.keys(SETTINGS_DEFAULTS)));
+	for (const lang of ['ja', 'en']) {
+		const keys = createSections(createStrings(lang)).flatMap((section) => section.fields.map((field) => field.key));
+		assert.equal(new Set(keys).size, keys.length, 'キーが重複している');
+		assert.deepEqual(new Set([...keys, 'popupTheme']), new Set(Object.keys(SETTINGS_DEFAULTS)));
+	}
 });
 
 test('先読みの選択肢は PREFETCH_CHOICES の値と並びから起こす', () => {
-	const field = SECTIONS.flatMap((section) => section.fields).find((one) => one.key === 'prefetch');
+	const field = createSections(createStrings('ja')).flatMap((section) => section.fields).find((one) => one.key === 'prefetch');
 	assert.deepEqual(field.options.map((option) => option.value), PREFETCH_CHOICES.map(String));
 	for (const option of field.options) {
 		assert.ok(option.label.length > 0 && option.description.length > 0, `${option.value} の文言が無い`);
@@ -492,7 +496,7 @@ test('外部リンクは新しいタブで開き、参照元を渡さない', ()
 test('描き直しても前の中身は残らない', () => {
 	const { doc, root } = build();
 	const before = collect(root, 'h2').length;
-	renderPopup({ doc, root, settings: { ...SETTINGS_DEFAULTS }, onChange() {}, onReset() {} });
+	renderPopup({ doc, root, settings: { ...SETTINGS_DEFAULTS }, strings: createStrings('ja'), onChange() {}, onReset() {} });
 	assert.equal(collect(root, 'h2').length, before);
 });
 
@@ -506,4 +510,15 @@ test('resolveTheme は明示の選択を OS の設定より優先する', () => 
 test('resolveTheme は matchMedia が無くてもダークを返す', () => {
 	assert.equal(resolveTheme(POPUP_THEMES.SYSTEM, undefined), POPUP_THEMES.DARK);
 	assert.equal(resolveTheme(POPUP_THEMES.SYSTEM, {}), POPUP_THEMES.DARK);
+});
+
+/* --- 英語のカタログ ----------------------------------------------------- */
+
+test('英語のカタログで設定画面が英語になる', () => {
+	const { root } = build({ strings: createStrings('en') });
+	assert.match(root.textContent, /Use the viewer/);
+	assert.match(root.textContent, /Reset settings/);
+	assert.match(root.textContent, /Licenses/);
+	assert.match(root.textContent, /Settings/);
+	assert.match(root.textContent, /Disclaimer/);
 });
