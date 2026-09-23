@@ -1,6 +1,6 @@
 /**
- * 紹介サイトの最小限の動き。配色の切り替えだけを持つ。
- * 言語の切り替えはただのリンクなので JS は関与しない。(JS が無くても読める)
+ * 紹介サイトの最小限の動き。配色の切り替え、動画の停止ボタン、先頭へ戻るボタンの出し入れの 3 つだけを持つ。
+ * 言語の切り替えと先頭へ戻る動作そのものはただのリンクなので JS は関与しない。(JS が無くても読める)
  */
 (function () {
 	'use strict';
@@ -134,8 +134,54 @@
 		sync();
 	}
 
+	/**
+	 * 先頭へ戻るボタンを出すまでのスクロール量。画面の高さに対する倍率。(1 = 1 画面分)
+	 */
+	var TO_TOP_AFTER_SCREENS = 1;
+
+	/**
+	 * 先頭へ戻るボタンを、1 画面分スクロールしたときだけ出す。
+	 * 飛ぶ動作は href="#top" のリンクに任せる。(JS が無いときは data-js が付かず、常に出たままになる)
+	 * @returns {void}
+	 */
+	function wireToTop() {
+		var button = document.querySelector('.to-top');
+		if (!button) return;
+		var pending = false;
+
+		/**
+		 * 今のスクロール量に合わせて出し入れする。
+		 * @returns {void}
+		 */
+		function update() {
+			pending = false;
+			var threshold = window.innerHeight * TO_TOP_AFTER_SCREENS;
+			// 隠すのは head の先読みが付ける data-js と style.css の役目。ここは出すときの印だけを持つ
+			if (window.scrollY >= threshold) {
+				button.setAttribute('data-shown', '');
+			} else {
+				button.removeAttribute('data-shown');
+			}
+		}
+
+		/**
+		 * スクロールのたびに計算しないよう、描画 1 回につき 1 度にまとめる。
+		 * @returns {void}
+		 */
+		function schedule() {
+			if (pending) return;
+			pending = true;
+			window.requestAnimationFrame(update);
+		}
+
+		window.addEventListener('scroll', schedule, { passive: true });
+		window.addEventListener('resize', schedule, { passive: true });
+		update();
+	}
+
 	document.addEventListener('DOMContentLoaded', function () {
 		wireVideos();
+		wireToTop();
 		var button = document.querySelector('.theme-toggle');
 		var stored = readStored();
 		// head の先読みスクリプトが既に属性を付けている。ここでは文言だけ合わせる

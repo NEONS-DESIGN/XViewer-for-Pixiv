@@ -744,6 +744,63 @@ td.default {
 	color: var(--muted);
 }
 
+/* ------------------------------------------------------------- 先頭へ戻る */
+
+.to-top {
+	--to-top-size: 46px;
+	--to-top-inset: 20px;
+	position: fixed;
+	/* iPhone の角やホームバーに掛からないよう、端末の安全域の分だけ内側へ寄せる */
+	right: calc(var(--to-top-inset) + env(safe-area-inset-right, 0px));
+	bottom: calc(var(--to-top-inset) + env(safe-area-inset-bottom, 0px));
+	/* ヘッダー (50) より下、本文より上 */
+	z-index: 40;
+	display: grid;
+	place-items: center;
+	width: var(--to-top-size);
+	height: var(--to-top-size);
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	background: var(--surface);
+	color: var(--fg);
+	box-shadow: var(--shadow);
+	transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s, background-color 0.15s ease, color 0.15s ease;
+}
+
+.to-top:hover {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: var(--on-accent);
+}
+
+/* :where() で付けている共通の角丸 (4px) を丸い形で上書きする */
+.to-top:focus-visible {
+	border-radius: 999px;
+}
+
+.to-top svg {
+	width: 26px;
+	height: 26px;
+	fill: currentColor;
+	/* 図形は下向き (expand_more)。回して上向きにする */
+	transform: rotate(180deg);
+}
+
+/* JS が動くときだけ、1 画面分スクロールするまで隠す。(data-js は head の先読み、data-shown は site.js が付ける)
+   JS が無ければ常に出したまま。visibility まで落としてフォーカス順からも外す */
+:root[data-js] .to-top:not([data-shown]) {
+	opacity: 0;
+	visibility: hidden;
+	transform: translateY(12px);
+	pointer-events: none;
+}
+
+@media (max-width: 640px) {
+	.to-top {
+		--to-top-inset: 16px;
+	}
+}
+
 /* -------------------------------------------------------------------- キー */
 
 .keys {
