@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#14161c" media="(prefers-color-scheme: dark)">
 <title>プライバシーポリシー - XViewer for Pixiv</title>
-<meta name="description" content="XViewer for Pixiv のプライバシーポリシー。この拡張機能はいかなる個人情報も収集せず、作者のサーバーへ送ることもありません。保存するのは利用者が選んだ設定項目だけです。">
+<meta name="description" content="XViewer for Pixiv のプライバシーポリシー。この拡張機能はいかなる個人情報も収集せず、作者のサーバーへ送ることもありません。保存するのは利用者が選んだ設定項目と、最後に見た pixiv の表示言語だけです。">
 <link rel="canonical" href="https://xviewer.neonsdesign.com/privacy.html">
 <link rel="alternate" hreflang="ja" href="https://xviewer.neonsdesign.com/privacy.html">
 <link rel="alternate" hreflang="en" href="https://xviewer.neonsdesign.com/en/privacy.html">
@@ -73,7 +73,7 @@
 			<p>この拡張機能は、いかなる個人情報も収集しません。</p>
 			<p>
 				作者が管理するサーバーを持たず、あなたが開いている pixiv 以外へデータを送ることはありません。
-				保存するのは、あなたが選んだ設定項目だけです。以下はその詳細です。
+				保存するのは、あなたが選んだ設定項目と、最後に見た pixiv の表示言語だけです。以下はその詳細です。
 			</p>
 		</div>
 
@@ -115,12 +115,15 @@
 
 		<h2>3. 保存する情報</h2>
 		<p>
-			本拡張機能が保存するのは、あなたがポップアップ画面で選んだ設定だけです。
-			保存先は Chrome の設定同期領域 (<code>chrome.storage.sync</code>) で、
+			本拡張機能が保存する情報は 2 種類です。ひとつはポップアップ画面で選んだ設定、
+			もうひとつは最後に見た pixiv の表示言語です。保存先はそれぞれ別で、詳しくは以下のとおりです。
+		</p>
+		<p>
+			設定の保存先は Chrome の設定同期領域 (<code>chrome.storage.sync</code>) で、
 			あなたのブラウザと、あなたが Chrome の同期を有効にしている場合はあなたの Google アカウントの中に置かれます。
 			作者を含む第三者がこれを読むことはできません。
 		</p>
-		<p>保存される項目は次の 11 件です。いずれも真偽値、または決められた選択肢の中の 1 つです。</p>
+		<p>保存される設定は次の 11 件です。いずれも真偽値、または決められた選択肢の中の 1 つです。</p>
 		<ul>
 			<li>ビュワーを使うかどうか</li>
 			<li>画像の解像度</li>
@@ -136,6 +139,12 @@
 		</ul>
 		<p>
 			閲覧した作品の ID、ユーザー ID、閲覧の履歴、いいねやブックマークの記録は、一切保存しません。
+		</p>
+		<p>
+			設定画面 (ポップアップ) は pixiv のページを持たないため、表示言語を自分では判定できません。
+			そのため、pixiv のページで動くスクリプトが見た表示言語を <code>chrome.storage.local</code> に保存し、
+			設定画面がそれを読み取ります。保存する値は <code>ja</code> や <code>en</code> のような言語コード 1 つだけで、
+			個人を識別する情報は含まれません。この領域は端末の中だけに置かれ、Chrome の同期対象にはなりません。
 		</p>
 
 		<h3>保存した情報の削除</h3>
@@ -163,8 +172,9 @@
 		<p>本拡張機能が要求する権限は次の 2 つだけです。他のサイトへのアクセス権限は求めません。</p>
 		<h3><code>storage</code></h3>
 		<p>
-			前述の設定を保存するために使用します。設定はツールバーのポップアップで変更し、
+			前述の設定と、最後に見た pixiv の表示言語を保存するために使用します。設定はツールバーのポップアップで変更し、
 			pixiv のページで動くスクリプトが読み取るため、この 2 つをまたいで値を共有する手段が必要です。
+			表示言語はその逆で、pixiv のページで動くスクリプトが書き、ポップアップがそれを読み取ります。
 		</p>
 		<h3><code>https://www.pixiv.net/*</code></h3>
 		<p>

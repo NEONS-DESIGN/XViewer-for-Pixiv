@@ -83,7 +83,7 @@ const KEEP_OPEN_SELECTOR = [
  * @property {() => boolean} canExtendSequence グリッドの端で全作品の並びへ広げてよいか (タグ絞り込み中は false)
  * @property {(current: import('../sequence.js').Sequence) => Promise<import('../sequence.js').Sequence>} extendSequence 端で全作品の並びへ広げる
  * @property {(url: string) => Promise<object>} [getJsonImpl] 作品詳細の取得。テストから通信させないために使う
- * @property {(userId: string) => Promise<object>} [fetchUser] 作者情報の取得。テストから通信させないために使う
+ * @property {(userId: string, lang: string) => Promise<object>} [fetchUser] 作者情報の取得。テストから通信させないために使う
  */
 
 /**

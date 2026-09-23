@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#14161c" media="(prefers-color-scheme: dark)">
 <title>Privacy Policy - XViewer for Pixiv</title>
-<meta name="description" content="The privacy policy for XViewer for Pixiv. The extension collects no personal information and sends nothing to any server run by the author. It stores only the preferences you choose.">
+<meta name="description" content="The privacy policy for XViewer for Pixiv. The extension collects no personal information and sends nothing to any server run by the author. It stores only the preferences you choose and the pixiv display language it last saw.">
 <link rel="canonical" href="https://xviewer.neonsdesign.com/en/privacy.html">
 <link rel="alternate" hreflang="ja" href="https://xviewer.neonsdesign.com/privacy.html">
 <link rel="alternate" hreflang="en" href="https://xviewer.neonsdesign.com/en/privacy.html">
@@ -73,7 +73,8 @@
 			<p>This extension collects no personal information.</p>
 			<p>
 				There is no server run by the author, and nothing is sent anywhere other than the pixiv you
-				already have open. The only thing it stores is the set of preferences you choose. The details follow.
+				already have open. The only things it stores are the preferences you choose and the pixiv display
+				language it last saw. The details follow.
 			</p>
 		</div>
 
@@ -114,11 +115,15 @@
 
 		<h2>3. What is stored</h2>
 		<p>
-			The only thing the extension stores is the set of preferences you choose in its popup. They are kept in
-			Chrome's sync storage (<code>chrome.storage.sync</code>), which lives in your own browser and, if you have
-			Chrome sync enabled, in your own Google account. Neither the author nor any third party can read it.
+			The extension stores two kinds of data: the preferences you choose in its popup, and the pixiv display
+			language it last saw. Each is kept in a different place, as described below.
 		</p>
-		<p>There are 11 stored values. Each is a boolean or one of a fixed set of choices.</p>
+		<p>
+			Preferences are kept in Chrome's sync storage (<code>chrome.storage.sync</code>), which lives in your own
+			browser and, if you have Chrome sync enabled, in your own Google account. Neither the author nor any third
+			party can read it.
+		</p>
+		<p>There are 11 stored preferences. Each is a boolean or one of a fixed set of choices.</p>
 		<ul>
 			<li>Whether the viewer is enabled</li>
 			<li>Image resolution</li>
@@ -134,6 +139,13 @@
 		</ul>
 		<p>
 			Artwork IDs, user IDs, viewing history, and any record of likes or bookmarks are never stored.
+		</p>
+		<p>
+			The popup has no direct access to a pixiv page, so it cannot tell on its own which language pixiv is
+			currently displayed in. To work around that, the script running on the pixiv page saves the display
+			language it sees to <code>chrome.storage.local</code>, and the popup reads it from there. The stored
+			value is nothing more than a language code such as <code>ja</code> or <code>en</code> — it does not
+			identify you. This storage area stays on your own device and is never synced by Chrome.
 		</p>
 
 		<h3>Deleting what is stored</h3>
@@ -161,8 +173,10 @@
 		<p>The extension requests exactly two permissions. It asks for no access to any other site.</p>
 		<h3><code>storage</code></h3>
 		<p>
-			Used to save the preferences described above. Settings are changed in the toolbar popup but read by the script
-			running on pixiv pages, so the two need a shared place to keep them.
+			Used to save the preferences described above, and the pixiv display language it last saw. Settings are
+			changed in the toolbar popup but read by the script running on pixiv pages, so the two need a shared place
+			to keep them. The display language works the other way around: the script running on pixiv pages writes
+			it, and the popup reads it.
 		</p>
 		<h3><code>https://www.pixiv.net/*</code></h3>
 		<p>

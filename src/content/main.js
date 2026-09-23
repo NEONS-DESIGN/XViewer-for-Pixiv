@@ -622,6 +622,10 @@ async function boot() {
 	const pageLanguage = readPageLanguage(document);
 	strings = createStrings(uiLanguage(pageLanguage));
 	// popup は pixiv のページを持たないので、見た言語をここで残す。失敗しても先へ進む
+	// ここで保存しているのは strings.lang (uiLanguage() で解決した後の UI 言語) であって、
+	// pageLanguage (readPageLanguage() が返す生の表示言語) そのものではない。
+	// 現状は popup 側も loadPageLanguage() の結果を uiLanguage() に通すため挙動に差は出ないが、
+	// 対応言語が増えたときに「生の表示言語」と「解決後の UI 言語」の区別が必要になったら書き直すこと
 	void savePageLanguage(strings.lang);
 	settings = await loadSettings();
 	// ビュワーの入切とは独立して効かせる。ピックアップ非表示や無限スクロールだけを使う人もいる

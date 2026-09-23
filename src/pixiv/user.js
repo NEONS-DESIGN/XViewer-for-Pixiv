@@ -26,6 +26,9 @@ export const USER_PROFILE_CACHE_LIMIT = 100;
  * ユーザー ID → 取得中または取得済みの Promise。
  * 取得中の Promise をそのまま入れておくことで、同時に呼ばれても 1 本にまとまる。
  * Map は挿入順を保つので、先頭が最も古い。
+ * キーは userId だけで lang を含まない。表示言語の切り替えは pixiv 側のページ全体の
+ * リロードを伴うため、このモジュールの状態 (このキャッシュを含む) ごと消える前提に乗っている。
+ * 同一セッション中に lang だけが変わることは無い、という前提が崩れたらキーの見直しが要る。
  * @type {Map<string, Promise<object>>}
  */
 const cache = new Map();

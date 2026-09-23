@@ -170,7 +170,7 @@ export function commentToNodes(doc, html) {
  * @typedef {object} SidebarDeps
  * @property {Document} doc
  * @property {HTMLElement} container 描画先 (.sidebar)
- * @property {(userId: string) => Promise<object>} [fetchUser] ユーザー情報の取得。既定は共有キャッシュ付きの取得
+ * @property {(userId: string, lang: string) => Promise<object>} [fetchUser] ユーザー情報の取得。既定は共有キャッシュ付きの取得
  * @property {object} strings 文言のカタログ (src/i18n)
  */
 
