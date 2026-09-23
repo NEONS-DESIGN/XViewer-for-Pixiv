@@ -994,6 +994,11 @@ kbd {
 	margin-bottom: 0;
 }
 
+.footer-copyright {
+	margin: 24px 0 0;
+	font-size: 13px;
+}
+
 /* ------------------------------------------------------------- responsive */
 
 @media (max-width: 860px) {
