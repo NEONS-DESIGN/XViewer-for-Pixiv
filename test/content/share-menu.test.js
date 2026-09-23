@@ -2,9 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createShareMenu } from '../../src/content/viewer/share-menu.js';
 import { fakeElement, fakeDoc, iconName, flush } from '../helpers/dom.js';
+import { createStrings } from '../../src/i18n/index.js';
 
 /** シェア対象の作品詳細の代わり。 */
 const DETAIL = Object.freeze({ id: '149431011', title: 'モンブラン', userName: 'チャイ' });
+
+/** 文言のカタログ (日本語)。 */
+const STRINGS = createStrings('ja');
 
 /**
  * メニューを組み立てる。
@@ -13,7 +17,7 @@ const DETAIL = Object.freeze({ id: '149431011', title: 'モンブラン', userNa
  */
 function build(overrides = {}) {
 	const doc = fakeDoc();
-	const menu = createShareMenu({ doc, detail: DETAIL, ...overrides });
+	const menu = createShareMenu({ doc, detail: DETAIL, strings: STRINGS, ...overrides });
 	const button = menu.element.children[0];
 	const list = menu.element.children[1];
 	const items = list.children.filter((child) => child.className === 'share-item');
@@ -215,4 +219,13 @@ test('dispose は document と自分に付けたリスナを外す', () => {
 	menu.dispose();
 	assert.equal((doc.listeners.pointerdown ?? []).length, 0);
 	assert.equal((menu.element.listeners.focusout ?? []).length, 0);
+});
+
+test('英語のカタログを渡すと文言が英語になる', () => {
+	const { button, items } = build({ strings: createStrings('en') });
+	assert.equal(button.children[1].textContent, 'Share this artwork');
+	assert.deepEqual(
+		items.map((item) => item.children[1].textContent),
+		['X', 'Facebook', 'Pawoo', 'Copy link'],
+	);
 });

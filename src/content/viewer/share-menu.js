@@ -16,14 +16,6 @@ import { buildShareTargets } from '../../pixiv/share.js';
 import { KEYS } from '../../common/constants.js';
 import { warn } from '../../common/log.js';
 
-/** 画面に出す文言。 */
-const MESSAGES = Object.freeze({
-	/** ボタンとメニューの見出し */
-	SHARE: 'この作品をシェア',
-	COPY_FAILED: 'コピーできませんでした',
-	COPY_DONE: 'リンクをコピーしました',
-});
-
 /** メニューの中で使うキー。項目の移動と端への移動。 */
 const MENU_KEYS = Object.freeze({
 	NEXT: 'ArrowDown',
@@ -36,6 +28,7 @@ const MENU_KEYS = Object.freeze({
  * @typedef {object} ShareMenuDeps
  * @property {Document} doc 対象のドキュメント
  * @property {object} detail 正規化した作品詳細
+ * @property {object} strings 文言のカタログ (src/i18n)
  * @property {(text: string) => Promise<void>} [writeText] クリップボードへ書く。既定は navigator.clipboard
  */
 
@@ -46,7 +39,7 @@ const MENU_KEYS = Object.freeze({
  * @returns {{element: HTMLElement, isOpen: () => boolean, consumeEscape: () => boolean, consumeKey: (event: KeyboardEvent) => boolean, dispose: () => void}}
  */
 export function createShareMenu(deps) {
-	const { doc, detail } = deps;
+	const { doc, detail, strings } = deps;
 	const writeText = deps.writeText
 		?? ((text) => navigator.clipboard.writeText(text));
 	/** 開いているか */
@@ -65,18 +58,18 @@ export function createShareMenu(deps) {
 	button.appendChild(createIcon(doc, 'share'));
 	// 文言が見えているので title は付けない (同じ文字が重なるだけ)
 	const buttonText = doc.createElement('span');
-	buttonText.textContent = MESSAGES.SHARE;
+	buttonText.textContent = strings.shareMenu.SHARE;
 	button.appendChild(buttonText);
 
 	const list = doc.createElement('div');
 	list.className = 'share-menu';
 	list.hidden = true;
 	list.setAttribute('role', 'menu');
-	list.setAttribute('aria-label', MESSAGES.SHARE);
+	list.setAttribute('aria-label', strings.shareMenu.SHARE);
 
 	const heading = doc.createElement('p');
 	heading.className = 'share-menu-heading';
-	heading.textContent = MESSAGES.SHARE;
+	heading.textContent = strings.shareMenu.SHARE;
 	list.appendChild(heading);
 
 	/** コピーの結果を伝える場所。読み上げにも渡す */
@@ -151,7 +144,7 @@ export function createShareMenu(deps) {
 		items.push(item);
 	}
 
-	for (const target of buildShareTargets(detail)) {
+	for (const target of buildShareTargets(detail, strings)) {
 		if (target.href) {
 			const link = doc.createElement('a');
 			link.href = target.href;
@@ -171,9 +164,9 @@ export function createShareMenu(deps) {
 			// クリップボードは権限や実行文脈で失敗しうる。落とさずに結果だけ伝える。
 			// navigator.clipboard が無い環境では同期で TypeError が出るので、Promise の中で呼んで reject 側へ流す
 			Promise.resolve().then(() => writeText(target.copyText)).then(
-				() => { status.textContent = MESSAGES.COPY_DONE; },
+				() => { status.textContent = strings.shareMenu.COPY_DONE; },
 				(error) => {
-					status.textContent = MESSAGES.COPY_FAILED;
+					status.textContent = strings.shareMenu.COPY_FAILED;
 					warn('failed to copy share url', error);
 				},
 			);

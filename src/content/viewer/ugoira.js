@@ -17,15 +17,10 @@ import { createIcon } from '../../common/icons.js';
 import { IMAGE_QUALITY } from '../../common/constants.js';
 import { warn } from '../../common/log.js';
 
-/** 再生ボタンの表示。キーは今の再生状態、値は「押すと何になるか」。 */
+/** 再生ボタンの表示。キーは今の再生状態、値は「押すと何になるか」。アイコンは言語に依らない。 */
 const TOGGLE = Object.freeze({
-	PLAYING: Object.freeze({ icon: 'pause', label: '一時停止' }),
-	PAUSED: Object.freeze({ icon: 'play', label: '再生' }),
-});
-
-/** 画面に出す文言。 */
-const MESSAGES = Object.freeze({
-	PLAY_FAILED: 'うごイラを再生できませんでした',
+	PLAYING: Object.freeze({ icon: 'pause', labelKey: 'PAUSE' }),
+	PAUSED: Object.freeze({ icon: 'play', labelKey: 'PLAY' }),
 });
 
 /** 開発者向けの失敗理由。画面には出さず warn に渡す。 */
@@ -113,6 +108,7 @@ export function advanceFrame({ now, startedAt, index, timings }) {
  * @property {Document} doc
  * @property {HTMLElement} container 描画先 (.stage)
  * @property {object} settings 設定
+ * @property {object} strings 文言のカタログ (src/i18n)
  * @property {(message: string) => void} [onError] 使わない。失敗はペインの中の .pane-error に出す。(image-pane と同じ)
  *   呼び出し側の配線が残っている間だけ受け取る
  * @property {typeof fetch} [fetchImpl] 通信 (meta と zip) の差し替え。テストから pixiv を叩かないために使う
@@ -127,7 +123,7 @@ export function advanceFrame({ now, startedAt, index, timings }) {
  * @returns {{render: (detail: object) => Promise<void>, dispose: () => void}}
  */
 export function createUgoiraPlayer(deps) {
-	const { doc, container } = deps;
+	const { doc, container, strings } = deps;
 	const fetchImpl = deps.fetchImpl ?? ((url, init) => fetch(url, init));
 	const createImage = deps.createImage ?? (() => new Image());
 	const raf = deps.requestAnimationFrame ?? ((callback) => requestAnimationFrame(callback));
@@ -281,8 +277,9 @@ export function createUgoiraPlayer(deps) {
 			 */
 			const setToggle = (isPlaying) => {
 				const next = isPlaying ? TOGGLE.PLAYING : TOGGLE.PAUSED;
-				toggle.setAttribute('aria-label', next.label);
-				toggle.title = next.label;
+				const label = strings.ugoira[next.labelKey];
+				toggle.setAttribute('aria-label', label);
+				toggle.title = label;
 				toggle.replaceChildren(createIcon(doc, next.icon));
 			};
 			setToggle(true);
@@ -342,7 +339,7 @@ export function createUgoiraPlayer(deps) {
 				// 破棄後の失敗 (abort を含む) は伝えない。枠ごと消えている
 				if (disposed) return;
 				// 静止画は出ているので、動かないことだけを伝える
-				showPaneError(MESSAGES.PLAY_FAILED);
+				showPaneError(strings.ugoira.PLAY_FAILED);
 				warn('failed to play ugoira', detail.id, error);
 			}
 		},

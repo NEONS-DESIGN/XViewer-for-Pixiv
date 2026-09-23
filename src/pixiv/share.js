@@ -47,10 +47,13 @@ export function shareText(detail) {
  *
  * パラメータは URLSearchParams ではなく encodeURIComponent で組む。
  * URLSearchParams は空白を + にするので、pixiv 本体が作る URL と文字列が変わる。(実測確認済み)
+ *
+ * ブランド名 (`X` / `Facebook` / `Pawoo`)・リンク先・アイコンは言語に依らない。訳すのはコピーの項目だけ。
  * @param {{id: string, title: string, userName: string}} detail 正規化した作品詳細
+ * @param {object} strings 文言のカタログ
  * @returns {ShareTarget[]} シェア先。pixiv 本体と同じ並び
  */
-export function buildShareTargets(detail) {
+export function buildShareTargets(detail, strings) {
 	const url = artworkUrl(detail.id);
 	const text = shareText(detail);
 	const encodedUrl = encodeURIComponent(url);
@@ -79,7 +82,7 @@ export function buildShareTargets(detail) {
 			// pixiv 本体には無い項目。「コレクションを作成」は拡張の中では再現できないので、
 			// 代わりに URL をコピーできるようにする (docs/DECISIONS.md)
 			key: 'copy',
-			label: 'リンクをコピー',
+			label: strings.share.COPY_LINK,
 			icon: 'link',
 			copyText: url,
 		},

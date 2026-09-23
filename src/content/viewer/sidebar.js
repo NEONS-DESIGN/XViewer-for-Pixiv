@@ -310,7 +310,7 @@ export function createSidebar(deps) {
 		original.append(label, createIcon(doc, 'openInNew'));
 		row.appendChild(original);
 
-		shareMenu = createShareMenu({ doc, detail });
+		shareMenu = createShareMenu({ doc, detail, strings });
 		row.appendChild(shareMenu.element);
 		return row;
 	}

@@ -146,7 +146,7 @@ export async function renderWork(detail, session, settings, targets) {
 	}
 
 	if (plan.main === MAIN_PANE.UGOIRA) {
-		ugoiraPane = createUgoiraPlayer({ doc, container: stage, settings });
+		ugoiraPane = createUgoiraPlayer({ doc, container: stage, settings, strings });
 		await ugoiraPane.render(detail);
 	} else {
 		// 原寸表示を開けるのは静止画だけ。うごイラ (canvas) と見られない作品には渡さない
