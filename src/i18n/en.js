@@ -224,6 +224,12 @@ export default {
 					label: 'Off',
 					description: 'Loads on every switch. Uses less data.',
 				},
+				/**
+				 * 先読みする枚数の選択肢。
+				 * 文言を添字で手書きすると PREFETCH_CHOICES の並びを変えたときに黙ってずれるので、値から作る。
+				 * @param {number} count 前後に先読みする枚数 (1 以上)
+				 * @returns {{label: string, description: string}} 選択肢の文言
+				 */
 				some: (count) => (count === 1
 					? { label: '1 image each way', description: 'Loads only the adjacent image ahead.' }
 					: {

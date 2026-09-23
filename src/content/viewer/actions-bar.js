@@ -82,7 +82,7 @@ export function countLabel(label, count, strings) {
  * @property {Document} doc
  * @property {HTMLElement} container カウンタの行 (.counts)。中の .count-like / .count-bookmark を差し替える
  * @property {HTMLElement} [followContainer] フォローの描画先 (.follow-slot)。無ければフォローを出さない
- * @property {(userId: string) => Promise<object>} [fetchUser] ユーザー情報の取得。既定は /ajax/user/{id}?full=1
+ * @property {(userId: string, lang: string) => Promise<object>} [fetchUser] ユーザー情報の取得。既定は /ajax/user/{id}?full=1
  * @property {(userId: string, patch: object) => void} [patchUser] 覚えているユーザー情報の書き換え。既定は pixiv/user.js
  * @property {object} [actions] 更新系の差し替え。テストから通信させないために使う
  * @property {object} strings 文言のカタログ (src/i18n)

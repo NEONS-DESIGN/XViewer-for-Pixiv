@@ -72,7 +72,7 @@ export function planPanes(detail, session, settings) {
  * @property {HTMLElement} stage 主役の描画先 (.stage)
  * @property {HTMLElement} sidebar サイドバーの描画先 (.sidebar)
  * @property {{open: (pages: object) => void}} [zoom] 原寸表示のレイヤ (zoom.js)。画像ペインだけが使う
- * @property {(userId: string) => Promise<object>} [fetchUser] 作者情報の取得。(サイドバーとアクションの両方へ渡す) テストから通信させないために使う
+ * @property {(userId: string, lang: string) => Promise<object>} [fetchUser] 作者情報の取得。(サイドバーとアクションの両方へ渡す) テストから通信させないために使う
  * @property {object} strings 文言のカタログ (src/i18n)
  */
 
