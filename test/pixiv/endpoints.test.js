@@ -23,15 +23,26 @@ import { WORK_CATEGORY } from '../../src/common/constants.js';
 test('langParam は検証済みの言語だけを送る', () => {
 	assert.equal(langParam('ja'), 'lang=ja');
 	assert.equal(langParam('en'), 'lang=en');
+	assert.equal(langParam('ko'), 'lang=ko');
+	assert.equal(langParam('zh'), 'lang=zh');
 });
 
-test('langParam は綴りが未検証の言語を送らない', () => {
-	// pixiv が lang= に期待する綴りを ja / en 以外で実測できていない。
-	// 外すと API 呼び出しそのものが壊れるので、既定へ倒す
-	assert.equal(langParam('ko'), 'lang=ja');
-	assert.equal(langParam('zh'), 'lang=ja');
+test('langParam は翻訳が確認できていない言語を既定へ倒す', () => {
+	// pixiv は未知の lang= でもエラーにせず黙って英語へ倒すが、
+	// 翻訳が返ると実測できていない値をこちらから送る理由はないので既定 (ja) へ倒す
+	assert.equal(langParam('th'), 'lang=ja');
+	assert.equal(langParam('xx'), 'lang=ja');
 	assert.equal(langParam(''), 'lang=ja');
 	assert.equal(langParam(undefined), 'lang=ja');
+});
+
+test('langParam は繁体字中国語を簡体字へ倒す (既知の制限)', () => {
+	// pixiv 側は zh_tw (アンダースコア) でないと繁体字の翻訳を返さないが、
+	// normalizeLanguage (common/language.js) が zh-TW を zh へ切り詰めるため
+	// langParam には zh_tw が渡ってこない。結果として繁体字の利用者には
+	// 簡体字の翻訳が返る。直すなら normalizeLanguage 側から見直す必要がある
+	assert.equal(langParam('zh'), 'lang=zh');
+	assert.notEqual(langParam('zh'), 'lang=zh_tw');
 });
 
 test('URL ビルダーが言語をそのまま反映する', () => {
