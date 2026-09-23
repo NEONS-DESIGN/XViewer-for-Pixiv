@@ -40,22 +40,13 @@ const SENTINEL_STATE = Object.freeze({
 	DONE: 'done',
 });
 
-/** sentinel に出す文言。テストからも引けるように公開する。 */
-export const SENTINEL_TEXT = Object.freeze({
-	LOADING: '作品を読み込んでいます',
-	ERROR: '作品を読み込めませんでした',
-	BUILD_FAILED: '作品を表示できませんでした',
-	RETRY: '再試行',
-	DONE: 'すべての作品を表示しました',
-});
-
 /** 再試行ボタンを出す状態。 */
 const RETRYABLE_STATES = new Set([SENTINEL_STATE.ERROR, SENTINEL_STATE.BUILD_FAILED]);
 
-/** 状態ごとの失敗の文言。RETRYABLE_STATES と対。 */
-const FAILURE_TEXT = Object.freeze({
-	[SENTINEL_STATE.ERROR]: SENTINEL_TEXT.ERROR,
-	[SENTINEL_STATE.BUILD_FAILED]: SENTINEL_TEXT.BUILD_FAILED,
+/** 状態ごとの失敗の文言のキー。RETRYABLE_STATES と対。 */
+const FAILURE_TEXT_KEY = Object.freeze({
+	[SENTINEL_STATE.ERROR]: 'ERROR',
+	[SENTINEL_STATE.BUILD_FAILED]: 'BUILD_FAILED',
 });
 
 /** sentinel の中の部品のクラス名。pixiv 側と衝突しないよう xv- を付ける。(UI_DESIGN_KIT §10) */
@@ -217,11 +208,12 @@ function inactiveHandle() {
  * @param {Document} doc 対象のドキュメント
  * @param {{ul: Element, source: {pageCount: () => Promise<number>, loadPage: (page: number) => Promise<object[]>},
  *   mode: string, loggedIn: boolean, startPage?: number, onPageChange?: (page: number) => void,
- *   deps?: {createObserver?: Function, computedStyle?: Function, actions?: object}}} options 組み立ての材料
+ *   strings: object, deps?: {createObserver?: Function, computedStyle?: Function, actions?: object}}} options
+ *   組み立ての材料。strings は文言のカタログ (src/i18n)
  * @returns {InfiniteHandle} 操作
  */
 export function attachInfiniteScroll(doc, options) {
-	const { ul, source, loggedIn } = options;
+	const { ul, source, loggedIn, strings } = options;
 	const deps = options.deps ?? {};
 	const createObserver = deps.createObserver
 		?? ((callback, init) => new globalThis.IntersectionObserver(callback, init));
@@ -379,17 +371,17 @@ export function attachInfiniteScroll(doc, options) {
 				// 回っている絵は読み上げに意味が無い。文言だけを伝える
 				spinner.setAttribute('aria-hidden', 'true');
 				sentinel.appendChild(spinner);
-				appendMessage(SENTINEL_TEXT.LOADING);
+				appendMessage(strings.infinite.LOADING);
 			} else if (RETRYABLE_STATES.has(next)) {
-				appendMessage(FAILURE_TEXT[next], true);
+				appendMessage(strings.infinite[FAILURE_TEXT_KEY[next]], true);
 				const button = doc.createElement('button');
 				button.setAttribute('type', 'button');
 				button.setAttribute('class', SENTINEL_CLASS.RETRY);
-				button.textContent = SENTINEL_TEXT.RETRY;
+				button.textContent = strings.infinite.RETRY;
 				button.addEventListener('click', retry);
 				sentinel.appendChild(button);
 			} else if (next === SENTINEL_STATE.DONE) {
-				appendMessage(SENTINEL_TEXT.DONE);
+				appendMessage(strings.infinite.DONE);
 			}
 			// idle は何も出さない
 			// 組み立てに成功したときだけ状態を進める。先に進めると、投げたときに

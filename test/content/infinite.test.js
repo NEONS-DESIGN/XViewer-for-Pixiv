@@ -1,14 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-	attachInfiniteScroll, SENTINEL_TEXT, SENTINEL_STYLE_ID, PAGER_STYLE_ID, PAGER_HIDE_CSS,
+	attachInfiniteScroll, SENTINEL_STYLE_ID, PAGER_STYLE_ID, PAGER_HIDE_CSS,
 	CARD_STYLE_ID, CARD_SHOW_CSS,
 } from '../../src/content/infinite.js';
 import {
 	INFINITE_SCROLL, XV_CARD_ATTR, XV_BOOKMARK_ID_ATTR, SENTINEL_ATTR, SENTINEL_MARGIN,
 	BOOKMARK_BUTTON_SELECTOR, BOOKMARKED_FILL, PAGER_SELECTOR,
 } from '../../src/common/constants.js';
+import { createStrings } from '../../src/i18n/index.js';
 import { makeCard, makeGrid, el, fakeComputedStyle } from '../helpers/card.js';
+
+/** 日本語の sentinel の文言。移設前の SENTINEL_TEXT と同じ値。 */
+const SENTINEL_TEXT = createStrings('ja').infinite;
 
 /**
  * IntersectionObserver の偽物。trigger() で「見えた」を起こす。
@@ -143,7 +147,8 @@ function stylesIn(doc, id) {
 /**
  * 継ぎ足しを組み立てる。
  * @param {{pages?: number, claimedPages?: number, mode?: string, startPage?: number, trailing?: boolean,
- *   bookmarked?: boolean, loggedIn?: boolean, actions?: object, onPageChange?: Function}} [options] 上書き
+ *   bookmarked?: boolean, loggedIn?: boolean, actions?: object, onPageChange?: Function,
+ *   strings?: object}} [options] 上書き。strings は文言のカタログ (既定は日本語)
  * @returns {{ul: object, wrap: object, doc: object, handle: object, loaded: number[],
  *   observer: object, trailing: object|null}} 材料一式
  */
@@ -163,6 +168,7 @@ function setup(options = {}) {
 		loggedIn: options.loggedIn ?? true,
 		startPage: options.startPage ?? 1,
 		onPageChange: options.onPageChange,
+		strings: options.strings ?? createStrings('ja'),
 		deps: { createObserver: observer.create, computedStyle: fakeComputedStyle, actions: options.actions },
 	});
 	return { ul, wrap, doc, handle, loaded, observer, trailing };
@@ -197,6 +203,17 @@ test('何もしていないときの sentinel は空', () => {
 	assert.equal(sentinelMessage(wrap), '');
 });
 
+test('strings に英語のカタログを渡すと sentinel の文言も英語になる', async () => {
+	// カタログの値そのものはテストしない (createStrings 側の責務)。
+	// ここで見るのは attachInfiniteScroll が SENTINEL_TEXT を直書きせず、
+	// 渡された strings.infinite を実際に引いているかどうか
+	const { wrap, observer } = setup({ pages: 1, strings: createStrings('en') });
+	const pending = observer.trigger();
+	assert.equal(sentinelMessage(wrap), 'Loading artworks');
+	await pending;
+	assert.equal(sentinelMessage(wrap), 'You have reached the end');
+});
+
 test('sentinel は中身が入る前から読み上げの領域として置かれる', () => {
 	// role="status" は「空の領域が先にあって、後から中身が変わる」形でないと鳴らない。
 	// 中身入りで差し込むと読み上げられず、出していないのと同じになる (UI_DESIGN_KIT §6)
@@ -223,6 +240,7 @@ test('sentinel のスタイルは同じ doc に 1 枚しか入らない', () => 
 	const { source } = fakeSource(3);
 	const attach = () => attachInfiniteScroll(doc, {
 		ul, source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
+		strings: createStrings('ja'),
 		deps: { createObserver: observer.create, computedStyle: fakeComputedStyle },
 	});
 	attach();
@@ -331,6 +349,7 @@ test('総ページ数が取れなかったら何も並べずに失敗として�
 	};
 	attachInfiniteScroll(fakeDoc(wrap), {
 		ul, source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
+		strings: createStrings('ja'),
 		onPageChange: (page) => pages.push(page),
 		deps: { createObserver: observer.create, computedStyle: fakeComputedStyle },
 	});
@@ -360,6 +379,7 @@ function setupFlaky() {
 	};
 	const handle = attachInfiniteScroll(fakeDoc(wrap), {
 		ul, source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
+		strings: createStrings('ja'),
 		deps: { createObserver: observer.create, computedStyle: fakeComputedStyle },
 	});
 	return { ul, wrap, handle, observer };
@@ -427,6 +447,7 @@ function setupUnbuildable(options = {}) {
 		mode: INFINITE_SCROLL.ON_REACH,
 		loggedIn: true,
 		startPage: 1,
+		strings: createStrings('ja'),
 		onPageChange: options.onPageChange,
 		deps: { createObserver: observer.create, computedStyle: fakeComputedStyle },
 	});
@@ -471,6 +492,7 @@ function setupDuplicating(options = {}) {
 	};
 	attachInfiniteScroll(fakeDoc(wrap), {
 		ul, source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
+		strings: createStrings('ja'),
 		onPageChange: (page) => pages.push(page),
 		deps: { createObserver: observer.create, computedStyle: fakeComputedStyle },
 	});
@@ -530,6 +552,7 @@ test('読み込み中は読み込み中と出る', async () => {
 	};
 	attachInfiniteScroll(fakeDoc(wrap), {
 		ul, source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
+		strings: createStrings('ja'),
 		deps: { createObserver: observer.create, computedStyle: fakeComputedStyle },
 	});
 	const pending = observer.trigger();
@@ -570,6 +593,7 @@ function setupSlowPrefetch() {
 	};
 	const handle = attachInfiniteScroll(fakeDoc(wrap), {
 		ul, source, mode: INFINITE_SCROLL.PREFETCH, loggedIn: true, startPage: 1,
+		strings: createStrings('ja'),
 		deps: { createObserver: observer.create, computedStyle: fakeComputedStyle },
 	});
 	return { ul, wrap, handle, observer, loaded, reached, release };
@@ -656,6 +680,7 @@ test('表示の組み立てが途中で失敗しても中途半端な中身を�
 	};
 	attachInfiniteScroll(doc, {
 		ul, source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
+		strings: createStrings('ja'),
 		deps: { createObserver: observer.create, computedStyle: fakeComputedStyle },
 	});
 	await observer.trigger();
@@ -691,6 +716,7 @@ test('雛形が採れなければ何もしない', () => {
 	const doc = { createElement: (tag) => el(tag), body: wrap };
 	const handle = attachInfiniteScroll(doc, {
 		ul, source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
+		strings: createStrings('ja'),
 		deps: { createObserver: observer.create, computedStyle: fakeComputedStyle },
 	});
 	assert.equal(handle.isActive(), false);
@@ -720,6 +746,7 @@ test('雛形が採れなければページャを隠さない', () => {
 	const doc = fakeDoc(wrap);
 	const handle = attachInfiniteScroll(doc, {
 		ul, source: fakeSource(3).source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
+		strings: createStrings('ja'),
 		deps: { createObserver: fakeObserver().create, computedStyle: fakeComputedStyle },
 	});
 	assert.equal(handle.isActive(), false);
@@ -737,6 +764,7 @@ test('sentinel を置けなければページャを隠さない', () => {
 	});
 	const handle = attachInfiniteScroll(doc, {
 		ul, source: fakeSource(3).source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
+		strings: createStrings('ja'),
 		deps: { createObserver, computedStyle: fakeComputedStyle },
 	});
 	assert.equal(handle.isActive(), false);
@@ -759,6 +787,7 @@ test('雛形が採れなければカードの CSS も入らない', () => {
 	const doc = fakeDoc(wrap);
 	attachInfiniteScroll(doc, {
 		ul, source: fakeSource(3).source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
+		strings: createStrings('ja'),
 		deps: { createObserver: fakeObserver().create, computedStyle: fakeComputedStyle },
 	});
 	assert.equal(stylesIn(doc, CARD_STYLE_ID).length, 0, '継ぎ足せないのにカードの style を入れている');
@@ -785,6 +814,7 @@ test('ページャの CSS は二重に入らない', () => {
 	const doc = fakeDoc(wrap);
 	const attach = () => attachInfiniteScroll(doc, {
 		ul, source: fakeSource(3).source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
+		strings: createStrings('ja'),
 		deps: { createObserver: fakeObserver().create, computedStyle: fakeComputedStyle },
 	});
 	const first = attach();
@@ -859,6 +889,7 @@ test('observe() が投げても observer は切られ、sentinel も残らない
 	const { source } = fakeSource(3);
 	const handle = attachInfiniteScroll(fakeDoc(wrap), {
 		ul, source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
+		strings: createStrings('ja'),
 		deps: { createObserver, computedStyle: fakeComputedStyle },
 	});
 	assert.equal(disconnected, 1, '投げた observer が切られずに残っている');
@@ -1099,6 +1130,7 @@ test('未ログインならハートの購読を張らない', () => {
 	doc.addEventListener = (type, handler, capture) => { bound.push(type); original.call(doc, type, handler, capture); };
 	const handle = attachInfiniteScroll(doc, {
 		ul, source: fakeSource(3).source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: false, startPage: 1,
+		strings: createStrings('ja'),
 		deps: { createObserver: fakeObserver().create, computedStyle: fakeComputedStyle },
 	});
 	assert.equal(handle.isActive(), true);
@@ -1115,6 +1147,7 @@ test('雛形にハートが無ければ購読を張らない', () => {
 	doc.addEventListener = (type, handler, capture) => { bound.push(type); original.call(doc, type, handler, capture); };
 	const handle = attachInfiniteScroll(doc, {
 		ul, source: fakeSource(3).source, mode: INFINITE_SCROLL.ON_REACH, loggedIn: true, startPage: 1,
+		strings: createStrings('ja'),
 		deps: { createObserver: fakeObserver().create, computedStyle: fakeComputedStyle },
 	});
 	// 継ぎ足し自体は動く。ハートが無いだけで、無限スクロールを諦める理由にはならない
@@ -1234,6 +1267,7 @@ function setupScroll(options = {}) {
 		mode: INFINITE_SCROLL.ON_REACH,
 		loggedIn: true,
 		startPage: 1,
+		strings: createStrings('ja'),
 		onPageChange: (page) => pages.push(page),
 		deps: {
 			createObserver: observer.create,
