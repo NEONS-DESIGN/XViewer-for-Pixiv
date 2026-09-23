@@ -74,7 +74,7 @@ test('画像ペインは dispose で自分の枠を DOM から外す', async () 
 
 test('サイドバーは dispose で中身を空にする', () => {
 	const container = fakeElement('div');
-	const pane = createSidebar({ doc: fakeDoc(), container, fetchUser: async () => ({}) });
+	const pane = createSidebar({ doc: fakeDoc(), container, fetchUser: async () => ({}), strings: createStrings('ja') });
 	pane.render(DETAIL);
 	assert.ok(container.children.length > 0);
 

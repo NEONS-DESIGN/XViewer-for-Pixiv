@@ -103,7 +103,7 @@ export async function renderWork(detail, session, settings, targets) {
 	// コメントとアクションはサイドバーの中に入るので (plan.comments / plan.actions は
 	// plan.sidebar を含意する)、この 1 ブロックで済ませる
 	if (plan.sidebar) {
-		sidebarPane = createSidebar({ doc, container: sidebar, fetchUser: targets.fetchUser });
+		sidebarPane = createSidebar({ doc, container: sidebar, fetchUser: targets.fetchUser, strings });
 		sidebarPane.render(detail);
 
 		if (plan.comments) {
@@ -132,6 +132,7 @@ export async function renderWork(detail, session, settings, targets) {
 				container: sidebarPane.countsSlot(),
 				followContainer: sidebarPane.followSlot(),
 				fetchUser: targets.fetchUser,
+				strings,
 			});
 			actionsPane.render(detail);
 		}

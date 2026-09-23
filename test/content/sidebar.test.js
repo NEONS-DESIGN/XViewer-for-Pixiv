@@ -2,22 +2,37 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { formatDate, splitComment, createSidebar } from '../../src/content/viewer/sidebar.js';
 import { createAvatar, showAvatar } from '../../src/content/viewer/avatar.js';
+import { createStrings } from '../../src/i18n/index.js';
 import { fakeElement, fakeDoc, iconName, flush, find } from '../helpers/dom.js';
+
+/** このファイルの既定の表示言語。文言は日本語のまま揃える。 */
+const STRINGS = createStrings('ja');
 
 test('formatDate は日本語の日時にする', () => {
 	// createDate は ISO 8601。タイムゾーンの表記が 2 種類あることを SITE_SPEC で確認済み
-	assert.equal(formatDate('2026-09-08T17:45:00+09:00'), '2026年9月8日 17:45');
+	assert.equal(formatDate('2026-09-08T17:45:00+09:00', STRINGS), '2026年9月8日 17:45');
 });
 
 test('formatDate は実行環境のタイムゾーンに依らず JST で出す', () => {
 	// UTC の深夜は JST では翌日。ここがローカル時刻だと閲覧地で表示が変わる
-	assert.equal(formatDate('2026-09-09T15:30:00Z'), '2026年9月10日 00:30');
-	assert.equal(formatDate('2026-01-01T00:05:00Z'), '2026年1月1日 09:05');
+	assert.equal(formatDate('2026-09-09T15:30:00Z', STRINGS), '2026年9月10日 00:30');
+	assert.equal(formatDate('2026-01-01T00:05:00Z', STRINGS), '2026年1月1日 09:05');
 });
 
 test('formatDate は読めない値で空文字を返す', () => {
-	assert.equal(formatDate('よくわからない'), '');
-	assert.equal(formatDate(''), '');
+	assert.equal(formatDate('よくわからない', STRINGS), '');
+	assert.equal(formatDate('', STRINGS), '');
+});
+
+test('formatDate は英語のカタログで英語の書式を返す', () => {
+	const iso = '2026-09-23T13:05:00+09:00';
+	assert.equal(formatDate(iso, createStrings('ja')), '2026年9月23日 13:05');
+	assert.equal(formatDate(iso, createStrings('en')), 'Sep 23, 2026 13:05');
+});
+
+test('formatDate は読めない値に空文字を返す', () => {
+	assert.equal(formatDate('', createStrings('ja')), '');
+	assert.equal(formatDate('not a date', createStrings('ja')), '');
 });
 
 test('splitComment は br で分割する', () => {
@@ -107,7 +122,7 @@ const NO_USER = async () => ({});
  */
 function build(overrides = {}) {
 	const container = fakeElement('div');
-	const sidebar = createSidebar({ doc: fakeDoc(), container, fetchUser: NO_USER, ...overrides });
+	const sidebar = createSidebar({ doc: fakeDoc(), container, fetchUser: NO_USER, strings: STRINGS, ...overrides });
 	return { container, sidebar };
 }
 

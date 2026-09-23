@@ -6,34 +6,54 @@ import {
 	followLabel,
 	countLabel,
 	createActionsBar,
-	BOOKMARK_PRIVATE_HINT,
 } from '../../src/content/viewer/actions-bar.js';
 import { clearSessionCache } from '../../src/content/session.js';
 import { PixivError, PIXIV_ERROR_KINDS } from '../../src/pixiv/errors.js';
+import { createStrings } from '../../src/i18n/index.js';
 import { find } from '../helpers/dom.js';
 import { fakeElement, fakeDoc as fakeDocWith, iconName, flush as settle } from '../helpers/dom.js';
 import { buildNextData } from '../helpers/pixiv.js';
 
+/** このファイルの既定の表示言語。文言は日本語のまま揃える。 */
+const STRINGS = createStrings('ja');
+
+/** ブックマークを非公開で入れる操作の手掛かり。title にだけ添える。(画面には出ない) */
+const BOOKMARK_PRIVATE_HINT = STRINGS.actionsBar.BOOKMARK_PRIVATE_HINT;
+
 test('ブックマークのラベルは状態で変わる', () => {
-	assert.equal(bookmarkLabel(null), 'ブックマークに追加');
-	assert.equal(bookmarkLabel('38764402172'), 'ブックマークから削除');
+	assert.equal(bookmarkLabel(null, STRINGS), 'ブックマークに追加');
+	assert.equal(bookmarkLabel('38764402172', STRINGS), 'ブックマークから削除');
 });
 
 test('いいねのラベルは取り消せないことを明記する', () => {
 	// pixiv の仕様上いいねは解除できない。押す前に分かるようにしておく
-	assert.equal(likeLabel(false), 'いいね (取り消せません)');
-	assert.equal(likeLabel(true), 'いいね済み');
+	assert.equal(likeLabel(false, STRINGS), 'いいね (取り消せません)');
+	assert.equal(likeLabel(true, STRINGS), 'いいね済み');
 });
 
 test('フォローのラベルは状態で変わる', () => {
-	assert.equal(followLabel(false), 'フォロー');
-	assert.equal(followLabel(true), 'フォロー中');
+	assert.equal(followLabel(false, STRINGS), 'フォロー');
+	assert.equal(followLabel(true, STRINGS), 'フォロー中');
 });
 
 test('押せるカウンタの文言は操作の説明と件数を両方持つ', () => {
 	// 見えているのはアイコンと数字だけなので、これが唯一の説明になる
-	assert.equal(countLabel('いいね済み', 2740), 'いいね済み 2,740 件');
-	assert.equal(countLabel('ブックマークに追加', 0), 'ブックマークに追加 0 件');
+	assert.equal(countLabel('いいね済み', 2740, STRINGS), 'いいね済み 2,740 件');
+	assert.equal(countLabel('ブックマークに追加', 0, STRINGS), 'ブックマークに追加 0 件');
+});
+
+test('ラベル関数は英語のカタログで英語を返す', () => {
+	const en = createStrings('en');
+	assert.equal(bookmarkLabel('123', en), 'Remove bookmark');
+	assert.equal(bookmarkLabel(null, en), 'Add bookmark');
+	assert.equal(likeLabel(true, en), 'Liked');
+	assert.equal(likeLabel(false, en), 'Like (cannot be undone)');
+	assert.equal(followLabel(true, en), 'Following');
+});
+
+test('countLabel は英語では助数詞を付けない', () => {
+	assert.equal(countLabel('Likes', 1234, createStrings('en')), 'Likes 1,234');
+	assert.equal(countLabel('いいね', 1234, createStrings('ja')), 'いいね 1,234 件');
 });
 
 /**
@@ -88,6 +108,7 @@ function setup(overrides = {}) {
 		fetchUser: overrides.fetchUser ?? (async () => ({ isFollowed: false })),
 		patchUser: overrides.patchUser ?? ((userId, patch) => { patched.push([userId, patch]); }),
 		actions: overrides.actions,
+		strings: STRINGS,
 	});
 	return {
 		container,
@@ -235,6 +256,7 @@ test('未ログインならカウンタを差し替えず案内だけ出す', ()
 		doc: fakeDocWith(),
 		container,
 		followContainer: fakeElement('div'),
+		strings: STRINGS,
 	});
 	bar.render(DETAIL);
 	// 件数は読めるままにする
@@ -369,6 +391,7 @@ test('自分の作品ではカウンタを差し替えずフォローも出さ�
 		followContainer,
 		// 呼ばれたら「自分かどうか」を見ずにフォロー状態を引きに行っている
 		fetchUser: async (userId) => { calls.push(userId); return { isFollowed: false }; },
+		strings: STRINGS,
 	});
 	bar.render(DETAIL);
 	// 件数は読めるままにする (未ログインのときと同じ扱い)
@@ -396,6 +419,7 @@ test('他人の作品なら self.id があってもボタンを出す', () => {
 		followContainer,
 		fetchUser: async () => ({ isFollowed: false }),
 		patchUser: () => {},
+		strings: STRINGS,
 	});
 	bar.render(DETAIL);
 	assert.equal(container.querySelector('.count-like').tag, 'button');
