@@ -27,7 +27,7 @@ import {
 
 /**
  * sentinel が示す状態。
- * idle は何も出さない。それ以外は sentinel の中に表示を出す。(設計 §5.1)
+ * idle は何も出さない。それ以外は sentinel の中に表示を出す。(SPEC §6.8.3)
  * error は通信の失敗、buildFailed は「作品は返ったのに 1 枚も組めなかった」。
  * どちらも再試行ボタンを出すが、文言を分けるのは原因が違うため。(後者は再試行しても
  * 同じ結果になりやすい)
@@ -40,14 +40,25 @@ const SENTINEL_STATE = Object.freeze({
 	DONE: 'done',
 });
 
-/** 再試行ボタンを出す状態。 */
-const RETRYABLE_STATES = new Set([SENTINEL_STATE.ERROR, SENTINEL_STATE.BUILD_FAILED]);
-
-/** 状態ごとの失敗の文言のキー。RETRYABLE_STATES と対。 */
+/** 失敗した状態ごとの文言のキー (strings.infinite)。再試行ボタンを出す状態はここから導く */
 const FAILURE_TEXT_KEY = Object.freeze({
 	[SENTINEL_STATE.ERROR]: 'ERROR',
 	[SENTINEL_STATE.BUILD_FAILED]: 'BUILD_FAILED',
 });
+
+/** 再試行ボタンを出す状態。失敗の文言を持つ状態と同じ集合 */
+const RETRYABLE_STATES = new Set(Object.keys(FAILURE_TEXT_KEY));
+
+/**
+ * sentinel が引く strings.infinite のキーの一覧。
+ * カタログ側と過不足が無いことは test/i18n/coverage.test.js がこれを基準に確かめる
+ */
+export const SENTINEL_TEXT_KEYS = Object.freeze([
+	'LOADING',
+	'RETRY',
+	'DONE',
+	...Object.values(FAILURE_TEXT_KEY),
+]);
 
 /** sentinel の中の部品のクラス名。pixiv 側と衝突しないよう xv- を付ける。(UI_DESIGN_KIT §10) */
 const SENTINEL_CLASS = Object.freeze({
@@ -70,7 +81,7 @@ export const PAGER_STYLE_ID = 'xviewer-hide-pager';
  * (pixiv は React で何度も描き直すので、JS で当てる方式だと描き直しのたびに一瞬見えてしまう)
  * pixiv 側の指定に競り負けないよう !important を付け、規則はこの 1 本だけに留める。
  */
-export const PAGER_HIDE_CSS = `
+const PAGER_HIDE_CSS = `
 ${PAGER_SELECTOR} {
 	display: none !important;
 }
@@ -91,7 +102,7 @@ export const CARD_STYLE_ID = 'xviewer-show-cards';
  * pixiv 側は :nth-child() 付きで詳細度が高いため !important で競り勝つ。
  * 戻す値は li の既定 (list-item)。本体の可視カードの computed 値と同じ。
  */
-export const CARD_SHOW_CSS = `
+const CARD_SHOW_CSS = `
 [${XV_CARD_ATTR}] {
 	display: list-item !important;
 }
@@ -219,8 +230,13 @@ export function attachInfiniteScroll(doc, options) {
 		?? ((callback, init) => new globalThis.IntersectionObserver(callback, init));
 	/** 画面。スクロールと大きさの変化はここで受ける。取れなければ ?p= の追従だけを諦める */
 	const view = doc.defaultView ?? null;
-	// 要素の上端 (ビューポート基準) を読む。測れない要素は 0 (= 上端の上) として扱う
-	const rectTop = deps.rectTop ?? ((node) => node.getBoundingClientRect?.().top ?? 0);
+	// 要素の上端 (ビューポート基準) を読む。測れない要素は 0 (= 上端の上) として扱う。
+	// DOM から外れた要素は getBoundingClientRect() が 0 を返すので、そのままだと
+	// 「上端を越えた」に倒れる。印のカードを pixiv に消されても、その上にいながら
+	// そのページを名乗らないよう、外れた要素は NaN にして pickVisiblePage に飛ばさせる
+	const rectTop = deps.rectTop ?? ((node) => (
+		node.isConnected === false ? Number.NaN : (node.getBoundingClientRect?.().top ?? 0)
+	));
 	// 見直しを次のフレームまで遅らせる。rAF が無い環境ではマクロタスクへ回す
 	const schedule = deps.schedule ?? ((fn) => {
 		if (typeof view?.requestAnimationFrame === 'function') view.requestAnimationFrame(fn);
@@ -348,7 +364,7 @@ export function attachInfiniteScroll(doc, options) {
 	}
 
 	/**
-	 * sentinel の中身を今の状態に合わせて作り直す。(設計 §5.1)
+	 * sentinel の中身を今の状態に合わせて作り直す。(SPEC §6.8.3)
 	 * 失敗したときだけ再試行ボタンを出す。自動では読み直さない。
 	 * sentinel 自身は入れ替えない。読み上げの領域は作り直すと鳴らなくなる。
 	 * @param {string} next SENTINEL_STATE のいずれか
@@ -477,13 +493,15 @@ export function attachInfiniteScroll(doc, options) {
 
 	/**
 	 * 先読み用に 1 ページ読む。失敗しても黙って諦める。
+	 * 空のページは空配列のまま持ち分にする。null にすると advance() が同じページを
+	 * 読み直してから終わるので、末尾で 1 リクエスト余分に走る
 	 * @param {number} page ページ番号 (1 始まり)
-	 * @returns {Promise<object[]|null>} 作品。取れなければ null
+	 * @returns {Promise<object[]|null>} 作品 (空のページは空配列)。取れなければ null
 	 */
 	async function loadQuietly(page) {
 		try {
 			const works = await source.loadPage(page);
-			return Array.isArray(works) && works.length > 0 ? works : null;
+			return Array.isArray(works) ? works : null;
 		} catch (error) {
 			// 先読みは失敗しても実害が無い。下まで来たときに読み直す
 			warn('infinite scroll prefetch failed', error);
@@ -842,10 +860,11 @@ export function attachInfiniteScroll(doc, options) {
 		/**
 		 * 今画面に出ているページ番号。
 		 * 呼び出し側が URL の ?p= を合わせ直すときに読む。(pixiv が ?p= を戻したあと等)
-		 * 測れなければ最後に知らせた値を返す。
-		 * @returns {number} ページ番号 (1 以上)
+		 * 測れなければ最後に知らせた値を返す。dispose() 後は動いていないので null。
+		 * @returns {number|null} ページ番号 (1 以上)。動いていなければ null
 		 */
 		currentPage() {
+			if (disposed) return null;
 			try {
 				return pickVisiblePage(pageMarks, rectTop) ?? notifiedPage;
 			} catch (error) {

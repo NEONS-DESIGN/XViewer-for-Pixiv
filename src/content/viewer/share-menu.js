@@ -13,6 +13,7 @@
  */
 import { createIcon } from '../../common/icons.js';
 import { buildShareTargets } from '../../pixiv/share.js';
+import { activeElementIn } from './focus.js';
 import { KEYS } from '../../common/constants.js';
 import { warn } from '../../common/log.js';
 
@@ -36,7 +37,7 @@ const MENU_KEYS = Object.freeze({
  * シェアメニューを作る。
  * 呼んだ時点では element を返すだけで、どこへも差し込まない。
  * @param {ShareMenuDeps} deps 依存
- * @returns {{element: HTMLElement, isOpen: () => boolean, consumeEscape: () => boolean, consumeKey: (event: KeyboardEvent) => boolean, dispose: () => void}}
+ * @returns {{element: HTMLElement, isOpen: () => boolean, consumeKey: (event: KeyboardEvent) => boolean, dispose: () => void}}
  */
 export function createShareMenu(deps) {
 	const { doc, detail, strings } = deps;
@@ -101,23 +102,14 @@ export function createShareMenu(deps) {
 	}
 
 	/**
-	 * 今フォーカスのある要素。Shadow DOM の中では document.activeElement がホストを返すので、
-	 * 自分の属する木 (shadowRoot) から引く。
-	 * @returns {Element|null} フォーカスのある要素
-	 */
-	function activeElement() {
-		const tree = typeof element.getRootNode === 'function' ? element.getRootNode() : null;
-		return tree?.activeElement ?? doc.activeElement ?? null;
-	}
-
-	/**
 	 * 項目の間でフォーカスを動かす。
+	 * 今の所在は focus.js から引く。(Shadow DOM の中では document.activeElement がホストを返す)
 	 * @param {string} key 押されたキー
 	 * @returns {boolean} 動かしたなら true
 	 */
 	function moveFocus(key) {
 		if (items.length === 0) return false;
-		const current = items.indexOf(activeElement());
+		const current = items.indexOf(activeElementIn(doc, element));
 		let target;
 		if (key === MENU_KEYS.FIRST) target = 0;
 		else if (key === MENU_KEYS.LAST) target = items.length - 1;
@@ -194,8 +186,8 @@ export function createShareMenu(deps) {
 		if (!open) return;
 		const next = event.relatedTarget;
 		if (!next) return;
-		if (next === element || items.includes(next) || next === button) return;
-		if (typeof element.contains === 'function' && element.contains(next)) return;
+		// 項目もボタンも element の子孫なので、contains で一緒に見られる
+		if (next === element || (typeof element.contains === 'function' && element.contains(next))) return;
 		setOpen(false);
 	}
 
@@ -240,15 +232,6 @@ export function createShareMenu(deps) {
 	return {
 		element,
 		isOpen() { return open; },
-
-		/**
-		 * Escape を食い止める。consumeKey の Escape だけを呼ぶ形。
-		 * @returns {boolean} 食い止めたなら true
-		 */
-		consumeEscape() {
-			return consumeKey({ key: KEYS.CLOSE });
-		},
-
 		consumeKey,
 
 		dispose() {

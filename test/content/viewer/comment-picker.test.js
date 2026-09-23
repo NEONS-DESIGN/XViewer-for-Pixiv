@@ -91,6 +91,43 @@ test('閉じているときは Escape を食い止めない', () => {
 	assert.equal(one.picker.consumeKey({ key: 'Escape' }), false);
 });
 
+test('パネルの外を押すと閉じる', () => {
+	const one = build();
+	const panel = open(one);
+	// パネルや差し込み先の中では閉じない (項目側が自分で閉じる)
+	one.doc.dispatch('pointerdown', { composedPath: () => [panel, one.slot] });
+	assert.equal(one.picker.isOpen(), true);
+	one.doc.dispatch('pointerdown', { composedPath: () => [fakeElement('div')] });
+	assert.equal(one.picker.isOpen(), false);
+});
+
+test('閉じたら document のリスナを外し、dispose でも残さない', () => {
+	const one = build();
+	open(one);
+	assert.equal((one.doc.listeners.pointerdown ?? []).length, 1);
+	one.picker.close();
+	assert.equal((one.doc.listeners.pointerdown ?? []).length, 0);
+	open(one);
+	one.picker.dispose();
+	assert.equal((one.doc.listeners.pointerdown ?? []).length, 0);
+	assert.equal(one.picker.isOpen(), false);
+});
+
+test('isOpenIn は差し込み先を含む要素でだけ true', () => {
+	// 入力欄を畳むとき、別の欄で開いているピッカーまで閉じないための判定
+	const one = build();
+	const form = fakeElement('div');
+	form.appendChild(one.slot);
+	const otherForm = fakeElement('div');
+	assert.equal(one.picker.isOpenIn(form), false);
+	open(one);
+	assert.equal(one.picker.isOpenIn(form), true);
+	assert.equal(one.picker.isOpenIn(one.slot), true);
+	assert.equal(one.picker.isOpenIn(otherForm), false);
+	one.picker.close();
+	assert.equal(one.picker.isOpenIn(form), false);
+});
+
 test('開き直すと同じパネルを使い回す', () => {
 	const one = build();
 	const first = open(one);

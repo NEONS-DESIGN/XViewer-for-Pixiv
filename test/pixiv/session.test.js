@@ -49,6 +49,14 @@ test('api.token が無ければ csrfToken は null', () => {
 	assert.equal(session.self.xRestrict, 1);
 });
 
+test('api.token が文字列でない・空なら csrfToken は null', () => {
+	// client.js の post() は !token で UNAUTHORIZED に倒す。数値や空文字を通すと送ってから 401 になる
+	for (const token of ['', 123, true, {}, null]) {
+		const session = parseNextData(buildNextData({ token }));
+		assert.equal(session.csrfToken, null, `${JSON.stringify(token)} が null にならない`);
+	}
+});
+
 test('preloadedState が壊れていてもログイン状態だけは読める', () => {
 	const text = JSON.stringify({
 		props: { pageProps: { isLoggedIn: true, serverSerializedPreloadedState: '{壊れている' } },

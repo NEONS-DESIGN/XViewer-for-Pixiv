@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { NAV_EVENTS, NAV_HOOK_FLAG } from '../../src/common/constants.js';
 
@@ -8,17 +8,21 @@ import { NAV_EVENTS, NAV_HOOK_FLAG } from '../../src/common/constants.js';
  * 読み込む前に globalThis へ置いておく。
  * 実ページでは window.history と history は同じオブジェクトなので、代役でも繋いでおく。
  * 別物にすると「フラグは window、パッチ先は history」の対応が崩れても気づけない。
- * @returns {{window: EventTarget, calls: string[], originals: object}} 代役と観測用の記録
+ * @returns {{window: EventTarget, history: object, calls: string[], receivers: object[], originals: object}}
+ *   代役と観測用の記録。receivers は元のメソッドが呼ばれたときの this
  */
 function installPageWorld() {
 	const calls = [];
+	const receivers = [];
 	const originals = {
 		pushState(...args) {
 			calls.push(`pushState:${args[2]}`);
+			receivers.push(this);
 			return 'push-result';
 		},
 		replaceState(...args) {
 			calls.push(`replaceState:${args[2]}`);
+			receivers.push(this);
 			return 'replace-result';
 		},
 	};
@@ -27,7 +31,7 @@ function installPageWorld() {
 	win.history = hist;
 	globalThis.window = win;
 	globalThis.history = hist;
-	return { window: win, calls, originals };
+	return { window: win, history: hist, calls, receivers, originals };
 }
 
 const page = installPageWorld();
@@ -39,17 +43,43 @@ page.window.addEventListener(NAV_EVENTS.NAVIGATE, () => { navigateCount += 1; })
 // 副作用 (hook の実行) が要るので、代役を置いたあとに読み込む
 await import('../../src/inject/inject.js');
 
+// 読み込んだ直後の状態。beforeEach が張り直す前に写しておく
+const atLoad = {
+	pushStateWrapped: globalThis.history.pushState !== page.originals.pushState,
+	flagOnWindow: Boolean(page.window[NAV_HOOK_FLAG]),
+	sameFromWindow: page.window.history.pushState === globalThis.history.pushState,
+	flagOnHistory: page.window.history[NAV_HOOK_FLAG],
+};
+
+/**
+ * 各テストを「元の history に包みが 1 枚だけ掛かっている」既知の状態から始める。
+ * テスト同士が unhook / rehook の順序に依存すると、1 本だけ走らせたときに落ちる。
+ */
+beforeEach(() => {
+	page.window.dispatchEvent(new CustomEvent(NAV_EVENTS.UNHOOK));
+	page.window.history = page.history;
+	globalThis.history = page.history;
+	page.window.dispatchEvent(new CustomEvent(NAV_EVENTS.REHOOK));
+	navigateCount = 0;
+});
+
+after(() => {
+	// ファイルごとに別プロセスなので今は無害だが、--test-isolation=none にしても他へ漏らさない
+	page.window.dispatchEvent(new CustomEvent(NAV_EVENTS.UNHOOK));
+	delete globalThis.window;
+	delete globalThis.history;
+});
+
 test('読み込んだ時点で history を包み、フラグを立てる', () => {
-	assert.notEqual(globalThis.history.pushState, page.originals.pushState);
-	assert.ok(page.window[NAV_HOOK_FLAG]);
+	assert.equal(atLoad.pushStateWrapped, true);
+	assert.equal(atLoad.flagOnWindow, true);
 	// フラグを置く先とパッチする先を取り違えていないこと。
 	// サイト本体が呼ぶのは window.history なので、そちらから見て包まれている必要がある
-	assert.equal(page.window.history.pushState, globalThis.history.pushState);
-	assert.equal(page.window.history[NAV_HOOK_FLAG], undefined);
+	assert.equal(atLoad.sameFromWindow, true);
+	assert.equal(atLoad.flagOnHistory, undefined);
 });
 
 test('pushState は元の戻り値を返しつつ遷移を通知する', () => {
-	navigateCount = 0;
 	const result = globalThis.history.pushState({}, '', '/users/1');
 	assert.equal(result, 'push-result');
 	assert.equal(navigateCount, 1);
@@ -57,14 +87,35 @@ test('pushState は元の戻り値を返しつつ遷移を通知する', () => {
 });
 
 test('replaceState も同じように透過に通知する', () => {
-	navigateCount = 0;
 	assert.equal(globalThis.history.replaceState({}, '', '/artworks/1'), 'replace-result');
 	assert.equal(navigateCount, 1);
+	assert.equal(page.calls.at(-1), 'replaceState:/artworks/1');
+});
+
+test('包んだメソッドは this をそのまま元のメソッドへ渡す', () => {
+	// サイト本体は history.pushState(...) と呼ぶ。this が history でなくなると本物の History は投げる
+	globalThis.history.pushState({}, '', '/users/5');
+	assert.equal(page.receivers.at(-1), globalThis.history);
+	globalThis.history.replaceState({}, '', '/users/6');
+	assert.equal(page.receivers.at(-1), globalThis.history);
+});
+
+test('通知に失敗しても pushState は元どおり動き、例外を外へ出さない', () => {
+	// SPEC §12: 通知はサイト本体の遷移の経路に割り込んでいるので、ここで投げてはいけない
+	page.window.dispatchEvent = () => { throw new Error('dispatch failed'); };
+	try {
+		assert.equal(globalThis.history.pushState({}, '', '/users/9'), 'push-result');
+		assert.equal(page.calls.at(-1), 'pushState:/users/9');
+		assert.equal(globalThis.history.replaceState({}, '', '/users/10'), 'replace-result');
+		assert.equal(page.calls.at(-1), 'replaceState:/users/10');
+	} finally {
+		// own property を消して EventTarget.prototype のものへ戻す
+		delete page.window.dispatchEvent;
+	}
 });
 
 test('rehook を二重に受けても包みは 1 枚だけ', () => {
 	page.window.dispatchEvent(new CustomEvent(NAV_EVENTS.REHOOK));
-	navigateCount = 0;
 	globalThis.history.pushState({}, '', '/users/2');
 	// 二重に包まれていれば通知が 2 回来る
 	assert.equal(navigateCount, 1);
@@ -76,15 +127,15 @@ test('unhook で元のメソッドへ戻し、フラグも消す', () => {
 	assert.equal(globalThis.history.replaceState, page.originals.replaceState);
 	assert.equal(page.window[NAV_HOOK_FLAG], undefined);
 
-	navigateCount = 0;
 	globalThis.history.pushState({}, '', '/users/3');
 	assert.equal(navigateCount, 0);
 });
 
 test('unhook のあと rehook で張り直せる', () => {
+	page.window.dispatchEvent(new CustomEvent(NAV_EVENTS.UNHOOK));
+	assert.equal(globalThis.history.pushState, page.originals.pushState, '外れていない');
 	page.window.dispatchEvent(new CustomEvent(NAV_EVENTS.REHOOK));
 	assert.notEqual(globalThis.history.pushState, page.originals.pushState);
-	navigateCount = 0;
 	globalThis.history.pushState({}, '', '/users/4');
 	assert.equal(navigateCount, 1);
 });

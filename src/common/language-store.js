@@ -8,6 +8,7 @@
  * pixiv 側の状態を反映するものなので、`chrome.storage.local` に置く。
  */
 import { normalizeLanguage } from './language.js';
+import { withArea as withStorageArea } from './storage-area.js';
 
 const KEY = 'pageLanguage';
 
@@ -20,22 +21,15 @@ function defaultArea() {
 }
 
 /**
- * 保存領域を触る処理を包む。領域が無ければ・失敗したら fallback を返す。
+ * 表示言語の保存領域 (local) を触る処理を包む。領域が無ければ・失敗したら fallback を返す。
  * @template T
- * @param {{area?: object}} deps 保存領域の差し替え
+ * @param {{area?: object|null}} deps 保存領域の差し替え。null は「領域なし」
  * @param {(area: object) => Promise<T>} run 領域に対する処理
  * @param {T} fallback 領域が無い・失敗したときの値
  * @returns {Promise<T>} 結果
  */
-async function withArea(deps, run, fallback) {
-	const area = deps.area === undefined ? defaultArea() : deps.area;
-	if (!area) return fallback;
-	try {
-		return await run(area);
-	} catch {
-		// 言語が読めなくても既定で描く。呼び出し側が倒す先を持っている
-		return fallback;
-	}
+function withArea(deps, run, fallback) {
+	return withStorageArea(deps, defaultArea, run, fallback);
 }
 
 /**

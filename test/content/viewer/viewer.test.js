@@ -5,6 +5,7 @@ import { clearSessionCache } from '../../../src/content/session.js';
 import { KEYS } from '../../../src/common/constants.js';
 import { createStrings } from '../../../src/i18n/index.js';
 import { fakeElement, fakeDoc as fakeDocBase, find, findAll, flush } from '../../helpers/dom.js';
+import { fakeSequence } from '../../helpers/sequence.js';
 
 // viewer.js は viewer.css と common/tokens.css を import する。(esbuild が文字列にする)
 // node はそのままでは .css を読めないので、空文字を返す読み込みフックを先に登録してから
@@ -206,6 +207,44 @@ test('開いている間は body のスクロールを止め、スクロール�
 	assert.equal(doc.body.getAttribute('style'), 'color:red');
 });
 
+test('開いている間だけ背後を inert にし、元から inert の要素は剥がさない', async () => {
+	const { viewer, doc } = setup();
+	const plain = enrich(fakeElement('div'));
+	const already = enrich(fakeElement('div'));
+	already.setAttribute('inert', '');
+	doc.body.append(plain, already);
+	await viewer.open('1');
+	assert.equal(plain.getAttribute('inert'), '');
+	assert.equal(already.getAttribute('inert'), '');
+	assert.equal(doc.body.children[2].getAttribute('inert'), null, 'ホスト自身には付けない');
+	viewer.close();
+	assert.equal(plain.getAttribute('inert'), null, '自分が付けた分は外す');
+	assert.equal(already.getAttribute('inert'), '', '元から付いていた分は剥がさない');
+});
+
+test('閉じたら keydown を document から外す', async () => {
+	// 外し忘れると、閉じた後も pixiv 側の全キーを捕捉フェーズで奪い続ける
+	const { viewer, doc } = setup();
+	await viewer.open('1');
+	assert.equal(doc.listeners.keydown.length, 1);
+	viewer.close();
+	assert.equal(doc.listeners.keydown.length, 0);
+});
+
+test('取得を待っている間に閉じたら、届いた応答で描かない', async () => {
+	// 閉じた後は stage が無い。応答で描きに行くと例外になる
+	let release;
+	const { viewer, doc } = setup({
+		getJsonImpl: () => new Promise((resolve) => { release = () => resolve(rawDetail('1')); }),
+	});
+	const opening = viewer.open('1');
+	viewer.close();
+	release();
+	await opening;
+	assert.equal(viewer.isOpen(), false);
+	assert.equal(doc.body.children.length, 0);
+});
+
 test('余白で押して余白で離すと閉じる', async () => {
 	const { viewer, stage, closed } = setup();
 	await viewer.open('1');
@@ -311,7 +350,6 @@ test('描画に失敗したら描きかけのペインを捨ててから文言�
 	Object.defineProperty(broken, 'imageQuality', { get() { throw new Error('壊れた設定'); } });
 	const { viewer, stage } = setup({ settings: broken });
 	await viewer.open('1');
-	await flush();
 	const status = find(stage(), '.status');
 	assert.ok(status, '文言が出る');
 	assert.equal(status.textContent, '作品を読み込めませんでした');
@@ -380,19 +418,6 @@ test('dispose は this に依らず閉じる', async () => {
 	dispose();
 	assert.equal(viewer.isOpen(), false);
 });
-
-/**
- * ID の配列から並びの代わりを作る。
- * @param {string[]} ids 作品 ID
- * @returns {{next: (id: string) => string|null, prev: (id: string) => string|null}} 並びの代わり
- */
-function fakeSequence(ids) {
-	const at = (id, offset) => {
-		const index = ids.indexOf(id);
-		return index < 0 ? null : (ids[index + offset] ?? null);
-	};
-	return { next: (id) => at(id, 1), prev: (id) => at(id, -1) };
-}
 
 test('開いたシェアメニューでは上下キーと Escape をメニューに使わせ、本体は動かない', async () => {
 	// これが無いと、メニューの項目を送ろうとした下キーで次の作品へ移る。
@@ -540,4 +565,15 @@ test('Tab は inert を付けた背後の部品を巡回しない', async () => 
 	await doc.dispatch('keydown', { key: KEYS.FOCUS_NEXT, shiftKey: false, preventDefault() {} });
 	assert.equal(behind.focused, false);
 	assert.equal(front.focused, true);
+});
+
+test('巡回先が無くても Tab を素通しさせない', async () => {
+	// 原寸表示で 1 枚の作品はクリック領域が hidden で巡回先が空になる。
+	// 背後は inert でページ内に行き先が無く、素通しすると文書の外 (アドレスバー) へ抜ける
+	const { viewer, doc, shadow } = setup();
+	await viewer.open('1');
+	shadow().querySelectorAll = () => [];
+	let prevented = 0;
+	await doc.dispatch('keydown', { key: KEYS.FOCUS_NEXT, shiftKey: false, preventDefault() { prevented += 1; } });
+	assert.equal(prevented, 1);
 });

@@ -1,43 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { savePageLanguage, loadPageLanguage } from '../../src/common/language-store.js';
-
-/**
- * chrome.storage.local の代わりになる偽の保存領域。
- * @param {object} [initial] 最初から入っている値
- * @returns {object} get / set を持つ領域
- */
-function fakeArea(initial = {}) {
-	const store = { ...initial };
-	return {
-		store,
-		async get(keys) {
-			const wanted = Array.isArray(keys) ? keys : [keys];
-			return Object.fromEntries(wanted.filter((k) => k in store).map((k) => [k, store[k]]));
-		},
-		async set(patch) {
-			Object.assign(store, patch);
-		},
-	};
-}
+import { fakeArea } from '../helpers/storage.js';
 
 test('savePageLanguage は言語を保存する', async () => {
-	const area = fakeArea();
+	const { area } = fakeArea();
 	assert.equal(await savePageLanguage('en', { area }), true);
 	assert.equal(await loadPageLanguage({ area }), 'en');
 });
 
 test('loadPageLanguage は保存が無ければ null を返す', async () => {
-	assert.equal(await loadPageLanguage({ area: fakeArea() }), null);
+	assert.equal(await loadPageLanguage({ area: fakeArea().area }), null);
 });
 
 test('loadPageLanguage は壊れた保存値を null にする', async () => {
-	assert.equal(await loadPageLanguage({ area: fakeArea({ pageLanguage: 42 }) }), null);
-	assert.equal(await loadPageLanguage({ area: fakeArea({ pageLanguage: '' }) }), null);
+	assert.equal(await loadPageLanguage({ area: fakeArea({ pageLanguage: 42 }).area }), null);
+	assert.equal(await loadPageLanguage({ area: fakeArea({ pageLanguage: '' }).area }), null);
 });
 
 test('loadPageLanguage は保存値を正規化して返す', async () => {
-	assert.equal(await loadPageLanguage({ area: fakeArea({ pageLanguage: 'en-US' }) }), 'en');
+	assert.equal(await loadPageLanguage({ area: fakeArea({ pageLanguage: 'en-US' }).area }), 'en');
 });
 
 test('保存領域が無くても投げない', async () => {

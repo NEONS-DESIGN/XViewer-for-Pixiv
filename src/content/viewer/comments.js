@@ -1,6 +1,9 @@
 /**
  * コメントの表示。ルートコメントを並べ、返信は必要なときだけ引いて下にぶら下げる。
  * コメントの取得に失敗しても画像は見られるので、失敗はこの区画の中だけで伝える。
+ *
+ * 持つのは取得・描画・投稿と、それらをつなぐ状態 (今の作品・一覧・入力欄)。
+ * 区画の採寸は comments-layout.js、削除の導線は comments-delete.js に分けてある。
  */
 import { createIcon } from '../../common/icons.js';
 import { currentLocalePrefix } from '../../common/locale.js';
@@ -9,6 +12,8 @@ import { commentRootsUrl, commentRepliesUrl, emojiUrl, stampUrl, userPath, illus
 import { createAvatar, showAvatar } from './avatar.js';
 import { createCommentForm } from './comment-form.js';
 import { createCommentPicker } from './comment-picker.js';
+import { createCommentsLayout } from './comments-layout.js';
+import { attachDelete, createConfirmRegistry, DELETE_BUTTON_CLASS } from './comments-delete.js';
 import { isFocused } from './focus.js';
 import { parseCommentText } from '../../pixiv/emoji.js';
 import { postComment, postStamp, deleteComment } from '../../pixiv/actions.js';
@@ -22,50 +27,6 @@ const CACHE_BUSTER = '_';
 
 /** 返信の 1 ページ目。replies API は offset ではなく 1 始まりの page で送る。 */
 const FIRST_REPLY_PAGE = 1;
-
-/** 見出しと入力欄の入れ物が上端に貼り付いている間だけ付ける印。下に線を引くのに使う。 */
-const STUCK_CLASS = 'is-stuck';
-
-/**
- * 貼り付いたと見なす許容差 (px)。
- * 端数の丸めで 1px 足らずずれることがあり、ちょうど 0 で比べると線が点滅する。
- */
-const STUCK_EPSILON = 1;
-
-/**
- * 見出しがスクロール領域の上端に貼り付いているかを判定する。
- * @param {number} headingTop 見出しの上端 (画面座標)。実際に測るのは見出しと入力欄をまとめた入れ物
- * @param {number} scrollportTop スクロール領域の上端 (画面座標)
- * @returns {boolean} 貼り付いていれば true
- */
-export function isHeadingStuck(headingTop, scrollportTop) {
-	return headingTop - scrollportTop <= STUCK_EPSILON;
-}
-
-/**
- * コメント区画を潰してよい下限の件数。
- * 主文がとても長い作品ではサイドバーの高さが足りず、コメント区画が圧縮される。
- * 0 まで潰れると一覧が箱の外へ出てスクロールでも届かなくなるので、この件数は必ず残す。
- */
-const MIN_VISIBLE_COMMENTS = 3;
-
-/**
- * コメント区画を潰してよい下限の高さを求める。
- *
- * 中身が下限より低いときは中身の高さをそのまま返す。
- * 「3 件分」を固定値にすると、中身が 1 件しか無い作品では下に空きができ、
- * 逆に短くしすぎると中身が切れる。どちらも起きないよう実測値から決める。
- * @param {object} sizes 実測値
- * @param {number} sizes.outside 一覧以外の子 (見出し・状態の文言) が使う高さの合計。margin 込み
- * @param {number} sizes.contentHeight 一覧の中身の高さ。一覧が無ければ 0
- * @param {number|null} sizes.nthBottom 残したい件数の最後のコメントの下端。件数が足りなければ null
- * @returns {number} 下限の高さ (px)
- */
-export function commentsFloorHeight({ outside, contentHeight, nthBottom }) {
-	// 件数が足りないときは中身を全部残す。中身の高さそのものなので空きは出ない
-	const listFloor = nthBottom === null ? contentHeight : Math.min(contentHeight, nthBottom);
-	return outside + listFloor;
-}
 
 /**
  * @typedef {object} Comment
@@ -219,16 +180,12 @@ export function createComments(deps) {
 	let failure = null;
 	/** @type {HTMLElement|null} 「まだコメントはありません」。1 件目を投稿したら消す */
 	let emptyEl = null;
-	/** @type {(() => void)|null} 聞き返し中の削除ボタンを畳む口。同時に 1 つだけ持つ */
-	let confirmingDelete = null;
-	/** @type {ResizeObserver|null} 中身の高さが変わったら下限を測り直す */
-	let sizeWatcher = null;
 	/** @type {HTMLElement|null} 見出しと入力欄をまとめた入れ物。貼り付いたかを見るのはこれ */
 	let headerEl = null;
+	/** @type {HTMLElement|null} 見出し (.comments-heading)。削除で行が消えたときのフォーカスの受け皿 */
+	let headingEl = null;
 	/** @type {HTMLButtonElement|null} 見出しの右端の「上部へ」 */
 	let toTopButton = null;
-	/** @type {(() => void)|null} scrollTarget の購読を解く */
-	let unwatchScroll = null;
 	/** 今の作品に投稿できるか。返信の導線を出すかの判断にも使う。load() が決める */
 	let canPost = false;
 	/** @type {object|null} 絵文字とスタンプのピッカー。1 枚を使い回す */
@@ -237,104 +194,15 @@ export function createComments(deps) {
 	const forms = new Set();
 	/** @type {object|null} 今開いている作品。投稿に作者 ID が要る */
 	let detailRef = null;
-
-	/**
-	 * 要素の外側の高さ。(margin 込み)
-	 * flex の中では上下の margin が相殺されないので、そのまま足せる。
-	 * @param {HTMLElement} el 測る要素
-	 * @returns {number} 高さ (px)
-	 */
-	function outerHeight(el) {
-		const height = el.getBoundingClientRect().height;
-		const view = doc.defaultView;
-		if (!view?.getComputedStyle) return height;
-		const style = view.getComputedStyle(el);
-		return height + (parseFloat(style.marginTop) || 0) + (parseFloat(style.marginBottom) || 0);
-	}
-
-	/**
-	 * MIN_VISIBLE_COMMENTS 件目のコメントの下端が、一覧の上から何 px かを測る。
-	 * @returns {number|null} 高さ (px)。件数が足りなければ null
-	 */
-	function nthCommentBottom() {
-		const nth = list?.children?.[MIN_VISIBLE_COMMENTS - 1];
-		if (!nth || !scroll) return null;
-		// すでに読み進めていても同じ値になるよう scrollTop を足す
-		return nth.getBoundingClientRect().bottom - scroll.getBoundingClientRect().top + scroll.scrollTop;
-	}
-
-	/**
-	 * コメント区画を潰してよい下限を実測して入れる。
-	 * 返信の開閉・「もっと見る」・幅の変化で中身の高さが変わるたびに呼ぶ。
-	 * @returns {void}
-	 */
-	function applyFloor() {
-		// テスト用の DOM には測る口が無い。見た目の調整なので黙って何もしない
-		if (typeof container.getBoundingClientRect !== 'function') return;
-		let outside = 0;
-		for (const child of container.children) {
-			if (child !== scroll) outside += outerHeight(child);
-		}
-		const height = commentsFloorHeight({
-			outside,
-			contentHeight: scroll ? scroll.scrollHeight : 0,
-			nthBottom: nthCommentBottom(),
-		});
-		const next = `${Math.ceil(height)}px`;
-		// 同じ値を書くと ResizeObserver が無駄に回る
-		if (container.style.minHeight !== next) container.style.minHeight = next;
-	}
-
-	/**
-	 * 高さが変わりうる要素を見張る。変わったら下限を測り直す。
-	 * @param {HTMLElement} el 見張る要素
-	 * @returns {void}
-	 */
-	function watchSize(el) {
-		const Observer = doc.defaultView?.ResizeObserver;
-		// テスト用の DOM には無い。見張れなくても初回の実測だけは効く
-		if (!Observer) return;
-		sizeWatcher ??= new Observer(() => { applyFloor(); });
-		sizeWatcher.observe(el);
-	}
-
-	/**
-	 * サイドバーを送るたびに見直す。
-	 *
-	 * **下の線と「上部へ」は同じ合図で出す。** どちらも「見出しと入力欄が上端に貼り付いた」ことに
-	 * 結び付いている: 線はコメントとの境目を示すため、ボタンは投稿文が画面から出た
-	 * ことを意味するため。貼り付いていなければ投稿文はまだ見えているので、戻す導線は要らない。
-	 * @returns {void}
-	 */
-	function syncScrollState() {
-		if (!headerEl || !scrollTarget) return;
-		// テスト用の DOM には測る口が無い。見た目の調整なので黙って何もしない
-		if (typeof headerEl.getBoundingClientRect !== 'function') return;
-		// 文書に入る前は位置が全て 0 で、上端に並んでいると誤判定する
-		if (headerEl.isConnected === false) return;
-		const stuck = isHeadingStuck(
-			headerEl.getBoundingClientRect().top,
-			scrollTarget.getBoundingClientRect().top,
-		);
-		headerEl.classList.toggle(STUCK_CLASS, stuck);
-		// 押しても何も起きないボタンは見せない (UI_DESIGN_KIT §6)
-		if (toTopButton) toTopButton.hidden = !stuck;
-	}
-
-	/**
-	 * サイドバーの先頭へ戻す。動きを抑える設定なら一気に戻す。
-	 * @returns {void}
-	 */
-	function scrollToTop() {
-		if (!scrollTarget) return;
-		const reduced = doc.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
-		if (typeof scrollTarget.scrollTo === 'function') {
-			scrollTarget.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' });
-			return;
-		}
-		// scrollTo を持たない相手 (古い実装・テスト用の DOM) でも戻せるようにする
-		scrollTarget.scrollTop = 0;
-	}
+	/** 聞き返し中の削除ボタンの台帳。同時に 1 つだけ */
+	const confirmations = createConfirmRegistry();
+	/** 区画の採寸。測る相手は描き直すたびに変わるので、毎回この状態から引かせる */
+	const layout = createCommentsLayout({
+		doc,
+		container,
+		scrollTarget,
+		parts: () => ({ scroll, list, header: headerEl, toTopButton }),
+	});
 
 	/**
 	 * 見出しを作る。右端に「上部へ」を置く。
@@ -348,6 +216,9 @@ export function createComments(deps) {
 	function createHeading() {
 		const heading = doc.createElement('h3');
 		heading.className = 'comments-heading';
+		// 削除で行が消えて次の受け皿が無いとき、フォーカスをここへ戻す。Tab の巡回には入れない
+		heading.setAttribute('tabindex', '-1');
+		headingEl = heading;
 
 		// 「上部へ」を右端へ寄せるため、見出しの文字も要素に入れる
 		const title = doc.createElement('span');
@@ -365,14 +236,10 @@ export function createComments(deps) {
 			text.textContent = strings.comments.TO_TOP;
 			toTopButton.appendChild(text);
 			toTopButton.hidden = true;
-			toTopButton.addEventListener('click', scrollToTop);
+			toTopButton.addEventListener('click', () => { layout.scrollToTop(); });
 			heading.appendChild(toTopButton);
 
-			if (typeof scrollTarget.addEventListener === 'function') {
-				const onScroll = () => { syncScrollState(); };
-				scrollTarget.addEventListener('scroll', onScroll, { passive: true });
-				unwatchScroll = () => { scrollTarget.removeEventListener('scroll', onScroll); };
-			}
+			layout.watchScroll();
 			// 最初の判定はここではできない。まだ container に入れていないので
 			// 位置を測れず、上端に並んでいることになってしまう。入れてから load() が呼ぶ
 		}
@@ -416,6 +283,8 @@ export function createComments(deps) {
 			strings,
 			errorMessage: postErrorMessage,
 			onSubmit: async (value) => {
+				// 破棄された後に押されていれば送らない。(消えた作品へ投稿しない)
+				if (!detailRef) return;
 				const requestedWorkId = workId;
 				// 同じ作品で load() を呼び直されたときも捨てられるよう、一覧そのものも世代の印にする
 				// (loadMore() と同じ。workId だけでは気付けず、組み直した一覧へ差し込んでしまう)
@@ -441,11 +310,11 @@ export function createComments(deps) {
 	 * 入力欄を見出しと同じ入れ物に入れるのは、「サイドバーごと送る」設定で
 	 * 一緒に画面の上端へ貼り付かせるため。別の子にすると見出しだけが貼り付き、
 	 * 入力欄は流れていく。
-	 * @param {boolean} canPost 入力欄を出してよいか
+	 * 入力欄を出すかは load() が決めた canPost (モジュールの状態) で見る
 	 * @param {boolean} commentOff コメントを受け付けていない作品か (未ログインの案内を出さない)
 	 * @returns {HTMLElement} 入れ物
 	 */
-	function createHeader(canPost, commentOff) {
+	function createHeader(commentOff) {
 		const header = doc.createElement('div');
 		header.className = 'comments-header';
 		headerEl = header;
@@ -467,14 +336,92 @@ export function createComments(deps) {
 			header.appendChild(signIn);
 		}
 		// 入力欄の高さも下限に効く。入れ物ごと見張る
-		watchSize(header);
+		layout.watchSize(header);
 		return header;
+	}
+
+	/**
+	 * 削除の導線に渡す依存。ボタンごとに作らず 1 つを使い回す。
+	 * 世代の確認と画面から外す処理はこちらの状態を見るので、ここで閉じ込める
+	 */
+	const deleteDeps = {
+		doc,
+		strings,
+		deleteComment: (illustId, commentId, token) => api.deleteComment(illustId, commentId, token),
+		illustId: () => detailRef?.id ?? null,
+		csrfToken: () => readSession(doc).csrfToken,
+		watchGeneration: () => {
+			const requestedWorkId = workId;
+			const requestedList = list;
+			return () => workId === requestedWorkId && list === requestedList;
+		},
+		errorMessage: (error) => postErrorMessage(error, strings.comments.DELETE_FAILED),
+		confirmations,
+		onRemoved: removeItem,
+	};
+
+	/**
+	 * 消した行の後にフォーカスを置く先を決める。
+	 * 同じ一覧の後ろの行にある削除ボタン、無ければ見出し。
+	 * (一覧の項目自体はフォーカスできないので、次の「押せるもの」へ渡す)
+	 * @param {HTMLElement} item これから消す行 (.comment-item)
+	 * @returns {HTMLElement|null} 受け皿。見出しも無ければ null
+	 */
+	function focusAfterRemove(item) {
+		const siblings = Array.from(item.parentElement?.children ?? []);
+		for (const sibling of siblings.slice(siblings.indexOf(item) + 1)) {
+			const button = sibling.querySelector(`.${DELETE_BUTTON_CLASS}`);
+			if (button) return button;
+		}
+		return headingEl;
+	}
+
+	/**
+	 * 削除できたコメントを画面から外し、件数を数え直す。(comments-delete.js から呼ばれる)
+	 * @param {import('./comments-delete.js').RemovedInfo} info 消してよい行と、押した時点の世代
+	 * @returns {Promise<void>}
+	 */
+	async function removeItem({ item, isRoot, focused, stillCurrent }) {
+		const illustId = workId;
+		// 受け皿は消す前に決める。消した後では隣が分からない
+		const receiver = focused ? focusAfterRemove(item) : null;
+		// 行に開いたままの返信欄は forms から外す。残すと消えた入力欄が Escape を食い止め続け、
+		// その欄で開いていたピッカーも開いたままになる
+		for (const form of forms) {
+			if (item.contains(form.element)) {
+				forms.delete(form);
+				form.dispose();
+			}
+		}
+		item.remove();
+		// 読み込み済みの件数も戻す。戻さないと次の「もっと見る」が 1 件飛ばす。
+		// 返信は roots の数え方に入らないのでルートのときだけ
+		if (isRoot) offset = Math.max(0, offset - 1);
+		// 最後の 1 件だったら「まだコメントはありません」へ戻す。
+		// 戻さないと見出しだけが残って、読み込みに失敗したように見える
+		if (list && list.children.length === 0) showEmpty();
+		// 行ごと消えるとフォーカスが body へ落ち、キーボード利用者が Tab の起点を失う
+		receiver?.focus();
+		layout.applyFloor();
+		// 受け手がいなければ数え直しも走らない。
+		// 件数を出していない呼び出し元に無駄な通信をさせないので、これでよい
+		if (!deps.onDeleted) return;
+		const count = await countAfterDelete(illustId);
+		// 数え直しを待つ間に別の作品へ移っていたら、前の作品の件数を今の作品に書かない
+		if (!stillCurrent()) return;
+		try {
+			deps.onDeleted(count);
+		} catch (error) {
+			// 受け手の失敗は削除の失敗ではない。行は既に外しているので、伝えずに記録だけ残す
+			warn('failed to apply comment count', illustId, error);
+		}
 	}
 
 	/**
 	 * コメント本体 (アバター・名前・本文・日時) を要素にする。
 	 * ルートにも返信にも同じ形を使う。
 	 * @param {Comment} comment コメント
+	 * @param {boolean} [isRoot] ルートコメントか。削除で読み込み済みの件数 (offset) を戻すかの判断に使う
 	 * @returns {{item: HTMLElement, body: HTMLElement, repliesSlot: HTMLElement, meta: HTMLElement}} 要素・本文側の入れ物・返信ボタンの差し込み先・下段
 	 */
 	function createItem(comment, isRoot = false) {
@@ -542,126 +489,8 @@ export function createComments(deps) {
 
 		// 削除はルートにも返信にも付く。返信を書く導線は後から meta.prepend() で
 		// 前へ差し込まれるので、並びは [返信][削除][返信を表示][日時] になる
-		if (comment.editable) attachDelete(comment, item, body, meta, isRoot);
+		if (comment.editable) attachDelete(comment, { item, body, meta, isRoot }, deleteDeps);
 		return { item, body, repliesSlot, meta };
-	}
-
-	/**
-	 * 削除の導線を 1 件のコメントに付ける。ルートにも返信にも同じものを使う。
-	 *
-	 * **削除は取り消せないので、一度目の押下では消さずに文言を聞き返しに変える。**
-	 * 別のモーダルを出さないのは、ビュワー自体がモーダルの中だから。
-	 * (二重に重ねるとどれを閉じているのか分からなくなる)
-	 * フォーカスが外れたら聞き返しをやめる。押しっぱなしの確認を残すと、
-	 * 別のコメントを消すつもりで押し直したときに誤爆する。
-	 * @param {Comment} comment 消す対象
-	 * @param {HTMLElement} item 一覧から外す相手 (.comment-item)
-	 * @param {HTMLElement} body 失敗の表示をぶら下げる先 (.comment-body)
-	 * @param {HTMLElement} meta 下段。ボタンをここの先頭へ差し込む
-	 * @param {boolean} isRoot ルートコメントか。読み込み済みの件数を戻すかの判断に使う
-	 * @returns {void}
-	 */
-	function attachDelete(comment, item, body, meta, isRoot) {
-		/** 聞き返している最中か */
-		let confirming = false;
-		/** @type {HTMLElement|null} 失敗の表示。1 つだけ持つ */
-		let failureNode = null;
-
-		const button = doc.createElement('button');
-		button.type = 'button';
-		button.className = 'comment-delete';
-		button.textContent = strings.comments.DELETE;
-
-		/**
-		 * 聞き返しの見た目を切り替える。
-		 * @param {boolean} next 聞き返すなら true
-		 * @returns {void}
-		 */
-		function setConfirming(next) {
-			confirming = next;
-			button.textContent = next ? strings.comments.DELETE_CONFIRM : strings.comments.DELETE;
-			button.classList.toggle('is-confirming', next);
-			// 聞き返しは同時に 1 つだけ。Escape で畳めるよう外から掴めるようにしておく
-			if (next) {
-				if (confirmingDelete && confirmingDelete !== cancel) confirmingDelete();
-				confirmingDelete = cancel;
-			} else if (confirmingDelete === cancel) {
-				confirmingDelete = null;
-			}
-		}
-
-		/**
-		 * 聞き返しをやめる。外 (Escape・別のボタン) から呼ぶ用の口。
-		 * @returns {void}
-		 */
-		function cancel() { setConfirming(false); }
-
-		/**
-		 * 失敗を 1 つだけ出す。コメント自体は読めるまま残す。
-		 * @param {unknown} error 失敗の中身
-		 * @returns {void}
-		 */
-		function showFailure(error) {
-			failureNode?.remove();
-			failureNode = doc.createElement('p');
-			failureNode.className = 'comment-error';
-			failureNode.setAttribute('role', 'alert');
-			failureNode.textContent = postErrorMessage(error, strings.comments.DELETE_FAILED);
-			body.appendChild(failureNode);
-			warn('failed to delete comment', comment.id, error);
-		}
-
-		/**
-		 * 実際に消す。消せたら一覧から外して件数を減らす。
-		 * @returns {Promise<void>}
-		 */
-		async function remove() {
-			// 描き直しの途中で押されることは無いが、押した瞬間に破棄されていれば送らない
-			if (!detailRef) return;
-			const illustId = detailRef.id;
-			// 待っている間に別の作品へ移ったり描き直されたりしたら、画面には手を出さない
-			const requestedWorkId = workId;
-			const requestedList = list;
-			button.disabled = true;
-			try {
-				await api.deleteComment(illustId, comment.id, readSession(doc).csrfToken);
-				if (workId !== requestedWorkId || list !== requestedList) return;
-				failureNode?.remove();
-				failureNode = null;
-				item.remove();
-				// 読み込み済みの件数も戻す。戻さないと次の「もっと見る」が 1 件飛ばす。
-				// 返信は roots の数え方に入らないのでルートのときだけ
-				if (isRoot) offset = Math.max(0, offset - 1);
-				// 最後の 1 件だったら「まだコメントはありません」へ戻す。
-				// 戻さないと見出しだけが残って、読み込みに失敗したように見える
-				if (list && list.children.length === 0) showEmpty();
-				// 受け手がいなければ数え直しも走らない。(?.() は引数も評価しない)
-				// 件数を出していない呼び出し元に無駄な通信をさせないので、これでよい
-				deps.onDeleted?.(await countAfterDelete(illustId));
-				applyFloor();
-			} catch (error) {
-				if (workId !== requestedWorkId || list !== requestedList) return;
-				// 消せていないのに画面から外すと、読み直したときに戻ってきて食い違う
-				showFailure(error);
-				// disabled にした時点でフォーカスが body へ落ちている。押し直せるよう戻す
-				button.focus();
-			} finally {
-				button.disabled = false;
-				// 押し直せるように聞き返しは畳む
-				setConfirming(false);
-			}
-		}
-
-		button.addEventListener('click', () => {
-			if (!confirming) {
-				setConfirming(true);
-				return;
-			}
-			void remove();
-		});
-		button.addEventListener('blur', () => { setConfirming(false); });
-
-		meta.prepend(button);
 	}
 
 	/**
@@ -831,7 +660,7 @@ export function createComments(deps) {
 				toggle.hidden = false;
 				if (!open || !replyList) return;
 				replyList.appendChild(createItem(fromPosted(posted)).item);
-				applyFloor();
+				layout.applyFloor();
 			},
 		};
 	}
@@ -863,7 +692,7 @@ export function createComments(deps) {
 				form.dispose();
 				form = null;
 				toggle.setAttribute('aria-expanded', 'false');
-				applyFloor();
+				layout.applyFloor();
 				// 入力欄ごと消えるとフォーカスが body へ落ちる。押したボタンへ戻す
 				toggle.focus();
 				return;
@@ -880,7 +709,7 @@ export function createComments(deps) {
 			if (area) body.insertBefore(form.element, area);
 			else body.appendChild(form.element);
 			toggle.setAttribute('aria-expanded', 'true');
-			applyFloor();
+			layout.applyFloor();
 			form.focus();
 		});
 
@@ -940,14 +769,9 @@ export function createComments(deps) {
 		// 一覧から読んだ 1 件と同じ導線を付ける。付けないと、描き直すまで
 		// この 1 件にだけ返信できない。返信はまだ無いので「返信を表示」は隠れる
 		list.prepend(createRootItem(fromPosted(posted)));
-		applyFloor();
+		layout.applyFloor();
 	}
 
-	/**
-	 * 一覧とスクロール領域を組み立てて入れ物へ入れる。既にあれば何もしない。
-	 * コメントのある作品では load() が、0 件の作品では 1 件目の投稿が呼ぶ。
-	 * @returns {void}
-	 */
 	/**
 	 * 「まだコメントはありません」を出す。
 	 * 読み込み前に 0 件だったときと、最後の 1 件を消したときの両方から呼ぶ。
@@ -959,7 +783,7 @@ export function createComments(deps) {
 		emptyEl.className = 'status';
 		emptyEl.textContent = strings.comments.EMPTY;
 		container.appendChild(emptyEl);
-		watchSize(emptyEl);
+		layout.watchSize(emptyEl);
 	}
 
 	/**
@@ -988,11 +812,17 @@ export function createComments(deps) {
 		}
 	}
 
+	/**
+	 * 一覧とスクロール領域を組み立てて入れ物へ入れる。既にあれば何もしない。
+	 * コメントのある作品では load() が、0 件の作品では 1 件目の投稿が呼ぶ。
+	 * @returns {void}
+	 */
 	function ensureList() {
-		if (list) return;
-		// 一覧と「まだコメントはありません」は両立しない。1 件目が入る時点で消す
+		// 一覧と「まだコメントはありません」は両立しない。1 件目が入る時点で消す。
+		// 一覧の有無とは切り離す: 最後の 1 件を消して案内へ戻したあとは一覧が残ったまま案内が出ている
 		emptyEl?.remove();
 		emptyEl = null;
+		if (list) return;
 
 		// 一覧と「もっと見る」を同じ領域に入れてスクロールさせる。
 		// 外に置くと、一番下まで読んでいなくてもボタンが見えて不自然になる
@@ -1004,7 +834,7 @@ export function createComments(deps) {
 		list.className = 'comment-list';
 		scroll.appendChild(list);
 		// 返信の開閉でも高さが変わる。一覧そのものを見張れば全部拾える
-		watchSize(list);
+		layout.watchSize(list);
 
 		moreButton = doc.createElement('button');
 		moreButton.type = 'button';
@@ -1046,7 +876,7 @@ export function createComments(deps) {
 				moreButton.hidden = body?.hasNext !== true;
 				moreButton.disabled = false;
 			}
-			applyFloor();
+			layout.applyFloor();
 		} catch (error) {
 			// 破棄後・別の作品へ移った後・描き直した後の失敗は伝えない。
 			// これを入れないと、正常な切り替えが読み込み失敗として表示される
@@ -1060,13 +890,13 @@ export function createComments(deps) {
 			failure.setAttribute('role', 'alert');
 			failure.textContent = strings.comments.LOAD_FAILED;
 			container.appendChild(failure);
-			watchSize(failure);
+			layout.watchSize(failure);
 			if (moreButton) {
 				moreButton.textContent = strings.comments.RETRY;
 				moreButton.hidden = false;
 				moreButton.disabled = false;
 			}
-			applyFloor();
+			layout.applyFloor();
 			warn('failed to load comments', requestedWorkId, error);
 		} finally {
 			// 隠れたボタン (続きが無い) にはフォーカスを置けない。その場合は諦める
@@ -1087,45 +917,43 @@ export function createComments(deps) {
 			container.textContent = '';
 			// 前の作品で測った下限と、消える見出しの購読を残さない。
 			// 一覧やボタンの参照も戻す。残すと前の作品の応答が新しい一覧へ追記される
-			sizeWatcher?.disconnect();
-			unwatchScroll?.();
-			unwatchScroll = null;
+			layout.reset();
 			headerEl = null;
+			headingEl = null;
 			toTopButton = null;
 			scroll = null;
 			list = null;
 			moreButton = null;
 			failure = null;
 			emptyEl = null;
-			confirmingDelete = null;
+			confirmations.clear();
 			// 前の作品の入力欄は捨てる。書きかけごと消えるが、別の作品へ送るほうが害が大きい
 			forms.clear();
 			picker?.close();
-			container.style.minHeight = '';
 
 			detailRef = detail;
 			const session = readSession(doc);
 			// コメントを受け付けていない作品と未ログインでは投稿できない。
 			// 返信の導線を出すかの判断にも使うので、モジュールの状態として覚えておく
 			canPost = detail.commentOff !== true && session.isLoggedIn === true && Boolean(session.csrfToken);
-			container.appendChild(createHeader(canPost, detail.commentOff === true));
+			container.appendChild(createHeader(detail.commentOff === true));
 			// 判定は文書に入れてから。createHeader() の中では位置を測れない
-			syncScrollState();
+			layout.syncScrollState();
 
 			if (detail.commentOff) {
 				const off = doc.createElement('p');
 				off.className = 'status';
 				off.textContent = strings.comments.COMMENT_OFF;
 				container.appendChild(off);
-				watchSize(off);
-				applyFloor();
+				layout.watchSize(off);
+				layout.applyFloor();
 				return;
 			}
 			if (detail.commentCount === 0) {
 				// 引いても空なので読みに行かない。一覧もまだ作らず、
 				// 投稿されたときだけ prependComment() が作ってこの文言を消す
 				showEmpty();
-				applyFloor();
+				layout.applyFloor();
 				return;
 			}
 
@@ -1143,10 +971,7 @@ export function createComments(deps) {
 			if (picker?.consumeKey(event) === true) return true;
 			// 削除の聞き返しは Escape で畳む。ここで食い止めないとビュワーごと閉じてしまい、
 			// キーボードだけの利用者には取り消す手段が無くなる
-			if (event.key === KEYS.CLOSE && confirmingDelete) {
-				confirmingDelete();
-				return true;
-			}
+			if (event.key === KEYS.CLOSE && confirmations.cancel()) return true;
 			for (const form of forms) {
 				if (form.consumeKey(event) === true) return true;
 			}
@@ -1158,19 +983,16 @@ export function createComments(deps) {
 		 * @returns {void}
 		 */
 		dispose() {
-			// 見張ったままだと、閉じたあとの高さの変化で測りに行って落ちる
-			sizeWatcher?.disconnect();
-			sizeWatcher = null;
-			unwatchScroll?.();
-			unwatchScroll = null;
+			layout.dispose();
 			headerEl = null;
+			headingEl = null;
 			toTopButton = null;
 			list = null;
 			scroll = null;
 			moreButton = null;
 			failure = null;
 			emptyEl = null;
-			confirmingDelete = null;
+			confirmations.clear();
 			workId = null;
 			canPost = false;
 			forms.clear();

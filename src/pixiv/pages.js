@@ -8,18 +8,18 @@
  */
 import { getJson } from './client.js';
 import { userProfileAllUrl, userProfileIllustsUrl } from './endpoints.js';
+import { createPromiseCache } from './promise-cache.js';
 import { WORK_CATEGORY, WORKS_PER_PAGE } from '../common/constants.js';
-
-/**
- * profile/all の応答本体を覚える。キーはユーザー ID。
- * 覚えるのは Promise そのもの。同時に呼ばれても 1 本にまとまる。
- * 種別 (イラスト / 漫画) で分けないのは、応答が同じものだから。
- * @type {Map<string, Promise<object>>}
- */
-const profileCache = new Map();
 
 /** 覚えておく作者の数。他人のページを渡り歩いても際限なく増やさない。 */
 const PROFILE_CACHE_LIMIT = 20;
+
+/**
+ * profile/all の応答本体を覚える。キーはユーザー ID。
+ * 覚え方 (Promise のまま覚える・失敗は覚えない・上限で最古を捨てる) は promise-cache.js。
+ * 種別 (イラスト / 漫画) で分けないのは、応答が同じものだから。
+ */
+const profileCache = createPromiseCache(PROFILE_CACHE_LIMIT);
 
 /**
  * 覚えている応答を捨てる。今はテストからだけ呼ぶ。(本体に呼び出し元は無い)
@@ -49,20 +49,7 @@ export function sortIdsDesc(ids) {
  * @returns {Promise<object>} 応答の body
  */
 function loadProfileAll(userId, lang, get) {
-	const hit = profileCache.get(userId);
-	if (hit) return hit;
-	const task = Promise.resolve()
-		.then(() => get(userProfileAllUrl(userId, lang)))
-		.catch((error) => {
-			// 失敗は覚えない。次に呼ばれたらもう一度取りに行く。
-			// 自分が入れた Promise がまだキャッシュに居るときだけ消す。
-			// clearPageSourceCache() を挟んで既に新しい Promise に置き換わっていたら消さない
-			if (profileCache.get(userId) === task) profileCache.delete(userId);
-			throw error;
-		});
-	profileCache.set(userId, task);
-	if (profileCache.size > PROFILE_CACHE_LIMIT) profileCache.delete(profileCache.keys().next().value);
-	return task;
+	return profileCache.get(userId) ?? profileCache.remember(userId, () => get(userProfileAllUrl(userId, lang)));
 }
 
 /**

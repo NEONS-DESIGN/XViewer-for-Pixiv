@@ -89,13 +89,22 @@ test('リンクを押したら閉じてボタンへフォーカスを戻す', ()
 	assert.equal(button.focused, true);
 });
 
-test('リンクをコピーは作品 URL をクリップボードへ書く', async () => {
+test('リンクをコピーは作品 URL をクリップボードへ書き、できたことを伝える', async () => {
 	const written = [];
-	const { list } = build({ writeText: async (value) => { written.push(value); } });
+	const { menu, button, list } = build({ writeText: async (value) => { written.push(value); } });
+	button.dispatch('click', {});
 	const copy = list.children.find((child) => child.tag === 'button');
 	copy.dispatch('click', {});
 	await flush();
 	assert.deepEqual(written, ['https://www.pixiv.net/artworks/149431011']);
+	const status = list.children.find((child) => child.className === 'share-status');
+	assert.equal(status.getAttribute('role'), 'status');
+	assert.equal(status.textContent, 'リンクをコピーしました');
+	// コピーしただけではメニューは閉じない。(結果の文言を読める)
+	assert.equal(menu.isOpen(), true);
+	// 閉じたら前回の結果は残さない
+	button.dispatch('click', {});
+	assert.equal(status.textContent, '');
 });
 
 test('コピーに失敗しても落ちず、その旨を伝える', async () => {
@@ -118,16 +127,6 @@ test('クリップボードが無くて同期で落ちても、失敗として�
 	await flush();
 	const status = list.children.find((child) => child.className === 'share-status');
 	assert.equal(status.textContent, 'コピーできませんでした');
-});
-
-test('consumeEscape は開いているときだけ食い止めて閉じる', () => {
-	const { menu, button } = build();
-	assert.equal(menu.consumeEscape(), false);
-	button.dispatch('click', {});
-	assert.equal(menu.consumeEscape(), true);
-	assert.equal(menu.isOpen(), false);
-	// 閉じたらボタンへフォーカスを戻す。モーダル全体のフォーカスが迷子にならないように
-	assert.equal(button.focused, true);
 });
 
 test('開いたら最初の項目へフォーカスを置く', () => {
@@ -175,8 +174,10 @@ test('閉じているときや関係ないキーは食い止めない', () => {
 	assert.equal(menu.consumeKey(keyEvent('ArrowRight')), false);
 });
 
-test('Escape は consumeKey でも閉じてボタンへ戻す', () => {
+test('Escape は閉じてボタンへフォーカスを戻す。閉じているときは食い止めない', () => {
+	// 戻さないとモーダル全体のフォーカスが迷子になる
 	const { menu, button } = build();
+	assert.equal(menu.consumeKey(keyEvent('Escape')), false);
 	button.dispatch('click', {});
 	button.focused = false;
 	const escape = keyEvent('Escape');

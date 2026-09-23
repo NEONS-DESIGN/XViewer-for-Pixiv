@@ -68,9 +68,6 @@ const BRAND_SOURCE_DIR = 'node_modules/@fortawesome/fontawesome-free/svgs/brands
 /** 生成先。 */
 const OUTPUT_PATH = 'src/common/icon-shapes.js';
 
-/** viewBox が読めなかったときの既定値。Material Symbols と Font Awesome の brands はどちらも 24 単位。 */
-const DEFAULT_VIEW_BOX = '0 0 24 24';
-
 /**
  * SVG の中のコメント。Font Awesome は各ファイルの先頭に帰属のコメントを持つ。
  * 帰属は HEADER と NOTICE に書いてあるので、図形データには残さない。
@@ -83,13 +80,18 @@ const SVG_COMMENT_PATTERN = /<!--[\s\S]*?-->/g;
  * @param {string} svg SVG の中身
  * @param {string} source 読み込み元 (エラー表示用)
  * @returns {{viewBox: string, markup: string}} 図形
- * @throws {Error} svg 要素が見つからないとき (パッケージの更新で形式が変わった等)
+ * @throws {Error} svg 要素か viewBox が見つからないとき (パッケージの更新で形式が変わった等)
  */
 function extract(svg, source) {
 	if (!/<svg[\s>]/.test(svg)) {
 		throw new Error(`${source} に <svg> がありません`);
 	}
-	const viewBox = /viewBox="([^"]+)"/.exec(svg)?.[1] ?? DEFAULT_VIEW_BOX;
+	// viewBox は原本ごとに違う (Material Symbols は 0 -960 960 960、Font Awesome は 0 0 448 512 等)。
+	// 既定値で埋めると単位の合わない枠に置かれ、アイコンが空に見えるまま生成が成功してしまう
+	const viewBox = /viewBox="([^"]+)"/.exec(svg)?.[1];
+	if (!viewBox) {
+		throw new Error(`${source} に viewBox がありません (パッケージの更新で形式が変わっていないか)`);
+	}
 	const markup = svg
 		.replace(SVG_COMMENT_PATTERN, '')
 		.replace(/^[\s\S]*?<svg[^>]*>/, '')

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { pickPageUrls, prefetchTargets, createImagePane } from '../../src/content/viewer/image-pane.js';
-import { fakeElement, fakeDoc, find, findAll, flush } from '../helpers/dom.js';
+import { fakeElement, fakeDoc, find, findAll } from '../helpers/dom.js';
 import { fakeFetch, fakeApiFetch } from '../helpers/pixiv.js';
 import { createStrings } from '../../src/i18n/index.js';
 
@@ -156,6 +156,16 @@ test('/pages に失敗しても 1 枚目は残し、ペインの中にだけ理�
 	assert.equal(findAll(container, '.status').length, 0);
 });
 
+test('/pages の body が配列でなければ 1 枚目を残し、複数枚の失敗として扱う', async () => {
+	// そのまま採ると urls が空になり、出ていた 1 枚目が消えてカウンタが「1/0」になる
+	const { impl } = fakeApiFetch({});
+	const { container, pane } = build({ fetchImpl: impl });
+	await pane.render(DETAIL);
+	assert.equal(find(container, 'img').src, cdn('r0'));
+	assert.equal(find(container, '.counter').textContent, '1/1');
+	assert.equal(find(container, '.pane-error').textContent, '2 枚目以降を読み込めませんでした');
+});
+
 test('dispose した後に /pages が届いても DOM を触らない', async () => {
 	let respond;
 	const fetchImpl = () => new Promise((resolve) => { respond = resolve; });
@@ -165,10 +175,12 @@ test('dispose した後に /pages が届いても DOM を触らない', async ()
 	const counter = find(frame, '.counter');
 	pane.dispose();
 	assert.equal(container.children.length, 0);
-	respond({ ok: true, status: 200, json: async () => ({ error: false, body: PAGES }) });
+	// 応答は client.js が text() で読む形にする。(json() だけだと network 失敗の経路に落ちて成功経路を通らない)
+	respond({ ok: true, status: 200, text: async () => JSON.stringify({ error: false, body: PAGES }) });
 	await rendering;
-	// 捨てた枠のカウンタも書き換えない
+	// 捨てた枠のカウンタも矢印も書き換えない (届いていれば 1/3 になり矢印が出る)
 	assert.equal(counter.textContent, '1/1');
+	assert.equal(find(frame, '.arrow-next').hidden, true);
 	assert.equal(find(frame, '.pane-error'), null);
 });
 
@@ -223,15 +235,17 @@ test('先読みは URL ごとに 1 度だけ Image を作り、空の URL は飛
 	assert.deepEqual(created.map((img) => img.src), [cdn('r1'), cdn('r0')]);
 });
 
-test('dispose で先読みの Image を手放し、画像の error を外す', async () => {
+test('dispose で先読みの読み込みを取り消し、画像の error を外す', async () => {
 	const { impl } = fakeApiFetch(PAGES);
-	const { container, pane } = build({ fetchImpl: impl, prefetch: 1 });
+	const { container, pane, created } = build({ fetchImpl: impl, prefetch: 1 });
 	await pane.render(DETAIL);
 	const image = find(container, 'img');
+	assert.deepEqual(created.map((img) => img.src), [cdn('r1')]);
 	pane.dispose();
 	assert.equal(image.src, '');
 	assert.equal((image.listeners.error ?? []).length, 0);
-	await flush();
+	// 参照を捨てるだけでは読み込み途中の転送が続く。src を空にして取り消す
+	assert.deepEqual(created.map((img) => img.src), ['']);
 });
 
 test('クリックで原寸表示がオンなら、画像を押して原寸の並びを渡す', async () => {

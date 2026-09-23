@@ -8,14 +8,15 @@
  */
 import { getJson } from './client.js';
 import { userUrl } from './endpoints.js';
+import { createPromiseCache } from './promise-cache.js';
 
 /**
  * 覚えておく作者の上限。
  * ブックマーク一覧のように他人の作品が並ぶページを長く流し見すると作者の数だけ増えるので、
- * 古いものから捨てて定常に保つ。テストが押し出しを確かめるために export している。
+ * 古いものから捨てて定常に保つ。
  * pages.js の PROFILE_CACHE_LIMIT (profile/all の ID 一覧) とは別物。
  */
-export const USER_PROFILE_CACHE_LIMIT = 100;
+const USER_PROFILE_CACHE_LIMIT = 100;
 
 /**
  * @typedef {object} UserDeps
@@ -24,25 +25,12 @@ export const USER_PROFILE_CACHE_LIMIT = 100;
 
 /**
  * ユーザー ID → 取得中または取得済みの Promise。
- * 取得中の Promise をそのまま入れておくことで、同時に呼ばれても 1 本にまとまる。
- * Map は挿入順を保つので、先頭が最も古い。
+ * 覚え方 (Promise のまま覚える・失敗は覚えない・上限で最古を捨てる) は promise-cache.js。
  * キーは userId だけで lang を含まない。表示言語の切り替えは pixiv 側のページ全体の
  * リロードを伴うため、このモジュールの状態 (このキャッシュを含む) ごと消える前提に乗っている。
  * 同一セッション中に lang だけが変わることは無い、という前提が崩れたらキーの見直しが要る。
- * @type {Map<string, Promise<object>>}
  */
-const cache = new Map();
-
-/**
- * Promise を覚える。失敗は覚えず、次に呼ばれたらもう一度取りに行けるようにする。
- * @param {string} userId ユーザー ID
- * @param {Promise<object>} promise 覚える Promise
- * @returns {void}
- */
-function remember(userId, promise) {
-	cache.set(userId, promise);
-	promise.catch(() => { if (cache.get(userId) === promise) cache.delete(userId); });
-}
+const cache = createPromiseCache(USER_PROFILE_CACHE_LIMIT);
 
 /**
  * ユーザー情報を取る。同じ ID は覚えて使い回す。
@@ -52,14 +40,8 @@ function remember(userId, promise) {
  * @returns {Promise<object>} /ajax/user/{id}?full=1 の body
  */
 export function fetchUserProfile(userId, lang, deps = {}) {
-	const cached = cache.get(userId);
-	if (cached) return cached;
 	const getJsonImpl = deps.getJsonImpl ?? getJson;
-	// 差し替えが同期的に投げても失敗として返せるよう、必ず Promise に包んでから覚える
-	const pending = Promise.resolve().then(() => getJsonImpl(userUrl(userId, lang)));
-	if (cache.size >= USER_PROFILE_CACHE_LIMIT) cache.delete(cache.keys().next().value);
-	remember(userId, pending);
-	return pending;
+	return cache.get(userId) ?? cache.remember(userId, () => getJsonImpl(userUrl(userId, lang)));
 }
 
 /**
@@ -72,7 +54,7 @@ export function fetchUserProfile(userId, lang, deps = {}) {
 export function patchUserProfile(userId, patch) {
 	const cached = cache.get(userId);
 	if (!cached) return false;
-	remember(userId, cached.then((profile) => ({ ...profile, ...patch })));
+	cache.replace(userId, cached.then((profile) => ({ ...profile, ...patch })));
 	return true;
 }
 

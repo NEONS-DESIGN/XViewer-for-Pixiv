@@ -19,6 +19,11 @@ const ARROW_SHAPES = Object.freeze({
 	next: Object.freeze({ messageKey: 'NEXT_PAGE', key: '→', icon: 'chevronRight' }),
 });
 
+/** 開発者向けの失敗理由。画面には出さず warn に渡す。 */
+const REASONS = Object.freeze({
+	PAGES_EMPTY: '/pages の body にページがありません',
+});
+
 /**
  * ページ配列から表示に使う URL を並べる。
  * 指定した解像度が無い作品もあるので regular へ落とす。
@@ -258,7 +263,11 @@ export function createImagePane(deps) {
 			try {
 				const pages = await getJson(illustPagesUrl(detail.id, strings.lang), { fetchImpl });
 				if (disposed) return;
-				urls = pickPageUrls(pages, deps.settings.imageQuality);
+				const next = pickPageUrls(pages, deps.settings.imageQuality);
+				// body が配列でない応答をそのまま採ると、出ていた 1 枚目が消えて「1/0」になる。
+				// 複数枚が開けなかった扱い (1 枚目は残る) に流す
+				if (next.length === 0) throw new Error(REASONS.PAGES_EMPTY);
+				urls = next;
 				originalUrls = pickPageUrls(pages, IMAGE_QUALITY.ORIGINAL);
 				paint();
 			} catch (error) {
@@ -282,6 +291,9 @@ export function createImagePane(deps) {
 			// 自分が作った DOM は自分で片付ける。
 			// これを外すと、読み込み中に前の作品の矢印とカウンタが残る
 			frame?.remove();
+			// 読み込み途中の先読みは参照を捨てても転送が続く。src を空にして取り消し、
+			// 見ていない作品の分が今見ている作品の取得と帯域を取り合わないようにする (うごイラの abort と同じ理由)
+			for (const img of prefetched.values()) img.src = '';
 			prefetched.clear();
 			image = null;
 			shownUrl = null;

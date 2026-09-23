@@ -26,6 +26,23 @@ function build(options = {}) {
 }
 
 /**
+ * ピッカーの代わり。開いたときの受け口を記録し、閉じた回数を数える。
+ * @param {object} [options] isOpenIn の戻り値など
+ * @returns {{picker: object, picked: object[], closed: number[]}} ピッカーと記録
+ */
+function fakePicker(options = {}) {
+	const picked = [];
+	const closed = [];
+	const picker = {
+		open: (_slot, handlers) => { picked.push(handlers); },
+		close: () => { closed.push(1); },
+		isOpen: () => false,
+		isOpenIn: () => options.openIn ?? false,
+	};
+	return { picker, picked, closed };
+}
+
+/**
  * textarea に文字を入れる。
  * @param {object} element 入力欄
  * @param {string} value 入れる文字
@@ -144,12 +161,7 @@ test('送信中は入力とボタンを止める', async () => {
 });
 
 test('スタンプを選ぶと確認の表示になり、送信で確定する', async () => {
-	const picked = [];
-	const picker = {
-		open: (_slot, handlers) => { picked.push(handlers); },
-		close: () => {},
-		isOpen: () => false,
-	};
+	const { picker, picked } = fakePicker();
 	const { element, sent } = build({ picker });
 	await find(element, '.comment-form-pick').click();
 	picked[0].onStamp('304');
@@ -163,8 +175,7 @@ test('スタンプを選ぶと確認の表示になり、送信で確定する',
 });
 
 test('選んだスタンプは取り消せる', async () => {
-	const picked = [];
-	const picker = { open: (_slot, handlers) => { picked.push(handlers); }, close: () => {}, isOpen: () => false };
+	const { picker, picked } = fakePicker();
 	const { element } = build({ picker });
 	await find(element, '.comment-form-pick').click();
 	picked[0].onStamp('304');
@@ -174,15 +185,65 @@ test('選んだスタンプは取り消せる', async () => {
 	assert.equal(find(element, '.comment-form-submit').disabled, true);
 });
 
-test('絵文字は本文の末尾に入る', async () => {
-	const picked = [];
-	const picker = { open: (_slot, handlers) => { picked.push(handlers); }, close: () => {}, isOpen: () => false };
+test('絵文字はキャレットの位置が取れなければ本文の末尾に入る', async () => {
+	const { picker, picked } = fakePicker();
 	const { element } = build({ picker });
 	const input = type(element, 'すき');
 	await find(element, '.comment-form-pick').click();
 	picked[0].onEmoji('heaven');
 	assert.equal(input.value, 'すき(heaven)');
 	assert.equal(find(element, '.comment-form-submit').disabled, false);
+	// 続けて書けるよう本文へ戻す
+	assert.equal(input.focused, true);
+});
+
+test('絵文字はキャレットの位置に入り、選択範囲は置き換える', async () => {
+	// 末尾に足すだけだと、途中に入れたいときに切り貼りが要る
+	const { picker, picked } = fakePicker();
+	const { element } = build({ picker });
+	const input = type(element, 'すきです');
+	const ranges = [];
+	input.selectionStart = 2;
+	input.selectionEnd = 2;
+	input.setSelectionRange = (start, end) => { ranges.push([start, end]); };
+	await find(element, '.comment-form-pick').click();
+	picked[0].onEmoji('heaven');
+	assert.equal(input.value, 'すき(heaven)です');
+	// キャレットは差し込んだ直後 (2 + '(heaven)' の 8 文字)
+	assert.deepEqual(ranges, [[10, 10]]);
+
+	input.selectionStart = 0;
+	input.selectionEnd = 2;
+	picked[0].onEmoji('normal');
+	assert.equal(input.value, '(normal)(heaven)です');
+});
+
+test('絵文字を入れたら高さを測り直す', async () => {
+	// 1 行増えることがある
+	const { picker, picked } = fakePicker();
+	const { element } = build({ picker });
+	const input = find(element, '.comment-form-input');
+	Object.defineProperty(input, 'scrollHeight', { get: () => 84, configurable: true });
+	await find(element, '.comment-form-pick').click();
+	picked[0].onEmoji('heaven');
+	assert.equal(input.style.height, '84px');
+});
+
+test('スタンプを選んでいる間に絵文字を選ぶと、スタンプを取り消して本文へ入れる', async () => {
+	// 本文とスタンプは排他。スタンプ中は本文が hidden で、そこへ書くと黙って消える
+	const { picker, picked } = fakePicker();
+	const { element, sent } = build({ picker });
+	await find(element, '.comment-form-pick').click();
+	picked[0].onStamp('304');
+	picked[0].onEmoji('heaven');
+	const input = find(element, '.comment-form-input');
+	assert.equal(input.hidden, false);
+	assert.equal(find(element, '.comment-form-stamp'), null);
+	assert.equal(input.value, '(heaven)');
+	await find(element, '.comment-form-submit').click();
+	await flush();
+	// 送られるのは本文。スタンプではない
+	assert.deepEqual(sent, [{ text: '(heaven)', stampId: null }]);
 });
 
 test('入力中の Escape はビュワーへ渡さない', async () => {
@@ -205,9 +266,27 @@ test('フォーカスが外にあるときは Escape を食い止めない', () 
 	assert.equal(form.consumeKey({ key: 'Escape' }), false);
 });
 
+test('Escape 以外のキーは食い止めない', async () => {
+	// 上下キーまで食い止めると、ビュワーの作品移動が入力欄の外でも効かなくなる
+	const { form, element } = build();
+	const input = type(element, 'あ');
+	await input.dispatch('input', {});
+	input.focus();
+	assert.equal(form.consumeKey({ key: 'ArrowDown' }), false);
+	assert.equal(form.consumeKey({ key: 'Enter' }), false);
+});
+
+test('Cmd+Enter (Mac) でも送信する', async () => {
+	const { element, sent } = build();
+	const input = type(element, 'あ');
+	await input.dispatch('input', {});
+	await input.dispatch('keydown', { key: 'Enter', metaKey: true, preventDefault() {} });
+	await flush();
+	assert.deepEqual(sent, [{ text: 'あ', stampId: null }]);
+});
+
 test('スタンプの取り消しボタンにフォーカスがあるときも Escape を食い止める', async () => {
-	const picked = [];
-	const picker = { open: (_slot, handlers) => { picked.push(handlers); }, close: () => {}, isOpen: () => false };
+	const { picker, picked } = fakePicker();
 	const { form, element } = build({ picker });
 	await find(element, '.comment-form-pick').click();
 	picked[0].onStamp('304');
@@ -246,8 +325,7 @@ test('送信に失敗しても入力へフォーカスを戻し、Escape で書�
 
 test('スタンプの送信に失敗したら送信ボタンへフォーカスを戻す', async () => {
 	// 本文の入力はスタンプを選んでいる間 hidden。隠れた要素には戻せない
-	const picked = [];
-	const picker = { open: (_slot, handlers) => { picked.push(handlers); }, close: () => {}, isOpen: () => false };
+	const { picker, picked } = fakePicker();
 	const { form, element } = build({ picker, onSubmit: async () => { throw new Error('失敗'); } });
 	await find(element, '.comment-form-pick').click();
 	picked[0].onStamp('304');
@@ -273,13 +351,9 @@ test('中身に合わせて高さを測り直す', async () => {
 	// 本家と同じく、行が増えたらスクロールではなく入力欄自体が伸びる
 	const { element } = build();
 	const input = find(element, '.comment-form-input');
-	// 一度 auto へ戻してから測らないと、縮むときに前の高さが残る
-	const applied = [];
 	Object.defineProperty(input, 'scrollHeight', { get: () => 84, configurable: true });
-	input.style.height = '';
 	await input.dispatch('input', {});
-	applied.push(input.style.height);
-	assert.deepEqual(applied, ['84px']);
+	assert.equal(input.style.height, '84px');
 });
 
 test('高さの測り直しは縮むときも効く', async () => {
@@ -315,6 +389,19 @@ test('測れない DOM では高さに触らない', async () => {
 	const input = find(element, '.comment-form-input');
 	await input.dispatch('input', {});
 	assert.equal(input.style.height, undefined);
+});
+
+test('dispose は自分の欄で開いているピッカーだけ閉じる', () => {
+	// ピッカーは 1 枚を共有している。別の欄で開いているものまで閉じない
+	const own = fakePicker({ openIn: true });
+	const mine = build({ picker: own.picker });
+	mine.form.dispose();
+	assert.deepEqual(own.closed, [1]);
+
+	const other = fakePicker({ openIn: false });
+	const theirs = build({ picker: other.picker });
+	theirs.form.dispose();
+	assert.deepEqual(other.closed, []);
 });
 
 test('英語のカタログでは送信ボタンが英語になる', () => {

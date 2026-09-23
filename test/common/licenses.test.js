@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { PROJECT_LICENSE, THIRD_PARTY } from '../../src/common/licenses.js';
 import { createStrings } from '../../src/i18n/index.js';
+import { OUT_DIR, STATIC_FILES } from '../../scripts/static-files.mjs';
 
 const NOTICE = await readFile(new URL('../../NOTICE', import.meta.url), 'utf8');
 const LICENSE = await readFile(new URL('../../LICENSE', import.meta.url), 'utf8');
 const APACHE_2 = await readFile(new URL('../../LICENSES/Apache-2.0.txt', import.meta.url), 'utf8');
-const BUILD_SCRIPT = await readFile(new URL('../../scripts/build.mjs', import.meta.url), 'utf8');
 // NOTICE は日本語のままなので、比較は日本語カタログに対して行う
 const DISCLAIMER = createStrings('ja').licenses.disclaimer;
 const NOTES = createStrings('ja').licenses.notes;
@@ -58,8 +58,10 @@ test('Apache License 2.0 の本文をリポジトリに持っている', () => {
 });
 
 // 配布する zip は dist をそのまま固める。ライセンス文がコピー対象から落ちると、受け取った人に届かない
-test('ビルドは LICENSE / NOTICE / Apache-2.0 の本文を dist へコピーする', () => {
+test('ビルドは LICENSE / NOTICE / Apache-2.0 の本文を dist の同じ相対位置へコピーする', () => {
 	for (const file of ['LICENSE', 'NOTICE', 'LICENSES/Apache-2.0.txt']) {
-		assert.ok(BUILD_SCRIPT.includes(`['${file}',`), `STATIC_FILES に ${file} が無い`);
+		const entry = STATIC_FILES.find(([from]) => from === file);
+		assert.ok(entry, `STATIC_FILES に ${file} が無い`);
+		assert.equal(entry[1], `${OUT_DIR}/${file}`);
 	}
 });

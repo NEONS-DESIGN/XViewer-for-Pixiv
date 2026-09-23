@@ -47,7 +47,7 @@ test('SVG は canvas と同じ viewBox を持つ', () => {
 });
 
 test('SVG の背景は図形データの背景色で塗る', () => {
-	// 値そのものは popup.css の --accent と突き合わせる (test/popup/popup-css.test.js)
+	// 値そのものは tokens.css のダークの --accent と突き合わせる (test/popup/popup-css.test.js)
 	for (const variant of VARIANTS) {
 		const { background } = getArtwork(variant);
 		assert.match(background, /^#[0-9a-f]{6}$/);

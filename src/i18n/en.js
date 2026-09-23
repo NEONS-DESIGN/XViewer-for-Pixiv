@@ -68,10 +68,30 @@ export default {
 			FOLLOW_FAILED: 'Could not change the follow state',
 		},
 		BOOKMARK_PRIVATE_HINT: '(Shift + click for private)',
+		/**
+		 * ブックマークのボタンの読み上げ名。
+		 * @param {boolean} bookmarked 入っていれば true
+		 * @returns {string} 押すと何が起きるか
+		 */
 		bookmarkLabel: (bookmarked) => (bookmarked ? 'Remove bookmark' : 'Add bookmark'),
+		/**
+		 * いいねのボタンの読み上げ名。
+		 * @param {boolean} liked 済みなら true
+		 * @returns {string} 状態か、押すと何が起きるか
+		 */
 		likeLabel: (liked) => (liked ? 'Liked' : 'Like (cannot be undone)'),
+		/**
+		 * フォローのボタンの読み上げ名。
+		 * @param {boolean} following フォロー中なら true
+		 * @returns {string} 状態
+		 */
 		followLabel: (following) => (following ? 'Following' : 'Follow'),
-		// 英語には「件」にあたる助数詞が無いので、数字だけを添える
+		/**
+		 * カウンタの読み上げ名。英語には「件」にあたる助数詞が無いので、数字だけを添える。
+		 * @param {string} label 何の数か
+		 * @param {string} formattedCount 桁区切り済みの件数
+		 * @returns {string} 読み上げ名
+		 */
 		countLabel: (label, formattedCount) => `${label} ${formattedCount}`,
 	},
 	comments: {

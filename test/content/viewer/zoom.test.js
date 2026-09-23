@@ -203,6 +203,21 @@ test('URL が無ければ開かない', () => {
 	assert.equal(find(container, '.zoom'), null);
 });
 
+test('途中のページの URL が空なら真っ黒にせず文言を出し、次のページで消す', () => {
+	// 1 枚目が空なら開かないが、途中のページは開いた後に分かる。画像ペインの失敗と同じ文言を出す
+	const { container, zoom } = build();
+	zoom.open(pages({ urls: [URLS[0], '', URLS[2]] }));
+	assert.equal(find(container, '.pane-error'), null);
+	zoom.consumeKey({ key: KEYS.NEXT_PAGE });
+	const error = find(container, '.pane-error');
+	assert.equal(error.textContent, '画像を読み込めませんでした');
+	assert.equal(error.getAttribute('role'), 'alert');
+	assert.equal(error.parent.className, 'zoom-canvas');
+	zoom.consumeKey({ key: KEYS.NEXT_PAGE });
+	assert.equal(find(container, '.pane-error'), null);
+	assert.equal(find(container, '.zoom-image').src, URLS[2]);
+});
+
 test('開き直しても前のレイヤは残らない', () => {
 	const { container, zoom } = build();
 	zoom.open(pages());

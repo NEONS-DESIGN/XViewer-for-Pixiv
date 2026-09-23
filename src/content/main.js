@@ -20,7 +20,7 @@ import { attachInfiniteScroll } from './infinite.js';
 import { decideInfiniteSync, SYNC_ACTIONS } from './infinite-sync.js';
 import { readSession } from './session.js';
 import { createViewer } from './viewer/viewer.js';
-import { createDomSequence, extendWithAllWorks } from './sequence.js';
+import { createSequence, extendWithAllWorks } from './sequence.js';
 import { createPageSource } from '../pixiv/pages.js';
 import { loadSettings, watchSettings } from '../common/storage.js';
 import { warn, info } from '../common/log.js';
@@ -135,7 +135,7 @@ function handleOpen(workId) {
 	rememberPage(location.pathname);
 	const ids = collectWorkIds(document, location.origin);
 	router.open(workId);
-	void viewer.open(workId, createDomSequence(ids));
+	void viewer.open(workId, createSequence(ids));
 }
 
 /**
@@ -154,7 +154,7 @@ function handlePopState(workId) {
 	}
 	// 既に開いている作品なら描き直さない (作品移動で replaceState した直後など)
 	if (!viewer.isOpen()) {
-		void viewer.open(workId, createDomSequence(collectWorkIds(document, location.origin)));
+		void viewer.open(workId, createSequence(collectWorkIds(document, location.origin)));
 	}
 }
 
@@ -320,6 +320,17 @@ function hasGridChanged() {
 }
 
 /**
+ * 継ぎ足しを張ったグリッドを、今も見ているか。
+ * pixiv 本体が別のページ (ホーム・検索・別ユーザー) へ遷移した直後は、遅延させた追従が
+ * 届くまで継ぎ足しが張られたままになる。その間の URL は別のページのものなので、
+ * `?p=` を触ってはいけない。(触ると遷移先の URL に無関係な `?p=` が残る)
+ * @returns {boolean} 張ったグリッドの URL のままなら true。張っていなければ false
+ */
+function isOnAttachedGrid() {
+	return infiniteKey !== null && infiniteKey === gridKeyOf(infiniteTargetPage(location.pathname));
+}
+
+/**
  * 継ぎ足しを撤去する。
  * グリッドについての記憶 (`infiniteGridKey` / `infiniteBasePage` / `infiniteList`) は捨てない。
  * 設定を切っただけでも呼ばれるので、ここで捨てると再び入れたときに
@@ -327,19 +338,17 @@ function hasGridChanged() {
  * @returns {void}
  */
 function disposeInfinite() {
-	const attachedKey = infiniteKey;
-	infinite?.dispose();
-	infinite = null;
-	infiniteKey = null;
-	infiniteListImages = -1;
 	// 撤去するとグリッドには pixiv が並べたぶんしか残らない。URL の ?p= もそこへ戻し、
 	// 「自分が書いた値」の記憶も揃える。URL・グリッド・記憶の 3 つを常に一致させるのが狙いで、
 	// ずれたままだと「戻ったつもりでページャを踏んだ番号」を自分の書き込みと取り違える。
 	// 張っていたグリッドをまだ見ているときだけ書く。既に別のページへ移っていたら、
-	// 今の URL は別のグリッドのものなので触らない
-	if (attachedKey !== null && attachedKey === gridKeyOf(infiniteTargetPage(location.pathname))) {
-		writePageParam(infiniteBasePage);
-	}
+	// 今の URL は別のグリッドのものなので触らない。
+	// writePageParam() も同じ判定で守っているので、infiniteKey を消す前に書く
+	if (isOnAttachedGrid()) writePageParam(infiniteBasePage);
+	infinite?.dispose();
+	infinite = null;
+	infiniteKey = null;
+	infiniteListImages = -1;
 }
 
 /**
@@ -473,11 +482,13 @@ function syncInfiniteOnce() {
  * 上へ戻れば小さい値も書く。(画面と URL を常に一致させる)
  * 再読み込みや共有で同じ場所へ戻れるようにするための追従なので、履歴は積まない。
  * モーダルが開いている間は書かない。その間 URL は /artworks/{id} で router.js の持ち物。
+ * 張ったグリッドの URL でなくなっていても書かない。別のページへ遷移した直後、
+ * 遅延させた追従が撤去するまでの間にも scroll → onPageChange でここへ来るため
  * @param {number} page ページ番号
  * @returns {void}
  */
 function writePageParam(page) {
-	if (viewer?.isOpen()) return;
+	if (viewer?.isOpen() || !isOnAttachedGrid()) return;
 	const previousOwn = infiniteOwnPage;
 	try {
 		const url = new URL(location.href);
@@ -513,7 +524,7 @@ function needsNavigationWatch() {
  * URL が変わったかもしれないときの入口。
  * 注入側のイベント・popstate・MutationObserver の 3 経路をここに集約する。
  * @param {{deferInfinite?: boolean}} [options] 無限スクロールの追従を遅らせるか
- *   (注入側のイベントは pixiv の pushState の中で同期に届くので、その経路だけ遅らせる)
+ *   (注入側のイベントと popstate は React の描画より先に届くので、その 2 経路は遅らせる)
  * @returns {void}
  */
 function handleLocationChange(options = {}) {
@@ -549,7 +560,11 @@ function startNavigationWatch() {
 	};
 	const onPopState = () => {
 		observedPath = location.pathname;
-		handleLocationChange();
+		// Next.js の popstate 処理は非同期で、この時点の DOM は戻る前のページのまま。
+		// 同期で合わせると前のページの ul (例: ブックマーク) に別のキーで継ぎ足しを張ってしまう。
+		// pushState と同じく React の描画が済むのを待つ。張ったままのグリッドへ戻った場合の
+		// ?p= の揃え直しは、遅延後の syncInfinite() が RESTORE_PARAM / REATTACH で行う
+		handleLocationChange({ deferInfinite: true });
 	};
 	window.addEventListener(NAV_EVENTS.NAVIGATE, onNavigate);
 	window.addEventListener('popstate', onPopState);
@@ -633,12 +648,21 @@ async function boot() {
 	syncPickup();
 	// この時点ではグリッドがまだ無いのが普通。張れなければ遷移監視の経路で張り直す
 	syncInfinite();
-	if (!needsNavigationWatch()) return;
-	startNavigationWatch();
-	if (settings.enabled) apply();
+	if (needsNavigationWatch()) {
+		startNavigationWatch();
+		if (settings.enabled) apply();
+	}
+	// 設定の購読は起動が済んでから。先に購読すると、loadSettings() を待つ間に届いた変更が
+	// pickupHider の無い状態で syncPickup() を走らせ、遷移監視を boot より先に張る
+	watchSettings(handleSettingsChange);
 }
 
-watchSettings((next) => {
+/**
+ * popup で設定が変わったときの処理。
+ * @param {object} next 新しい設定 (normalizeSettings 済み)
+ * @returns {void}
+ */
+function handleSettingsChange(next) {
 	settings = next;
 	viewer?.setSettings(next);
 	tabSkip?.setMode(next.gridTabSkip);
@@ -655,5 +679,6 @@ watchSettings((next) => {
 	if (needsNavigationWatch()) startNavigationWatch();
 	else stopNavigationWatch();
 	if (next.enabled) apply();
-});
+}
+
 void boot();

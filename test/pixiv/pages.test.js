@@ -1,6 +1,6 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { createPageSource, clearPageSourceCache } from '../../src/pixiv/pages.js';
+import { createPageSource, clearPageSourceCache, sortIdsDesc } from '../../src/pixiv/pages.js';
 import { WORK_CATEGORY } from '../../src/common/constants.js';
 
 // 各テストが同じ userId '1' を使うため、キャッシュを挟むと前のテストの ID が漏れる。
@@ -31,6 +31,17 @@ function fakeGet(illustIds, mangaIds = []) {
 	};
 	return { impl, urls };
 }
+
+test('sortIdsDesc は数値として降順に並べる', () => {
+	// 文字列比較だと '9' > '10' になってしまうため数値で比べる
+	assert.deepEqual(sortIdsDesc(['9', '10', '100', '2']), ['100', '10', '9', '2']);
+});
+
+test('sortIdsDesc は渡した配列を変えない', () => {
+	const ids = ['1', '3', '2'];
+	sortIdsDesc(ids);
+	assert.deepEqual(ids, ['1', '3', '2']);
+});
 
 test('ID の数値降順で 48 件ずつ切り出す', async () => {
 	// 本体のページャと同じ並びになることが要 (SITE_SPEC §3 で実測確認済み)
@@ -93,60 +104,8 @@ test('同時に呼ばれても profile/all は 1 本にまとまる', async () =
 	assert.equal(urls.filter((u) => u.includes('/profile/all')).length, 1);
 });
 
-test('失敗は投げ、覚え込まない', async () => {
-	// 覚えると、通信が戻っても失敗したままになる
-	let calls = 0;
-	const impl = async (url) => {
-		calls += 1;
-		if (calls === 1) throw new Error('boom');
-		if (url.includes('/profile/all')) return { illusts: { 100: null } };
-		return { works: { 100: { id: '100' } } };
-	};
-	const source = createPageSource('1', null, 'ja', { getJsonImpl: impl });
-	await assert.rejects(() => source.loadPage(1));
-	assert.deepEqual((await source.loadPage(1)).map((w) => w.id), ['100']);
-});
-
-test('clearPageSourceCache を挟むと、古い呼び出しが後から失敗しても新しいキャッシュは残る', async () => {
-	// 発行中の古い loadIds が失敗で解決したとき、無条件に消すと
-	// clearPageSourceCache 後に乗った健全なキャッシュまで巻き添えで消えてしまう
-	let resolveOldProfileAll;
-	let profileAllCalls = 0;
-	const impl = async (url) => {
-		if (url.includes('/profile/all')) {
-			profileAllCalls += 1;
-			if (profileAllCalls === 1) {
-				// 1 回目 (古い呼び出し) は手動で解決するまで待たせる
-				return new Promise((resolve, reject) => {
-					resolveOldProfileAll = () => reject(new Error('boom (古い呼び出し)'));
-				});
-			}
-			// 2 回目 (clearPageSourceCache 後の新しい呼び出し) はすぐ成功する
-			return { illusts: { 100: null } };
-		}
-		const ids = [...new URL(url, 'https://www.pixiv.net').searchParams.getAll('ids[]')];
-		return { works: Object.fromEntries(ids.map((id) => [id, { id }])) };
-	};
-	const source = createPageSource('1', null, 'ja', { getJsonImpl: impl });
-
-	// 1. 古い loadIds を発行 (まだ解決しない)
-	const oldPageCount = source.pageCount();
-
-	// 2. ページを離れて戻ってきた想定でキャッシュを空にし、新しい呼び出しを乗せる
-	clearPageSourceCache();
-	const newSource = createPageSource('1', null, 'ja', { getJsonImpl: impl });
-	const page = await newSource.loadPage(1);
-	assert.deepEqual(page.map((w) => w.id), ['100'], '新しいキャッシュから取得できていない');
-
-	// 3. 古い呼び出しを失敗させる
-	resolveOldProfileAll();
-	await assert.rejects(() => oldPageCount);
-
-	// 4. 新しいキャッシュが古い呼び出しの失敗に巻き添えで消えていないか確認する
-	//    (消えていたら profile/all がもう一度呼ばれてしまう)
-	await newSource.loadPage(1);
-	assert.equal(profileAllCalls, 2, '古い呼び出しの失敗で新しいキャッシュが消されている');
-});
+// 「失敗は覚えない」「古い失敗が新しいキャッシュを巻き添えにしない」「上限で押し出す」は
+// promise-cache.js の責務なので test/pixiv/promise-cache.test.js で見る
 
 test('ページ番号が 1 未満なら空配列を返す', async () => {
 	const ids = Array.from({ length: 100 }, (_, i) => String(1000 + i));

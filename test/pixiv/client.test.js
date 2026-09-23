@@ -190,30 +190,25 @@ test('postForm は error:true を PixivError にする', async () => {
 	);
 });
 
-test('postForm はトークンが無ければ通信せずに UNAUTHORIZED', async () => {
-	const { impl, calls } = fakeFetch({ json: { error: false, body: {} } });
-	await assert.rejects(
-		() => postForm('/rpc/post_comment.php', {}, '', { fetchImpl: impl }),
-		(error) => error.kind === PIXIV_ERROR_KINDS.UNAUTHORIZED,
-	);
-	assert.equal(calls.length, 0);
-});
-
 test('POST は CSRF トークンが空なら通信せずに unauthorized として投げる', async () => {
 	// 空のトークンを送っても 401 が返るだけ。往復を省き、呼び出し側の 401 と同じ分岐へ寄せる
 	for (const token of ['', null, undefined]) {
 		const { impl, calls } = fakeFetch({ json: { error: false, body: {} } });
 		await assert.rejects(
 			() => postJson('/ajax/illusts/like', {}, token, { fetchImpl: impl }),
-			(error) => error.kind === 'unauthorized',
+			(error) => error.kind === PIXIV_ERROR_KINDS.UNAUTHORIZED,
 		);
 		await assert.rejects(
 			() => postFormRaw('/bookmark_add.php', {}, token, { fetchImpl: impl }),
-			(error) => error.kind === 'unauthorized',
+			(error) => error.kind === PIXIV_ERROR_KINDS.UNAUTHORIZED,
+		);
+		await assert.rejects(
+			() => postForm('/rpc/post_comment.php', {}, token, { fetchImpl: impl }),
+			(error) => error.kind === PIXIV_ERROR_KINDS.UNAUTHORIZED,
 		);
 		await assert.rejects(
 			() => postFormData('/ajax/illusts/bookmarks/delete', {}, token, { fetchImpl: impl }),
-			(error) => error.kind === 'unauthorized',
+			(error) => error.kind === PIXIV_ERROR_KINDS.UNAUTHORIZED,
 		);
 		assert.equal(calls.length, 0);
 	}

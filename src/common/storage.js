@@ -5,6 +5,7 @@
  */
 import { SETTINGS_DEFAULTS, IMAGE_QUALITY, PREFETCH_CHOICES, GRID_TAB_SKIP, POPUP_THEMES, SIDEBAR_SCROLL, INFINITE_SCROLL } from './constants.js';
 import { warn } from './log.js';
+import { withArea as withStorageArea } from './storage-area.js';
 
 /** 設定を置く保存領域の名前。onChanged の areaName と比べる。 */
 const SYNC_AREA_NAME = 'sync';
@@ -15,6 +16,18 @@ const SYNC_AREA_NAME = 'sync';
  */
 function defaultArea() {
 	return globalThis.chrome?.storage?.sync ?? null;
+}
+
+/**
+ * 設定の保存領域 (sync) を触る処理を包む。領域が無ければ・失敗したら fallback を返す。
+ * @template T
+ * @param {{area?: object|null}} deps 保存領域の差し替え。null は「領域なし」
+ * @param {(area: object) => Promise<T>} run 領域に対する処理
+ * @param {T} fallback 領域が無い・失敗したときの値
+ * @returns {Promise<T>} 結果
+ */
+function withArea(deps, run, fallback) {
+	return withStorageArea(deps, defaultArea, run, fallback);
 }
 
 /**
@@ -37,26 +50,6 @@ function asBoolean(value, fallback) {
  */
 function oneOf(value, choices, fallback) {
 	return choices.includes(value) ? value : fallback;
-}
-
-/**
- * 保存領域を触る処理を包む。領域が無ければ・失敗したら fallback を返す。
- * 読み書きのどれも「領域を解決 → 無ければ既定 → 失敗しても投げない」の同じ形になる。
- * @template T
- * @param {{area?: object}} deps 保存領域の差し替え
- * @param {(area: object) => Promise<T>} run 領域に対する処理
- * @param {T} fallback 領域が無い・失敗したときの値
- * @returns {Promise<T>} 結果
- */
-async function withArea(deps, run, fallback) {
-	const area = deps.area ?? defaultArea();
-	if (!area) return fallback;
-	try {
-		return await run(area);
-	} catch {
-		// 保存領域が使えなくても既定で動かす。呼び出し側が画面に出す
-		return fallback;
-	}
 }
 
 /**

@@ -1,60 +1,25 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { planSkipTargets, attachTabSkip } from '../../src/content/tab-skip.js';
-import { GRID_TAB_SKIP, TAB_SKIP_MARK_ATTR, TAB_SKIP_LABEL_ATTR, ARTWORK_LINK_SELECTOR } from '../../src/common/constants.js';
+import { planSkipTargets, attachTabSkip, stripTabSkipMarks } from '../../src/content/tab-skip.js';
+import {
+	GRID_TAB_SKIP, TAB_SKIP_MARK_ATTR, TAB_SKIP_LABEL_ATTR, ARTWORK_LINK_SELECTOR, THUMB_LINK_SELECTOR, CARD_BUTTON_SELECTOR,
+} from '../../src/common/constants.js';
+import { el, makeCard as makeCardNode, makeGrid } from '../helpers/card.js';
 
 /**
- * 要素の代わり。属性の読み書きと、子の img を引く口だけを持つ。
- * @param {string} tagName タグ名 (大文字)
- * @param {Record<string, string>} [attrs] 初期の属性
- * @param {string} [textContent] 文字列
- * @param {object[]} [children] 子 (サムネリンクの中の img など)
- * @returns {object} 要素の代わり
- */
-function fakeEl(tagName, attrs = {}, textContent = '', children = []) {
-	return {
-		tagName,
-		textContent,
-		attrs: { ...attrs },
-		getAttribute(name) { return name in this.attrs ? this.attrs[name] : null; },
-		setAttribute(name, value) { this.attrs[name] = String(value); },
-		removeAttribute(name) { delete this.attrs[name]; },
-		hasAttribute(name) { return name in this.attrs; },
-		querySelector(selector) { return children.find((el) => el.tagName === selector.toUpperCase()) ?? null; },
-	};
-}
-
-/**
- * 作品カード (li) の代わり。
- * 受け取るセレクタは作品リンクと button の 2 種類だけを解釈する。
- * @param {object[]} children カードの中の要素
- * @returns {object} カードの代わり
- */
-function fakeCard(children) {
-	return {
-		tagName: 'LI',
-		children,
-		querySelectorAll(selector) {
-			if (selector === 'button') return children.filter((el) => el.tagName === 'BUTTON');
-			return children.filter((el) => el.tagName === 'A' && String(el.getAttribute('href')).startsWith('/artworks/'));
-		},
-	};
-}
-
-/**
- * 作品カードの代わりを 1 枚作る。実測どおり「サムネ → ブックマーク → タイトル」の並び。
- * 中の要素は closest('li') で自分のカードへ戻れる。(attachTabSkip がカードを引くため)
+ * 作品カードを 1 枚組み、中の要素を取り出しておく。
+ * 実測どおり「サムネ → ブックマーク → タイトル」の並び。(helpers/card.js が SITE_SPEC §3 に合わせてある)
  * @param {string} [id] 作品 ID
- * @param {{alt?: string}} [options] alt を渡すとサムネリンクの中に img を置く (実機はこちら。SITE_SPEC §3)
+ * @param {{alt?: string, loaded?: boolean}} [options] alt でサムネの img の alt を上書きする。loaded: false で img を figure のままにする
  * @returns {{card: object, thumb: object, button: object, title: object}}
  */
 function makeCard(id = '1', options = {}) {
-	const img = options.alt === undefined ? [] : [fakeEl('IMG', { alt: options.alt })];
-	const thumb = fakeEl('A', { href: `/artworks/${id}` }, '', img);
-	const button = fakeEl('BUTTON', { type: 'button' });
-	const title = fakeEl('A', { href: `/artworks/${id}` }, `作品${id}`);
-	const card = fakeCard([thumb, button, title]);
-	for (const el of [thumb, button, title]) el.closest = (selector) => (selector === 'li' ? card : null);
+	const { alt, loaded = true } = options;
+	const card = makeCardNode({ id, title: `作品${id}`, loaded });
+	if (alt !== undefined) card.querySelector('img').setAttribute('alt', alt);
+	const thumb = card.querySelector(THUMB_LINK_SELECTOR);
+	const button = card.querySelector(CARD_BUTTON_SELECTOR);
+	const title = card.querySelectorAll(ARTWORK_LINK_SELECTOR).find((link) => link !== thumb);
 	return { card, thumb, button, title };
 }
 
@@ -86,33 +51,55 @@ test('知らない指定は何も外さない', () => {
 
 test('リンクが 1 本だけのカードではサムネイルを外さない', () => {
 	// タイトルを持たない置き方をされても、サムネイルまで飛ばしては開けなくなる
-	const thumb = fakeEl('A', { href: '/artworks/9' });
-	const button = fakeEl('BUTTON', {});
-	const card = fakeCard([thumb, button]);
+	const card = el('li');
+	card.appendChild(el('a', { href: '/artworks/9' }));
+	const button = card.appendChild(el('button'));
 	assert.deepEqual(planSkipTargets(card, GRID_TAB_SKIP.BOTH), [button]);
 });
 
+test('stripTabSkipMarks は目印付きの属性だけを外す', () => {
+	// card-clone.js が雛形から印を落とすときと、attachTabSkip の後片付けの両方で使う
+	const { card, thumb, button, title } = makeCard('1');
+	const marked = makeCardNode({ id: '2', tabSkipped: true });
+	const root = makeGrid([card, marked]).ul;
+	button.setAttribute('tabindex', '0');
+	thumb.setAttribute('aria-label', 'pixiv がつけた名前');
+	stripTabSkipMarks(root);
+	// 目印の無い pixiv 側の属性は残る
+	assert.equal(button.getAttribute('tabindex'), '0');
+	assert.equal(thumb.getAttribute('aria-label'), 'pixiv がつけた名前');
+	assert.equal(title.getAttribute('tabindex'), null);
+	// 目印付きは属性ごと消え、目印も残らない
+	assert.equal(marked.querySelector(THUMB_LINK_SELECTOR).getAttribute('aria-label'), null);
+	assert.equal(marked.querySelector(CARD_BUTTON_SELECTOR).getAttribute('tabindex'), null);
+	assert.equal(root.querySelectorAll(`[${TAB_SKIP_MARK_ATTR}]`).length, 0);
+	assert.equal(root.querySelectorAll(`[${TAB_SKIP_LABEL_ATTR}]`).length, 0);
+});
+
 /**
- * document の代わり。作品リンクと目印付きの要素を引ける。
+ * document の代わり。作品グリッド (ul) を 1 つ持ち、目印付きの要素も引ける。
  * @param {object[]} cards makeCard の戻り値の配列
- * @returns {object} doc の代わり
+ * @returns {object} doc の代わり。add(fixture) でカードを足せる
  */
 function fakeDoc(cards) {
-	return {
-		body: { nodeName: 'BODY' },
-		cards,
-		/** 全走査の回数。増えた部分木だけを見ているかを確かめる */
-		scans: 0,
-		querySelectorAll(selector) {
-			this.scans += 1;
-			const all = this.cards.flatMap((c) => c.card.children);
-			if (selector.startsWith('[')) {
-				const name = selector.slice(1, -1);
-				return all.filter((el) => el.hasAttribute(name));
-			}
-			return all.filter((el) => el.tagName === 'A' && String(el.getAttribute('href')).startsWith('/artworks/'));
-		},
+	const doc = el('#document');
+	const { ul, wrap } = makeGrid(cards.map((one) => one.card));
+	doc.appendChild(wrap);
+	doc.body = wrap;
+	/** 全走査の回数。増えた部分木だけを見ているかを確かめる */
+	doc.scans = 0;
+	const query = doc.querySelectorAll;
+	doc.querySelectorAll = (selector) => {
+		doc.scans += 1;
+		return query(selector);
 	};
+	/**
+	 * グリッドへカードを足す。(MutationObserver の通知は呼び出し側が起こす)
+	 * @param {{card: object}} fixture makeCard の戻り値
+	 * @returns {void}
+	 */
+	doc.add = (fixture) => { ul.appendChild(fixture.card); };
+	return doc;
 }
 
 /**
@@ -207,7 +194,7 @@ test('サムネイルの img に alt が無いときだけ作品名を補う', (
 
 test('img が無いサムネイル (未読込) にも作品名を補う', () => {
 	// figure のままの間は alt が無い。読み上げ名が空になるよりは補う
-	const cards = [makeCard('7')];
+	const cards = [makeCard('7', { loaded: false })];
 	const { deps } = fakeObserverDeps();
 	attachTabSkip(fakeDoc(cards), GRID_TAB_SKIP.BOTH, deps);
 	assert.equal(cards[0].thumb.getAttribute('aria-label'), '作品7');
@@ -236,7 +223,7 @@ test('自分が足した tabindex には目印が付く', () => {
 });
 
 test('サムネイルが元から aria-label を持っていれば触らない', () => {
-	const cards = [makeCard('7')];
+	const cards = [makeCard('7', { alt: '' })];
 	cards[0].thumb.setAttribute('aria-label', 'pixiv がつけた名前');
 	const { deps } = fakeObserverDeps();
 	const handle = attachTabSkip(fakeDoc(cards), GRID_TAB_SKIP.BOTH, deps);
@@ -259,7 +246,7 @@ test('後から増えたカードにも当たる', () => {
 	const { deps, trigger } = fakeObserverDeps();
 	attachTabSkip(doc, GRID_TAB_SKIP.BOTH, deps);
 	const added = makeCard('2');
-	doc.cards.push(added);
+	doc.add(added);
 	trigger(added.card);
 	assert.equal(added.title.getAttribute('tabindex'), '-1');
 	assert.equal(added.button.getAttribute('tabindex'), '-1');
@@ -272,7 +259,7 @@ test('DOM の変化では増えた部分木だけを見て、全カードを走�
 	attachTabSkip(doc, GRID_TAB_SKIP.BOTH, deps);
 	const scansAfterAttach = doc.scans;
 	const added = makeCard('2');
-	doc.cards.push(added);
+	doc.add(added);
 	trigger(added.card);
 	assert.equal(doc.scans, scansAfterAttach, 'document 全体を引き直している');
 	assert.equal(added.title.getAttribute('tabindex'), '-1');
@@ -284,8 +271,8 @@ test('増えたノードが作品リンクそのものでも当たる', () => {
 	const { deps, trigger } = fakeObserverDeps();
 	attachTabSkip(doc, GRID_TAB_SKIP.BOTH, deps);
 	const added = makeCard('2');
-	doc.cards.push(added);
-	added.title.querySelectorAll = () => [];
+	doc.add(added);
+	// helpers の要素は matches を持たない。本物の Element と同じく自分がセレクタに合うか答えさせる
 	added.title.matches = (selector) => selector === ARTWORK_LINK_SELECTOR;
 	trigger(added.title);
 	assert.equal(added.title.getAttribute('tabindex'), '-1');
@@ -305,27 +292,45 @@ test('同期で発火するスケジューラでも 2 回目以降の通知を�
 	attachTabSkip(doc, GRID_TAB_SKIP.BOTH, deps);
 	for (const id of ['2', '3']) {
 		const added = makeCard(id);
-		doc.cards.push(added);
+		doc.add(added);
 		trigger(added.card);
 		assert.equal(added.title.getAttribute('tabindex'), '-1', `${id} 枚目に当たっていない`);
 	}
 });
 
-test('none のときは DOM の変化で当て直しを予約しない', () => {
-	// 何も外さない設定で、無限スクロールの再描画ごとに空振りのタイマを積まないため
-	const doc = fakeDoc([makeCard('1')]);
+/**
+ * schedule の呼ばれた回数を数える deps を作る。
+ * @returns {{deps: object, scheduled: () => number}} deps と、予約された回数
+ */
+function countingDeps() {
 	let scheduled = 0;
 	const deps = {
 		createObserver(fn) { deps.callback = fn; return { observe() {}, disconnect() {} }; },
 		schedule(fn) { scheduled += 1; fn(); return 1; },
 		cancel() {},
 	};
+	return { deps, scheduled: () => scheduled };
+}
+
+test('none のときは DOM の変化で当て直しを予約しない', () => {
+	// 何も外さない設定で、無限スクロールの再描画ごとに空振りのタイマを積まないため
+	const doc = fakeDoc([makeCard('1')]);
+	const { deps, scheduled } = countingDeps();
 	const handle = attachTabSkip(doc, GRID_TAB_SKIP.NONE, deps);
 	deps.callback(addedRecords([makeCard('2').card]));
-	assert.equal(scheduled, 0);
+	assert.equal(scheduled(), 0);
 	handle.setMode(GRID_TAB_SKIP.BOTH);
 	deps.callback(addedRecords([makeCard('3').card]));
-	assert.equal(scheduled, 1);
+	assert.equal(scheduled(), 1);
+});
+
+test('知らない指定のときも DOM の変化で当て直しを予約しない', () => {
+	// planSkipTargets が何も外さない値では、予約しても空振りになるだけ。判定を揃える
+	const doc = fakeDoc([makeCard('1')]);
+	const { deps, scheduled } = countingDeps();
+	attachTabSkip(doc, 'よくわからない', deps);
+	deps.callback(addedRecords([makeCard('2').card]));
+	assert.equal(scheduled(), 0);
 });
 
 test('予約が発火する前の DOM の変化は 1 回の当て直しにまとめる', () => {
@@ -339,7 +344,8 @@ test('予約が発火する前の DOM の変化は 1 回の当て直しにまと
 	attachTabSkip(doc, GRID_TAB_SKIP.BOTH, deps);
 	const second = makeCard('2');
 	const third = makeCard('3');
-	doc.cards.push(second, third);
+	doc.add(second);
+	doc.add(third);
 	deps.callback(addedRecords([second.card]));
 	deps.callback(addedRecords([third.card]));
 	assert.equal(queued.length, 1);

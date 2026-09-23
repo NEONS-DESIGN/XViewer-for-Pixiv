@@ -37,13 +37,29 @@ function panelElementId(id) {
 }
 
 /**
+ * キーから次に選ぶタブの位置を出す関数の表。対応しないキーは undefined。
+ * 前後は端で巻き戻る。(WAI-ARIA の tabs パターン)
+ * @param {number} count タブの数
+ * @returns {Record<string, (current: number) => number>} キー名から「今の位置 → 次の位置」を引く表
+ */
+function keyMoves(count) {
+	return {
+		[TAB_KEYS.PREV]: (i) => (i - 1 + count) % count,
+		[TAB_KEYS.NEXT]: (i) => (i + 1) % count,
+		[TAB_KEYS.FIRST]: () => 0,
+		[TAB_KEYS.LAST]: () => count - 1,
+	};
+}
+
+/**
  * タブの並びを組み立て、パネルの表示と結び付ける。
  * @param {Document} doc 対象のドキュメント
  * @param {{id: string, label: string, panel: HTMLElement}[]} entries タブとパネルの組
  * @param {object} options 設定
  * @param {string} options.label 並び全体の読み上げ名
  * @param {string|null} [options.initialId] 最初に選ぶタブの id。無い・見つからなければ先頭
- * @returns {{list: HTMLElement, currentId: () => string}} タブの並びと、今選んでいるタブの id を返す関数
+ * @returns {{list: HTMLElement, currentId: () => string|null}} タブの並びと、今選んでいるタブの id を返す関数。
+ *   entries が空なら currentId は null を返す
  */
 export function renderTabs(doc, entries, { label, initialId = null }) {
 	const list = doc.createElement('div');
@@ -97,16 +113,10 @@ export function renderTabs(doc, entries, { label, initialId = null }) {
 		if (moveFocus) buttons[index].focus();
 	}
 
-	/** キーから次に選ぶタブの位置を出す。対応しないキーは undefined。 */
-	const MOVES = {
-		[TAB_KEYS.PREV]: (i) => (i - 1 + entries.length) % entries.length,
-		[TAB_KEYS.NEXT]: (i) => (i + 1) % entries.length,
-		[TAB_KEYS.FIRST]: () => 0,
-		[TAB_KEYS.LAST]: () => entries.length - 1,
-	};
+	const moves = keyMoves(entries.length);
 
 	list.addEventListener('keydown', (event) => {
-		const move = MOVES[event.key];
+		const move = moves[event.key];
 		// 関係ないキーは通す。ここで握りつぶすと画面全体のキー操作を奪う
 		if (!move) return;
 		event.preventDefault();
@@ -120,5 +130,5 @@ export function renderTabs(doc, entries, { label, initialId = null }) {
 	});
 
 	select(current, false);
-	return { list, currentId: () => entries[current].id };
+	return { list, currentId: () => entries[current]?.id ?? null };
 }

@@ -1,7 +1,10 @@
-import { test } from 'node:test';
+import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readSession, clearSessionCache } from '../../src/content/session.js';
 import { buildNextData as buildNextDataWith } from '../helpers/pixiv.js';
+
+// 解析結果はモジュールが 1 つだけ覚える。テストごとに捨てて、前のテストの結果を見ないようにする
+afterEach(() => { clearSessionCache(); });
 
 /**
  * getElementById だけを持つ最小の Document の代わり。
@@ -32,7 +35,6 @@ function buildNextData(token) {
 }
 
 test('ドキュメントからセッションを読む', () => {
-	clearSessionCache();
 	const { doc } = fakeDoc(buildNextData('abc'));
 	const session = readSession(doc);
 	assert.equal(session.isLoggedIn, true);
@@ -41,7 +43,6 @@ test('ドキュメントからセッションを読む', () => {
 });
 
 test('2 回目は解析し直さない', () => {
-	clearSessionCache();
 	const first = fakeDoc(buildNextData('abc'));
 	const session = readSession(first.doc);
 	assert.equal(first.calls(), 1);
@@ -53,7 +54,6 @@ test('2 回目は解析し直さない', () => {
 });
 
 test('clearSessionCache を呼べば読み直す', () => {
-	clearSessionCache();
 	readSession(fakeDoc(buildNextData('abc')).doc);
 	clearSessionCache();
 	const next = fakeDoc(buildNextData('xyz'));
@@ -62,13 +62,11 @@ test('clearSessionCache を呼べば読み直す', () => {
 });
 
 test('script が無くても未ログイン相当を返す', () => {
-	clearSessionCache();
 	const session = readSession(fakeDoc(null).doc);
 	assert.deepEqual({ ...session }, { isLoggedIn: false, self: null, csrfToken: null });
 });
 
 test('返る値は書き換えられない', () => {
-	clearSessionCache();
 	const session = readSession(fakeDoc(buildNextData('abc')).doc);
 	// 使い回す値なので、呼び出し側の書き換えが他へ漏れないこと
 	assert.throws(() => { 'use strict'; session.csrfToken = 'すり替え'; }, TypeError);

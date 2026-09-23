@@ -42,45 +42,21 @@ function capture(cards) {
 }
 
 /**
- * ブックマークボタンを持たないカードを組む。ハートの色が採れない状況を作るため。
- * @param {string} id 作品 id
- * @returns {object} li の代わり
+ * 複数枚バッジの枚数 (数字だけの span の文字) を読む。
+ * バッジのアイコンも span で包まれている (SITE_SPEC §3) ので、最初の span を見てはいけない
+ * @param {object} node 探し始める要素
+ * @returns {string|null} 枚数。無ければ null
  */
-function makeCardWithoutHeart(id) {
-	const li = el('li');
-	const outer = li.appendChild(el('div'));
-	const thumbBox = outer.appendChild(el('div'));
-	const sized = thumbBox.appendChild(el('div', { width: '184', height: '184' }));
-	const thumb = sized.appendChild(el('a', {
-		href: `/artworks/${id}`,
-		'data-ga4-label': 'thumbnail_link',
-		'data-gtm-value': id,
-	}));
-	const imgBox = thumb.appendChild(el('div')).appendChild(el('div', { radius: '4' }));
-	imgBox.appendChild(el('img', { src: `https://i.pximg.net/${id}.jpg` }));
-	return li;
-}
-
-/**
- * node が ancestor の子孫かどうか。(自分自身は含めない)
- * @param {object} node 調べたい要素
- * @param {object} ancestor 祖先の候補
- * @returns {boolean} 子孫なら true
- */
-function isDescendantOf(node, ancestor) {
-	let current = node.parent;
-	while (current) {
-		if (current === ancestor) return true;
-		current = current.parent;
-	}
-	return false;
+function badgeCount(node) {
+	return node.querySelectorAll('span').find((span) => /^\d+$/.test(span.textContent.trim()))?.textContent ?? null;
 }
 
 test('画像が読み込まれたカードだけを雛形にする', () => {
 	// figure のままのカードを雛形にすると、継ぎ足したカードに img が無くなる
 	const templates = capture([makeCard({ id: '1', loaded: false }), makeCard({ id: '2', loaded: true })]);
 	assert.notEqual(templates, null);
-	assert.equal(templates.single.querySelector('img').getAttribute('data-xv-src-id'), null);
+	// 読み込み済みのカード (2) の画像を持つ
+	assert.match(templates.single.querySelector('img').getAttribute('src'), /\/2\.jpg$/);
 	assert.equal(templates.single.querySelector('a[data-ga4-label="thumbnail_link"]').getAttribute('data-gtm-value'), '2');
 });
 
@@ -93,8 +69,6 @@ test('ブックマーク済みのカードは雛形にしない', () => {
 	// 済みのカードから採ると、未ブックマークの色が #ff4060 になってしまう
 	const templates = capture([makeCard({ id: '1', bookmarked: true }), makeCard({ id: '2' })]);
 	assert.equal(templates.single.querySelector('a[data-ga4-label="thumbnail_link"]').getAttribute('data-gtm-value'), '2');
-	// 未ブックマークの色は雛形 (本体の CSS) に任せるので、雛形は色を持ち歩かない
-	assert.equal('heartFills' in templates, false);
 });
 
 test('ブックマーク済みの判定は BOOKMARKED_FILL から導く', () => {
@@ -114,7 +88,7 @@ test('ブックマーク済みしか無ければ null', () => {
 test('複数枚のカードがあれば multi に採る', () => {
 	const templates = capture([makeCard({ id: '1' }), makeCard({ id: '2', pages: 3 })]);
 	assert.notEqual(templates.multi, null);
-	assert.equal(templates.multi.querySelector('span').textContent, '3');
+	assert.equal(badgeCount(templates.multi), '3');
 	assert.equal(templates.single.querySelector('span'), null);
 });
 
@@ -141,15 +115,15 @@ test('雛形は元のカードから切り離されている', () => {
 test('ハートを持つカードがあれば、ハート無しのカードは雛形にしない', () => {
 	// bookmark_button が無いとハートの色を採れず、未ブックマーク判定ができない。
 	// 読み込み途中などで 1 枚だけ欠けたカードを掴むと、継ぎ足し分だけブックマークできなくなる
-	const { ul } = makeGrid([makeCardWithoutHeart('1'), makeCard({ id: '2' })]);
+	const { ul } = makeGrid([makeCard({ id: '1', heart: false }), makeCard({ id: '2' })]);
 	const templates = captureTemplates(ul, { computedStyle: fakeComputedStyle });
-	assert.equal(templates.single.querySelector('[data-ga4-label="bookmark_button"]') === null, false);
+	assert.notEqual(templates.single.querySelector('[data-ga4-label="bookmark_button"]'), null);
 });
 
 test('どのカードにもハートが無ければ、ハート無しのまま雛形にする', () => {
 	// 自分のユーザーページ。pixiv が自分の作品にブックマークボタンを描かない。(SITE_SPEC §4)
 	// ここで諦めると自分のページだけ無限スクロールが起動しない
-	const { ul } = makeGrid([makeCardWithoutHeart('1'), makeCardWithoutHeart('2')]);
+	const { ul } = makeGrid([makeCard({ id: '1', heart: false }), makeCard({ id: '2', heart: false })]);
 	const templates = captureTemplates(ul, { computedStyle: fakeComputedStyle });
 	assert.notEqual(templates, null);
 	assert.equal(templates.single.querySelector('[data-ga4-label="bookmark_button"]'), null);
@@ -159,7 +133,7 @@ test('どのカードにもハートが無ければ、ハート無しのまま�
 test('ハート無しでも複数枚のカードは multi に採る', () => {
 	const { ul } = makeGrid([makeCard({ id: '1', heart: false }), makeCard({ id: '2', pages: 3, heart: false })]);
 	const templates = captureTemplates(ul, { computedStyle: fakeComputedStyle });
-	assert.equal(templates.multi.querySelector('span').textContent, '3');
+	assert.equal(badgeCount(templates.multi), '3');
 	assert.equal(templates.single.querySelector('span'), null);
 });
 
@@ -195,9 +169,8 @@ test('findBadge は想定より浅い構造でも thumb の外の無関係なノ
 	const span = thumb.appendChild(el('span'));
 	span.textContent = '3';
 
-	const result = findBadge(li);
-	// null か、thumb 自身か、thumb の子孫のどれかでなければならない (thumb の外は不可)
-	assert.ok(result === null || result === thumb || isDescendantOf(result, thumb));
+	// thumb を返すと buildCard の badge.remove() がサムネリンクごと消すので、安全側 (バッジ無し) に倒す
+	assert.equal(findBadge(li), null);
 });
 
 test('リンクと ID を差し替える', () => {
@@ -268,7 +241,7 @@ test('pixiv 側が持たせた tabindex (目印なし) はそのまま残す', (
 test('複数枚の作品はバッジ付きの雛形を使い、数字を差し替える', () => {
 	const templates = capture([makeCard({ id: '1' }), makeCard({ id: '2', pages: 2 })]);
 	const card = buildCard(templates, work({ pageCount: 5 }), { loggedIn: true });
-	assert.equal(card.querySelector('span').textContent, '5');
+	assert.equal(badgeCount(card), '5');
 });
 
 test('複数枚の雛形が無ければバッジ無しで出す', () => {
@@ -364,7 +337,7 @@ test('ラベルを落としても複数枚バッジは残る', () => {
 	const templates = captureTemplates(ul, { computedStyle: fakeComputedStyle });
 	const card = buildCard(templates, work({ pageCount: 3 }), { loggedIn: true });
 	assert.equal(card.textContent.includes('R-18'), false);
-	assert.equal(findBadge(card).querySelector('span').textContent, '3');
+	assert.equal(badgeCount(findBadge(card)), '3');
 });
 
 test('findOverlayLabels はバッジも画像もラベルとして拾わない', () => {

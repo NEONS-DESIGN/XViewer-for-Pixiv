@@ -21,7 +21,8 @@ function fakeWindow(pathname = '/users/1/artworks') {
 			back() { calls.push(['back']); },
 		},
 		addEventListener(type, fn) { listeners[type] = fn; },
-		removeEventListener(type) { delete listeners[type]; },
+		// 本物と同じく、登録した関数と一致したときだけ外す。(別の関数を渡す dispose を通さないため)
+		removeEventListener(type, fn) { if (listeners[type] === fn) delete listeners[type]; },
 		fire(type) { listeners[type]?.(); },
 		hasListener(type) { return Boolean(listeners[type]); },
 	};

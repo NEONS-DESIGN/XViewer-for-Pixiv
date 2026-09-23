@@ -1,8 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolvePopupLanguage, main } from '../../src/popup/app.js';
-import { SETTINGS_DEFAULTS } from '../../src/common/constants.js';
-import { fakeElement, fakeDoc, flush } from '../helpers/dom.js';
+import { resolvePopupLanguage } from '../../src/popup/app.js';
+import { bootPopup } from '../helpers/popup.js';
 
 test('保存されている pixiv の言語を使う', async () => {
 	const lang = await resolvePopupLanguage({
@@ -47,22 +46,11 @@ test('保存の読み出しが失敗しても日本語で描ける', async () =>
 });
 
 test('documentElement.lang が描いた言語に合う', async () => {
-	const doc = fakeDoc();
-	doc.documentElement = fakeElement('html');
-	const root = fakeElement('main');
-	root.dataset.role = 'app';
-	doc.getElementById = (id) => (id === 'app' ? root : null);
-
-	await main({
-		doc,
-		loadSettings: async () => ({ ...SETTINGS_DEFAULTS }),
-		saveSetting: async () => true,
-		resetSettings: async () => true,
-		renderPopup: () => ({ currentTab: () => null }),
-		loadPageLanguage: async () => 'en',
-		getUILanguage: () => 'ja',
+	const { doc } = await bootPopup({
+		deps: {
+			loadPageLanguage: async () => 'en',
+			getUILanguage: () => 'ja',
+		},
 	});
-	await flush();
-
 	assert.equal(doc.documentElement.lang, 'en');
 });

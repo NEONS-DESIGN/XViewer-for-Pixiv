@@ -12,6 +12,8 @@
  *
  * 接頭辞を増やすときはここへ足すだけでよい。パスの判定 (`LOCALE_PATH_PATTERN`) も
  * 作品リンクのセレクタ (`ARTWORK_LINK_SELECTOR`) もこの配列から組み立てている。
+ * `src/` で参照するのはこのファイルだけ。export はテスト (locale / grid-focus) が
+ * 「接頭辞の数だけ生成物が揃うこと」を確かめるためのもので、消さない。
  * @type {readonly string[]}
  */
 export const LOCALE_PREFIXES = Object.freeze(['en']);
@@ -198,9 +200,9 @@ export const PREFETCH_CHOICES = Object.freeze([0, 1, 3]);
  * 先読みの既定値。前後 1 枚。
  * 切り替えの速さより、端末と回線への負担の少なさを既定に置く。
  * (高解像度の作品を 3 枚先まで取ると、送るだけで通信量が膨らむ)
- * 値は PREFETCH_CHOICES から引く。(選択肢に無い既定を書けないようにするため)
+ * PREFETCH_CHOICES に含まれることは storage.test.js が見張る。
  */
-export const DEFAULT_PREFETCH = PREFETCH_CHOICES[PREFETCH_CHOICES.indexOf(1)];
+const DEFAULT_PREFETCH = 1;
 
 /** コメントを 1 回に読む件数。 */
 export const COMMENT_PAGE_SIZE = 30;
@@ -245,7 +247,6 @@ export const SENTINEL_ATTR = 'data-xv-sentinel';
  * モードごとの sentinel の見張り範囲 (IntersectionObserver の rootMargin)。
  *
  * 2 つのモードの差はここだけで決まるので、値は 1 か所にまとめて取り違えを防ぐ。
- * (0.22.1 までは割り当てが逆で、「下まで来たら」のほうが早く読み始めていた)
  *
  * - onReach は 0。「一番下に着いてから読む」と案内している以上、手前から読み始めない。
  *   下端でスピナーが出て少し待つのがこのモードの正しい見え方 (通信は最小で済む)

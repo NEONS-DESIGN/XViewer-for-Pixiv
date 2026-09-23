@@ -22,15 +22,4 @@ test('action は default_popup だけを持つ', () => {
 	assert.deepEqual(Object.keys(manifest.action), ['default_popup']);
 });
 
-test('manifest の name / description は _locales を参照する', () => {
-	// name / description はブラウザの UI 言語にしか従えないため _locales へ切り出した (test/scripts/locales.test.js)
-	assert.equal(manifest.name, '__MSG_extName__');
-	assert.equal(manifest.description, '__MSG_extDescription__');
-});
-
-test('ja の説明文に非公式である旨がある', async () => {
-	// pixiv の商標ガイドラインが求める 2 つの表記。ストアの一覧に出る文なのでここが要
-	const messages = JSON.parse(await readFile(new URL('../../src/_locales/ja/messages.json', import.meta.url), 'utf8'));
-	assert.match(messages.extDescription.message, /非公式/);
-	assert.match(messages.extDescription.message, /作成・配布するものではありません/);
-});
+// name / description (__MSG_*__) と説明文の検査は test/scripts/locales.test.js にある

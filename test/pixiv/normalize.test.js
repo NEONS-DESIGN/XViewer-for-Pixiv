@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { canView, isOwnWork, normalizeDetail, ILLUST_TYPES } from '../../src/pixiv/normalize.js';
+import { PIXIV_ERROR_KINDS } from '../../src/pixiv/errors.js';
 
 test('canView は作品の xRestrict とユーザー設定を比べる', () => {
 	// SITE_SPEC 実測: 設定 OFF (self.xRestrict=0) では R-18 の /pages が 404 になる
@@ -103,6 +104,18 @@ test('normalizeDetail はタグ配列の null と名前の無い要素を落と�
 	assert.deepEqual(detail.tags, ['a', 'b']);
 });
 
+test('normalizeDetail は body が null や illustId 無しなら parse として投げる', () => {
+	// client.js の unwrap() は body: null を API の値として通す。
+	// TypeError で落ちると呼び出し側が kind で分岐できず、id の無い WorkDetail を黙って返すのも同じ
+	for (const raw of [null, undefined, 'x', {}, { illustTitle: 'x' }, { illustId: '' }]) {
+		assert.throws(() => normalizeDetail(raw), (error) => {
+			assert.equal(error.name, 'PixivError', `${JSON.stringify(raw)} で PixivError にならない`);
+			assert.equal(error.kind, PIXIV_ERROR_KINDS.PARSE);
+			return true;
+		});
+	}
+});
+
 test('ILLUST_TYPES はうごイラを 2 とする', () => {
 	assert.equal(ILLUST_TYPES.ILLUST, 0);
 	assert.equal(ILLUST_TYPES.MANGA, 1);
@@ -130,6 +143,12 @@ test('isOwnWork は作者 ID と自分の ID を比べる', () => {
 	// 自分の作品には更新系のボタンを出さない (pixiv 本体も出さない)
 	assert.equal(isOwnWork({ userId: '16343044' }, { id: '16343044' }), true);
 	assert.equal(isOwnWork({ userId: '54734418' }, { id: '16343044' }), false);
+});
+
+test('isOwnWork は数値と文字列が混ざっても同じ ID なら true', () => {
+	// session.js は self.id を文字列にそろえるが、詳細側が数値で来ても型で外さない
+	assert.equal(isOwnWork({ userId: 16343044 }, { id: '16343044' }), true);
+	assert.equal(isOwnWork({ userId: '16343044' }, { id: 16343044 }), true);
 });
 
 test('isOwnWork は判定できないときは false に倒す', () => {

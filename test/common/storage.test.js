@@ -2,21 +2,9 @@ import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeSettings, loadSettings, saveSetting, resetSettings, watchSettings } from '../../src/common/storage.js';
 import { LOG_PREFIX } from '../../src/common/log.js';
-import { SETTINGS_DEFAULTS, GRID_TAB_SKIP, POPUP_THEMES, SIDEBAR_SCROLL, INFINITE_SCROLL, PREFETCH_CHOICES } from '../../src/common/constants.js';
-
-/**
- * chrome.storage.sync の偽物を作る。
- * @param {object} stored 保存済みの値
- * @returns {{area: object, written: object}}
- */
-function fakeArea(stored = {}) {
-	const written = {};
-	const area = {
-		get: async () => ({ ...stored }),
-		set: async (items) => { Object.assign(written, items); },
-	};
-	return { area, written };
-}
+import { fakeArea } from '../helpers/storage.js';
+import { flush } from '../helpers/dom.js';
+import { SETTINGS_DEFAULTS, GRID_TAB_SKIP, POPUP_THEMES, SIDEBAR_SCROLL, INFINITE_SCROLL, PREFETCH_CHOICES, IMAGE_QUALITY } from '../../src/common/constants.js';
 
 test('normalizeSettings は空の入力を既定へ倒す', () => {
 	assert.deepEqual(normalizeSettings({}), SETTINGS_DEFAULTS);
@@ -30,13 +18,14 @@ test('既定値は「初めて入れた人がそのまま使える」側に寄�
 	assert.equal(SETTINGS_DEFAULTS.prefetch, 1, '先読みは前後 1 枚 (通信量と端末の負荷を抑える)');
 	assert.equal(SETTINGS_DEFAULTS.gridTabSkip, GRID_TAB_SKIP.NONE, 'Tab 順は pixiv 標準のまま');
 	assert.equal(SETTINGS_DEFAULTS.clickZoom, false, 'クリックで原寸表示は既定でオフ');
+	assert.equal(SETTINGS_DEFAULTS.infiniteScroll, INFINITE_SCROLL.OFF, '無限スクロールは既定でオフ (知らないうちにページの動きを変えない)');
 	assert.ok(PREFETCH_CHOICES.includes(SETTINGS_DEFAULTS.prefetch), '既定が選択肢に無い');
 });
 
 test('normalizeSettings は正しい値をそのまま通す', () => {
 	const input = {
 		enabled: false,
-		imageQuality: 'original',
+		imageQuality: IMAGE_QUALITY.ORIGINAL,
 		prefetch: 1,
 		showSidebar: false,
 		sidebarScroll: SIDEBAR_SCROLL.WHOLE,
@@ -72,7 +61,7 @@ test('normalizeSettings は知らないサイドバーの送り方を既定へ�
 });
 
 test('normalizeSettings は知らない解像度を既定へ倒す', () => {
-	assert.equal(normalizeSettings({ imageQuality: 'huge' }).imageQuality, 'regular');
+	assert.equal(normalizeSettings({ imageQuality: 'huge' }).imageQuality, IMAGE_QUALITY.REGULAR);
 });
 
 test('normalizeSettings は選択肢に無い先読み数を既定へ倒す', () => {
@@ -94,15 +83,22 @@ test('normalizeSettings は真偽値でない値を既定へ倒す', () => {
 });
 
 test('loadSettings は保存値と既定を混ぜて返す', async () => {
-	const { area } = fakeArea({ imageQuality: 'original' });
+	const { area } = fakeArea({ imageQuality: IMAGE_QUALITY.ORIGINAL });
 	const settings = await loadSettings({ area });
-	assert.equal(settings.imageQuality, 'original');
+	assert.equal(settings.imageQuality, IMAGE_QUALITY.ORIGINAL);
 	assert.equal(settings.prefetch, SETTINGS_DEFAULTS.prefetch);
 });
 
 test('loadSettings は storage が失敗しても既定を返す', async () => {
 	const area = { get: async () => { throw new Error('no storage'); } };
 	assert.deepEqual(await loadSettings({ area }), SETTINGS_DEFAULTS);
+});
+
+test('保存領域が無くても投げず、既定で動く', async () => {
+	// area: null は「領域なし」。language-store と同じ意味で、既定の chrome.storage.sync へは落ちない
+	assert.deepEqual(await loadSettings({ area: null }), SETTINGS_DEFAULTS);
+	assert.equal(await saveSetting('enabled', false, { area: null }), false);
+	assert.equal(await resetSettings({ area: null }), false);
 });
 
 test('saveSetting は 1 項目だけ書く', async () => {
@@ -173,12 +169,12 @@ test('watchSettings は差し替えた storage の sync 領域から読み直す
 	const received = [];
 	const watch = watchSettings((settings) => received.push(settings), { storage });
 	listener({}, 'sync');
-	await new Promise((resolve) => setTimeout(resolve, 0));
+	await flush();
 	assert.equal(received.length, 1);
 	assert.equal(received[0].prefetch, 1);
 	// 別の領域の変更は無視する
 	listener({}, 'local');
-	await new Promise((resolve) => setTimeout(resolve, 0));
+	await flush();
 	assert.equal(received.length, 1);
 	watch.dispose();
 	assert.equal(listener, null);
@@ -201,7 +197,7 @@ test('watchSettings はコールバックが投げても unhandled rejection に
 	try {
 		const watch = watchSettings(() => { throw new Error('描画で落ちた'); }, { storage });
 		listener({}, 'sync');
-		await new Promise((resolve) => setTimeout(resolve, 0));
+		await flush();
 		assert.equal(warn.mock.callCount(), 1);
 		assert.ok(String(warn.mock.calls[0].arguments[0]).startsWith(LOG_PREFIX));
 		assert.equal(warn.mock.calls[0].arguments[1].message, '描画で落ちた');
@@ -213,20 +209,22 @@ test('watchSettings はコールバックが投げても unhandled rejection に
 	}
 });
 
-test('infiniteScroll は既定が off', async () => {
-	// 既定オフ。知らないうちにページの動きが変わらないようにする
-	const settings = await loadSettings({ area: { async get() { return {}; } } });
-	assert.equal(settings.infiniteScroll, INFINITE_SCROLL.OFF);
+test('watchSettings は storage.onChanged が無ければ何もしない dispose を返す', () => {
+	// 拡張の外 (テストや紹介サイトの埋め込み) でも、購読の解除まで同じ形で呼べること
+	for (const storage of [{}, { onChanged: undefined }]) {
+		const watch = watchSettings(() => { throw new Error('呼ばれてはいけない'); }, { storage });
+		assert.equal(typeof watch.dispose, 'function');
+		assert.doesNotThrow(() => watch.dispose());
+	}
 });
 
-test('infiniteScroll は知らない値を off へ倒す', async () => {
-	const area = { async get() { return { infiniteScroll: 'sometimes' }; } };
-	assert.equal((await loadSettings({ area })).infiniteScroll, INFINITE_SCROLL.OFF);
+test('normalizeSettings は知らない無限スクロールの指定を off へ倒す', () => {
+	assert.equal(normalizeSettings({ infiniteScroll: 'sometimes' }).infiniteScroll, INFINITE_SCROLL.OFF);
+	assert.equal(normalizeSettings({ infiniteScroll: true }).infiniteScroll, INFINITE_SCROLL.OFF);
 });
 
-test('infiniteScroll は onReach と prefetch をそのまま読む', async () => {
+test('normalizeSettings は無限スクロールの onReach と prefetch をそのまま通す', () => {
 	for (const value of [INFINITE_SCROLL.ON_REACH, INFINITE_SCROLL.PREFETCH]) {
-		const area = { async get() { return { infiniteScroll: value }; } };
-		assert.equal((await loadSettings({ area })).infiniteScroll, value);
+		assert.equal(normalizeSettings({ infiniteScroll: value }).infiniteScroll, value);
 	}
 });
