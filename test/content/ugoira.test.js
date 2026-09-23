@@ -2,6 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { pickZipUrl, buildFrames, advanceFrame, createUgoiraPlayer } from '../../src/content/viewer/ugoira.js';
 import { fakeElement, fakeDoc, find, findAll, flush } from '../helpers/dom.js';
+import { createStrings } from '../../src/i18n/index.js';
+
+/** 文言のカタログ (日本語)。 */
+const STRINGS = createStrings('ja');
 
 const META = {
 	src: 'https://i.pximg.net/img-zip-ugoira/img/x_ugoira600x600.zip',
@@ -151,9 +155,10 @@ function metaResponse(body) {
  * @param {number[]} [options.sizes] 作った順に各 Image へ与える naturalWidth。0 は壊れたコマ
  * @param {Function} [options.fetchImpl] 通信の代わり。省くと meta と zip を返す
  * @param {boolean} [options.holdImages] true なら Image の load を releaseImages() まで止める
+ * @param {object} [options.strings] 文言のカタログ。省くと日本語
  * @returns {object} container / player / 作った Image / rAF のコールバック / 描いたコマ / zip fetch の init / releaseImages
  */
-function build({ sizes = [10, 10, 10], fetchImpl, holdImages = false } = {}) {
+function build({ sizes = [10, 10, 10], fetchImpl, holdImages = false, strings = STRINGS } = {}) {
 	const doc = fakeDoc();
 	const drawn = [];
 	const create = doc.createElement;
@@ -182,6 +187,7 @@ function build({ sizes = [10, 10, 10], fetchImpl, holdImages = false } = {}) {
 		doc,
 		container,
 		settings: { imageQuality: 'regular' },
+		strings,
 		fetchImpl: fetchImpl ?? defaultFetch,
 		createImage: () => {
 			const image = fakeElement('img');
@@ -329,5 +335,15 @@ test('再生ボタンは押すと止まり、もう一度押すと動く', async
 	await toggle.click();
 	assert.equal(toggle.getAttribute('aria-label'), '一時停止');
 	assert.equal(rafCallbacks.length, 2);
+	player.dispose();
+});
+
+test('再生ボタンの読み上げ名が英語になる', async () => {
+	const { container, player } = build({ strings: createStrings('en') });
+	await player.render(DETAIL);
+	const toggle = find(container, '.ugoira-toggle');
+	assert.equal(toggle.getAttribute('aria-label'), 'Pause');
+	await toggle.click();
+	assert.equal(toggle.getAttribute('aria-label'), 'Play');
 	player.dispose();
 });
