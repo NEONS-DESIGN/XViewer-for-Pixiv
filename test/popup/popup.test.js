@@ -44,6 +44,8 @@ function deferred() {
 async function boot(options = {}) {
 	const { save = true, reset = true, hasRoot = true } = options;
 	const doc = fakeDocWith();
+	// app.js が doc.documentElement.lang を書き換えるので、実物の <html> の代わりを用意する
+	doc.documentElement = fakeElement('html');
 	const root = fakeElement('main');
 	root.dataset.role = 'app';
 	// 共通の偽物は属性セレクタを解さないので、app.js が使う [data-role="x"] だけ受ける
