@@ -237,7 +237,7 @@ export function createViewer(deps) {
 
 		// 原寸表示は overlay の直下に敷く。ステージの中に入れるとサイドバーが上に残る。
 		// 閉じたらフォーカスはダイアログ本体へ戻す (レイヤの中の部品ごと消えるため)
-		zoomLayer = createZoomLayer({ doc, container: overlay, restoreFocus: () => overlay?.focus() });
+		zoomLayer = createZoomLayer({ doc, container: overlay, restoreFocus: () => overlay?.focus(), strings });
 
 		doc.body.appendChild(host);
 	}
@@ -415,6 +415,7 @@ export function createViewer(deps) {
 				sidebar,
 				zoom: zoomLayer,
 				fetchUser: deps.fetchUser,
+				strings,
 			});
 		} catch (error) {
 			if (token !== requestToken) return;

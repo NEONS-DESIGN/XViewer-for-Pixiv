@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createZoomLayer } from '../../../src/content/viewer/zoom.js';
 import { KEYS, INERT_ATTRIBUTE } from '../../../src/common/constants.js';
 import { fakeElement, fakeDoc, find } from '../../helpers/dom.js';
+import { createStrings } from '../../../src/i18n/index.js';
 
 /** 実際の CDN と同じ形の URL。safeCdnUrl の関門は通した後の値を渡す前提。 */
 const cdn = (name) => `https://i.pximg.net/img-original/img/2026/09/10/00/00/00/${name}.jpg`;
@@ -15,14 +16,15 @@ const URLS = [cdn('o0'), cdn('o1'), cdn('o2')];
  * container はビュワーの overlay 役で、既に子 (ステージ) を 1 つ持っている。
  * @param {object} [options] 差し替え
  * @param {() => void} [options.restoreFocus] 閉じたときに呼ばれる
+ * @param {object} [options.strings] 文言のカタログ
  * @returns {{container: object, stage: object, zoom: object}} 描画先・既存の子・レイヤ
  */
-function build({ restoreFocus } = {}) {
+function build({ restoreFocus, strings = createStrings('ja') } = {}) {
 	const container = fakeElement('div');
 	const stage = fakeElement('div');
 	stage.className = 'stage';
 	container.appendChild(stage);
-	const zoom = createZoomLayer({ doc: fakeDoc(), container, restoreFocus });
+	const zoom = createZoomLayer({ doc: fakeDoc(), container, restoreFocus, strings });
 	return { container, stage, zoom };
 }
 
@@ -223,4 +225,12 @@ test('閉じているときに閉じてもフォーカスは戻さない', () =>
 	const { zoom } = build({ restoreFocus: () => { restored += 1; } });
 	zoom.close();
 	assert.equal(restored, 0);
+});
+
+test('英語のカタログで英語の文言が出る', () => {
+	const { container, zoom } = build({ strings: createStrings('en') });
+	zoom.open(pages());
+	assert.match(find(container, '.zoom').getAttribute('aria-label'), /Actual size/);
+	assert.equal(find(container, '.zoom-zone-prev').getAttribute('aria-label'), 'Previous page');
+	assert.equal(find(container, '.zoom-zone-next').getAttribute('aria-label'), 'Next page');
 });

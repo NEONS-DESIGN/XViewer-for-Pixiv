@@ -10,18 +10,13 @@ import { createIcon } from '../../common/icons.js';
 import { IMAGE_QUALITY } from '../../common/constants.js';
 import { warn } from '../../common/log.js';
 
-/** 画面に出す文言。 */
-const MESSAGES = Object.freeze({
-	PREV_PAGE: '前のページ',
-	NEXT_PAGE: '次のページ',
-	IMAGE_FAILED: '画像を読み込めませんでした',
-	PAGES_FAILED: '2 枚目以降を読み込めませんでした',
-});
-
-/** 矢印ボタンの向きごとの定義。ツールチップにキー操作を添える。 */
-const ARROWS = Object.freeze({
-	prev: Object.freeze({ label: MESSAGES.PREV_PAGE, key: '←', icon: 'chevronLeft' }),
-	next: Object.freeze({ label: MESSAGES.NEXT_PAGE, key: '→', icon: 'chevronRight' }),
+/**
+ * 矢印ボタンの向きごとの見た目。ラベルは文言カタログ (strings.imagePane) から引くため、
+ * キー操作の表示とアイコンだけをここに持つ。
+ */
+const ARROW_SHAPES = Object.freeze({
+	prev: Object.freeze({ messageKey: 'PREV_PAGE', key: '←', icon: 'chevronLeft' }),
+	next: Object.freeze({ messageKey: 'NEXT_PAGE', key: '→', icon: 'chevronRight' }),
 });
 
 /**
@@ -64,6 +59,7 @@ export function prefetchTargets(index, total, count) {
  * @property {{open: (pages: object) => void}} [zoom] 原寸表示のレイヤ (zoom.js)。設定がオンのときだけ使う
  * @property {typeof fetch} [fetchImpl] 通信の差し替え。テストから pixiv を叩かないために使う
  * @property {() => HTMLImageElement} [createImage] 先読み用 Image の差し替え。Node には Image が無い
+ * @property {object} strings 文言のカタログ (src/i18n)
  */
 
 /**
@@ -72,7 +68,7 @@ export function prefetchTargets(index, total, count) {
  * @returns {{render: (detail: object) => Promise<void>, next: () => void, prev: () => void, dispose: () => void}}
  */
 export function createImagePane(deps) {
-	const { doc, container } = deps;
+	const { doc, container, strings } = deps;
 	const fetchImpl = deps.fetchImpl;
 	const createImage = deps.createImage ?? (() => new Image());
 
@@ -117,13 +113,14 @@ export function createImagePane(deps) {
 	 * @returns {HTMLButtonElement} ボタン
 	 */
 	function createArrow(direction, onClick) {
-		const arrow = ARROWS[direction];
+		const shape = ARROW_SHAPES[direction];
+		const label = strings.imagePane[shape.messageKey];
 		const button = doc.createElement('button');
 		button.type = 'button';
 		button.className = `arrow arrow-${direction}`;
-		button.setAttribute('aria-label', arrow.label);
-		button.title = `${arrow.label} (${arrow.key})`;
-		button.appendChild(createIcon(doc, arrow.icon));
+		button.setAttribute('aria-label', label);
+		button.title = `${label} (${shape.key})`;
+		button.appendChild(createIcon(doc, shape.icon));
 		button.addEventListener('click', onClick);
 		return button;
 	}
@@ -230,7 +227,7 @@ export function createImagePane(deps) {
 
 			image = doc.createElement('img');
 			image.alt = detail.title;
-			onImageError = () => showPaneError(MESSAGES.IMAGE_FAILED);
+			onImageError = () => showPaneError(strings.imagePane.IMAGE_FAILED);
 			image.addEventListener('error', onImageError);
 			// クリックで原寸表示。設定がオフのときはリスナも付けず、カーソルも変えない
 			// (押せそうに見えて何も起きないのが一番まずい)
@@ -267,7 +264,7 @@ export function createImagePane(deps) {
 			} catch (error) {
 				if (disposed) return;
 				// 1 枚目は出ているので、複数枚が開けないことだけを伝える
-				showPaneError(MESSAGES.PAGES_FAILED);
+				showPaneError(strings.imagePane.PAGES_FAILED);
 				warn('failed to load pages', detail.id, error);
 			}
 		},
