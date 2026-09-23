@@ -24,13 +24,23 @@ export const LOCALE_PREFIXES = Object.freeze(['en']);
 export const LOCALE_PATH_PATTERN = new RegExp(`^/(?:${LOCALE_PREFIXES.join('|')})(?=/|$)`);
 
 /**
+ * 作品リンクのセレクタを接頭辞ごとに 1 本ずつ持つ配列。
+ * CSS で擬似クラスを付けるときは、**必ずこの配列の各要素へ個別に付けてから結合する。**
+ * カンマで結合した ARTWORK_LINK_SELECTOR の後ろへ継ぎ足すと、CSS のカンマは優先度が
+ * 最も低いため末尾の 1 本にしか掛からず、先頭のセレクタが裸で残る。
+ * @type {readonly string[]}
+ */
+export const ARTWORK_LINK_SELECTORS = Object.freeze(
+	['', ...LOCALE_PREFIXES.map((locale) => `/${locale}`)].map((prefix) => `a[href^="${prefix}/artworks/"]`),
+);
+
+/**
  * 作品リンクを拾うためのセレクタ。pixiv の CSS クラス名は当てにならないのでこれだけを使う。
  * 表示言語が英語のとき href は `/en/artworks/{id}` になるので、接頭辞ごとに 1 本ずつ並べる。
  * (前方一致だけを掴む方針は変えない。`[href*=]` へ緩めると別のパスまで拾ってしまう)
+ * querySelectorAll / closest / matches に渡す用。ARTWORK_LINK_SELECTORS を結合したもの。
  */
-export const ARTWORK_LINK_SELECTOR = ['', ...LOCALE_PREFIXES.map((locale) => `/${locale}`)]
-	.map((prefix) => `a[href^="${prefix}/artworks/"]`)
-	.join(',');
+export const ARTWORK_LINK_SELECTOR = ARTWORK_LINK_SELECTORS.join(',');
 
 /** カードのサムネリンク。pixiv の計測用属性で、クラス名より寿命が長い。(SITE_SPEC §3 実測) */
 export const THUMB_LINK_SELECTOR = 'a[data-ga4-label="thumbnail_link"]';

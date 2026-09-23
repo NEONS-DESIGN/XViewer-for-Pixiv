@@ -6,7 +6,7 @@
  * (SITE_SPEC 実測) そこでリンクの内側に重ねて描く。
  * 外側に暗い縁、内側にアクセント色の二重にして、明るい絵でも暗い絵でも輪郭が出るようにする。
  */
-import { ARTWORK_LINK_SELECTOR } from '../common/constants.js';
+import { ARTWORK_LINK_SELECTORS } from '../common/constants.js';
 import { createStyleHandle } from '../common/style-injector.js';
 
 /** 差し込む style 要素の id。二重注入を防ぐ目印も兼ねる。 */
@@ -28,17 +28,27 @@ const FOCUS_RING_WIDTH_PX = 5;
 const FOCUS_RADIUS_PX = 4;
 
 /**
+ * 作品リンクのセレクタすべてに同じ接尾辞を付けて結合する。
+ * カンマ区切りの並びの後ろへ継ぎ足すと先頭のセレクタが裸で残るので、必ず 1 本ずつ付ける。
+ * @param {string} suffix 付ける擬似クラスなど
+ * @returns {string} カンマで結合したセレクタ
+ */
+function eachArtworkLink(suffix) {
+	return ARTWORK_LINK_SELECTORS.map((selector) => `${selector}${suffix}`).join(',\n');
+}
+
+/**
  * light DOM へ差し込む CSS。
  * :focus-visible なのでキーボードで移ったときだけ出る。(クリックでは出ない)
  * :has(img) でサムネイルのリンクだけに絞る。(同じ href のタイトルリンクに枠を出さないため)
  * pixiv 標準のリングは消さない。(UI_DESIGN_KIT §10)
  */
 export const GRID_FOCUS_CSS = `
-${ARTWORK_LINK_SELECTOR}:focus-visible:has(img) {
+${eachArtworkLink(':focus-visible:has(img)')} {
 	position: relative;
 }
 
-${ARTWORK_LINK_SELECTOR}:focus-visible:has(img)::after {
+${eachArtworkLink(':focus-visible:has(img)::after')} {
 	content: '';
 	position: absolute;
 	inset: 0;
