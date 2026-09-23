@@ -5,9 +5,42 @@
  */
 import { loadSettings as loadSettingsImpl, saveSetting as saveSettingImpl, resetSettings as resetSettingsImpl } from '../common/storage.js';
 import { logError } from '../common/log.js';
-import { DEFAULT_LANGUAGE } from '../common/language.js';
+import { loadPageLanguage as loadPageLanguageImpl } from '../common/language-store.js';
+import { normalizeLanguage, uiLanguage } from '../common/language.js';
 import { createStrings } from '../i18n/index.js';
 import { renderPopup as renderPopupImpl } from './popup-ui.js';
+
+/**
+ * ブラウザの UI 言語を読む。拡張の外では空文字。
+ * @returns {string} BCP 47 のタグ
+ */
+function defaultGetUILanguage() {
+	return globalThis.chrome?.i18n?.getUILanguage?.() ?? '';
+}
+
+/**
+ * 設定画面に使う言語を決める。
+ *
+ * popup は pixiv のページを持たないので自分では判定できない。
+ * content script が最後に書いた値を使い、無ければブラウザの UI 言語へ落ちる。
+ * 最後に必ず uiLanguage() を通すので、フォールバックの規則は content script と同一になる。
+ * (未対応の言語は英語、判定そのものに失敗したら日本語)
+ *
+ * pixiv の表示言語はアカウント設定で全タブ共通なので、タブへ問い合わせる必要はない。
+ * @param {{loadPageLanguage?: () => Promise<string|null>, getUILanguage?: () => string}} [deps] 差し替え
+ * @returns {Promise<string>} 言語サブタグ
+ */
+export async function resolvePopupLanguage(deps = {}) {
+	const load = deps.loadPageLanguage ?? loadPageLanguageImpl;
+	const getUILanguage = deps.getUILanguage ?? defaultGetUILanguage;
+	let stored = null;
+	try {
+		stored = await load();
+	} catch {
+		// 読めなくても描く。下のフォールバックへ落とす
+	}
+	return uiLanguage(stored ?? normalizeLanguage(getUILanguage()));
+}
 
 /** 描き先の要素の id (popup.html)。 */
 const ROOT_ID = 'app';
@@ -30,6 +63,8 @@ function roleSelector(role) {
  * @param {typeof resetSettingsImpl} [deps.resetSettings] 設定の初期化
  * @param {typeof renderPopupImpl} [deps.renderPopup] 画面の描画
  * @param {typeof logError} [deps.report] 描画に失敗したときの記録
+ * @param {() => Promise<string|null>} [deps.loadPageLanguage] pixiv の表示言語の読み出し (resolvePopupLanguage へ渡す)
+ * @param {() => string} [deps.getUILanguage] ブラウザの UI 言語の読み出し (resolvePopupLanguage へ渡す)
  * @returns {Promise<void>} 最初の描画の完了
  */
 export async function main({
@@ -39,12 +74,20 @@ export async function main({
 	resetSettings = resetSettingsImpl,
 	renderPopup = renderPopupImpl,
 	report = logError,
+	loadPageLanguage,
+	getUILanguage,
 }) {
 	const root = doc.getElementById(ROOT_ID);
 	if (!root) return;
 
-	// 表示言語の判定は Task 13 で入れる。ここでは暫定で既定の言語を使う
-	const strings = createStrings(DEFAULT_LANGUAGE);
+	// 設定の読み出しと言語の解決を同時に行う。直列にすると popup が開くのが遅くなる
+	const [initialSettings, lang] = await Promise.all([
+		loadSettings(),
+		resolvePopupLanguage({ loadPageLanguage, getUILanguage }),
+	]);
+	const strings = createStrings(lang);
+	// popup.html は lang="ja" で書いてある。実際に描く言語へ合わせる
+	doc.documentElement.lang = strings.lang;
 
 	// 保存の失敗だけを画面に出す。成功は画面がそのまま変わるので言葉を足さない。
 	// 出した通知は次の保存が成功したときに消す (UI_DESIGN_KIT §4.8)
@@ -80,13 +123,14 @@ export async function main({
 	 * 設定を読み直して描き直す。
 	 * 利用者の現在地 (開いているタブ・フォーカス) は描き直しの外で持って復元する。(UI_DESIGN_KIT §7)
 	 * 描画の例外はここで受けて記録する。呼び出し側は結果を待たないので、放すと素の unhandled rejection になる
-	 * @param {{focusRole?: string|null}} [options] 描き直した後にフォーカスを戻す要素の data-role
+	 * @param {{focusRole?: string|null, settings?: object}} [options] 描き直した後にフォーカスを戻す要素の data-role。
+	 *   settings を渡すと読み直さずそれを使う (main() が言語の解決と同時に読んだ初回分の使い回し)
 	 * @returns {Promise<void>} 完了
 	 */
-	async function refresh({ focusRole = null } = {}) {
+	async function refresh({ focusRole = null, settings: preloadedSettings } = {}) {
 		try {
 			await settle();
-			const settings = await loadSettings();
+			const settings = preloadedSettings ?? await loadSettings();
 			screen = renderPopup({
 				doc,
 				root,
@@ -130,5 +174,5 @@ export async function main({
 		}).catch((error) => report('popup: 設定の初期化に失敗しました', error));
 	}
 
-	await refresh();
+	await refresh({ settings: initialSettings });
 }
