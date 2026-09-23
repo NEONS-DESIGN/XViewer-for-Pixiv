@@ -365,3 +365,10 @@ export const INERT_ATTRIBUTE = 'inert';
  * そこで Tab が止まったように見える。(原寸表示中のステージとサイドバーがこれに当たる)
  */
 export const INERT_SELECTOR = `[${INERT_ATTRIBUTE}]`;
+
+/**
+ * 日時の表示に使うタイムゾーン。
+ * 閲覧地に依らず pixiv 本体と同じ表示にするため固定する。
+ * 言語にも画面にも依らないのでここに置く。(言語ごとのカタログが参照する)
+ */
+export const DISPLAY_TIME_ZONE = 'Asia/Tokyo';

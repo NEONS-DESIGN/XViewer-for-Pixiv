@@ -9,6 +9,7 @@ import { createIcon } from '../../common/icons.js';
 import { formatCount } from '../../common/format.js';
 import { warn } from '../../common/log.js';
 import { currentLocalePrefix } from '../../common/locale.js';
+import { DISPLAY_TIME_ZONE } from '../../common/constants.js';
 import { PIXIV_ORIGIN, artworkPath, userPath, tagWorksPath } from '../../pixiv/endpoints.js';
 import { createAvatar, showAvatar } from './avatar.js';
 import { fetchUserProfile } from '../../pixiv/user.js';
@@ -41,9 +42,6 @@ const COUNT_VALUE_CLASS = 'count-value';
 
 /** コメントのカウンタに付ける差し替え用の印。actions-bar のいいね・ブックマークと同じ流儀。 */
 const COMMENT_COUNT_MARKER = 'count-comment';
-
-/** 日時の表示に使うタイムゾーン。閲覧地に依らず pixiv 本体と同じ表示にするため固定する。 */
-const DISPLAY_TIME_ZONE = 'Asia/Tokyo';
 
 /** 日時の書式。年月日は数値、時刻は 24 時間の 2 桁。 */
 const DATE_TIME_FORMAT = new Intl.DateTimeFormat('ja-JP', {
