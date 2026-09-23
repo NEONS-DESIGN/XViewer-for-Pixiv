@@ -73,19 +73,11 @@ const KEEP_OPEN_SELECTOR = [
 	'.status',
 ].join(', ');
 
-/** 利用者に見せる文言。 */
-const MESSAGES = Object.freeze({
-	DIALOG_LABEL: '作品ビュワー',
-	CLOSE: '閉じる',
-	CLOSE_TITLE: '閉じる (Esc)',
-	LOADING: '読み込み中...',
-	LOAD_FAILED: '作品を読み込めませんでした',
-});
-
 /**
  * @typedef {object} ViewerDeps
  * @property {Document} doc 対象のドキュメント
  * @property {object} settings 設定
+ * @property {object} strings 文言のカタログ (src/i18n)
  * @property {() => void} onRequestClose 閉じたいときに呼ばれる (履歴を戻す役は呼び出し側)
  * @property {(workId: string) => void} onNavigate 上下キーで作品が切り替わったときに呼ばれる (URL の差し替えは呼び出し側)
  * @property {() => boolean} canExtendSequence グリッドの端で全作品の並びへ広げてよいか (タグ絞り込み中は false)
@@ -140,7 +132,7 @@ export function isTextEntry(event) {
  * @returns {{open: (workId: string, nextSequence?: import('../sequence.js').Sequence) => Promise<void>, close: () => void, isOpen: () => boolean, dispose: () => void, setSettings: (s: object) => void}}
  */
 export function createViewer(deps) {
-	const { doc } = deps;
+	const { doc, strings } = deps;
 	const fetchJson = deps.getJsonImpl ?? getJson;
 	let settings = deps.settings;
 
@@ -191,6 +183,8 @@ export function createViewer(deps) {
 		if (host) return;
 		host = doc.createElement('div');
 		host.id = HOST_ELEMENT_ID;
+		// 注入先のページと UI の言語が違うことがある。読み上げを正しい言語にするため明示する
+		host.lang = strings.lang;
 		shadow = host.attachShadow({ mode: 'open' });
 
 		const style = doc.createElement('style');
@@ -201,7 +195,7 @@ export function createViewer(deps) {
 		overlay.className = 'overlay';
 		overlay.setAttribute('role', 'dialog');
 		overlay.setAttribute('aria-modal', 'true');
-		overlay.setAttribute('aria-label', MESSAGES.DIALOG_LABEL);
+		overlay.setAttribute('aria-label', strings.viewer.DIALOG_LABEL);
 		// 開いたときのフォーカスの受け皿。ダイアログを名乗る以上、開いたら中へフォーカスを
 		// 入れないと読み上げが文脈を失う。中のボタンではなく本体で受けるので、
 		// 十字キーを押したときにどのボタンにも輪郭が出ない。(§10.4)
@@ -215,8 +209,8 @@ export function createViewer(deps) {
 		closeButton.className = 'close';
 		closeButton.type = 'button';
 		// アイコンだけのボタンには必ず両方付ける (UI_DESIGN_KIT §6)
-		closeButton.setAttribute('aria-label', MESSAGES.CLOSE);
-		closeButton.title = MESSAGES.CLOSE_TITLE;
+		closeButton.setAttribute('aria-label', strings.viewer.CLOSE);
+		closeButton.title = strings.viewer.CLOSE_TITLE;
 		closeButton.appendChild(createIcon(doc, 'close'));
 		closeButton.addEventListener('click', () => deps.onRequestClose());
 
@@ -414,7 +408,7 @@ export function createViewer(deps) {
 	async function renderDetail(detail, token) {
 		try {
 			clearStatus();
-			overlay.setAttribute('aria-label', `${detail.title} - ${MESSAGES.DIALOG_LABEL}`);
+			overlay.setAttribute('aria-label', `${detail.title} - ${strings.viewer.DIALOG_LABEL}`);
 			await renderWork(detail, readSession(doc), settings, {
 				doc,
 				stage,
@@ -426,7 +420,7 @@ export function createViewer(deps) {
 			if (token !== requestToken) return;
 			zoomLayer?.close();
 			disposeAll();
-			showStatus(MESSAGES.LOAD_FAILED, STATUS_KINDS.ERROR);
+			showStatus(strings.viewer.LOAD_FAILED, STATUS_KINDS.ERROR);
 			warn('failed to render', detail.id, error);
 		}
 	}
@@ -466,7 +460,7 @@ export function createViewer(deps) {
 		// 十字キーでフォーカスが動いたように見える (§10.4)
 		if (!shadow.activeElement) overlay?.focus();
 		sidebar.hidden = !settings.showSidebar;
-		showStatus(MESSAGES.LOADING, STATUS_KINDS.INFO);
+		showStatus(strings.viewer.LOADING, STATUS_KINDS.INFO);
 
 		let detail;
 		try {
@@ -477,7 +471,7 @@ export function createViewer(deps) {
 			detail = normalizeDetail(raw);
 		} catch (error) {
 			if (token !== requestToken) return;
-			showStatus(MESSAGES.LOAD_FAILED, STATUS_KINDS.ERROR);
+			showStatus(strings.viewer.LOAD_FAILED, STATUS_KINDS.ERROR);
 			warn('failed to open', workId, error);
 			return;
 		}
