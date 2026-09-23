@@ -9,7 +9,6 @@ import { createIcon } from '../../common/icons.js';
 import { formatCount } from '../../common/format.js';
 import { warn } from '../../common/log.js';
 import { currentLocalePrefix } from '../../common/locale.js';
-import { DISPLAY_TIME_ZONE } from '../../common/constants.js';
 import { PIXIV_ORIGIN, artworkPath, userPath, tagWorksPath } from '../../pixiv/endpoints.js';
 import { createAvatar, showAvatar } from './avatar.js';
 import { fetchUserProfile } from '../../pixiv/user.js';
@@ -20,15 +19,6 @@ const SAFE_SCHEMES = ['http:', 'https:'];
 
 /** ユーザー ID の見出し。数字だけだと何の番号か分からないので前に置く。 */
 const USER_ID_PREFIX = 'ID: ';
-
-/** 利用者に見せる文言。 */
-const MESSAGES = Object.freeze({
-	OPEN_ORIGINAL: '作品ページを開く',
-	LIKE: 'いいね',
-	BOOKMARK: 'ブックマーク',
-	VIEWS: '閲覧数',
-	COMMENTS: 'コメント',
-});
 
 /**
  * アバターがまだ表示できない (取得前・取得失敗) ことを示すクラス。
@@ -42,17 +32,6 @@ const COUNT_VALUE_CLASS = 'count-value';
 
 /** コメントのカウンタに付ける差し替え用の印。actions-bar のいいね・ブックマークと同じ流儀。 */
 const COMMENT_COUNT_MARKER = 'count-comment';
-
-/** 日時の書式。年月日は数値、時刻は 24 時間の 2 桁。 */
-const DATE_TIME_FORMAT = new Intl.DateTimeFormat('ja-JP', {
-	timeZone: DISPLAY_TIME_ZONE,
-	year: 'numeric',
-	month: 'numeric',
-	day: 'numeric',
-	hour: '2-digit',
-	minute: '2-digit',
-	hourCycle: 'h23',
-});
 
 /** 名前付きの実体参照の戻し表。数値参照 (&#39; / &#x27;) は decodeEntities が汎用に戻す。 */
 const ENTITIES = Object.freeze({
@@ -69,18 +48,17 @@ const NUMERIC_ENTITY_PATTERN = /&#(x[0-9a-f]+|\d+);/gi;
 const NAMED_ENTITY_PATTERN = /&(?:amp|lt|gt|quot);/g;
 
 /**
- * ISO 8601 の日時を日本語表記にする。
- * ローカル時刻のゲッタを使うと閲覧地によって pixiv 本体と違う日時が出るため、JST に固定する。
+ * ISO 8601 の日時を画面の表記にする。
+ * 書式の組み立てはカタログが持つ。ここは読めない値をはじくだけ。
  * @param {string} iso createDate など
- * @returns {string} 日本語の日時。読めなければ空文字
+ * @param {object} strings 文言のカタログ
+ * @returns {string} 日時。読めなければ空文字
  */
-export function formatDate(iso) {
+export function formatDate(iso, strings) {
 	if (!iso) return '';
 	const date = new Date(iso);
 	if (Number.isNaN(date.getTime())) return '';
-	const parts = {};
-	for (const { type, value } of DATE_TIME_FORMAT.formatToParts(date)) parts[type] = value;
-	return `${parts.year}年${parts.month}月${parts.day}日 ${parts.hour}:${parts.minute}`;
+	return strings.sidebar.formatDateTime(date);
 }
 
 /**
@@ -193,6 +171,7 @@ export function commentToNodes(doc, html) {
  * @property {Document} doc
  * @property {HTMLElement} container 描画先 (.sidebar)
  * @property {(userId: string) => Promise<object>} [fetchUser] ユーザー情報の取得。既定は共有キャッシュ付きの取得
+ * @property {object} strings 文言のカタログ (src/i18n)
  */
 
 /**
@@ -201,7 +180,7 @@ export function commentToNodes(doc, html) {
  * @returns {{render: (detail: object) => void, followSlot: () => HTMLElement, countsSlot: () => HTMLElement, commentsSlot: () => HTMLElement, bumpCommentCount: (delta: number) => void, setCommentCount: (next: number) => void, consumeEscape: () => boolean, consumeKey: (event: KeyboardEvent) => boolean, dispose: () => void}}
  */
 export function createSidebar(deps) {
-	const { doc, container } = deps;
+	const { doc, container, strings } = deps;
 	// リンクは pixiv 本体のページを指すので、今の表示言語の接頭辞 (/en) を付ける
 	const localePrefix = deps.localePrefix ?? currentLocalePrefix(doc);
 	// actions-bar (フォロー状態) と同じ応答を使う。既定は共有キャッシュ付きなので通信は 1 回で済む
@@ -252,9 +231,9 @@ export function createSidebar(deps) {
 		const text = doc.createElement('span');
 		// 数字だけを持つ要素に印を付けておく。bumpCommentCount() がここだけを書き換える
 		text.className = COUNT_VALUE_CLASS;
-		text.textContent = formatCount(value);
+		text.textContent = formatCount(value, strings.lang);
 		item.appendChild(text);
-		item.title = `${label} ${formatCount(value)}`;
+		item.title = `${label} ${formatCount(value, strings.lang)}`;
 		return item;
 	}
 
@@ -327,7 +306,7 @@ export function createSidebar(deps) {
 		original.setAttribute('target', '_blank');
 		original.setAttribute('rel', 'noopener noreferrer');
 		const label = doc.createElement('span');
-		label.textContent = MESSAGES.OPEN_ORIGINAL;
+		label.textContent = strings.sidebar.OPEN_ORIGINAL;
 		original.append(label, createIcon(doc, 'openInNew'));
 		row.appendChild(original);
 
@@ -349,8 +328,8 @@ export function createSidebar(deps) {
 		commentCount = Math.max(0, next);
 		const value = node.querySelector(`.${COUNT_VALUE_CLASS}`);
 		if (!value) return;
-		value.textContent = formatCount(commentCount);
-		node.title = `${MESSAGES.COMMENTS} ${formatCount(commentCount)}`;
+		value.textContent = formatCount(commentCount, strings.lang);
+		node.title = `${strings.sidebar.COMMENTS} ${formatCount(commentCount, strings.lang)}`;
 	}
 
 	return {
@@ -405,17 +384,17 @@ export function createSidebar(deps) {
 			// 投稿日時はタグの下・カウンタの罫線の上。読み物の締めくくりとして置く
 			const date = doc.createElement('p');
 			date.className = 'date';
-			date.textContent = formatDate(detail.createDate);
+			date.textContent = formatDate(detail.createDate, strings);
 			info.appendChild(date);
 
 			counts = doc.createElement('div');
 			counts.className = 'counts';
 			// アイコンの対応は pixiv 本体に合わせる。いいねは顔、ブックマークはハート
 			counts.append(
-				createCount('like', MESSAGES.LIKE, detail.likeCount, 'count-like'),
-				createCount('favorite', MESSAGES.BOOKMARK, detail.bookmarkCount, 'count-bookmark'),
-				createCount('visibility', MESSAGES.VIEWS, detail.viewCount),
-				createCount('comment', MESSAGES.COMMENTS, detail.commentCount, COMMENT_COUNT_MARKER),
+				createCount('like', strings.sidebar.LIKE, detail.likeCount, 'count-like'),
+				createCount('favorite', strings.sidebar.BOOKMARK, detail.bookmarkCount, 'count-bookmark'),
+				createCount('visibility', strings.sidebar.VIEWS, detail.viewCount),
+				createCount('comment', strings.sidebar.COMMENTS, detail.commentCount, COMMENT_COUNT_MARKER),
 			);
 			info.appendChild(counts);
 			// 新しい作品を描いたら、前の作品で足した分は持ち越さず detail の値に揃える

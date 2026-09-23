@@ -35,61 +35,46 @@ import { isOwnWork } from '../../pixiv/normalize.js';
 import { PIXIV_ERROR_KINDS } from '../../pixiv/errors.js';
 import { likeIllust, addBookmark, deleteBookmark, followUser, unfollowUser } from '../../pixiv/actions.js';
 
-/** 利用者に見せる文言。 */
-const MESSAGES = Object.freeze({
-	LOGIN_TO_ACT: 'ログインするといいねやブックマークができます',
-	SESSION_EXPIRED: 'ログインが切れています。pixiv にログインし直し、このページを再読み込みしてください',
-	LIKED: 'いいねしました',
-	ALREADY_LIKED: '既にいいね済みでした',
-	LIKE_FAILED: 'いいねできませんでした',
-	BOOKMARKED: 'ブックマークしました',
-	BOOKMARKED_PRIVATE: '非公開でブックマークしました',
-	UNBOOKMARKED: 'ブックマークを外しました',
-	BOOKMARK_FAILED: 'ブックマークを変更できませんでした',
-	FOLLOWED: 'フォローしました',
-	UNFOLLOWED: 'フォローを解除しました',
-	FOLLOW_FAILED: 'フォローを変更できませんでした',
-});
-
-/** ブックマークを非公開で入れる操作の手掛かり。title にだけ添える。(画面には出ない) */
-export const BOOKMARK_PRIVATE_HINT = '(Shift + クリックで非公開)';
-
 /**
- * ブックマークボタンのラベル。
- * @param {string|null} bookmarkId ブックマーク済みならその ID
- * @returns {string} ラベル
+ * ブックマークのボタンの読み上げ名。
+ * @param {string|null} bookmarkId 入っていればその id
+ * @param {object} strings 文言のカタログ
+ * @returns {string} 押すと何が起きるか
  */
-export function bookmarkLabel(bookmarkId) {
-	return bookmarkId ? 'ブックマークから削除' : 'ブックマークに追加';
+export function bookmarkLabel(bookmarkId, strings) {
+	return strings.actionsBar.bookmarkLabel(Boolean(bookmarkId));
 }
 
 /**
- * いいねボタンのラベル。
- * @param {boolean} liked いいね済みか
- * @returns {string} ラベル
+ * いいねのボタンの読み上げ名。
+ * @param {boolean} liked 済みなら true
+ * @param {object} strings 文言のカタログ
+ * @returns {string} 状態か、押すと何が起きるか
  */
-export function likeLabel(liked) {
-	return liked ? 'いいね済み' : 'いいね (取り消せません)';
+export function likeLabel(liked, strings) {
+	return strings.actionsBar.likeLabel(liked);
 }
 
 /**
- * フォローボタンのラベル。
- * @param {boolean} following フォロー済みか
- * @returns {string} ラベル
+ * フォローのボタンの読み上げ名。
+ * @param {boolean} following フォロー中なら true
+ * @param {object} strings 文言のカタログ
+ * @returns {string} 状態
  */
-export function followLabel(following) {
-	return following ? 'フォロー中' : 'フォロー';
+export function followLabel(following, strings) {
+	return strings.actionsBar.followLabel(following);
 }
 
 /**
- * 押せるカウンタの読み上げ用の文言。
- * 見えているのはアイコンと数字だけなので、操作の説明と件数を両方入れる。
- * @param {string} label 操作の説明 (いいね済み など)
+ * カウンタの読み上げ名。
+ * 桁区切りは formatCount の担当で、カタログは並べ方だけを決める。
+ * @param {string} label 何の数か
  * @param {number} count 件数
- * @returns {string} 文言
+ * @param {object} strings 文言のカタログ
+ * @returns {string} 読み上げ名
  */
-export function countLabel(label, count) {
-	return `${label} ${formatCount(count)} 件`;
+export function countLabel(label, count, strings) {
+	return strings.actionsBar.countLabel(label, formatCount(count, strings.lang));
 }
 
 /**
@@ -100,6 +85,7 @@ export function countLabel(label, count) {
  * @property {(userId: string) => Promise<object>} [fetchUser] ユーザー情報の取得。既定は /ajax/user/{id}?full=1
  * @property {(userId: string, patch: object) => void} [patchUser] 覚えているユーザー情報の書き換え。既定は pixiv/user.js
  * @property {object} [actions] 更新系の差し替え。テストから通信させないために使う
+ * @property {object} strings 文言のカタログ (src/i18n)
  */
 
 /**
@@ -108,7 +94,7 @@ export function countLabel(label, count) {
  * @returns {{render: (detail: object) => void, dispose: () => void}}
  */
 export function createActionsBar(deps) {
-	const { doc, container, followContainer } = deps;
+	const { doc, container, followContainer, strings } = deps;
 	// サイドバー (作者アイコン) と同じ応答を使う。作品ごとに 2 本走らせない
 	const fetchUser = deps.fetchUser ?? fetchUserProfile;
 	// 自分で変えたフォロー状態は覚えている応答へ書き戻す。次の作品で取り直さないため
@@ -152,7 +138,7 @@ export function createActionsBar(deps) {
 	function announceFailure(message, error, logLabel) {
 		if (error?.kind === PIXIV_ERROR_KINDS.UNAUTHORIZED) {
 			clearSessionCache();
-			announce(MESSAGES.SESSION_EXPIRED, STATUS_KINDS.ERROR);
+			announce(strings.actionsBar.messages.SESSION_EXPIRED, STATUS_KINDS.ERROR);
 		} else {
 			announce(message, STATUS_KINDS.ERROR);
 		}
@@ -234,10 +220,10 @@ export function createActionsBar(deps) {
 	 */
 	function describeCount(button, label, count, hint) {
 		if (!button) return;
-		const text = countLabel(label, count);
+		const text = countLabel(label, count, strings);
 		button.setAttribute('aria-label', text);
 		button.title = hint ? `${text} ${hint}` : text;
-		button.querySelector('span').textContent = formatCount(count);
+		button.querySelector('span').textContent = formatCount(count, strings.lang);
 	}
 
 	/**
@@ -249,7 +235,7 @@ export function createActionsBar(deps) {
 	 * @returns {void}
 	 */
 	function describeBookmark(button, bookmarkId, count) {
-		describeCount(button, bookmarkLabel(bookmarkId), count, bookmarkId ? undefined : BOOKMARK_PRIVATE_HINT);
+		describeCount(button, bookmarkLabel(bookmarkId, strings), count, bookmarkId ? undefined : strings.actionsBar.BOOKMARK_PRIVATE_HINT);
 	}
 
 	/**
@@ -260,7 +246,7 @@ export function createActionsBar(deps) {
 	 * @returns {void}
 	 */
 	function applyFollowState(button, following) {
-		relabel(button, followLabel(following));
+		relabel(button, followLabel(following, strings));
 		reicon(button, following ? 'personCheck' : 'personAdd');
 		button.classList.toggle('is-on', following);
 	}
@@ -284,7 +270,7 @@ export function createActionsBar(deps) {
 	function renderFollow(detail) {
 		let following = false;
 
-		const button = createButton('personAdd', followLabel(false), async () => {
+		const button = createButton('personAdd', followLabel(false, strings), async () => {
 			button.disabled = true;
 			const token = readSession(doc).csrfToken;
 			try {
@@ -295,10 +281,10 @@ export function createActionsBar(deps) {
 				// 覚えている応答へ書き戻す。次の作品でも取り直さずに今の状態が出る
 				patchUser(detail.userId, { isFollowed: following });
 				applyFollowState(button, following);
-				announce(following ? MESSAGES.FOLLOWED : MESSAGES.UNFOLLOWED);
+				announce(following ? strings.actionsBar.messages.FOLLOWED : strings.actionsBar.messages.UNFOLLOWED);
 			} catch (error) {
 				if (disposed) return;
-				announceFailure(MESSAGES.FOLLOW_FAILED, error, 'follow failed');
+				announceFailure(strings.actionsBar.messages.FOLLOW_FAILED, error, 'follow failed');
 			} finally {
 				button.disabled = false;
 			}
@@ -338,7 +324,7 @@ export function createActionsBar(deps) {
 			if (!session.isLoggedIn || !session.csrfToken) {
 				const notice = doc.createElement('p');
 				notice.className = 'status';
-				notice.textContent = MESSAGES.LOGIN_TO_ACT;
+				notice.textContent = strings.actionsBar.messages.LOGIN_TO_ACT;
 				container.appendChild(notice);
 				return;
 			}
@@ -372,15 +358,15 @@ export function createActionsBar(deps) {
 					liked = true;
 					if (alreadyLiked !== true) likeCount += 1;
 					likeButton.classList.add('is-on');
-					describeCount(likeButton, likeLabel(true), likeCount);
-					announce(alreadyLiked === true ? MESSAGES.ALREADY_LIKED : MESSAGES.LIKED);
+					describeCount(likeButton, likeLabel(true, strings), likeCount);
+					announce(alreadyLiked === true ? strings.actionsBar.messages.ALREADY_LIKED : strings.actionsBar.messages.LIKED);
 				} catch (error) {
 					if (disposed) return;
 					likeButton.disabled = false;
-					announceFailure(MESSAGES.LIKE_FAILED, error, 'like failed');
+					announceFailure(strings.actionsBar.messages.LIKE_FAILED, error, 'like failed');
 				}
 			});
-			describeCount(likeButton, likeLabel(liked), likeCount);
+			describeCount(likeButton, likeLabel(liked, strings), likeCount);
 			if (likeButton) {
 				// いいねは取り消せない。済みなら押させない
 				likeButton.disabled = liked;
@@ -401,7 +387,7 @@ export function createActionsBar(deps) {
 						// 表示が負の数になるのを防ぐ。pixiv 側の集計とずれていても画面は壊さない
 						bookmarkCount = Math.max(0, bookmarkCount - 1);
 						bookmarkButton.classList.remove('is-on');
-						announce(MESSAGES.UNBOOKMARKED);
+						announce(strings.actionsBar.messages.UNBOOKMARKED);
 					} else {
 						// 非公開で入れたいときは Shift を押しながら
 						const isPrivate = event.shiftKey === true;
@@ -410,12 +396,12 @@ export function createActionsBar(deps) {
 						bookmarkId = added;
 						bookmarkCount += 1;
 						bookmarkButton.classList.add('is-on');
-						announce(isPrivate ? MESSAGES.BOOKMARKED_PRIVATE : MESSAGES.BOOKMARKED);
+						announce(isPrivate ? strings.actionsBar.messages.BOOKMARKED_PRIVATE : strings.actionsBar.messages.BOOKMARKED);
 					}
 					describeBookmark(bookmarkButton, bookmarkId, bookmarkCount);
 				} catch (error) {
 					if (disposed) return;
-					announceFailure(MESSAGES.BOOKMARK_FAILED, error, 'bookmark failed');
+					announceFailure(strings.actionsBar.messages.BOOKMARK_FAILED, error, 'bookmark failed');
 				} finally {
 					bookmarkButton.disabled = false;
 				}
