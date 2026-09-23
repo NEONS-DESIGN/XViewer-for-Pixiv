@@ -11,15 +11,6 @@ import { hasFocusWithin } from './focus.js';
 import { stampUrl } from '../../pixiv/endpoints.js';
 import { KEYS } from '../../common/constants.js';
 
-/** 画面に出す文言。 */
-const MESSAGES = Object.freeze({
-	SUBMIT: '送信',
-	PICK: '絵文字とスタンプ',
-	STAMP_ALT: 'スタンプ',
-	STAMP_CLEAR: '選んだスタンプを取り消す',
-	FAILED: 'コメントを投稿できませんでした',
-});
-
 /** 送信するキー。Ctrl (Mac は Cmd) と一緒に押す。Enter だけは改行のまま残す。 */
 const SUBMIT_KEY = 'Enter';
 
@@ -32,12 +23,13 @@ const SUBMIT_KEY = 'Enter';
  * @param {object} [deps.picker] 絵文字とスタンプのピッカー。省略すると選ぶボタンを出さない
  * @param {(value: {text: string, stampId: string|null}) => Promise<void>} deps.onSubmit 送信
  * @param {(error: unknown) => string} [deps.errorMessage] 失敗時の文言。省略すると既定の文言
+ * @param {object} deps.strings 文言のカタログ (src/i18n)
  * @returns {object} 入力欄
  */
 export function createCommentForm(deps) {
-	const { doc, placeholder, onSubmit } = deps;
+	const { doc, placeholder, onSubmit, strings } = deps;
 	const picker = deps.picker ?? null;
-	const errorMessage = deps.errorMessage ?? (() => MESSAGES.FAILED);
+	const errorMessage = deps.errorMessage ?? (() => strings.commentForm.FAILED);
 
 	/** @type {string|null} 選んでいるスタンプ。選んでいる間は本文を送らない */
 	let stampId = null;
@@ -83,7 +75,7 @@ export function createCommentForm(deps) {
 	const submit = doc.createElement('button');
 	submit.type = 'button';
 	submit.className = 'comment-form-submit';
-	submit.textContent = MESSAGES.SUBMIT;
+	submit.textContent = strings.commentForm.SUBMIT;
 	row.appendChild(submit);
 
 	/**
@@ -187,12 +179,12 @@ export function createCommentForm(deps) {
 		image.className = 'comment-form-stamp';
 		const url = stampUrl(id);
 		if (url) image.setAttribute('src', url);
-		image.setAttribute('alt', MESSAGES.STAMP_ALT);
+		image.setAttribute('alt', strings.commentForm.STAMP_ALT);
 		const clear = doc.createElement('button');
 		clear.type = 'button';
 		clear.className = 'comment-form-stamp-clear';
-		clear.title = MESSAGES.STAMP_CLEAR;
-		clear.setAttribute('aria-label', MESSAGES.STAMP_CLEAR);
+		clear.title = strings.commentForm.STAMP_CLEAR;
+		clear.setAttribute('aria-label', strings.commentForm.STAMP_CLEAR);
 		clear.appendChild(createIcon(doc, 'close'));
 		clear.addEventListener('click', () => { clearStamp(); });
 		stampBox.append(image, clear);
@@ -255,8 +247,8 @@ export function createCommentForm(deps) {
 		const pick = doc.createElement('button');
 		pick.type = 'button';
 		pick.className = 'comment-form-pick';
-		pick.title = MESSAGES.PICK;
-		pick.setAttribute('aria-label', MESSAGES.PICK);
+		pick.title = strings.commentForm.PICK;
+		pick.setAttribute('aria-label', strings.commentForm.PICK);
 		pick.appendChild(createIcon(doc, 'mood'));
 		pick.addEventListener('click', () => {
 			if (picker.isOpen()) {

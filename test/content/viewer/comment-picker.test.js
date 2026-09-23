@@ -2,16 +2,21 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createCommentPicker } from '../../../src/content/viewer/comment-picker.js';
 import { fakeDoc, fakeElement, find, findAll } from '../../helpers/dom.js';
+import { createStrings } from '../../../src/i18n/index.js';
+
+/** テストで使う文言のカタログ。日本語の文言は元の MESSAGES と同じ値。 */
+const STRINGS = createStrings('ja');
 
 /**
  * ピッカーと差し込み先を作る。
+ * @param {object} [strings] 文言のカタログ。省略すると日本語
  * @returns {{doc: object, slot: object, picker: object, opened: {emoji: string[], stamps: string[]}}} 一式
  */
-function build() {
+function build(strings = STRINGS) {
 	const doc = fakeDoc();
 	const slot = fakeElement('span');
 	const opened = { emoji: [], stamps: [] };
-	const picker = createCommentPicker({ doc });
+	const picker = createCommentPicker({ doc, strings });
 	return { doc, slot, picker, opened };
 }
 
@@ -287,4 +292,10 @@ test('スクロール領域の上端で切れるなら下へ開く', () => {
 test('スクロール領域の中でも余地があれば上のまま開く', () => {
 	const one = inScrollport(300, 200);
 	assert.equal(open(one).classList.contains('is-below'), false);
+});
+
+test('英語のカタログではパネルの読み上げ名が英語になる', () => {
+	const one = build(createStrings('en'));
+	const panel = open(one);
+	assert.equal(panel.getAttribute('aria-label'), 'Emoji and stamps');
 });

@@ -2,6 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createCommentForm } from '../../../src/content/viewer/comment-form.js';
 import { fakeDoc, find, flush } from '../../helpers/dom.js';
+import { createStrings } from '../../../src/i18n/index.js';
+
+/** テストで使う文言のカタログ。日本語の文言は元の MESSAGES と同じ値。 */
+const STRINGS = createStrings('ja');
 
 /**
  * 入力欄を作る。
@@ -16,6 +20,7 @@ function build(options = {}) {
 		onSubmit: options.onSubmit ?? (async (value) => { sent.push(value); }),
 		picker: options.picker,
 		avatarUrl: options.avatarUrl,
+		strings: options.strings ?? STRINGS,
 	});
 	return { form, sent, element: form.element };
 }
@@ -310,4 +315,9 @@ test('測れない DOM では高さに触らない', async () => {
 	const input = find(element, '.comment-form-input');
 	await input.dispatch('input', {});
 	assert.equal(input.style.height, undefined);
+});
+
+test('英語のカタログでは送信ボタンが英語になる', () => {
+	const { element } = build({ strings: createStrings('en') });
+	assert.equal(find(element, '.comment-form-submit').textContent, 'Post');
 });

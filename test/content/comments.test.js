@@ -6,6 +6,10 @@ import { clearSessionCache } from '../../src/content/session.js';
 import { PixivError, PIXIV_ERROR_KINDS } from '../../src/pixiv/errors.js';
 import { stampIds } from '../../src/pixiv/stamps.js';
 import { buildNextData } from '../helpers/pixiv.js';
+import { createStrings } from '../../src/i18n/index.js';
+
+/** テストで使う文言のカタログ。日本語の文言は元の MESSAGES / LABELS と同じ値。 */
+const STRINGS = createStrings('ja');
 
 test('コメントを共通の形にする', () => {
 	const raw = {
@@ -18,7 +22,7 @@ test('コメントを共通の形にする', () => {
 		commentDate: '2026-09-10 09:20',
 		hasReplies: false,
 	};
-	assert.deepEqual(normalizeComment(raw), {
+	assert.deepEqual(normalizeComment(raw, STRINGS), {
 		id: '233674946',
 		userId: '92064764',
 		userName: 'キーー',
@@ -35,19 +39,19 @@ test('コメントを共通の形にする', () => {
 
 test('スタンプのコメントは stampId を持ち回る', () => {
 	// SITE_SPEC 実測: スタンプのときは comment が空で stampId に文字列が入る
-	const comment = normalizeComment({ id: '1', userId: '2', userName: 'x', img: '', comment: '', stampId: '304', commentDate: '', hasReplies: false });
+	const comment = normalizeComment({ id: '1', userId: '2', userName: 'x', img: '', comment: '', stampId: '304', commentDate: '', hasReplies: false }, STRINGS);
 	assert.equal(comment.isStamp, true);
 	assert.equal(comment.stampId, '304');
 	assert.equal(comment.text, '');
 });
 
 test('返信があるコメントに印を付ける', () => {
-	const comment = normalizeComment({ id: '1', userId: '2', userName: 'x', img: '', comment: 'a', stampId: null, commentDate: '', hasReplies: true });
+	const comment = normalizeComment({ id: '1', userId: '2', userName: 'x', img: '', comment: 'a', stampId: null, commentDate: '', hasReplies: true }, STRINGS);
 	assert.equal(comment.hasReplies, true);
 });
 
 test('削除されたユーザーでも落ちない', () => {
-	const comment = normalizeComment({ id: '1', isDeletedUser: true, comment: 'a', commentDate: '' });
+	const comment = normalizeComment({ id: '1', isDeletedUser: true, comment: 'a', commentDate: '' }, STRINGS);
 	assert.equal(comment.userName, '退会したユーザー');
 	// 飛び先が無いことを後段 (リンクにするかの判断) へ伝える
 	assert.equal(comment.isDeleted, true);
@@ -80,7 +84,7 @@ test('絵文字の画像が読めなければ元の文字に戻す', () => {
 });
 
 test('スタンプを画像にする', () => {
-	const stamp = renderStamp(fakeDoc(), '304');
+	const stamp = renderStamp(fakeDoc(), '304', STRINGS);
 	assert.equal(stamp.tag, 'img');
 	assert.equal(stamp.className, 'comment-stamp');
 	assert.equal(stamp.attributes.src, 'https://s.pximg.net/common/images/stamp/generated-stamps/304_s.jpg');
@@ -88,14 +92,14 @@ test('スタンプを画像にする', () => {
 });
 
 test('スタンプの画像が読めなければ文字で伝える', () => {
-	const stamp = renderStamp(fakeDoc(), '304');
+	const stamp = renderStamp(fakeDoc(), '304', STRINGS);
 	stamp.listeners.error[0]();
 	assert.equal(stamp.replacedWith[0].textContent, '[スタンプ]');
 });
 
 test('スタンプの ID が使えなければ画像を出さない', () => {
 	// URL を組み立てられない値でも、コメントが 1 件消えたように見せない
-	const stamp = renderStamp(fakeDoc(), '../evil');
+	const stamp = renderStamp(fakeDoc(), '../evil', STRINGS);
 	assert.equal(stamp.tag, 'span');
 	assert.equal(stamp.textContent, '[スタンプ]');
 });
@@ -158,7 +162,7 @@ function loggedInDoc() {
  */
 function build(fetchJson) {
 	const container = fakeElement('div');
-	const comments = createComments({ doc: loggedInDoc(), container, fetchJson });
+	const comments = createComments({ doc: loggedInDoc(), container, fetchJson, strings: STRINGS });
 	return { container, comments };
 }
 
@@ -175,6 +179,7 @@ function buildPostable(options = {}) {
 	const comments = createComments({
 		doc,
 		container,
+		strings: STRINGS,
 		fetchJson: options.fetchJson ?? (async () => ({ comments: [ROOT], hasNext: false })),
 		actions: options.actions ?? {
 			postComment: async (...args) => {
@@ -485,6 +490,7 @@ test('見出しの「上部へ」は下の線と同じ合図 (貼り付き) で�
 	const comments = createComments({
 		doc: measurableDoc(() => 431 - scrolled),
 		container,
+		strings: STRINGS,
 		scrollTarget,
 		fetchJson: async () => ({ comments: [ROOT], hasNext: false }),
 	});
@@ -531,6 +537,7 @@ test('dispose すると scrollTarget の購読を解く', async () => {
 	const comments = createComments({
 		doc: loggedInDoc(),
 		container,
+		strings: STRINGS,
 		scrollTarget,
 		fetchJson: async () => ({ comments: [ROOT], hasNext: false }),
 	});
@@ -563,6 +570,7 @@ test('開いた直後の見出しを貼り付き扱いにしない', async () =>
 	const comments = createComments({
 		doc,
 		container,
+		strings: STRINGS,
 		scrollTarget,
 		fetchJson: async () => ({ comments: [ROOT], hasNext: false }),
 	});
@@ -647,6 +655,7 @@ test('キーボードで押した返信ボタンへ読み込み後にフォー�
 	const comments = createComments({
 		doc,
 		container,
+		strings: STRINGS,
 		fetchJson: async (url) => (url.includes('replies')
 			? { comments: [REPLY], hasNext: true }
 			: { comments: [ROOT], hasNext: false }),
@@ -670,6 +679,7 @@ test('フォーカスが無いボタンには読み込み後もフォーカス�
 	const comments = createComments({
 		doc,
 		container,
+		strings: STRINGS,
 		fetchJson: async (url) => (url.includes('replies')
 			? { comments: [REPLY], hasNext: false }
 			: { comments: [ROOT], hasNext: true }),
@@ -690,6 +700,7 @@ test('「もっと見る」をキーボードで押したら読み込み後に�
 	const comments = createComments({
 		doc,
 		container,
+		strings: STRINGS,
 		fetchJson: async () => {
 			page += 1;
 			return { comments: [{ ...ROOT, id: String(page), hasReplies: false }], hasNext: page < 3 };
@@ -732,6 +743,7 @@ test('文字が見えている「上部へ」に title を重ねない', async (
 	const comments = createComments({
 		doc: loggedInDoc(),
 		container,
+		strings: STRINGS,
 		scrollTarget,
 		fetchJson: async () => ({ comments: [ROOT], hasNext: false }),
 	});
@@ -858,6 +870,7 @@ async function postThenReload(nextDetail) {
 	const comments = createComments({
 		doc: loggedInDoc(),
 		container,
+		strings: STRINGS,
 		fetchJson: async () => ({ comments: [ROOT], hasNext: false }),
 		actions: {
 			postComment: () => new Promise((resolve) => { release = resolve; }),
@@ -904,6 +917,7 @@ test('未ログインなら入力欄の代わりに案内を出す', async () =>
 	const comments = createComments({
 		doc: fakeDoc({ nextData: buildNextData({ isLoggedIn: false, token: '' }) }),
 		container,
+		strings: STRINGS,
 		fetchJson: async () => ({ comments: [ROOT], hasNext: false }),
 	});
 	await comments.load(POST_DETAIL);
@@ -918,6 +932,7 @@ test('未ログインでもコメントを受け付けていない作品では�
 	const comments = createComments({
 		doc: fakeDoc({ nextData: buildNextData({ isLoggedIn: false, token: '' }) }),
 		container,
+		strings: STRINGS,
 		fetchJson: async () => ({ comments: [ROOT], hasNext: false }),
 	});
 	await comments.load({ ...POST_DETAIL, commentOff: true });
@@ -1072,6 +1087,7 @@ test('未ログインでは返信ボタンを出さない', async () => {
 	const comments = createComments({
 		doc: fakeDoc({ nextData: buildNextData({ isLoggedIn: false, token: '' }) }),
 		container,
+		strings: STRINGS,
 		fetchJson: async () => ({ comments: [ROOT], hasNext: false }),
 	});
 	await comments.load(POST_DETAIL);
@@ -1158,22 +1174,22 @@ test('コメントを受け付けていない作品には一覧も入力欄も�
 
 test('コメントは削除できるかを持ち回る', () => {
 	// editable は一覧 API が付けてくる。自分のコメントと自分の作品のコメントで true (SITE_SPEC §4)
-	assert.equal(normalizeComment({ id: '1', comment: 'a', commentDate: '', editable: true }).editable, true);
-	assert.equal(normalizeComment({ id: '1', comment: 'a', commentDate: '' }).editable, false);
+	assert.equal(normalizeComment({ id: '1', comment: 'a', commentDate: '', editable: true }, STRINGS).editable, true);
+	assert.equal(normalizeComment({ id: '1', comment: 'a', commentDate: '' }, STRINGS).editable, false);
 });
 
 test('投稿者のラベルは自分が最優先', () => {
 	// 自分の作品に自分でコメントすると両方に当てはまる。pixiv 本体は「あなた」を出す (実測)
-	assert.equal(commentLabel({ userId: '99' }, '99', '99'), 'あなた');
-	assert.equal(commentLabel({ userId: '99' }, '99', '54734418'), 'あなた');
-	assert.equal(commentLabel({ userId: '54734418' }, '99', '54734418'), '作者');
-	assert.equal(commentLabel({ userId: '92064764' }, '99', '54734418'), null);
+	assert.equal(commentLabel({ userId: '99' }, '99', '99', STRINGS), 'あなた');
+	assert.equal(commentLabel({ userId: '99' }, '99', '54734418', STRINGS), 'あなた');
+	assert.equal(commentLabel({ userId: '54734418' }, '99', '54734418', STRINGS), '作者');
+	assert.equal(commentLabel({ userId: '92064764' }, '99', '54734418', STRINGS), null);
 });
 
 test('ラベルは ID が欠けていたら出さない', () => {
 	// 空文字どうしが一致して、無関係なコメントに「あなた」が付くのを防ぐ
-	assert.equal(commentLabel({ userId: '' }, '', ''), null);
-	assert.equal(commentLabel({ userId: '99' }, null, null), null);
+	assert.equal(commentLabel({ userId: '' }, '', '', STRINGS), null);
+	assert.equal(commentLabel({ userId: '99' }, null, null, STRINGS), null);
 });
 
 test('自分のコメントには「あなた」、作者には「作者」が名前の後ろに付く', async () => {
@@ -1453,4 +1469,16 @@ test('「あなた」のラベルだけ印を付けて色を分ける', async ()
 	assert.deepEqual(labels.map((one) => one.textContent), ['あなた', '作者']);
 	assert.equal(labels[0].classList.contains('is-self'), true);
 	assert.equal(labels[1].classList.contains('is-self'), false);
+});
+
+test('英語のカタログでコメント欄の文言が英語になる', async () => {
+	const container = fakeElement('div');
+	const comments = createComments({
+		doc: loggedInDoc(),
+		container,
+		strings: createStrings('en'),
+		fetchJson: async () => ({ comments: [], hasNext: false }),
+	});
+	await comments.load({ ...DETAIL, commentCount: 0 });
+	assert.equal(find(container, '.status').textContent, 'No comments yet');
 });

@@ -17,55 +17,6 @@ import { readSession, clearSessionCache } from '../session.js';
 import { COMMENT_PAGE_SIZE, KEYS } from '../../common/constants.js';
 import { warn } from '../../common/log.js';
 
-/** 画面に出す文言。 */
-const MESSAGES = Object.freeze({
-	/** 見出し */
-	HEADING: 'コメント',
-	/** 続きを読むボタン */
-	MORE: 'もっと見る',
-	/** 読み込みに失敗したあとのボタン。押すと同じ位置から読み直す */
-	RETRY: '再試行',
-	/** 退会したユーザーの表示名 */
-	DELETED_USER: '退会したユーザー',
-	/** スタンプコメントの本文の代わり (画像が出せないとき) */
-	STAMP_PLACEHOLDER: '[スタンプ]',
-	/** スタンプ画像の alt */
-	STAMP_ALT: 'スタンプ',
-	/** 返信の開閉ボタン */
-	REPLIES_SHOW: '返信を表示',
-	REPLIES_HIDE: '返信を隠す',
-	/** 返信の続きを読むボタン */
-	REPLY_MORE: '返信をもっと見る',
-	REPLY_FAILED: '返信を読み込めませんでした',
-	LOAD_FAILED: 'コメントを読み込めませんでした',
-	COMMENT_OFF: 'この作品はコメントを受け付けていません',
-	EMPTY: 'まだコメントはありません',
-	/** 見出しの右端のボタン。サイドバーの先頭 (投稿文) へ戻す */
-	TO_TOP: '上部へ',
-	/** 投稿の入力欄 */
-	COMMENT_PLACEHOLDER: 'コメントする',
-	REPLY_PLACEHOLDER: '返信する',
-	REPLY: '返信',
-	/** 未ログイン */
-	SIGN_IN: 'ログインするとコメントできます',
-	/** 投稿の失敗 */
-	POST_FAILED: 'コメントを投稿できませんでした',
-	SESSION_EXPIRED: 'ログインが切れています。pixiv にログインし直し、このページを再読み込みしてください',
-	/** 削除。取り消せないので押すと一度聞き返す */
-	DELETE: '削除',
-	DELETE_CONFIRM: '本当に削除？',
-	DELETE_FAILED: 'コメントを削除できませんでした',
-});
-
-/**
- * 投稿者に付けるラベルの文言。
- * pixiv 本体と同じく名前の直後に出す。(SITE_SPEC §4)
- */
-const LABELS = Object.freeze({
-	SELF: 'あなた',
-	AUTHOR: '作者',
-});
-
 /** 件数を数え直すときに付ける、キャッシュを外すためのパラメータ名。 */
 const CACHE_BUSTER = '_';
 
@@ -134,14 +85,15 @@ export function commentsFloorHeight({ outside, contentHeight, nthBottom }) {
 /**
  * コメントを共通の形にする。
  * @param {object} raw comments/roots の 1 件
+ * @param {object} strings 文言のカタログ (src/i18n)
  * @returns {Comment} 正規化したコメント
  */
-export function normalizeComment(raw) {
+export function normalizeComment(raw, strings) {
 	const isStamp = Boolean(raw.stampId);
 	return {
 		id: raw.id,
 		userId: raw.userId ?? '',
-		userName: raw.isDeletedUser ? MESSAGES.DELETED_USER : (raw.userName ?? MESSAGES.DELETED_USER),
+		userName: raw.isDeletedUser ? strings.comments.DELETED_USER : (raw.userName ?? strings.comments.DELETED_USER),
 		avatarUrl: raw.img ?? '',
 		// スタンプのときは本文が空で届く。文字に置き換えず、描画側で画像にする
 		text: raw.comment ?? '',
@@ -164,13 +116,14 @@ export function normalizeComment(raw) {
  * @param {{userId: string}} comment コメント
  * @param {string|null|undefined} selfId 自分のユーザー ID
  * @param {string|null|undefined} authorId 作品の作者のユーザー ID
+ * @param {object} strings 文言のカタログ (src/i18n)
  * @returns {string|null} ラベルの文言。付けないなら null
  */
-export function commentLabel(comment, selfId, authorId) {
+export function commentLabel(comment, selfId, authorId, strings) {
 	const userId = comment.userId;
 	if (!userId) return null;
-	if (selfId && userId === selfId) return LABELS.SELF;
-	if (authorId && userId === authorId) return LABELS.AUTHOR;
+	if (selfId && userId === selfId) return strings.comments.roles.SELF;
+	if (authorId && userId === authorId) return strings.comments.roles.AUTHOR;
 	return null;
 }
 
@@ -210,20 +163,21 @@ export function renderCommentText(doc, text) {
  * スタンプを描画用のノードにする。
  * @param {Document} doc document
  * @param {string|null} stampId スタンプ ID
+ * @param {object} strings 文言のカタログ (src/i18n)
  * @returns {Node} 画像。URL を組み立てられなければ文字
  */
-export function renderStamp(doc, stampId) {
+export function renderStamp(doc, stampId, strings) {
 	const url = stampUrl(stampId);
 	if (!url) {
 		const fallback = doc.createElement('span');
-		fallback.textContent = MESSAGES.STAMP_PLACEHOLDER;
+		fallback.textContent = strings.comments.STAMP_PLACEHOLDER;
 		return fallback;
 	}
 	const image = doc.createElement('img');
 	image.className = 'comment-stamp';
 	image.setAttribute('src', url);
-	image.setAttribute('alt', MESSAGES.STAMP_ALT);
-	image.addEventListener('error', () => { image.replaceWith(doc.createTextNode(MESSAGES.STAMP_PLACEHOLDER)); });
+	image.setAttribute('alt', strings.comments.STAMP_ALT);
+	image.addEventListener('error', () => { image.replaceWith(doc.createTextNode(strings.comments.STAMP_PLACEHOLDER)); });
 	return image;
 }
 
@@ -231,6 +185,7 @@ export function renderStamp(doc, stampId) {
  * @typedef {object} CommentsDeps
  * @property {Document} doc
  * @property {HTMLElement} container 描画先
+ * @property {object} strings 文言のカタログ (src/i18n)
  * @property {HTMLElement} [scrollTarget] 「上部へ」で先頭に戻す相手 (.sidebar)。無ければボタンを出さない
  * @property {(url: string) => Promise<object>} [fetchJson] 取得の差し替え。テストから通信させないために使う
  * @property {{postComment?: Function, postStamp?: Function, deleteComment?: Function}} [actions] 更新系の差し替え。テストから通信させないために使う
@@ -244,7 +199,7 @@ export function renderStamp(doc, stampId) {
  * @returns {{load: (detail: object) => Promise<void>, consumeKey: (event: KeyboardEvent) => boolean, dispose: () => void}}
  */
 export function createComments(deps) {
-	const { doc, container } = deps;
+	const { doc, container, strings } = deps;
 	// コメント主のリンクは pixiv 本体のページを指すので、今の表示言語の接頭辞 (/en) を付ける
 	const localePrefix = deps.localePrefix ?? currentLocalePrefix(doc);
 	const scrollTarget = deps.scrollTarget ?? null;
@@ -397,7 +352,7 @@ export function createComments(deps) {
 		// 「上部へ」を右端へ寄せるため、見出しの文字も要素に入れる
 		const title = doc.createElement('span');
 		title.className = 'comments-heading-text';
-		title.textContent = MESSAGES.HEADING;
+		title.textContent = strings.comments.HEADING;
 		heading.appendChild(title);
 
 		if (scrollTarget) {
@@ -407,7 +362,7 @@ export function createComments(deps) {
 			// 文言が見えているので title は付けない (同じ文字が重なるだけ)
 			toTopButton.appendChild(createIcon(doc, 'expandLess'));
 			const text = doc.createElement('span');
-			text.textContent = MESSAGES.TO_TOP;
+			text.textContent = strings.comments.TO_TOP;
 			toTopButton.appendChild(text);
 			toTopButton.hidden = true;
 			toTopButton.addEventListener('click', scrollToTop);
@@ -434,10 +389,10 @@ export function createComments(deps) {
 	 * @param {string} [fallback] 401 以外で出す文言。省略すると投稿の失敗
 	 * @returns {string} 出す文言
 	 */
-	function postErrorMessage(error, fallback = MESSAGES.POST_FAILED) {
+	function postErrorMessage(error, fallback = strings.comments.POST_FAILED) {
 		if (error?.kind === PIXIV_ERROR_KINDS.UNAUTHORIZED) {
 			clearSessionCache();
-			return MESSAGES.SESSION_EXPIRED;
+			return strings.comments.SESSION_EXPIRED;
 		}
 		return fallback;
 	}
@@ -452,12 +407,13 @@ export function createComments(deps) {
 	 * @returns {object} 入力欄
 	 */
 	function buildForm(options) {
-		picker ??= createCommentPicker({ doc });
+		picker ??= createCommentPicker({ doc, strings });
 		const form = createCommentForm({
 			doc,
 			placeholder: options.placeholder,
 			avatarUrl: options.avatarUrl,
 			picker,
+			strings,
 			errorMessage: postErrorMessage,
 			onSubmit: async (value) => {
 				const requestedWorkId = workId;
@@ -496,7 +452,7 @@ export function createComments(deps) {
 		header.appendChild(createHeading());
 		if (canPost) {
 			const form = buildForm({
-				placeholder: MESSAGES.COMMENT_PLACEHOLDER,
+				placeholder: strings.comments.COMMENT_PLACEHOLDER,
 				parentId: null,
 				avatarUrl: null,
 				onPosted: (posted) => { prependComment(posted); },
@@ -507,7 +463,7 @@ export function createComments(deps) {
 			// 伝えるので、両方出して二重に断らない
 			const signIn = doc.createElement('p');
 			signIn.className = 'status';
-			signIn.textContent = MESSAGES.SIGN_IN;
+			signIn.textContent = strings.comments.SIGN_IN;
 			header.appendChild(signIn);
 		}
 		// 入力欄の高さも下限に効く。入れ物ごと見張る
@@ -555,18 +511,18 @@ export function createComments(deps) {
 		name.textContent = comment.userName;
 
 		// 名前の直後にラベルを置く。(pixiv 本体と同じ並び) 付かないコメントには要素ごと作らない
-		const label = commentLabel(comment, readSession(doc).self?.id ?? null, detailRef?.userId ?? null);
+		const label = commentLabel(comment, readSession(doc).self?.id ?? null, detailRef?.userId ?? null, strings);
 		let labelNode = null;
 		if (label) {
 			labelNode = doc.createElement('span');
 			// 本体は「あなた」だけ地を緑にしている。色の出し分けは CSS に任せ、印だけ付ける
-			labelNode.className = label === LABELS.SELF ? 'comment-label is-self' : 'comment-label';
+			labelNode.className = label === strings.comments.roles.SELF ? 'comment-label is-self' : 'comment-label';
 			labelNode.textContent = label;
 		}
 
 		const text = doc.createElement('p');
 		text.className = 'comment-text';
-		if (comment.isStamp) text.appendChild(renderStamp(doc, comment.stampId));
+		if (comment.isStamp) text.appendChild(renderStamp(doc, comment.stampId, strings));
 		else text.append(...renderCommentText(doc, comment.text));
 
 		// 下段は「返信を書く導線が左端、返信を読む導線がその隣、日時が右端」で揃える。
@@ -614,7 +570,7 @@ export function createComments(deps) {
 		const button = doc.createElement('button');
 		button.type = 'button';
 		button.className = 'comment-delete';
-		button.textContent = MESSAGES.DELETE;
+		button.textContent = strings.comments.DELETE;
 
 		/**
 		 * 聞き返しの見た目を切り替える。
@@ -623,7 +579,7 @@ export function createComments(deps) {
 		 */
 		function setConfirming(next) {
 			confirming = next;
-			button.textContent = next ? MESSAGES.DELETE_CONFIRM : MESSAGES.DELETE;
+			button.textContent = next ? strings.comments.DELETE_CONFIRM : strings.comments.DELETE;
 			button.classList.toggle('is-confirming', next);
 			// 聞き返しは同時に 1 つだけ。Escape で畳めるよう外から掴めるようにしておく
 			if (next) {
@@ -650,7 +606,7 @@ export function createComments(deps) {
 			failureNode = doc.createElement('p');
 			failureNode.className = 'comment-error';
 			failureNode.setAttribute('role', 'alert');
-			failureNode.textContent = postErrorMessage(error, MESSAGES.DELETE_FAILED);
+			failureNode.textContent = postErrorMessage(error, strings.comments.DELETE_FAILED);
 			body.appendChild(failureNode);
 			warn('failed to delete comment', comment.id, error);
 		}
@@ -750,7 +706,7 @@ export function createComments(deps) {
 		function setOpen(next) {
 			open = next;
 			toggle.setAttribute('aria-expanded', String(next));
-			toggleText.textContent = next ? MESSAGES.REPLIES_HIDE : MESSAGES.REPLIES_SHOW;
+			toggleText.textContent = next ? strings.comments.REPLIES_HIDE : strings.comments.REPLIES_SHOW;
 			toggleMark.textContent = '';
 			toggleMark.appendChild(createIcon(doc, next ? 'expandLess' : 'expandMore'));
 		}
@@ -777,7 +733,7 @@ export function createComments(deps) {
 			replyError = doc.createElement('p');
 			replyError.className = 'reply-error';
 			replyError.setAttribute('role', 'alert');
-			replyError.textContent = MESSAGES.REPLY_FAILED;
+			replyError.textContent = strings.comments.REPLY_FAILED;
 			body.appendChild(replyError);
 			warn('failed to load replies', comment.id, error);
 		}
@@ -809,7 +765,7 @@ export function createComments(deps) {
 					body.appendChild(area);
 				}
 				for (const raw of responseBody?.comments ?? []) {
-					replyList.appendChild(createItem(normalizeComment(raw)).item);
+					replyList.appendChild(createItem(normalizeComment(raw, strings)).item);
 				}
 				page += 1;
 				if (responseBody?.hasNext === true) {
@@ -821,7 +777,7 @@ export function createComments(deps) {
 						area.appendChild(replyMore);
 					}
 					// 再試行から読み直せたら文言を戻す
-					replyMore.textContent = MESSAGES.REPLY_MORE;
+					replyMore.textContent = strings.comments.REPLY_MORE;
 				} else {
 					replyMore?.remove();
 					replyMore = null;
@@ -833,7 +789,7 @@ export function createComments(deps) {
 					setOpen(false);
 				} else if (replyMore) {
 					// 続きだけが取れなかった。見えている返信は残し、ボタンを再試行に替える
-					replyMore.textContent = MESSAGES.RETRY;
+					replyMore.textContent = strings.comments.RETRY;
 				}
 				showFailure(error);
 			} finally {
@@ -898,7 +854,7 @@ export function createComments(deps) {
 		const toggle = doc.createElement('button');
 		toggle.type = 'button';
 		toggle.className = 'comment-reply-toggle';
-		toggle.textContent = MESSAGES.REPLY;
+		toggle.textContent = strings.comments.REPLY;
 		toggle.setAttribute('aria-expanded', 'false');
 		toggle.addEventListener('click', () => {
 			if (form) {
@@ -913,7 +869,7 @@ export function createComments(deps) {
 				return;
 			}
 			form = buildForm({
-				placeholder: MESSAGES.REPLY_PLACEHOLDER,
+				placeholder: strings.comments.REPLY_PLACEHOLDER,
 				parentId: comment.id,
 				avatarUrl: readSession(doc).self?.profileImg ?? null,
 				onPosted: (posted) => { onReplied(posted); },
@@ -958,7 +914,7 @@ export function createComments(deps) {
 		return {
 			id: posted.id,
 			userId: posted.userId || self?.id || '',
-			userName: posted.userName || self?.name || MESSAGES.DELETED_USER,
+			userName: posted.userName || self?.name || strings.comments.DELETED_USER,
 			avatarUrl: self?.profileImg ?? '',
 			text: posted.text,
 			date: formatPostedDate(new Date()),
@@ -1001,7 +957,7 @@ export function createComments(deps) {
 		if (emptyEl) return;
 		emptyEl = doc.createElement('p');
 		emptyEl.className = 'status';
-		emptyEl.textContent = MESSAGES.EMPTY;
+		emptyEl.textContent = strings.comments.EMPTY;
 		container.appendChild(emptyEl);
 		watchSize(emptyEl);
 	}
@@ -1053,7 +1009,7 @@ export function createComments(deps) {
 		moreButton = doc.createElement('button');
 		moreButton.type = 'button';
 		moreButton.className = 'more';
-		moreButton.textContent = MESSAGES.MORE;
+		moreButton.textContent = strings.comments.MORE;
 		// 続きがあるかは読んでみるまで分からない。loadMore() が出す
 		moreButton.hidden = true;
 		moreButton.addEventListener('click', () => { void loadMore(); });
@@ -1078,7 +1034,7 @@ export function createComments(deps) {
 			const body = await fetchJson(commentRootsUrl(requestedWorkId, offset, COMMENT_PAGE_SIZE));
 			// 待っている間に破棄されたか、別の作品へ移ったか、描き直されていたら捨てる
 			if (workId !== requestedWorkId || !list || list !== requestedList) return;
-			const comments = (body?.comments ?? []).map(normalizeComment);
+			const comments = (body?.comments ?? []).map((raw) => normalizeComment(raw, strings));
 			for (const comment of comments) {
 				list.appendChild(createRootItem(comment));
 			}
@@ -1086,7 +1042,7 @@ export function createComments(deps) {
 			failure?.remove();
 			failure = null;
 			if (moreButton) {
-				moreButton.textContent = MESSAGES.MORE;
+				moreButton.textContent = strings.comments.MORE;
 				moreButton.hidden = body?.hasNext !== true;
 				moreButton.disabled = false;
 			}
@@ -1102,11 +1058,11 @@ export function createComments(deps) {
 			failure.className = 'status';
 			failure.dataset.kind = 'error';
 			failure.setAttribute('role', 'alert');
-			failure.textContent = MESSAGES.LOAD_FAILED;
+			failure.textContent = strings.comments.LOAD_FAILED;
 			container.appendChild(failure);
 			watchSize(failure);
 			if (moreButton) {
-				moreButton.textContent = MESSAGES.RETRY;
+				moreButton.textContent = strings.comments.RETRY;
 				moreButton.hidden = false;
 				moreButton.disabled = false;
 			}
@@ -1159,7 +1115,7 @@ export function createComments(deps) {
 			if (detail.commentOff) {
 				const off = doc.createElement('p');
 				off.className = 'status';
-				off.textContent = MESSAGES.COMMENT_OFF;
+				off.textContent = strings.comments.COMMENT_OFF;
 				container.appendChild(off);
 				watchSize(off);
 				applyFloor();

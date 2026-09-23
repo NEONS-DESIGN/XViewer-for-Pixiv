@@ -11,20 +11,6 @@ import { stampIds } from '../../pixiv/stamps.js';
 import { activeElementIn, hasFocusWithin } from './focus.js';
 import { KEYS } from '../../common/constants.js';
 
-/** 画面に出す文言。 */
-const MESSAGES = Object.freeze({
-	EMOJI: '絵文字',
-	STAMP: 'スタンプ',
-	/** パネル自体の説明。可視の見出しを持たないので付ける */
-	PANEL: '絵文字とスタンプ',
-});
-
-/** タブの種別。 */
-const TABS = Object.freeze([
-	{ key: 'emoji', label: MESSAGES.EMOJI },
-	{ key: 'stamp', label: MESSAGES.STAMP },
-]);
-
 /**
  * タブを移るキー。選ばれていないタブは Tab の巡回から外してあるので、
  * これが無いとキーボードではスタンプのタブへ辿り着けない。(UI_DESIGN_KIT §4.3)
@@ -56,11 +42,16 @@ const CLIPPING_OVERFLOW = Object.freeze(['auto', 'scroll', 'hidden', 'clip']);
 
 /**
  * ピッカーを作る。
- * @param {{doc: Document}} deps 依存
+ * @param {{doc: Document, strings: object}} deps 依存。strings は文言のカタログ (src/i18n)
  * @returns {{open: Function, close: () => void, isOpen: () => boolean, consumeKey: (event: KeyboardEvent) => boolean, dispose: () => void}} ピッカー
  */
 export function createCommentPicker(deps) {
-	const { doc } = deps;
+	const { doc, strings } = deps;
+	/** タブの種別。 */
+	const TABS = Object.freeze([
+		{ key: 'emoji', label: strings.commentPicker.EMOJI },
+		{ key: 'stamp', label: strings.commentPicker.STAMP },
+	]);
 	/** @type {HTMLElement|null} パネル本体。最初に開いたときに作って使い回す */
 	let panel = null;
 	/** @type {HTMLElement|null} 項目を並べる場所 */
@@ -121,7 +112,7 @@ export function createCommentPicker(deps) {
 			return;
 		}
 		for (const id of stampIds()) {
-			grid.appendChild(createItem('is-stamp', `${MESSAGES.STAMP} ${id}`, stampUrl(id), id, () => {
+			grid.appendChild(createItem('is-stamp', `${strings.commentPicker.STAMP} ${id}`, stampUrl(id), id, () => {
 				handlers?.onStamp(id);
 				close();
 			}));
@@ -187,7 +178,7 @@ export function createCommentPicker(deps) {
 		const element = doc.createElement('div');
 		element.className = 'comment-picker';
 		element.setAttribute('role', 'dialog');
-		element.setAttribute('aria-label', MESSAGES.PANEL);
+		element.setAttribute('aria-label', strings.commentPicker.PANEL);
 
 		const tablist = doc.createElement('div');
 		tablist.className = 'comment-picker-tabs';
