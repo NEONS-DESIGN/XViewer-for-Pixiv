@@ -94,3 +94,25 @@ test('dispose で購読を解除する', () => {
 	router.dispose();
 	assert.equal(win.hasListener('popstate'), false);
 });
+
+test('英語表示では /en を保ったまま履歴を積む', () => {
+	// 接頭辞を落とすと、モーダルを閉じた後やリロードで日本語ページに飛ぶ
+	const win = fakeWindow('/en/users/1/artworks');
+	const router = createRouter(() => {}, { window: win });
+	router.open('149425016');
+	assert.deepEqual(win.calls[0], ['push', '/en/artworks/149425016']);
+	// 開いている間の URL も /en 付きなので、作品を移っても接頭辞は残る
+	router.replace('149485890');
+	assert.deepEqual(win.calls[1], ['replace', '/en/artworks/149485890']);
+});
+
+test('英語表示でも popstate から作品 ID を読める', () => {
+	const win = fakeWindow('/en/users/1/artworks');
+	const seen = [];
+	createRouter((id) => seen.push(id), { window: win });
+	win.location.pathname = '/en/artworks/1';
+	win.fire('popstate');
+	win.location.pathname = '/en/users/1/artworks';
+	win.fire('popstate');
+	assert.deepEqual(seen, ['1', null]);
+});

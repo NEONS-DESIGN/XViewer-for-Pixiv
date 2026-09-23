@@ -172,3 +172,33 @@ test('parsePageParam は 10 進の数字以外を 1 に倒す', () => {
 	assert.equal(parsePageParam('?p=3%20'), 1);
 	assert.equal(parsePageParam('?p=1_000'), 1);
 });
+
+test('英語表示 (/en 付き) のユーザーページも認識する', () => {
+	// 表示言語を英語にすると pixiv は全てのパスの先頭へ /en を挟む。(SITE_SPEC §3 実測)
+	// ここを落として判定しないと、拡張がそもそも起動しない
+	const works = { userId: '54734418', isWorksGrid: true, isTagFiltered: false, category: null };
+	assert.deepEqual(parseUserPage('/en/users/54734418'), works);
+	assert.deepEqual(parseUserPage('/en/users/54734418/artworks'), works);
+	assert.deepEqual(parseUserPage('/en/users/54734418/illustrations'), { ...works, category: WORK_CATEGORY.ILLUST });
+	assert.deepEqual(parseUserPage('/en/users/54734418/manga'), { ...works, category: WORK_CATEGORY.MANGA });
+	assert.deepEqual(parseUserPage('/en/users/54734418/bookmarks/artworks'),
+		{ userId: '54734418', isWorksGrid: false, isTagFiltered: false, category: null });
+	assert.deepEqual(parseUserPage('/en/users/54734418/artworks/%E3%82%AA%E3%83%AA%E3%82%B8%E3%83%8A%E3%83%AB'),
+		{ ...works, isTagFiltered: true });
+});
+
+test('英語表示でも作品パス・ホーム・無限スクロールの判定が効く', () => {
+	assert.equal(parseArtworkPath('/en/artworks/149425016'), '149425016');
+	assert.equal(parseArtworkPath('/en/users/54734418/artworks/オリジナル'), null);
+	assert.equal(isViewerTarget('/en/users/54734418'), true);
+	assert.equal(isProfileHome('/en/users/54734418'), true);
+	assert.equal(isProfileHome('/en/users/54734418/artworks'), false);
+	assert.equal(isInfiniteScrollTarget('/en/users/54734418/illustrations'), true);
+	assert.equal(isInfiniteScrollTarget('/en/users/54734418'), false);
+});
+
+test('表示言語が違っても同じページなら同じキーになる', () => {
+	// 言語でキーが変わると、同じ画面のままで購読を組み直したことになってしまう
+	assert.equal(pageKey('/en/users/54734418'), pageKey('/users/54734418'));
+	assert.equal(pageKey('/en/ranking.php'), pageKey('/ranking.php'));
+});

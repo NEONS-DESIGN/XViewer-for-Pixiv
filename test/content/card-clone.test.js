@@ -4,7 +4,7 @@ import {
 	captureTemplates, findBadge, findOverlayLabels, buildCard, paintHeart, heartPaths, hexToRgb, isBookmarkedFill,
 } from '../../src/content/card-clone.js';
 import {
-	XV_CARD_ATTR, XV_BOOKMARK_ID_ATTR, BOOKMARKED_FILL, TAB_SKIP_MARK_ATTR, TAB_SKIP_LABEL_ATTR,
+	XV_CARD_ATTR, XV_BOOKMARK_ID_ATTR, BOOKMARKED_FILL, TAB_SKIP_MARK_ATTR, TAB_SKIP_LABEL_ATTR, ARTWORK_LINK_SELECTOR,
 } from '../../src/common/constants.js';
 import { el, makeCard, makeGrid, fakeComputedStyle } from '../helpers/card.js';
 
@@ -372,4 +372,15 @@ test('findOverlayLabels はバッジも画像もラベルとして拾わない',
 	assert.deepEqual(findOverlayLabels(withAll).map((node) => node.textContent), ['R-18']);
 	// ラベルの無いカードでは 1 つも拾わない (空のオーバーレイ層や img を掴まない)
 	assert.deepEqual(findOverlayLabels(makeCard({ id: '2', pages: 2 })), []);
+});
+
+test('英語表示では href に /en を付ける', () => {
+	// 雛形は pixiv 本体のカード (/en/artworks/...)。継ぎ足したカードだけ日本語ページへ飛ばさない
+	const templates = capture([makeCard({ id: '1', userId: '9', localePrefix: '/en' })]);
+	const card = buildCard(templates, work(), { loggedIn: true, localePrefix: '/en' });
+	const links = card.querySelectorAll(ARTWORK_LINK_SELECTOR);
+	assert.ok(links.length > 0, '作品リンクを 1 本も掴めていない');
+	for (const link of links) {
+		assert.equal(link.getAttribute('href'), '/en/artworks/777');
+	}
 });

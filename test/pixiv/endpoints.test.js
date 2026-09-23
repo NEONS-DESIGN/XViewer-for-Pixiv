@@ -13,6 +13,9 @@ import {
 	emojiUrl,
 	stampUrl,
 	ACTION_URLS,
+	artworkPath,
+	userPath,
+	tagWorksPath,
 } from '../../src/pixiv/endpoints.js';
 import { WORK_CATEGORY } from '../../src/common/constants.js';
 
@@ -141,4 +144,15 @@ test('コメント投稿は旧 RPC のパス', () => {
 test('コメント削除も旧 RPC のパス', () => {
 	// 投稿とは別のパス。/ajax でも /rpc/ 配下でもなくルート直下 (SITE_SPEC §4 実測)
 	assert.equal(ACTION_URLS.DELETE_COMMENT, '/rpc_delete_comment.php');
+});
+
+test('ページのパスは表示言語の接頭辞を付けられる', () => {
+	// 英語表示のとき /en を付けないと、モーダルを開いた URL もサイドバーのリンクも
+	// 日本語ページを指し、リロードやリンク遷移で表示言語が勝手に戻る
+	assert.equal(artworkPath('149425016'), '/artworks/149425016');
+	assert.equal(artworkPath('149425016', '/en'), '/en/artworks/149425016');
+	assert.equal(userPath('54734418'), '/users/54734418');
+	assert.equal(userPath('54734418', '/en'), '/en/users/54734418');
+	assert.equal(tagWorksPath('オリジナル'), '/tags/%E3%82%AA%E3%83%AA%E3%82%B8%E3%83%8A%E3%83%AB/artworks');
+	assert.equal(tagWorksPath('オリジナル', '/en'), '/en/tags/%E3%82%AA%E3%83%AA%E3%82%B8%E3%83%8A%E3%83%AB/artworks');
 });

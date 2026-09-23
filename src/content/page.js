@@ -1,7 +1,12 @@
 /**
  * URL からページの種別を判定する。
  * DOM を触らない純粋関数だけを置く。判定を 1 か所に閉じ込めるのが目的。
+ *
+ * **パスを受け取る関数は必ず `stripLocale()` を最初に通す。**
+ * 表示言語が英語のとき pixiv のパスは `/en/users/11` の形になり、
+ * 接頭辞を落とさないと 1 つも当たらない。(SITE_SPEC §3 実測)
  */
+import { stripLocale } from '../common/locale.js';
 import {
 	USER_PATH_PATTERN,
 	PROFILE_HOME_PATH_PATTERN,
@@ -28,13 +33,14 @@ import {
  * @returns {UserPage|null} ユーザーページでなければ null
  */
 export function parseUserPage(pathname) {
-	const matched = USER_PATH_PATTERN.exec(pathname);
+	const path = stripLocale(pathname);
+	const matched = USER_PATH_PATTERN.exec(path);
 	if (!matched) return null;
-	const tab = USER_WORKS_CATEGORY_PATTERN.exec(pathname)?.[1];
+	const tab = USER_WORKS_CATEGORY_PATTERN.exec(path)?.[1];
 	return {
 		userId: matched[1],
-		isWorksGrid: USER_WORKS_PATH_PATTERN.test(pathname),
-		isTagFiltered: USER_TAG_PATH_PATTERN.test(pathname),
+		isWorksGrid: USER_WORKS_PATH_PATTERN.test(path),
+		isTagFiltered: USER_TAG_PATH_PATTERN.test(path),
 		category: tab ? WORK_CATEGORY_BY_TAB[tab] : null,
 	};
 }
@@ -46,7 +52,7 @@ export function parseUserPage(pathname) {
  * @returns {string|null} 作品 ID。作品パスでなければ null
  */
 export function parseArtworkPath(pathname) {
-	return ARTWORK_PATH_PATTERN.exec(pathname)?.[1] ?? null;
+	return ARTWORK_PATH_PATTERN.exec(stripLocale(pathname))?.[1] ?? null;
 }
 
 /**
@@ -66,8 +72,9 @@ export function parseArtworkPath(pathname) {
  */
 export function pageKey(pathname) {
 	const page = parseUserPage(pathname);
-	// ユーザーページとして読めないパスは、フォールバックとしてパスそのものを使う
-	if (!page) return pathname;
+	// ユーザーページとして読めないパスは、フォールバックとしてパスそのものを使う。
+	// 表示言語の接頭辞は落としてから使う。(同じページが言語違いで別のキーになるのを避ける)
+	if (!page) return stripLocale(pathname);
 	return [page.userId, page.isWorksGrid, page.isTagFiltered].join(PAGE_KEY_SEPARATOR);
 }
 
@@ -88,7 +95,7 @@ export function isViewerTarget(pathname) {
  * @returns {boolean} ホームタブなら true
  */
 export function isProfileHome(pathname) {
-	return PROFILE_HOME_PATH_PATTERN.test(pathname);
+	return PROFILE_HOME_PATH_PATTERN.test(stripLocale(pathname));
 }
 
 /**
@@ -98,7 +105,7 @@ export function isProfileHome(pathname) {
  * @returns {boolean} 対象なら true
  */
 export function isInfiniteScrollTarget(pathname) {
-	return USER_WORKS_TAB_PATH_PATTERN.test(pathname);
+	return USER_WORKS_TAB_PATH_PATTERN.test(stripLocale(pathname));
 }
 
 /** ページ番号として受ける形。10 進の数字だけ。 */

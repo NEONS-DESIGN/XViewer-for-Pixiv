@@ -245,3 +245,18 @@ test('attachGridListener の dispose でリスナーが外れる', () => {
 	doc.fire(fakeClick('/artworks/1'));
 	assert.deepEqual(opened, []);
 });
+
+test('英語表示 (/en 付き) の作品リンクからも ID を取り出す', () => {
+	assert.equal(workIdFromLink('/en/artworks/149425016', ORIGIN), '149425016');
+	assert.equal(workIdFromLink('https://www.pixiv.net/en/artworks/149425016', ORIGIN), '149425016');
+	// タグ絞り込みリンクは接頭辞が付いても作品リンクではない
+	assert.equal(workIdFromLink('/en/users/54734418/artworks/オリジナル', ORIGIN), null);
+});
+
+test('英語表示のグリッドからも作品 ID を集める', () => {
+	// 接頭辞を知らないままだとセレクタが 1 本も当たらず、並びが空になる
+	const cards = ['1', '2', '3'].map((id) => makeCard({ id, localePrefix: '/en' }));
+	const { ul } = makeGrid(cards);
+	assert.deepEqual(collectWorkIds(ul, ORIGIN), ['1', '2', '3']);
+	assert.equal(findGridList(ul.parent), ul);
+});

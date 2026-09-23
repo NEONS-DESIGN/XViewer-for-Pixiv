@@ -9,6 +9,7 @@
  * このモジュールだけをハッシュ方式へ差し替える。
  */
 import { parseArtworkPath } from './page.js';
+import { currentLocalePrefix } from '../common/locale.js';
 import { artworkPath } from '../pixiv/endpoints.js';
 
 /** 自分が積んだ履歴だと分かるようにする目印。 */
@@ -54,13 +55,21 @@ export function createRouter(onPopState, deps = {}) {
 	};
 	win.addEventListener('popstate', listener);
 
+	/**
+	 * 積む URL に付ける表示言語の接頭辞。
+	 * 積むたびに読み直すのは、モーダルを開いている間も接頭辞が保たれるため。
+	 * (開いている間の URL は `/en/artworks/{id}` なので、次に積む値も `/en` のままになる)
+	 * @returns {string} 接頭辞 (`/en` か空文字)
+	 */
+	const prefix = () => currentLocalePrefix(win);
+
 	return {
 		open(workId) {
 			closing = false;
-			win.history.pushState({ [HISTORY_STATE_KEY]: true }, '', artworkPath(workId));
+			win.history.pushState({ [HISTORY_STATE_KEY]: true }, '', artworkPath(workId, prefix()));
 		},
 		replace(workId) {
-			win.history.replaceState({ [HISTORY_STATE_KEY]: true }, '', artworkPath(workId));
+			win.history.replaceState({ [HISTORY_STATE_KEY]: true }, '', artworkPath(workId, prefix()));
 		},
 		close() {
 			if (closing) return;

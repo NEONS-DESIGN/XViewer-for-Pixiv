@@ -149,11 +149,22 @@ function descendants(root) {
 /**
  * タグ名と属性だけを見る簡易セレクタ。
  * 'a[href^="/artworks/"]' / '[data-ga4-label="bookmark_button"]' / 'li' / 'img' を解する。
+ * カンマ区切りの並びも解する。(ARTWORK_LINK_SELECTOR は表示言語の接頭辞ごとに 1 本ずつ並ぶ)
  * @param {object} node 要素
  * @param {string} selector セレクタ
  * @returns {boolean} 合えば true
  */
 function matches(node, selector) {
+	return selector.split(',').some((one) => matchesOne(node, one));
+}
+
+/**
+ * カンマを含まないセレクタ 1 本に合うか。
+ * @param {object} node 要素
+ * @param {string} selector セレクタ
+ * @returns {boolean} 合えば true
+ */
+function matchesOne(node, selector) {
 	const parsed = /^([a-z]*)(?:\[([\w-]+)(?:([~^$*]?=)"([^"]*)")?\])?$/.exec(selector.trim());
 	if (!parsed) return false;
 	const [, tag, name, op, value] = parsed;
@@ -170,15 +181,17 @@ function matches(node, selector) {
 /**
  * 作品カード 1 枚を組む。
  * @param {{id?: string, userId?: string, title?: string, pages?: number, loaded?: boolean,
- *   bookmarked?: boolean, tabSkipped?: boolean, heart?: boolean, label?: string|null}} [options] カードの内容。
+ *   bookmarked?: boolean, tabSkipped?: boolean, heart?: boolean, label?: string|null,
+ *   localePrefix?: string}} [options] カードの内容。
  *   heart: false でブックマークボタンごと落とす。(自分のユーザーページ。SITE_SPEC §4)
  *   label で公開範囲・年齢制限のラベル ('R-18' / '非公開') をオーバーレイ層に足す (SITE_SPEC §3)
+ *   localePrefix で href の先頭へ表示言語の接頭辞 ('/en') を付ける (SITE_SPEC §3)
  * @returns {object} li の代わり
  */
 export function makeCard(options = {}) {
 	const {
 		id = '100', userId = '9', title = '作品', pages = 1,
-		loaded = true, bookmarked = false, tabSkipped = true, heart = true, label = null,
+		loaded = true, bookmarked = false, tabSkipped = true, heart = true, label = null, localePrefix = '',
 	} = options;
 	const li = el('li');
 	const outer = li.appendChild(el('div'));
@@ -186,7 +199,7 @@ export function makeCard(options = {}) {
 	const sized = thumbBox.appendChild(el('div', { width: '184', height: '184' }));
 
 	const thumb = sized.appendChild(el('a', {
-		href: `/artworks/${id}`,
+		href: `${localePrefix}/artworks/${id}`,
 		'data-ga4-label': 'thumbnail_link',
 		'data-gtm-value': id,
 		'data-gtm-user-id': userId,
@@ -225,7 +238,7 @@ export function makeCard(options = {}) {
 		for (const fill of fills) svg.appendChild(el('path', { 'data-fill': fill }));
 	}
 
-	const titleLink = outer.appendChild(el('div')).appendChild(el('a', { href: `/artworks/${id}` }));
+	const titleLink = outer.appendChild(el('div')).appendChild(el('a', { href: `${localePrefix}/artworks/${id}` }));
 	titleLink.textContent = title;
 	return li;
 }

@@ -1,6 +1,6 @@
 {
 	"name": "xviewer_for_pixiv",
-	"version": "0.30.4",
+	"version": "0.30.5",
 	"private": true,
 	"type": "module",
 	"description": "pixiv のユーザーページに独自の画像ビュワーを追加する Chrome 拡張機能",
