@@ -82,7 +82,7 @@ The caption, tags, post date, counters and comments sit beside the image in a si
 | | |
 | --- | --- |
 | **Theme** | The viewer follows pixiv's own dark / light setting. The settings popup can be switched by hand |
-| **Settings apply as you change them** | Changes to image quality, prefetch and the sidebar reach the artwork already on screen |
+| **Fine-grained settings** | Viewer, image, user page and interaction settings let you tune image quality, prefetch, how the sidebar appears, infinite scroll and more |
 | **Accessibility** | A focus trap, `role="dialog"`, and a tidier tab order on the grid. Opening and closing works entirely from the keyboard |
 
 ## Requirements
@@ -145,8 +145,8 @@ While you are writing a comment, `←` `→` `↑` `↓` move the caret. (The wo
 
 ### Settings
 
-Open the popup from the toolbar icon. Every change is stored the moment you make it and reaches the
-page you have open straight away. The "license" tab carries the disclaimer and the notices for the
+Open the popup from the toolbar icon. The settings below are grouped into viewer, image, user page
+and interaction, so you can tune each part to suit you. The "license" tab carries the disclaimer and the notices for the
 bundled third-party assets.
 
 | Group | Setting | Default | Effect |
