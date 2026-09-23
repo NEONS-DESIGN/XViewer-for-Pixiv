@@ -113,6 +113,7 @@ export async function renderWork(detail, session, settings, targets) {
 				doc,
 				container: sidebarPane.commentsSlot(),
 				scrollTarget: sidebar,
+				strings,
 				onPosted: () => { sidebarPane.bumpCommentCount(1); },
 				// 削除は数え直した件数で置き換える。ルートを消すと返信も道連れになるので
 				// 手元で 1 を引くだけでは合わない。引けなかったときだけ 1 を引く
