@@ -231,7 +231,7 @@ export default {
 						description: `Loads ${count} images ahead. Smoother when browsing continuously.`,
 					}),
 			},
-			clickToZoom: {
+			clickZoom: {
 				label: 'Click to view at actual size',
 				description: 'Clicking the image opens it at actual size, filling the screen. (The same as a pixiv artwork page) Click the left or right edge or press the arrow keys to turn the page, and click again or press Esc to go back. This loads original-size images regardless of the resolution set above.',
 			},
