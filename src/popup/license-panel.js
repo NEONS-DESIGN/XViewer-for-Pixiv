@@ -1,10 +1,10 @@
 /**
  * ライセンスタブと、設定タブの末尾に残す非公式の断り。
- * 文言の出どころは `common/licenses.js` と `sections.js`。ここでは並べるだけにする。(SPEC §11.1.1)
+ * 言語に依らない値の出どころは `common/licenses.js`、文言の出どころは `strings` (src/i18n)。
+ * ここでは並べるだけにする。(SPEC §11.1.1)
  */
-import { DISCLAIMER, PROJECT_LICENSE, THIRD_PARTY } from '../common/licenses.js';
+import { PROJECT_LICENSE, THIRD_PARTY } from '../common/licenses.js';
 import { createDescription } from './description.js';
-import { LICENSE_HEADINGS } from './sections.js';
 
 /**
  * 外部サイトへのリンクを組み立てる。
@@ -27,13 +27,14 @@ function createExternalLink(doc, url) {
  * 本文はライセンスタブにあるが、タブを切り替えない利用者にも
  * 非公式であることだけは届かせる。
  * @param {Document} doc 対象のドキュメント
+ * @param {object} strings 文言のカタログ
  * @returns {HTMLElement} 1 行
  */
-export function renderBriefDisclaimer(doc) {
+export function renderBriefDisclaimer(doc, strings) {
 	const note = doc.createElement('p');
 	note.className = 'disclaimer-brief';
 	note.dataset.role = 'disclaimer-brief';
-	note.textContent = DISCLAIMER.brief;
+	note.textContent = strings.licenses.disclaimer.brief;
 	return note;
 }
 
@@ -53,16 +54,18 @@ function heading(doc, tag, text) {
 /**
  * ライセンスタブの中身を組み立てる。
  * @param {Document} doc 対象のドキュメント
+ * @param {object} strings 文言のカタログ
  * @returns {HTMLElement} パネル
  */
-export function renderLicensePanel(doc) {
+export function renderLicensePanel(doc, strings) {
 	const panel = doc.createElement('div');
 	panel.className = 'panel license';
+	const headings = strings.popup.licenseHeadings;
 
 	const disclaimer = doc.createElement('div');
 	disclaimer.className = 'disclaimer';
 	disclaimer.dataset.role = 'disclaimer';
-	for (const line of DISCLAIMER.body) {
+	for (const line of strings.licenses.disclaimer.body) {
 		const paragraph = doc.createElement('p');
 		paragraph.textContent = line;
 		disclaimer.append(paragraph);
@@ -73,11 +76,11 @@ export function renderLicensePanel(doc) {
 	project.textContent = `${PROJECT_LICENSE.name} / ${PROJECT_LICENSE.copyright}`;
 
 	panel.append(
-		heading(doc, 'h2', LICENSE_HEADINGS.disclaimer),
+		heading(doc, 'h2', headings.disclaimer),
 		disclaimer,
-		heading(doc, 'h2', LICENSE_HEADINGS.project),
+		heading(doc, 'h2', headings.project),
 		project,
-		heading(doc, 'h2', LICENSE_HEADINGS.thirdParty),
+		heading(doc, 'h2', headings.thirdParty),
 	);
 
 	for (const item of THIRD_PARTY) {
@@ -91,7 +94,7 @@ export function renderLicensePanel(doc) {
 		source.className = 'license-url';
 		source.append(createExternalLink(doc, item.url));
 
-		entry.append(heading(doc, 'h3', item.name), terms, createDescription(doc, item.note), source);
+		entry.append(heading(doc, 'h3', item.name), terms, createDescription(doc, strings.licenses.notes[item.name]), source);
 		panel.append(entry);
 	}
 

@@ -12,7 +12,7 @@ import { renderConfirmRow } from '../common/confirm-row.js';
 import { POPUP_THEMES, THEME_TOGGLE, SETTINGS_DEFAULTS } from '../common/constants.js';
 import { createDescription } from './description.js';
 import { renderLicensePanel, renderBriefDisclaimer } from './license-panel.js';
-import { TITLE, TABS, TABS_LABEL, RESET_FIELD, SECTIONS } from './sections.js';
+import { TITLE, createTabs, createResetField, createSections } from './sections.js';
 
 /** OS の配色を尋ねるメディアクエリ。 */
 const LIGHT_QUERY = '(prefers-color-scheme: light)';
@@ -58,9 +58,10 @@ function descriptionId(key) {
  * @param {Document} doc 対象のドキュメント
  * @param {string} initial 解決済みの配色
  * @param {(patch: object) => void} onChange 変更時の処理
+ * @param {object} strings 文言のカタログ
  * @returns {HTMLElement} 見出しの行
  */
-function renderHeader(doc, initial, onChange) {
+function renderHeader(doc, initial, onChange, strings) {
 	const header = doc.createElement('header');
 	header.className = 'header';
 
@@ -79,7 +80,8 @@ function renderHeader(doc, initial, onChange) {
 	 * @returns {void}
 	 */
 	function updateButton() {
-		const { icon, label } = THEME_TOGGLE[theme];
+		const { icon, labelKey } = THEME_TOGGLE[theme];
+		const label = strings.theme[labelKey];
 		button.replaceChildren(createIcon(doc, icon));
 		button.setAttribute('aria-label', label);
 		// アイコンのみのボタンなので、マウスでも意味が分かるよう title も添える
@@ -246,15 +248,16 @@ function renderChoice(doc, field, settings, onChange, rich) {
  * @param {object} settings 現在の設定 (正規化済み)
  * @param {(patch: object) => void} onChange 設定を変えたときの処理
  * @param {() => void} onReset 初期化を確定したときの処理
+ * @param {object} strings 文言のカタログ
  * @returns {HTMLElement} パネル
  */
-function renderSettingsPanel(doc, settings, onChange, onReset) {
+function renderSettingsPanel(doc, settings, onChange, onReset, strings) {
 	const panel = doc.createElement('div');
 	panel.className = 'panel settings';
 	// 判定の結果は環境で決まり項目ごとに変わらないので 1 回だけ尋ねる
 	const rich = supportsRichOptions(doc.defaultView);
 
-	for (const { heading, fields } of SECTIONS) {
+	for (const { heading, fields } of createSections(strings)) {
 		const section = doc.createElement('section');
 		section.className = 'section';
 
@@ -270,10 +273,10 @@ function renderSettingsPanel(doc, settings, onChange, onReset) {
 		panel.append(section);
 	}
 
-	const reset = renderConfirmRow(doc, RESET_FIELD, onReset);
+	const reset = renderConfirmRow(doc, createResetField(strings), onReset);
 	// 設定項目との区切り。置き場所に依る見た目なので、汎用の確認の行ではなくここで付ける
 	reset.classList.add('reset');
-	panel.append(reset, renderBriefDisclaimer(doc));
+	panel.append(reset, renderBriefDisclaimer(doc, strings));
 	return panel;
 }
 
@@ -283,17 +286,18 @@ function renderSettingsPanel(doc, settings, onChange, onReset) {
  * @param {Document} deps.doc 対象のドキュメント
  * @param {HTMLElement} deps.root 描き先
  * @param {object} deps.settings 現在の設定 (正規化済み)
+ * @param {object} deps.strings 文言のカタログ
  * @param {(patch: object) => void} deps.onChange 設定を変えたときの処理
  * @param {() => void} deps.onReset 初期化を確定したときの処理
  * @param {string|null} [deps.notice] 画面の先頭に出す一言 (保存の失敗など)
  * @param {string|null} [deps.initialTab] 最初に開くタブの id。描き直しで現在地を保つために渡す
  * @returns {{currentTab: () => string}} 今開いているタブの id を返す関数
  */
-export function renderPopup({ doc, root, settings, onChange, onReset, notice = null, initialTab = null }) {
+export function renderPopup({ doc, root, settings, strings, onChange, onReset, notice = null, initialTab = null }) {
 	const theme = resolveTheme(settings.popupTheme, doc.defaultView);
 	applyTheme(doc, theme);
 
-	const parts = [renderHeader(doc, theme, onChange)];
+	const parts = [renderHeader(doc, theme, onChange, strings)];
 
 	if (notice) {
 		// 保存の失敗など。黙って消えると、利用者は変えたつもりのまま画面を閉じてしまう。
@@ -307,11 +311,11 @@ export function renderPopup({ doc, root, settings, onChange, onReset, notice = n
 	}
 
 	const panels = {
-		settings: renderSettingsPanel(doc, settings, onChange, onReset),
-		license: renderLicensePanel(doc),
+		settings: renderSettingsPanel(doc, settings, onChange, onReset, strings),
+		license: renderLicensePanel(doc, strings),
 	};
-	const entries = TABS.map(({ id, label }) => ({ id, label, panel: panels[id] }));
-	const tabs = renderTabs(doc, entries, { label: TABS_LABEL, initialId: initialTab });
+	const entries = createTabs(strings).map(({ id, label }) => ({ id, label, panel: panels[id] }));
+	const tabs = renderTabs(doc, entries, { label: strings.popup.TABS_LABEL, initialId: initialTab });
 
 	parts.push(tabs.list, ...entries.map(({ panel }) => panel));
 	root.replaceChildren(...parts);

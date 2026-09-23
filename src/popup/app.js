@@ -5,16 +5,12 @@
  */
 import { loadSettings as loadSettingsImpl, saveSetting as saveSettingImpl, resetSettings as resetSettingsImpl } from '../common/storage.js';
 import { logError } from '../common/log.js';
+import { DEFAULT_LANGUAGE } from '../common/language.js';
+import { createStrings } from '../i18n/index.js';
 import { renderPopup as renderPopupImpl } from './popup-ui.js';
 
 /** 描き先の要素の id (popup.html)。 */
 const ROOT_ID = 'app';
-
-/** 保存に失敗したときに画面へ出す一言。 */
-export const SAVE_FAILED = '保存できませんでした。ブラウザの設定同期を確認してください。';
-
-/** 初期化に失敗したときに画面へ出す一言。 */
-export const RESET_FAILED = '初期化できませんでした。ブラウザの設定同期を確認してください。';
 
 /**
  * data-role で要素を探すセレクタ。
@@ -46,6 +42,9 @@ export async function main({
 }) {
 	const root = doc.getElementById(ROOT_ID);
 	if (!root) return;
+
+	// 表示言語の判定は Task 13 で入れる。ここでは暫定で既定の言語を使う
+	const strings = createStrings(DEFAULT_LANGUAGE);
 
 	// 保存の失敗だけを画面に出す。成功は画面がそのまま変わるので言葉を足さない。
 	// 出した通知は次の保存が成功したときに消す (UI_DESIGN_KIT §4.8)
@@ -92,6 +91,7 @@ export async function main({
 				doc,
 				root,
 				settings,
+				strings,
 				notice,
 				initialTab: screen?.currentTab() ?? null,
 				onChange,
@@ -112,7 +112,7 @@ export async function main({
 		const [[key, value]] = Object.entries(patch);
 		void track(saveSetting(key, value)).then((saved) => {
 			if (saved && notice === null) return;
-			notice = saved ? null : SAVE_FAILED;
+			notice = saved ? null : strings.popup.SAVE_FAILED;
 			// 変えた項目へフォーカスを戻す。描き直しで body へ落ちると現在地が失われる
 			return refresh({ focusRole: key });
 		}).catch((error) => report('popup: 設定の保存に失敗しました', error));
@@ -124,7 +124,7 @@ export async function main({
 	 */
 	function onReset() {
 		void track(resetSettings()).then((done) => {
-			notice = done ? null : RESET_FAILED;
+			notice = done ? null : strings.popup.RESET_FAILED;
 			// 確定ボタンを押した直後の現在地は、描き直した後の初期化ボタンに戻す
 			return refresh({ focusRole: 'reset' });
 		}).catch((error) => report('popup: 設定の初期化に失敗しました', error));

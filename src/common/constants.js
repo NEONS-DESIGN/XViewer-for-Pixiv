@@ -292,17 +292,18 @@ export const POPUP_THEMES = Object.freeze({
  * 今の状態は画面の配色そのものが伝えているため。
  * SYSTEM は「今見えている配色」ではないのでキーに現れない。
  * 解決済みの DARK / LIGHT だけを引く。(popup-ui.js の resolveTheme を通す)
+ * labelKey は文言そのものではなく、strings.theme を引くための鍵。(文言の出どころは src/i18n)
  */
 export const THEME_TOGGLE = Object.freeze({
 	[POPUP_THEMES.DARK]: Object.freeze({
 		next: POPUP_THEMES.LIGHT,
 		icon: 'lightMode',
-		label: 'ライトモードに切り替える',
+		labelKey: 'TO_LIGHT',
 	}),
 	[POPUP_THEMES.LIGHT]: Object.freeze({
 		next: POPUP_THEMES.DARK,
 		icon: 'darkMode',
-		label: 'ダークモードに切り替える',
+		labelKey: 'TO_DARK',
 	}),
 });
 
