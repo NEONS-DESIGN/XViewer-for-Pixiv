@@ -3,8 +3,34 @@
  * 値を直接書き散らさず、必ずここか各モジュール先頭の定数を経由する。
  */
 
-/** 作品リンクを拾うためのセレクタ。pixiv の CSS クラス名は当てにならないのでこれだけを使う。 */
-export const ARTWORK_LINK_SELECTOR = 'a[href^="/artworks/"]';
+/**
+ * 表示言語ごとに URL の先頭へ挟まる接頭辞。(先頭の `/` は含めない)
+ *
+ * pixiv は表示言語が英語のとき、全てのパスの先頭へ `/en` を挟む。(`/en/users/11`)
+ * 日本語は接頭辞を持たない。**この 2 つ以外は存在しない**。`/ko` `/zh` `/zh-tw` `/th` は
+ * いずれも 404 で、他の言語は接頭辞なしのパスのまま表示される。(SITE_SPEC §3 実測)
+ *
+ * 接頭辞を増やすときはここへ足すだけでよい。パスの判定 (`LOCALE_PATH_PATTERN`) も
+ * 作品リンクのセレクタ (`ARTWORK_LINK_SELECTOR`) もこの配列から組み立てている。
+ * @type {readonly string[]}
+ */
+export const LOCALE_PREFIXES = Object.freeze(['en']);
+
+/**
+ * パスの先頭に付いている表示言語の接頭辞。
+ * 次が区切りか終端であることを求め、`/entry` のような別のパスに当たらないようにする。
+ * 読み書きは `common/locale.js` に閉じ込めてあるので、直接使わない。
+ */
+export const LOCALE_PATH_PATTERN = new RegExp(`^/(?:${LOCALE_PREFIXES.join('|')})(?=/|$)`);
+
+/**
+ * 作品リンクを拾うためのセレクタ。pixiv の CSS クラス名は当てにならないのでこれだけを使う。
+ * 表示言語が英語のとき href は `/en/artworks/{id}` になるので、接頭辞ごとに 1 本ずつ並べる。
+ * (前方一致だけを掴む方針は変えない。`[href*=]` へ緩めると別のパスまで拾ってしまう)
+ */
+export const ARTWORK_LINK_SELECTOR = ['', ...LOCALE_PREFIXES.map((locale) => `/${locale}`)]
+	.map((prefix) => `a[href^="${prefix}/artworks/"]`)
+	.join(',');
 
 /** カードのサムネリンク。pixiv の計測用属性で、クラス名より寿命が長い。(SITE_SPEC §3 実測) */
 export const THUMB_LINK_SELECTOR = 'a[data-ga4-label="thumbnail_link"]';
@@ -48,6 +74,9 @@ export const PICKUP_SECTION_SELECTOR = `section:has(${ARTWORK_LINK_SELECTOR})`;
 /**
  * 作品ページのパス。
  * /users/{id}/artworks/{タグ} を除くため、末尾が数字だけであることを要求する。
+ *
+ * 以降のパスの正規表現は全て**表示言語の接頭辞を落としたあと**のパスに当てる。
+ * (`content/page.js` が `stripLocale()` を通してから使う) 接頭辞をここへ書き足さないこと。
  */
 export const ARTWORK_PATH_PATTERN = /^\/artworks\/(\d+)$/;
 

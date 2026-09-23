@@ -17,6 +17,7 @@ import {
 	TAB_SKIP_LABEL_ATTR,
 } from '../common/constants.js';
 import { warn } from '../common/log.js';
+import { currentLocalePrefix } from '../common/locale.js';
 import { safeCdnUrl, artworkPath } from '../pixiv/endpoints.js';
 
 /**
@@ -212,7 +213,9 @@ function stripTabSkipMarks(card) {
  * 画像 URL が pximg でなければカードを作らない。API の値をそのまま img へ渡さないため。(SPEC §9.2)
  * @param {{single: object, multi: object|null}} templates 雛形
  * @param {object} work 作品サマリ (profile/illusts の 1 件)
- * @param {{loggedIn: boolean}} deps セッションの状態
+ * @param {{loggedIn: boolean, localePrefix?: string}} deps セッションの状態。
+ *   `localePrefix` は href に付ける表示言語の接頭辞 (`/en` か空文字)。
+ *   省略したら今見ているページから読む
  * @returns {object|null} li。作れなければ null
  */
 export function buildCard(templates, work, deps) {
@@ -223,9 +226,11 @@ export function buildCard(templates, work, deps) {
 		const base = wantsBadge && templates.multi ? templates.multi : templates.single;
 		const card = base.cloneNode(true);
 
+		// 雛形は pixiv 本体のカードなので、href の接頭辞も今の表示言語に揃える
+		const localePrefix = deps.localePrefix ?? currentLocalePrefix();
 		const links = [...card.querySelectorAll(ARTWORK_LINK_SELECTOR)];
 		for (const link of links) {
-			link.setAttribute('href', artworkPath(work.id));
+			link.setAttribute('href', artworkPath(work.id, localePrefix));
 			if (link.getAttribute('data-gtm-value')) link.setAttribute('data-gtm-value', String(work.id));
 			if (link.getAttribute('data-gtm-user-id')) link.setAttribute('data-gtm-user-id', String(work.userId));
 		}

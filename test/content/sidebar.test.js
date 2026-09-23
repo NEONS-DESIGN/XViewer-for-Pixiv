@@ -354,3 +354,15 @@ test('bumpCommentCount は render() より前でも dispose() の後でも何も
 	// dispose() 後
 	assert.doesNotThrow(() => sidebar.bumpCommentCount(1));
 });
+
+test('英語表示では pixiv 本体へのリンクに /en を付ける', () => {
+	// 接頭辞を落とすと、リンクを踏んだ先でユーザーの表示言語が日本語に戻ってしまう
+	const { container, sidebar } = build({ localePrefix: '/en' });
+	sidebar.render(DETAIL);
+	const info = container.children[0];
+	assert.equal(info.children[0].children[0].href, '/en/users/54734418');
+	const link = info.children.find((child) => child.className === 'link-row').children[0];
+	assert.equal(link.href, '/en/artworks/149425016');
+	const tags = info.children.find((child) => child.className === 'tags');
+	assert.ok(tags.children[0].children[0].href.startsWith('/en/tags/'));
+});

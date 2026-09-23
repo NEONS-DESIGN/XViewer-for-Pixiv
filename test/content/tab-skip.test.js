@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { planSkipTargets, attachTabSkip } from '../../src/content/tab-skip.js';
-import { GRID_TAB_SKIP, TAB_SKIP_MARK_ATTR, TAB_SKIP_LABEL_ATTR } from '../../src/common/constants.js';
+import { GRID_TAB_SKIP, TAB_SKIP_MARK_ATTR, TAB_SKIP_LABEL_ATTR, ARTWORK_LINK_SELECTOR } from '../../src/common/constants.js';
 
 /**
  * 要素の代わり。属性の読み書きと、子の img を引く口だけを持つ。
@@ -286,7 +286,7 @@ test('増えたノードが作品リンクそのものでも当たる', () => {
 	const added = makeCard('2');
 	doc.cards.push(added);
 	added.title.querySelectorAll = () => [];
-	added.title.matches = (selector) => selector === 'a[href^="/artworks/"]';
+	added.title.matches = (selector) => selector === ARTWORK_LINK_SELECTOR;
 	trigger(added.title);
 	assert.equal(added.title.getAttribute('tabindex'), '-1');
 });

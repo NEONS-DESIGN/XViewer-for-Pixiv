@@ -3,6 +3,7 @@
  * コメントの取得に失敗しても画像は見られるので、失敗はこの区画の中だけで伝える。
  */
 import { createIcon } from '../../common/icons.js';
+import { currentLocalePrefix } from '../../common/locale.js';
 import { getJson } from '../../pixiv/client.js';
 import { commentRootsUrl, commentRepliesUrl, emojiUrl, stampUrl, userPath, illustUrl } from '../../pixiv/endpoints.js';
 import { createAvatar, showAvatar } from './avatar.js';
@@ -244,6 +245,8 @@ export function renderStamp(doc, stampId) {
  */
 export function createComments(deps) {
 	const { doc, container } = deps;
+	// コメント主のリンクは pixiv 本体のページを指すので、今の表示言語の接頭辞 (/en) を付ける
+	const localePrefix = deps.localePrefix ?? currentLocalePrefix(doc);
 	const scrollTarget = deps.scrollTarget ?? null;
 	const fetchJson = deps.fetchJson ?? ((url) => getJson(url));
 	const api = { postComment, postStamp, deleteComment, ...deps.actions };
@@ -523,7 +526,7 @@ export function createComments(deps) {
 		item.className = 'comment-item';
 
 		// 退会したユーザーと ID が取れなかったコメントには飛び先が無い。押せないままにする
-		const userPage = comment.userId && !comment.isDeleted ? userPath(comment.userId) : null;
+		const userPage = comment.userId && !comment.isDeleted ? userPath(comment.userId, localePrefix) : null;
 
 		// 作者行と同じ部品。CDN 以外の URL や読み込み失敗は枠だけ残して黙って続ける
 		const avatar = createAvatar(doc, 'comment-avatar');

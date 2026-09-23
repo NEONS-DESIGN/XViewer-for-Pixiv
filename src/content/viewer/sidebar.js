@@ -8,6 +8,7 @@
 import { createIcon } from '../../common/icons.js';
 import { formatCount } from '../../common/format.js';
 import { warn } from '../../common/log.js';
+import { currentLocalePrefix } from '../../common/locale.js';
 import { PIXIV_ORIGIN, artworkPath, userPath, tagWorksPath } from '../../pixiv/endpoints.js';
 import { createAvatar, showAvatar } from './avatar.js';
 import { fetchUserProfile } from '../../pixiv/user.js';
@@ -203,6 +204,8 @@ export function commentToNodes(doc, html) {
  */
 export function createSidebar(deps) {
 	const { doc, container } = deps;
+	// リンクは pixiv 本体のページを指すので、今の表示言語の接頭辞 (/en) を付ける
+	const localePrefix = deps.localePrefix ?? currentLocalePrefix(doc);
 	// actions-bar (フォロー状態) と同じ応答を使う。既定は共有キャッシュ付きなので通信は 1 回で済む
 	const fetchUser = deps.fetchUser ?? fetchUserProfile;
 	/** @type {HTMLElement|null} フォローボタンを後から差し込む場所 (作者行の右端) */
@@ -271,7 +274,7 @@ export function createSidebar(deps) {
 
 		const author = doc.createElement('a');
 		author.className = 'author';
-		author.href = userPath(detail.userId);
+		author.href = userPath(detail.userId, localePrefix);
 
 		// 取れるまでは枠だけ。読み込めなかったときと同じ見え方にしておく
 		const avatar = createAvatar(doc, 'author-avatar');
@@ -322,7 +325,7 @@ export function createSidebar(deps) {
 
 		const original = doc.createElement('a');
 		original.className = 'original-link';
-		original.href = artworkPath(detail.id);
+		original.href = artworkPath(detail.id, localePrefix);
 		original.setAttribute('target', '_blank');
 		original.setAttribute('rel', 'noopener noreferrer');
 		const label = doc.createElement('span');
@@ -393,7 +396,7 @@ export function createSidebar(deps) {
 				for (const tag of detail.tags) {
 					const item = doc.createElement('li');
 					const link = doc.createElement('a');
-					link.href = tagWorksPath(tag);
+					link.href = tagWorksPath(tag, localePrefix);
 					link.textContent = `#${tag}`;
 					item.appendChild(link);
 					tagList.appendChild(item);

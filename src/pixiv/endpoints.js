@@ -23,31 +23,46 @@ export const PIXIV_ORIGIN = 'https://www.pixiv.net';
 export const VIEWING_SETTINGS_URL = `${PIXIV_ORIGIN}/settings/viewing`;
 
 /**
+ * ページのパスを組むときの表示言語の接頭辞。
+ *
+ * 英語表示の pixiv はパスの先頭へ `/en` を挟む。(SITE_SPEC §3 実測)
+ * 付けずに組むと、モーダルを開いた直後の URL もサイドバーのリンクも日本語ページを指し、
+ * リロードやリンク遷移でユーザーの表示言語が勝手に日本語へ戻ってしまう。
+ *
+ * 値は呼び出し側が `common/locale.js` の `currentLocalePrefix()` で取って渡す。
+ * (ここは純粋関数だけを置く層なので `location` を読まない)
+ * 既定は空文字 = 日本語。
+ */
+
+/**
  * 作品ページのパス。ルーターの URL 書き換えとサイドバーのリンクで使う。
  * 形は ARTWORK_PATH_PATTERN (constants.js) と対になっている。
  * @param {string} illustId 作品 ID
+ * @param {string} [localePrefix] 表示言語の接頭辞 (`/en` か空文字)
  * @returns {string} パス
  */
-export function artworkPath(illustId) {
-	return `/artworks/${illustId}`;
+export function artworkPath(illustId, localePrefix = '') {
+	return `${localePrefix}/artworks/${illustId}`;
 }
 
 /**
  * ユーザーページのパス。
  * @param {string} userId ユーザー ID
+ * @param {string} [localePrefix] 表示言語の接頭辞 (`/en` か空文字)
  * @returns {string} パス
  */
-export function userPath(userId) {
-	return `/users/${userId}`;
+export function userPath(userId, localePrefix = '') {
+	return `${localePrefix}/users/${userId}`;
 }
 
 /**
  * タグで絞り込んだ作品一覧のパス。
  * @param {string} tag タグ名 (エンコード前)
+ * @param {string} [localePrefix] 表示言語の接頭辞 (`/en` か空文字)
  * @returns {string} パス
  */
-export function tagWorksPath(tag) {
-	return `/tags/${encodeURIComponent(tag)}/artworks`;
+export function tagWorksPath(tag, localePrefix = '') {
+	return `${localePrefix}/tags/${encodeURIComponent(tag)}/artworks`;
 }
 
 /**

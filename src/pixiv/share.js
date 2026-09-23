@@ -23,6 +23,9 @@ const SHARE_TAG = '#pixiv';
 /**
  * 作品ページの絶対 URL。
  * シェア先は外部サイトなので相対 URL では渡せない。
+ *
+ * 表示言語の接頭辞 (`/en`) は**付けない**。配る先は他人で、開いた人自身の表示設定で出るべきだから。
+ * (接頭辞を付ける他の URL 組み立てとはここだけ方針が違う。`pixiv/endpoints.js` 参照)
  * @param {string} illustId 作品 ID
  * @returns {string} URL
  */
