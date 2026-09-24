@@ -56,6 +56,8 @@ const IMAGES = [
 	{ source: 'comment-form-light-en.png', out: 'shot-comment-form-en.webp' },
 	{ source: 'popup-top-light.png', out: 'shot-popup.webp' },
 	{ source: 'popup-top-light-en.png', out: 'shot-popup-en.webp' },
+	{ source: 'popup-bottom-light.png', out: 'shot-popup-bottom.webp' },
+	{ source: 'popup-bottom-light-en.png', out: 'shot-popup-bottom-en.webp' },
 	{ source: 'infinite-scroll-poster.png', out: 'infinite-scroll.webp' },
 ];
 

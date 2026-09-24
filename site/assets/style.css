@@ -92,6 +92,12 @@ html {
 		animation-duration: 0.01ms !important;
 		transition-duration: 0.01ms !important;
 	}
+
+	/* 静止画の入れ替えは不透明度だけのフェードで、位置が動かず酔いの原因にならない。
+	   瞬時に切り替わるほうがかえって目に障るので、動きを減らす設定でもフェードを残す */
+	.showcase figure.has-slides img {
+		transition-duration: var(--slide-fade) !important;
+	}
 }
 
 body {
@@ -583,7 +589,30 @@ code {
 	position: relative;
 }
 
-.video-toggle {
+/* 静止画を重ねて一定時間ごとに入れ替える図。1 マスに全部を重ね、data-active の 1 枚だけを見せる */
+.showcase figure.has-slides {
+	/* 切り替えのフェードの長さ。site.js の SLIDE_INTERVAL_MS (1 枚を見せる時間) より短くすること */
+	--slide-fade: 0.8s;
+	position: relative;
+	display: grid;
+}
+
+.showcase figure.has-slides img {
+	grid-area: 1 / 1;
+	opacity: 0;
+	transition: opacity var(--slide-fade) ease;
+}
+
+.showcase figure.has-slides img[data-active] {
+	opacity: 1;
+}
+
+/* JS が動かないと切り替わらないので、止めるボタンも要らない */
+:root:not([data-js]) .has-slides .media-toggle {
+	display: none;
+}
+
+.media-toggle {
 	position: absolute;
 	right: 12px;
 	bottom: 12px;
@@ -594,7 +623,7 @@ code {
 	padding: 0;
 	border: 1px solid color-mix(in srgb, #ffffff 24%, transparent);
 	border-radius: 999px;
-	/* 動画の上に載るので、サイトの配色ではなく映像に対して読める固定色にする */
+	/* 動画や画像の上に載るので、サイトの配色ではなく映像に対して読める固定色にする */
 	background: rgba(12, 14, 20, 0.66);
 	color: #ffffff;
 	cursor: pointer;
@@ -603,27 +632,28 @@ code {
 	transition: opacity 0.15s ease;
 }
 
-.showcase figure.has-video:hover .video-toggle,
-.video-toggle:focus-visible {
+.showcase figure.has-video:hover .media-toggle,
+.showcase figure.has-slides:hover .media-toggle,
+.media-toggle:focus-visible {
 	opacity: 1;
 }
 
-.video-toggle svg {
+.media-toggle svg {
 	width: 18px;
 	height: 18px;
 	fill: currentColor;
 }
 
 /* 再生中は一時停止、止まっているときは再生のアイコンだけ出す */
-.video-toggle .icon-play {
+.media-toggle .icon-play {
 	display: none;
 }
 
-.video-toggle[data-state="paused"] .icon-play {
+.media-toggle[data-state="paused"] .icon-play {
 	display: block;
 }
 
-.video-toggle[data-state="paused"] .icon-pause {
+.media-toggle[data-state="paused"] .icon-pause {
 	display: none;
 }
 

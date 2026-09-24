@@ -1,5 +1,5 @@
 /**
- * 紹介サイトの最小限の動き。配色の切り替え、動画の停止ボタン、先頭へ戻るボタンの出し入れの 3 つだけを持つ。
+ * 紹介サイトの最小限の動き。配色の切り替え、動画の停止ボタン、静止画の自動切り替え、先頭へ戻るボタンの出し入れの 4 つだけを持つ。
  * 言語の切り替えと先頭へ戻る動作そのものはただのリンクなので JS は関与しない。(JS が無くても読める)
  */
 (function () {
@@ -92,13 +92,13 @@
 
 	/**
 	 * 動画 1 つ分の配線。
-	 * @param {HTMLElement} figure video と .video-toggle を含む入れ物
+	 * @param {HTMLElement} figure video と .media-toggle を含む入れ物
 	 * @param {boolean} calm 最初から止めておくか
 	 * @returns {void}
 	 */
 	function wireOne(figure, calm) {
 		var video = figure.querySelector('video');
-		var button = figure.querySelector('.video-toggle');
+		var button = figure.querySelector('.media-toggle');
 		if (!video || !button) return;
 
 		/**
@@ -132,6 +132,85 @@
 		video.addEventListener('play', sync);
 		video.addEventListener('pause', sync);
 		sync();
+	}
+
+	/**
+	 * 重ねた静止画を 1 枚見せておく時間。(ミリ秒) 切り替えのフェード (style.css の --slide-fade) もこの中に含まれる。
+	 */
+	var SLIDE_INTERVAL_MS = 4000;
+
+	/**
+	 * 重ねた静止画を一定時間ごとに入れ替える図に配線する。
+	 * 動画と同じく 5 秒を超えて自動で動くので、止めるボタンを添える。(WCAG 2.2.2)
+	 * @returns {void}
+	 */
+	function wireSlides() {
+		var calm = PAUSE_WHEN_CALM
+			&& Boolean(window.matchMedia) && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		var figures = document.querySelectorAll('figure.has-slides');
+		for (var i = 0; i < figures.length; i += 1) {
+			wireSlideshow(figures[i], calm);
+		}
+	}
+
+	/**
+	 * 入れ替える図 1 つ分の配線。
+	 * @param {HTMLElement} figure 重ねた img と .media-toggle を含む入れ物
+	 * @param {boolean} calm 最初から止めておくか
+	 * @returns {void}
+	 */
+	function wireSlideshow(figure, calm) {
+		var slides = figure.querySelectorAll('img');
+		var button = figure.querySelector('.media-toggle');
+		if (slides.length < 2 || !button) return;
+		var index = 0;
+		var timer = null;
+
+		/**
+		 * 次の 1 枚へ送る。最後まで行ったら最初へ戻る。
+		 * @returns {void}
+		 */
+		function advance() {
+			slides[index].removeAttribute('data-active');
+			index = (index + 1) % slides.length;
+			slides[index].setAttribute('data-active', '');
+		}
+
+		/**
+		 * ボタンの見た目と読み上げ文言を今の状態に合わせる。
+		 * @returns {void}
+		 */
+		function sync() {
+			var paused = timer === null;
+			button.setAttribute('data-state', paused ? 'paused' : 'playing');
+			button.setAttribute('aria-label', button.getAttribute(paused ? 'data-label-play' : 'data-label-pause') || '');
+		}
+
+		/**
+		 * 自動の入れ替えを始める。
+		 * @returns {void}
+		 */
+		function play() {
+			if (timer !== null) return;
+			timer = window.setInterval(advance, SLIDE_INTERVAL_MS);
+			sync();
+		}
+
+		/**
+		 * 自動の入れ替えを止める。今見えている 1 枚のまま残す。
+		 * @returns {void}
+		 */
+		function pause() {
+			if (timer === null) return;
+			window.clearInterval(timer);
+			timer = null;
+			sync();
+		}
+
+		button.addEventListener('click', function () {
+			if (timer === null) play(); else pause();
+		});
+		if (calm) sync(); else play();
 	}
 
 	/**
@@ -181,6 +260,7 @@
 
 	document.addEventListener('DOMContentLoaded', function () {
 		wireVideos();
+		wireSlides();
 		wireToTop();
 		var button = document.querySelector('.theme-toggle');
 		var stored = readStored();
