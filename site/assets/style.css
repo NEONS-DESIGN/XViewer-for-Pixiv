@@ -432,7 +432,7 @@ code {
 	background: var(--hover);
 }
 
-/* ストア公開までの無効状態 (Firefox Add-ons の審査中)。押せないことが見た目で分かるようにする */
+/* ストア公開までの無効状態 (Firefox Add-ons / Edge アドオンの審査中)。押せないことが見た目で分かるようにする */
 .btn[aria-disabled="true"] {
 	background: var(--surface);
 	color: var(--muted);
