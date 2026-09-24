@@ -268,7 +268,7 @@
 						poster="assets/img/infinite-scroll.webp" width="1280" height="688" preload="none"
 						autoplay loop muted playsinline
 						aria-label="ユーザーページを下へスクロールし続けると、ページャーを押さずに次のページの作品が読み込まれ、URL のページ番号が追従していく様子"></video>
-					<button type="button" class="video-toggle" aria-label="動画を一時停止する"
+					<button type="button" class="media-toggle" aria-label="動画を一時停止する"
 						data-label-pause="動画を一時停止する" data-label-play="動画を再生する">
 						<svg class="icon-pause" viewBox="0 -960 960 960" aria-hidden="true"><path d="M615-200q-24.75 0-42.37-17.63Q555-235.25 555-260v-440q0-24.75 17.63-42.38Q590.25-760 615-760h55q24.75 0 42.38 17.62Q730-724.75 730-700v440q0 24.75-17.62 42.37Q694.75-200 670-200h-55Zm-325 0q-24.75 0-42.37-17.63Q230-235.25 230-260v-440q0-24.75 17.63-42.38Q265.25-760 290-760h55q24.75 0 42.38 17.62Q405-724.75 405-700v440q0 24.75-17.62 42.37Q369.75-200 345-200h-55Z"/></svg>
 						<svg class="icon-play" viewBox="0 -960 960 960" aria-hidden="true"><path d="M320-258v-450q0-14 9-22t21-8q4 0 8 1t8 3l354 226q7 5 10.5 11t3.5 14q0 8-3.5 14T720-458L366-232q-4 2-8 3t-8 1q-12 0-21-8t-9-22Z"/></svg>
@@ -288,9 +288,17 @@
 						<li>ビュワー自体をオフにすれば、pixiv 標準の動作に戻ります</li>
 					</ul>
 				</div>
-				<figure class="portrait">
-					<img src="assets/img/shot-popup.webp" loading="lazy" decoding="async" width="459" height="861"
-						alt="拡張機能の設定ポップアップ。ビュワー、画像、ユーザーページ、操作の区分ごとに設定項目が並んでいる">
+				<!-- 設定ポップアップの上半分と下半分を一定時間ごとに重ねて切り替える (site.js)。JS が無ければ上半分のまま -->
+				<figure class="portrait has-slides">
+					<img src="assets/img/shot-popup.webp" loading="lazy" decoding="async" width="459" height="861" data-active
+						alt="拡張機能の設定ポップアップの上半分。ビュワーと画像の区分に設定項目が並んでいる">
+					<img src="assets/img/shot-popup-bottom.webp" loading="lazy" decoding="async" width="459" height="861"
+						alt="拡張機能の設定ポップアップの下半分。ユーザーページと操作の区分に設定項目が並び、末尾に設定の初期化ボタンがある">
+					<button type="button" class="media-toggle" aria-label="画像の切り替えを一時停止する"
+						data-label-pause="画像の切り替えを一時停止する" data-label-play="画像の切り替えを再開する">
+						<svg class="icon-pause" viewBox="0 -960 960 960" aria-hidden="true"><path d="M615-200q-24.75 0-42.37-17.63Q555-235.25 555-260v-440q0-24.75 17.63-42.38Q590.25-760 615-760h55q24.75 0 42.38 17.62Q730-724.75 730-700v440q0 24.75-17.62 42.37Q694.75-200 670-200h-55Zm-325 0q-24.75 0-42.37-17.63Q230-235.25 230-260v-440q0-24.75 17.63-42.38Q265.25-760 290-760h55q24.75 0 42.38 17.62Q405-724.75 405-700v440q0 24.75-17.62 42.37Q369.75-200 345-200h-55Z"/></svg>
+						<svg class="icon-play" viewBox="0 -960 960 960" aria-hidden="true"><path d="M320-258v-450q0-14 9-22t21-8q4 0 8 1t8 3l354 226q7 5 10.5 11t3.5 14q0 8-3.5 14T720-458L366-232q-4 2-8 3t-8 1q-12 0-21-8t-9-22Z"/></svg>
+					</button>
 				</figure>
 			</div>
 		</div>
