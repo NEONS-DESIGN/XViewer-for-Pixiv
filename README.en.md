@@ -111,7 +111,9 @@ If you would like another language, please ask through "Bugs, questions and requ
 
 ## Installing
 
-The Chrome Web Store listing is currently under review. Until it is published, load the extension in one of the two ways below.
+Install it from the **[Chrome Web Store](https://chromewebstore.google.com/detail/xviewer-for-pixiv/hbnpmpiipnocflhikmpamobpodadfbpd)**. Brave, Edge and other Chromium browsers can install it from the same store page.
+
+To install it without the store, load the extension in one of the two ways below.
 
 ### From the release zip
 
