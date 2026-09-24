@@ -9,7 +9,7 @@
 [![version](https://img.shields.io/github/package-json/v/NEONS-DESIGN/XViewer-for-Pixiv?color=0096fa)](package.json)
 [![license](https://img.shields.io/github/license/NEONS-DESIGN/XViewer-for-Pixiv?color=0096fa)](LICENSE)
 ![manifest](https://img.shields.io/badge/manifest-v3-0096fa)
-![tests](https://img.shields.io/badge/tests-920%20passing-0096fa)
+![tests](https://img.shields.io/badge/tests-1049%20passing-0096fa)
 
 **[Website](https://xviewer.neonsdesign.com/en/)** ・
 [Privacy policy](https://xviewer.neonsdesign.com/en/privacy.html) ・
@@ -111,7 +111,17 @@ If you would like another language, please ask through "Bugs, questions and requ
 
 ## Installing
 
-It is not published in the store yet. Build it and load it yourself.
+The Chrome Web Store listing is currently under review. Until it is published, load the extension in one of the two ways below.
+
+### From the release zip
+
+1. Download the latest `XViewer.for.Pixiv_x.y.z.zip` from [Releases](https://github.com/NEONS-DESIGN/XViewer-for-Pixiv/releases) and extract it
+2. Open `chrome://extensions/`
+3. Turn on **Developer mode** in the top right
+4. Press **Load unpacked**
+5. Select the extracted folder
+
+### Building from source
 
 ```bash
 git clone https://github.com/NEONS-DESIGN/XViewer-for-Pixiv.git
@@ -198,9 +208,10 @@ If you prefer GitHub, [Issues](https://github.com/NEONS-DESIGN/XViewer-for-Pixiv
 | --- | --- |
 | `npm run build` | Builds `dist/` |
 | `npm run watch` | Build in watch mode |
-| `npm test` | Runs the tests with `node --test` (920 tests) |
+| `npm test` | Runs the tests with `node --test` (1049 tests) |
 | `npm run build:icons` | Regenerates the extension icon PNGs (the output is committed) |
 | `npm run build:symbols` | Regenerates the UI icon shape data (the output is committed) |
+| `npm run build:site-images` | Exports the website images (WebP, plus JPEG for OGP) (the output is committed. The source PNGs are not in the repository, so it will not run on a fresh clone) |
 
 The single source of the version is `version` in `package.json`; the build writes it into
 `dist/manifest.json`. The single source of the minimum Chrome version (esbuild's target and
@@ -215,4 +226,4 @@ To check it locally, run `cd site && python -m http.server 8000` and open `http:
 
 [MIT License](LICENSE)
 
-See [`NOTICE`](NOTICE) for the bundled third-party assets.
+See [`NOTICE`](NOTICE) for the bundled third-party assets. The full text of the Apache License 2.0 is included in [`LICENSES/`](LICENSES).

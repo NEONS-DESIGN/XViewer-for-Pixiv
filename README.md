@@ -9,7 +9,7 @@
 [![version](https://img.shields.io/github/package-json/v/NEONS-DESIGN/XViewer-for-Pixiv?color=0096fa)](package.json)
 [![license](https://img.shields.io/github/license/NEONS-DESIGN/XViewer-for-Pixiv?color=0096fa)](LICENSE)
 ![manifest](https://img.shields.io/badge/manifest-v3-0096fa)
-![tests](https://img.shields.io/badge/tests-920%20passing-0096fa)
+![tests](https://img.shields.io/badge/tests-1049%20passing-0096fa)
 
 **[紹介サイト](https://xviewer.neonsdesign.com/)** ・
 [プライバシーポリシー](https://xviewer.neonsdesign.com/privacy.html) ・
@@ -104,7 +104,17 @@ Firefox / Safari には対応していません。
 
 ## インストール
 
-現在ストアでは配布していません。ビルドして読み込んでください。
+Chrome ウェブストアでの公開は現在審査中です。公開されるまでは、次のどちらかの方法で読み込んでください。
+
+### 配布用の zip から
+
+1. [Releases](https://github.com/NEONS-DESIGN/XViewer-for-Pixiv/releases) から最新版の `XViewer.for.Pixiv_x.y.z.zip` をダウンロードして展開する
+2. `chrome://extensions/` を開く
+3. 右上の **デベロッパーモード** をオンにする
+4. **パッケージ化されていない拡張機能を読み込む** を押す
+5. 展開したフォルダを選ぶ
+
+### ソースからビルドして
 
 ```bash
 git clone https://github.com/NEONS-DESIGN/XViewer-for-Pixiv.git
@@ -188,9 +198,10 @@ GitHub をお使いの方は [Issues](https://github.com/NEONS-DESIGN/XViewer-fo
 | --- | --- |
 | `npm run build` | `dist/` を作る |
 | `npm run watch` | ビルドの監視モード |
-| `npm test` | `node --test` でテストを走らせる (920 tests) |
+| `npm test` | `node --test` でテストを走らせる (1049 tests) |
 | `npm run build:icons` | 拡張機能アイコンの PNG を生成する (生成物はコミット済み) |
 | `npm run build:symbols` | UI のアイコン図形データを再生成する (生成物はコミット済み) |
+| `npm run build:site-images` | 紹介サイトの画像 (WebP と OGP 用の JPEG) を書き出す (生成物はコミット済み。元素材の PNG はリポジトリに含まれないため、手元では動かない) |
 
 バージョンの出どころは `package.json` の `version` だけで、ビルドが `dist/manifest.json` へ差し込みます。
 対応 Chrome の下限 (esbuild の target と `minimum_chrome_version`) の出どころは `scripts/targets.mjs` です。
@@ -204,4 +215,4 @@ GitHub をお使いの方は [Issues](https://github.com/NEONS-DESIGN/XViewer-fo
 
 [MIT License](LICENSE)
 
-同梱している第三者の成果物については [`NOTICE`](NOTICE) を参照してください。
+同梱している第三者の成果物については [`NOTICE`](NOTICE) を参照してください。Apache License 2.0 の本文は [`LICENSES/`](LICENSES) に同梱しています。
