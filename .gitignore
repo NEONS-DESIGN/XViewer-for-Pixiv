@@ -53,5 +53,7 @@ scratch/
 /store/screenshots/
 /store/sources/
 /store/edited/
+# AMO (Firefox) の API キー。絶対にコミットしない
+/store/AMO.txt
 .claude/
 .superpowers/
