@@ -12,6 +12,7 @@
  */
 import { canView } from '../../pixiv/normalize.js';
 import { VIEWING_SETTINGS_URL } from '../../pixiv/endpoints.js';
+import { assignImageSrc } from '../../common/image-source.js';
 
 /** ブロックの種別。 */
 export const BLOCK_KINDS = Object.freeze({
@@ -63,7 +64,7 @@ export function createBlocked(deps) {
 		// 48x48 を引き伸ばしてぼかす。元が極小なので拡大しても中身は読み取れない
 		const backdrop = doc.createElement('img');
 		backdrop.className = 'blocked-backdrop';
-		backdrop.src = mini;
+		assignImageSrc(backdrop, mini);
 		backdrop.alt = '';
 		backdrop.addEventListener('error', () => { backdrop.remove(); });
 		return backdrop;

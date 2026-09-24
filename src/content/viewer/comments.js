@@ -6,6 +6,7 @@
  * 区画の採寸は comments-layout.js、削除の導線は comments-delete.js に分けてある。
  */
 import { createIcon } from '../../common/icons.js';
+import { setImageSrcAttribute } from '../../common/image-source.js';
 import { currentLocalePrefix } from '../../common/locale.js';
 import { getJson } from '../../pixiv/client.js';
 import { commentRootsUrl, commentRepliesUrl, emojiUrl, stampUrl, userPath, illustUrl } from '../../pixiv/endpoints.js';
@@ -118,7 +119,7 @@ export function renderCommentText(doc, text) {
 		if (fragment.kind !== 'emoji') return doc.createTextNode(fragment.text);
 		const image = doc.createElement('img');
 		image.className = 'comment-emoji';
-		image.setAttribute('src', emojiUrl(fragment.id));
+		setImageSrcAttribute(image, emojiUrl(fragment.id));
 		// 読み上げと、画像が出ないときの控えを兼ねて元の文字を持たせる
 		image.setAttribute('alt', fragment.text);
 		// 落ちても本文が読めるように、元の (heaven) の形へ戻す
@@ -143,7 +144,7 @@ export function renderStamp(doc, stampId, strings) {
 	}
 	const image = doc.createElement('img');
 	image.className = 'comment-stamp';
-	image.setAttribute('src', url);
+	setImageSrcAttribute(image, url);
 	image.setAttribute('alt', strings.comments.STAMP_ALT);
 	image.addEventListener('error', () => { image.replaceWith(doc.createTextNode(strings.comments.STAMP_PLACEHOLDER)); });
 	return image;

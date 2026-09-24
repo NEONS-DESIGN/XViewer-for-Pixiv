@@ -6,6 +6,7 @@
  * 名前が隣にあるので読み上げでは装飾扱い。(alt は空)
  */
 import { safeCdnUrl } from '../../pixiv/endpoints.js';
+import { assignImageSrc } from '../../common/image-source.js';
 
 /** 画像がまだ無い (取得前・失敗) ことを表すクラス。viewer.css が枠だけを残す。 */
 export const AVATAR_PENDING_CLASS = 'is-pending';
@@ -35,7 +36,7 @@ export function showAvatar(avatar, url) {
 	// 応答の値をそのまま外部オリジンへのリクエストにしない
 	const safe = safeCdnUrl(url);
 	if (!safe) return false;
-	avatar.src = safe;
+	assignImageSrc(avatar, safe);
 	avatar.classList.remove(AVATAR_PENDING_CLASS);
 	return true;
 }

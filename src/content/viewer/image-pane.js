@@ -7,6 +7,7 @@
 import { getJson } from '../../pixiv/client.js';
 import { illustPagesUrl, safeCdnUrl } from '../../pixiv/endpoints.js';
 import { createIcon } from '../../common/icons.js';
+import { assignImageSrc } from '../../common/image-source.js';
 import { IMAGE_QUALITY } from '../../common/constants.js';
 import { warn } from '../../common/log.js';
 
@@ -158,7 +159,7 @@ export function createImagePane(deps) {
 		if (next !== shownUrl) {
 			shownUrl = next;
 			frame?.querySelector('.pane-error')?.remove();
-			image.src = next;
+			assignImageSrc(image, next);
 		}
 		if (counter) counter.textContent = `${index + 1}/${urls.length}`;
 		const single = urls.length <= 1;
@@ -183,7 +184,7 @@ export function createImagePane(deps) {
 			const url = urls[target];
 			if (!url || prefetched.has(url)) continue;
 			const img = createImage();
-			img.src = url;
+			assignImageSrc(img, url);
 			prefetched.set(url, img);
 		}
 	}
@@ -287,13 +288,13 @@ export function createImagePane(deps) {
 			// 新しく描いた画面にエラーを出すのを防ぐ
 			if (image && onImageError) image.removeEventListener('error', onImageError);
 			if (image && onImageClick) image.removeEventListener('click', onImageClick);
-			if (image) image.src = '';
+			if (image) assignImageSrc(image, '');
 			// 自分が作った DOM は自分で片付ける。
 			// これを外すと、読み込み中に前の作品の矢印とカウンタが残る
 			frame?.remove();
 			// 読み込み途中の先読みは参照を捨てても転送が続く。src を空にして取り消し、
 			// 見ていない作品の分が今見ている作品の取得と帯域を取り合わないようにする (うごイラの abort と同じ理由)
-			for (const img of prefetched.values()) img.src = '';
+			for (const img of prefetched.values()) assignImageSrc(img, '');
 			prefetched.clear();
 			image = null;
 			shownUrl = null;

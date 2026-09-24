@@ -14,6 +14,7 @@ import { getJson } from '../../pixiv/client.js';
 import { ugoiraMetaUrl, safeCdnUrl } from '../../pixiv/endpoints.js';
 import { parseStoredZip } from '../../pixiv/ugoira-zip.js';
 import { createIcon } from '../../common/icons.js';
+import { assignImageSrc } from '../../common/image-source.js';
 import { IMAGE_QUALITY } from '../../common/constants.js';
 import { warn } from '../../common/log.js';
 
@@ -234,7 +235,7 @@ export function createUgoiraPlayer(deps) {
 				// 失敗しても再生は続けたいので、error でも image を返して次の関門に任せる
 				image.addEventListener('load', () => resolve(image), { once: true });
 				image.addEventListener('error', () => resolve(image), { once: true });
-				image.src = url;
+				assignImageSrc(image, url);
 			});
 		});
 		return Promise.all(loaders);
@@ -256,7 +257,7 @@ export function createUgoiraPlayer(deps) {
 			const poster = doc.createElement('img');
 			poster.className = 'ugoira-poster';
 			poster.alt = detail.title;
-			poster.src = detail.urls[IMAGE_QUALITY.REGULAR] ?? '';
+			assignImageSrc(poster, detail.urls[IMAGE_QUALITY.REGULAR] ?? '');
 
 			canvas = doc.createElement('canvas');
 			canvas.className = 'ugoira-canvas';

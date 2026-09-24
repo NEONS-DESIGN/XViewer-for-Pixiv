@@ -12,6 +12,9 @@
  *
  * semver の prerelease / build metadata (0.2.0-beta.1+abc) は version には書けない。
  * 落としたうえで、表示用の version_name に元の文字列を残す。
+ *
+ * version の規則は Chrome のほうが狭い (Firefox は各成分 9 桁まで) ので、Chrome の規則だけを見れば両方に通る。
+ * ブラウザごとのキー (minimum_chrome_version / browser_specific_settings) の差し込みもここに置く。
  */
 
 /** version の成分として認める形。0 か、0 で始まらない整数。 */
@@ -105,4 +108,64 @@ export function applyMinimumChromeVersion(manifest, minimumChromeVersion) {
 		throw new Error(`minimum_chrome_version はメジャーバージョンの整数にしてください: ${minimumChromeVersion}`);
 	}
 	return { ...manifest, minimum_chrome_version: String(minimumChromeVersion) };
+}
+
+/** AMO のアドオン ID として認める形。(メールアドレス風の形。Firefox の manifest スキーマの規則) */
+const GECKO_ID_PATTERN = /^[a-zA-Z0-9-._]*@[a-zA-Z0-9-._]+$/;
+
+/** strict_min_version として認める形。("140.0" のようなメジャー.マイナー) */
+const GECKO_VERSION_PATTERN = /^[1-9]\d*\.\d+$/;
+
+/**
+ * manifest の内容に Firefox 用の browser_specific_settings を差し込む。
+ * Chrome 系の manifest には入れない。(Chrome は知らないキーとして拡張機能のページに警告を出す)
+ * 雛形 (src/manifest.json) に書いてあったら止める。Chrome 系の出力へ漏れるため。
+ * データは集めないので data_collection_permissions は "none" だけを宣言する。(AMO が新規登録に求める)
+ * @param {object} manifest manifest の内容 (browser_specific_settings を持たない)
+ * @param {{id: string, strictMinVersion: string}} settings アドオン ID と対応する Firefox の下限
+ * @returns {object} 差し込んだ manifest
+ * @throws {Error} 雛形に browser_specific_settings があるとき、ID や版の形が正しくないとき
+ */
+export function applyFirefoxSettings(manifest, { id, strictMinVersion }) {
+	if ('browser_specific_settings' in manifest) {
+		throw new Error('src/manifest.json に browser_specific_settings を書かないでください (Firefox 用の出力だけにビルドが差し込む)');
+	}
+	if (!GECKO_ID_PATTERN.test(String(id))) {
+		throw new Error(`Firefox のアドオン ID の形が正しくありません: ${id}`);
+	}
+	if (!GECKO_VERSION_PATTERN.test(String(strictMinVersion))) {
+		throw new Error(`strict_min_version は "140.0" の形にしてください: ${strictMinVersion}`);
+	}
+	return {
+		...manifest,
+		browser_specific_settings: {
+			gecko: {
+				id,
+				strict_min_version: strictMinVersion,
+				data_collection_permissions: { required: ['none'] },
+			},
+		},
+	};
+}
+
+/**
+ * ブラウザごとにビルドが差し込むキー。雛形 (src/manifest.json) に書くと、差し込み先でないブラウザの出力へ漏れる。
+ * (browser_specific_settings が Chrome 系の dist やストアへ上げる CRX に入る、など)
+ */
+const BROWSER_ONLY_KEYS = Object.freeze(['minimum_chrome_version', 'browser_specific_settings']);
+
+/**
+ * 雛形にブラウザごとのキーが無いことを確かめる。どのブラウザ向けのビルドでも最初に通す。
+ * (Firefox 向けを作らない `--target=chrome` / pack:crx でも止まるように)
+ * @param {object} manifest src/manifest.json の内容
+ * @returns {object} 渡された manifest (そのまま)
+ * @throws {Error} ブラウザごとのキーがあるとき
+ */
+export function assertNoBrowserOnlyKeys(manifest) {
+	for (const key of BROWSER_ONLY_KEYS) {
+		if (key in manifest) {
+			throw new Error(`src/manifest.json に ${key} を書かないでください (ビルドがブラウザごとの出力にだけ差し込む)`);
+		}
+	}
+	return manifest;
 }

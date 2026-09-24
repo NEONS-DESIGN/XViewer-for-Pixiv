@@ -1,6 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { toManifestVersion, applyVersion, applyMinimumChromeVersion } from '../../scripts/manifest-version.mjs';
+import {
+	toManifestVersion,
+	applyVersion,
+	applyMinimumChromeVersion,
+	applyFirefoxSettings,
+	assertNoBrowserOnlyKeys,
+} from '../../scripts/manifest-version.mjs';
 
 test('通常の version はそのまま通す', () => {
 	assert.equal(toManifestVersion('0.1.0'), '0.1.0');
@@ -98,4 +104,38 @@ test('applyMinimumChromeVersion は雛形に値が残っていたら止める', 
 test('applyMinimumChromeVersion はメジャーバージョンの整数以外を受け付けない', () => {
 	assert.throws(() => applyMinimumChromeVersion({}, 'chrome120'), /整数/);
 	assert.throws(() => applyMinimumChromeVersion({}, ''), /整数/);
+});
+
+test('applyFirefoxSettings は gecko の ID / 下限 / データ収集なしを差し込む', () => {
+	const manifest = { manifest_version: 3, name: 'x' };
+	const applied = applyFirefoxSettings(manifest, { id: 'xviewer@neonsdesign.com', strictMinVersion: '140.0' });
+	assert.deepEqual(applied.browser_specific_settings, {
+		gecko: {
+			id: 'xviewer@neonsdesign.com',
+			strict_min_version: '140.0',
+			data_collection_permissions: { required: ['none'] },
+		},
+	});
+	// 渡した manifest は書き換えない
+	assert.equal('browser_specific_settings' in manifest, false);
+});
+
+test('applyFirefoxSettings は雛形に browser_specific_settings があれば止める', () => {
+	assert.throws(
+		() => applyFirefoxSettings({ browser_specific_settings: {} }, { id: 'a@b', strictMinVersion: '140.0' }),
+		/browser_specific_settings を書かないでください/,
+	);
+});
+
+test('applyFirefoxSettings は ID と版の形が正しくなければ止める', () => {
+	assert.throws(() => applyFirefoxSettings({}, { id: 'no-at-mark', strictMinVersion: '140.0' }), /アドオン ID/);
+	assert.throws(() => applyFirefoxSettings({}, { id: 'a@b', strictMinVersion: '140' }), /strict_min_version/);
+	assert.throws(() => applyFirefoxSettings({}, { id: 'a@b', strictMinVersion: '140.0a1' }), /strict_min_version/);
+});
+
+test('assertNoBrowserOnlyKeys はブラウザごとのキーが無ければ manifest をそのまま返す', () => {
+	const manifest = { manifest_version: 3, name: 'x' };
+	assert.equal(assertNoBrowserOnlyKeys(manifest), manifest);
+	assert.throws(() => assertNoBrowserOnlyKeys({ browser_specific_settings: {} }), /browser_specific_settings/);
+	assert.throws(() => assertNoBrowserOnlyKeys({ minimum_chrome_version: '120' }), /minimum_chrome_version/);
 });

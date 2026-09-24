@@ -6,6 +6,7 @@
  * (モーダルの中の小さいパネルで誤爆すると実害が出る。設計書 §4.3)
  */
 import { createIcon } from '../../common/icons.js';
+import { setImageSrcAttribute } from '../../common/image-source.js';
 import { createAvatar, showAvatar } from './avatar.js';
 import { hasFocusWithin } from './focus.js';
 import { stampUrl } from '../../pixiv/endpoints.js';
@@ -194,7 +195,7 @@ export function createCommentForm(deps) {
 		const image = doc.createElement('img');
 		image.className = 'comment-form-stamp';
 		const url = stampUrl(id);
-		if (url) image.setAttribute('src', url);
+		if (url) setImageSrcAttribute(image, url);
 		image.setAttribute('alt', strings.commentForm.STAMP_ALT);
 		const clear = doc.createElement('button');
 		clear.type = 'button';

@@ -208,9 +208,10 @@ If you prefer GitHub, [Issues](https://github.com/NEONS-DESIGN/XViewer-for-Pixiv
 
 | Command | What it does |
 | --- | --- |
-| `npm run build` | Builds `dist/` |
+| `npm run build` | Builds `dist/` for Chromium browsers and `dist-firefox/` for Firefox (the Firefox build is for development and is not on a store yet) |
+| `npm run build:chrome` / `npm run build:firefox` | Builds only one of them |
 | `npm run watch` | Build in watch mode |
-| `npm test` | Runs the tests with `node --test` (1058 tests) |
+| `npm test` | Runs the tests with `node --test` (1084 tests) |
 | `npm run build:icons` | Regenerates the extension icon PNGs (the output is committed) |
 | `npm run build:symbols` | Regenerates the UI icon shape data (the output is committed) |
 | `npm run build:site-images` | Exports the website images (WebP, plus JPEG for OGP) (the output is committed. The source PNGs are not in the repository, so it will not run on a fresh clone) |
@@ -218,8 +219,9 @@ If you prefer GitHub, [Issues](https://github.com/NEONS-DESIGN/XViewer-for-Pixiv
 | `npm run pack:crx -- --key <private key>` | Builds the signed CRX uploaded to the store (for the Chrome Web Store's verified CRX uploads. Only the author holds the signing key) |
 
 The single source of the version is `version` in `package.json`; the build writes it into
-`dist/manifest.json`. The single source of the minimum Chrome version (esbuild's target and
-`minimum_chrome_version`) is `scripts/targets.mjs`.
+`dist/manifest.json` and `dist-firefox/manifest.json`. The single source of the minimum browser
+versions (esbuild's targets, `minimum_chrome_version`, and Firefox's `strict_min_version`) is
+`scripts/targets.mjs`.
 
 `site/` is the [website](https://xviewer.neonsdesign.com/en/) itself. There is no build step.
 Pushing to `main` makes `.github/workflows/pages.yml` publish `site/` alone to GitHub Pages.

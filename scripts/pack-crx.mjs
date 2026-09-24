@@ -137,7 +137,8 @@ async function readPublicKeyFromPrivate(path) {
  */
 async function buildAndCheckVersion() {
 	const { version } = JSON.parse(await readFile(PACKAGE_JSON, 'utf8'));
-	const result = spawnSync(process.execPath, ['scripts/build.mjs'], { stdio: 'inherit' });
+	// CRX は Chrome 系の出力 (dist) だけを使う。Firefox 側のビルドの失敗に巻き込まれないよう Chrome 系だけ作る
+	const result = spawnSync(process.execPath, ['scripts/build.mjs', '--target=chrome'], { stdio: 'inherit' });
 	if (result.status !== 0) throw new Error('ビルドに失敗しました');
 	const manifest = JSON.parse(await readFile(join(OUT_DIR, 'manifest.json'), 'utf8'));
 	const expected = toManifestVersion(version);

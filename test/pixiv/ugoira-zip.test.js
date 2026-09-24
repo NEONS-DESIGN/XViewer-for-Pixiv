@@ -77,3 +77,65 @@ test('STORE 以外の圧縮方式は例外を投げる', () => {
 	const zip = buildZip([{ name: 'a.jpg', data: [1, 2, 3], method: 8 }]);
 	assert.throws(() => parseStoredZip(zip), /未対応の圧縮方式/);
 });
+
+test('名前の途中で切れていても RangeError にせず読めたところまで返す', () => {
+	// ヘッダ (30 バイト) は揃っているが、名前の途中で終わっている
+	const zip = buildZip([{ name: 'abcdef.jpg', data: [1, 2, 3] }]);
+	assert.deepEqual(parseStoredZip(zip.slice(0, 33)), []);
+});
+
+test('拡張フィールドを飛ばして中身を切り出す', () => {
+	const zip = new Uint8Array(buildZip([{ name: 'a.jpg', data: [9, 8, 7] }]));
+	// 名前と中身の間に 4 バイトの拡張フィールドを挟んだ zip を組み直す
+	const withExtra = new Uint8Array(zip.length + 4);
+	withExtra.set(zip.subarray(0, 35), 0);
+	withExtra.set([0xaa, 0xbb, 0xcc, 0xdd], 35);
+	withExtra.set(zip.subarray(35), 39);
+	new DataView(withExtra.buffer).setUint16(28, 4, true);
+	const entries = parseStoredZip(withExtra.buffer);
+	assert.equal(entries[0].name, 'a.jpg');
+	assert.deepEqual([...entries[0].bytes], [9, 8, 7]);
+});
+
+test('中身は元の buffer を指す view で返す (写しを作らない)', () => {
+	const zip = buildZip([
+		{ name: 'a.jpg', data: [1, 2] },
+		{ name: 'b.jpg', data: [3, 4, 5] },
+	]);
+	const entries = parseStoredZip(zip);
+	assert.equal(entries[0].bytes.buffer, zip);
+	assert.equal(entries[1].bytes.buffer, zip);
+	// 1 つ目: ヘッダ 30 + 名前 5 の後ろ。2 つ目: 1 つ目の 37 バイトの後ろにヘッダ 30 + 名前 5
+	assert.equal(entries[0].bytes.byteOffset, 35);
+	assert.equal(entries[1].bytes.byteOffset, 72);
+	assert.equal(entries[1].bytes.length, 3);
+});
+
+test('subarray() に頼らない (Firefox の content script では constructor を引けないため)', () => {
+	// Firefox では fetch が返す ArrayBuffer がページ側にあり、subarray() が
+	// Permission denied to access property "constructor" を投げる。それを模す
+	const original = Uint8Array.prototype.subarray;
+	const zip = buildZip([{ name: 'a.jpg', data: [1, 2, 3] }]);
+	Uint8Array.prototype.subarray = () => {
+		throw new Error('Permission denied to access property "constructor"');
+	};
+	try {
+		const entries = parseStoredZip(zip);
+		assert.equal(entries[0].name, 'a.jpg');
+		assert.deepEqual(Array.from(entries[0].bytes), [1, 2, 3]);
+	} finally {
+		Uint8Array.prototype.subarray = original;
+	}
+});
+
+test('中身が 0 バイトのエントリが末尾にあっても読める', () => {
+	// 最後のエントリの中身がちょうど buffer の終わりで終わる (new Uint8Array(buffer, byteLength, 0) になる)
+	const zip = buildZip([
+		{ name: 'a.jpg', data: [1] },
+		{ name: 'b.jpg', data: [] },
+	]);
+	const entries = parseStoredZip(zip);
+	assert.deepEqual(entries.map((entry) => entry.name), ['a.jpg', 'b.jpg']);
+	assert.equal(entries[1].bytes.length, 0);
+	assert.equal(entries[1].bytes.byteOffset, zip.byteLength);
+});
