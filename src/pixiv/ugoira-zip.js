@@ -34,7 +34,6 @@ const ZIP_METHOD_STORE = 0;
  */
 export function parseStoredZip(buffer) {
 	const view = new DataView(buffer);
-	const bytes = new Uint8Array(buffer);
 	const decoder = new TextDecoder();
 	const entries = [];
 	let offset = 0;
@@ -54,9 +53,13 @@ export function parseStoredZip(buffer) {
 		// 途中で切れているなら、そこで打ち切って読めた分を返す
 		if (dataStart + size > buffer.byteLength) break;
 
+		// subarray() は使わない。Firefox の content script では fetch が返す ArrayBuffer がページ側の
+		// compartment にあり、subarray() が内部で constructor を引いて Permission denied になる。
+		// コンストラクタで同じ buffer を指す view を直接作れば constructor を引かない。(Chrome でも中身は同じ)
+		// 範囲は直前の判定 (dataStart + size <= byteLength) の内側に収まるので RangeError にはならない
 		entries.push({
-			name: decoder.decode(bytes.subarray(nameStart, nameStart + nameLength)),
-			bytes: bytes.subarray(dataStart, dataStart + size),
+			name: decoder.decode(new Uint8Array(buffer, nameStart, nameLength)),
+			bytes: new Uint8Array(buffer, dataStart, size),
 		});
 		offset = dataStart + size;
 	}

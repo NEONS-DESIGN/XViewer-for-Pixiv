@@ -10,6 +10,7 @@ import { emojiUrl, stampUrl } from '../../pixiv/endpoints.js';
 import { stampIds } from '../../pixiv/stamps.js';
 import { activeElementIn, hasFocusWithin } from './focus.js';
 import { KEYS } from '../../common/constants.js';
+import { setImageSrcAttribute } from '../../common/image-source.js';
 
 /**
  * タブを移るキー。選ばれていないタブは Tab の巡回から外してあるので、
@@ -85,7 +86,7 @@ export function createCommentPicker(deps) {
 		button.setAttribute('aria-label', label);
 		if (url) {
 			const image = doc.createElement('img');
-			image.setAttribute('src', url);
+			setImageSrcAttribute(image, url);
 			image.setAttribute('alt', '');
 			// 画像が読めなくても何が置かれていたか分かるようにする (一覧側と同じ扱い)
 			image.addEventListener('error', () => { image.replaceWith(doc.createTextNode(fallback)); });

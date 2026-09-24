@@ -15,6 +15,7 @@ import {
 	CARD_SELECTOR,
 } from '../common/constants.js';
 import { warn } from '../common/log.js';
+import { setImageSrcAttribute } from '../common/image-source.js';
 import { currentLocalePrefix } from '../common/locale.js';
 import { safeCdnUrl, artworkPath } from '../pixiv/endpoints.js';
 import { stripTabSkipMarks } from './tab-skip.js';
@@ -222,7 +223,7 @@ export function buildCard(templates, work, deps) {
 
 		const img = card.querySelector('img');
 		if (img) {
-			img.setAttribute('src', src);
+			setImageSrcAttribute(img, src);
 			img.setAttribute('alt', String(work.alt ?? work.title ?? ''));
 			// 48 枚を一度に足すので、読み込みはブラウザの遅延読み込みに任せる
 			img.setAttribute('loading', 'lazy');

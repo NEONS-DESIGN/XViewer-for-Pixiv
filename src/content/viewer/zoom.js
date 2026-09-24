@@ -10,6 +10,7 @@
  */
 import { KEYS, INERT_ATTRIBUTE } from '../../common/constants.js';
 import { createIcon } from '../../common/icons.js';
+import { assignImageSrc } from '../../common/image-source.js';
 
 /**
  * 左右のクリック領域の見た目。
@@ -132,7 +133,7 @@ export function createZoomLayer(deps) {
 	function paint() {
 		if (!layer) return;
 		const url = urls[index] ?? '';
-		image.src = url;
+		assignImageSrc(image, url);
 		canvas.querySelector('.pane-error')?.remove();
 		if (!url) {
 			const line = doc.createElement('p');
@@ -177,7 +178,7 @@ export function createZoomLayer(deps) {
 		if (!layer) return;
 		unlockBehind();
 		// 破棄したあとに読み込みが続かないようにしてから外す
-		image.src = '';
+		assignImageSrc(image, '');
 		layer.remove();
 		layer = null;
 		canvas = null;

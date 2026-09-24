@@ -198,17 +198,18 @@ GitHub をお使いの方は [Issues](https://github.com/NEONS-DESIGN/XViewer-fo
 
 | コマンド | 内容 |
 | --- | --- |
-| `npm run build` | `dist/` を作る |
+| `npm run build` | Chrome 系用の `dist/` と Firefox 用の `dist-firefox/` を作る (Firefox 版はストア未公開の開発用) |
+| `npm run build:chrome` / `npm run build:firefox` | 片方だけを作る |
 | `npm run watch` | ビルドの監視モード |
-| `npm test` | `node --test` でテストを走らせる (1058 tests) |
+| `npm test` | `node --test` でテストを走らせる (1084 tests) |
 | `npm run build:icons` | 拡張機能アイコンの PNG を生成する (生成物はコミット済み) |
 | `npm run build:symbols` | UI のアイコン図形データを再生成する (生成物はコミット済み) |
 | `npm run build:site-images` | 紹介サイトの画像 (WebP と OGP 用の JPEG) を書き出す (生成物はコミット済み。元素材の PNG はリポジトリに含まれないため、手元では動かない) |
 | `npm run build:screenshots` | Chrome ウェブストア用のスクリーンショットを組む (元になるキャプチャはリポジトリに含まれないため、手元では動かない) |
 | `npm run pack:crx -- --key <秘密鍵>` | ストアへ上げる署名済みの CRX を作る (Chrome ウェブストアの「検証済み CRX アップロード」用。署名の秘密鍵は作者だけが持つ) |
 
-バージョンの出どころは `package.json` の `version` だけで、ビルドが `dist/manifest.json` へ差し込みます。
-対応 Chrome の下限 (esbuild の target と `minimum_chrome_version`) の出どころは `scripts/targets.mjs` です。
+バージョンの出どころは `package.json` の `version` だけで、ビルドが `dist/manifest.json` と `dist-firefox/manifest.json` へ差し込みます。
+対応するブラウザの下限 (esbuild の target、`minimum_chrome_version`、Firefox の `strict_min_version`) の出どころは `scripts/targets.mjs` です。
 
 `site/` は[紹介サイト](https://xviewer.neonsdesign.com/)の実体です。ビルド工程はありません。
 `main` へ push すると `.github/workflows/pages.yml` が `site/` だけを GitHub Pages へ公開します。
