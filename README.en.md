@@ -9,7 +9,7 @@
 [![version](https://img.shields.io/github/package-json/v/NEONS-DESIGN/XViewer-for-Pixiv?color=0096fa)](package.json)
 [![license](https://img.shields.io/github/license/NEONS-DESIGN/XViewer-for-Pixiv?color=0096fa)](LICENSE)
 ![manifest](https://img.shields.io/badge/manifest-v3-0096fa)
-![tests](https://img.shields.io/badge/tests-1049%20passing-0096fa)
+![tests](https://img.shields.io/badge/tests-1058%20passing-0096fa)
 
 **[Website](https://xviewer.neonsdesign.com/en/)** ・
 [Privacy policy](https://xviewer.neonsdesign.com/en/privacy.html) ・
@@ -208,10 +208,11 @@ If you prefer GitHub, [Issues](https://github.com/NEONS-DESIGN/XViewer-for-Pixiv
 | --- | --- |
 | `npm run build` | Builds `dist/` |
 | `npm run watch` | Build in watch mode |
-| `npm test` | Runs the tests with `node --test` (1049 tests) |
+| `npm test` | Runs the tests with `node --test` (1058 tests) |
 | `npm run build:icons` | Regenerates the extension icon PNGs (the output is committed) |
 | `npm run build:symbols` | Regenerates the UI icon shape data (the output is committed) |
 | `npm run build:site-images` | Exports the website images (WebP, plus JPEG for OGP) (the output is committed. The source PNGs are not in the repository, so it will not run on a fresh clone) |
+| `npm run pack:crx -- --key <private key>` | Builds the signed CRX uploaded to the store (for the Chrome Web Store's verified CRX uploads. Only the author holds the signing key) |
 
 The single source of the version is `version` in `package.json`; the build writes it into
 `dist/manifest.json`. The single source of the minimum Chrome version (esbuild's target and

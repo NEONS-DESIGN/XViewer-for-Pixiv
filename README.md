@@ -9,7 +9,7 @@
 [![version](https://img.shields.io/github/package-json/v/NEONS-DESIGN/XViewer-for-Pixiv?color=0096fa)](package.json)
 [![license](https://img.shields.io/github/license/NEONS-DESIGN/XViewer-for-Pixiv?color=0096fa)](LICENSE)
 ![manifest](https://img.shields.io/badge/manifest-v3-0096fa)
-![tests](https://img.shields.io/badge/tests-1049%20passing-0096fa)
+![tests](https://img.shields.io/badge/tests-1058%20passing-0096fa)
 
 **[紹介サイト](https://xviewer.neonsdesign.com/)** ・
 [プライバシーポリシー](https://xviewer.neonsdesign.com/privacy.html) ・
@@ -198,10 +198,11 @@ GitHub をお使いの方は [Issues](https://github.com/NEONS-DESIGN/XViewer-fo
 | --- | --- |
 | `npm run build` | `dist/` を作る |
 | `npm run watch` | ビルドの監視モード |
-| `npm test` | `node --test` でテストを走らせる (1049 tests) |
+| `npm test` | `node --test` でテストを走らせる (1058 tests) |
 | `npm run build:icons` | 拡張機能アイコンの PNG を生成する (生成物はコミット済み) |
 | `npm run build:symbols` | UI のアイコン図形データを再生成する (生成物はコミット済み) |
 | `npm run build:site-images` | 紹介サイトの画像 (WebP と OGP 用の JPEG) を書き出す (生成物はコミット済み。元素材の PNG はリポジトリに含まれないため、手元では動かない) |
+| `npm run pack:crx -- --key <秘密鍵>` | ストアへ上げる署名済みの CRX を作る (Chrome ウェブストアの「検証済み CRX アップロード」用。署名の秘密鍵は作者だけが持つ) |
 
 バージョンの出どころは `package.json` の `version` だけで、ビルドが `dist/manifest.json` へ差し込みます。
 対応 Chrome の下限 (esbuild の target と `minimum_chrome_version`) の出どころは `scripts/targets.mjs` です。
