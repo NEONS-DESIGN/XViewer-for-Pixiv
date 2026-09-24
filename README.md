@@ -104,7 +104,9 @@ Firefox / Safari には対応していません。
 
 ## インストール
 
-Chrome ウェブストアでの公開は現在審査中です。公開されるまでは、次のどちらかの方法で読み込んでください。
+**[Chrome ウェブストア](https://chromewebstore.google.com/detail/xviewer-for-pixiv/hbnpmpiipnocflhikmpamobpodadfbpd)** からインストールできます。Brave / Edge などの Chromium 系ブラウザでも、同じストアのページから入れられます。
+
+ストアを使わずに入れたいときは、次のどちらかの方法で読み込んでください。
 
 ### 配布用の zip から
 
