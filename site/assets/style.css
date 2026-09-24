@@ -432,6 +432,24 @@ code {
 	background: var(--hover);
 }
 
+/* ストア公開までの無効状態 (Firefox Add-ons の審査中)。押せないことが見た目で分かるようにする */
+.btn[aria-disabled="true"] {
+	background: var(--surface);
+	color: var(--muted);
+	border-color: var(--border);
+	cursor: not-allowed;
+}
+
+.btn[aria-disabled="true"]:hover {
+	background: var(--surface);
+}
+
+.cta-note {
+	font-size: 13px;
+	color: var(--muted);
+	margin: 0;
+}
+
 .hero-shot {
 	margin-top: 56px;
 	border-radius: var(--radius);
