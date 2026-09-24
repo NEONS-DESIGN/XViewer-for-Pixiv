@@ -11,7 +11,7 @@ import {
 	pageKey,
 	parsePageParam,
 } from './page.js';
-import { createRouter, isOwnHistoryEntry } from './router.js';
+import { createRouter, createEntryTracker, replaceUrlKeepingState } from './router.js';
 import { attachGridListener, collectWorkIds, findGridList } from './grid.js';
 import { attachTabSkip } from './tab-skip.js';
 import { ensureFocusStyle } from './grid-focus.js';
@@ -101,6 +101,12 @@ let infiniteOwnPage = null;
 /** syncInfinite() を走らせている最中か。自分の ?p= の書き込みで再入するのを防ぐ目印 */
 let syncingInfinite = false;
 let router = null;
+/**
+ * 今の履歴エントリが自分のモーダル用に積んだものか。history.state を読まずに追う。(router.js)
+ * ルーターは作り直すが、これはページの寿命と同じだけ生かす。
+ * popstate の購読を boot() の遷移監視より先に張るため、読み込んだ時点で作る
+ */
+const historyEntry = createEntryTracker(window);
 let settings = null;
 /**
  * @type {object|null} 文言のカタログ。boot() で 1 回だけ決める。
@@ -171,11 +177,11 @@ function rememberPage(path) {
 /**
  * 自分のルーターが開いた作品を見ている最中か。
  * URL が /artworks/{id} でも pixiv 本体の作品ページ (本体の SPA 遷移や直接アクセス) なら false。
- * 履歴の state に付けた目印で見分ける
+ * 履歴の state に付けた目印で見分ける。(state そのものは読まず、router.js が追った結果を使う)
  * @returns {boolean} 自分のモーダル用の履歴エントリなら true
  */
 function isViewingOwnWork() {
-	return parseArtworkPath(location.pathname) !== null && isOwnHistoryEntry(window);
+	return parseArtworkPath(location.pathname) !== null && historyEntry.isOwn();
 }
 
 /**
@@ -210,7 +216,7 @@ function apply() {
 	activeKey = key;
 	rememberPage(path);
 
-	router = createRouter(handlePopState);
+	router = createRouter(handlePopState, { entry: historyEntry });
 	viewer = createViewer({
 		doc: document,
 		settings,
@@ -495,12 +501,13 @@ function writePageParam(page) {
 		// 1 ページ目は pixiv 自身も ?p= を付けない。付けずに揃える
 		if (page > 1) url.searchParams.set('p', String(page));
 		else url.searchParams.delete('p');
-		// 書く前に覚える。replaceState は inject.js のフックを通って同期的に
-		// handleLocationChange() を呼び戻すので、後に回すと呼び戻された先で
-		// 自分の書き込みを pixiv の書き込みと取り違える
+		// 書く前に覚える。書き込みの途中で遷移の通知が来ても、自分の値だと分かるようにする
 		infiniteOwnPage = page;
-		// 既に同じ URL なら書かない。replaceState を呼び過ぎるとブラウザに絞られる
-		if (url.href !== location.href) history.replaceState(history.state, '', url);
+		// 既に同じ URL なら書かない。replaceState を呼び過ぎるとブラウザに絞られる。
+		// ここで history.replaceState(history.state, ...) としてはいけない。isolated world の
+		// history.state は古いことがあり、Next.js の state を拡張の目印で上書きしてしまう。(SITE_SPEC §8)
+		// state を保ったまま URL だけ差し替えるのは注入側 (page world) に任せる
+		if (url.href !== location.href) replaceUrlKeepingState(url.href);
 	} catch (error) {
 		// 書けていないので、URL に残っているのは前に自分が書いた値のまま。記憶も戻す
 		infiniteOwnPage = previousOwn;

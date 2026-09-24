@@ -70,6 +70,32 @@ function unhook() {
 	delete window[NAV_HOOK_FLAG];
 }
 
+/**
+ * 今の履歴 state を保ったまま URL だけ差し替える。(無限スクロールの ?p= の追従)
+ *
+ * content script からは history.state を正しく読めない。world ごとに読んだ値を覚えていて、
+ * 別の world が先に読むと古い値を返す。(SITE_SPEC §8) それを書き戻すと Next.js の state
+ * (`__N`) が拡張の目印で上書きされ、そのエントリへ戻っても Next.js が popstate を無視する。
+ * ここで読んで書けば、読むのが page world だけになるので正しい値が返る。
+ *
+ * 包みは通さない。自分の書き込みを pixiv の遷移として isolated world へ知らせないため。
+ * (content script は書く前に自分の値を覚えており、通知が要らない)
+ * @param {Event} event detail に URL の文字列を持つ CustomEvent
+ * @returns {void}
+ */
+function replaceUrl(event) {
+	const url = /** @type {CustomEvent} */ (event).detail;
+	if (typeof url !== 'string' || url === '') return;
+	try {
+		const replace = window[NAV_HOOK_FLAG]?.replaceState ?? history.replaceState;
+		replace.call(history, history.state, '', url);
+	} catch {
+		// 別オリジンの URL などで投げる。URL がずれるだけなので、サイト本体へは漏らさない。
+		// 書けたかどうかは content script が location を見て判断する
+	}
+}
+
 window.addEventListener(NAV_EVENTS.UNHOOK, unhook);
 window.addEventListener(NAV_EVENTS.REHOOK, hook);
+window.addEventListener(NAV_EVENTS.REPLACE_URL, replaceUrl);
 hook();

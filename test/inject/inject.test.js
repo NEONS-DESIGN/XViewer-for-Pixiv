@@ -156,3 +156,56 @@ test('プロトタイプのメソッドを包んでいたら、unhook は own pr
 	assert.equal(hist.pushState(), 'proto-push');
 	assert.equal(page.window[NAV_HOOK_FLAG], undefined);
 });
+
+test('URL の差し替えの依頼は、今の state を保ったまま元の replaceState で書く', () => {
+	// isolated world からは history.state を正しく読めないので、page world で読んで書き戻す。(SITE_SPEC §8)
+	// 包みを通さないのは、自分の書き込みを pixiv の遷移として知らせないため
+	const written = [];
+	const saved = page.originals.replaceState;
+	page.window.dispatchEvent(new CustomEvent(NAV_EVENTS.UNHOOK));
+	page.history.replaceState = function replaceState(...args) {
+		written.push(args);
+		return 'replace-result';
+	};
+	page.window.dispatchEvent(new CustomEvent(NAV_EVENTS.REHOOK));
+	page.history.state = { __N: true, as: '/users/1/illustrations?p=2' };
+	try {
+		page.window.dispatchEvent(new CustomEvent(NAV_EVENTS.REPLACE_URL, { detail: '/users/1/illustrations?p=3' }));
+		assert.deepEqual(written, [[{ __N: true, as: '/users/1/illustrations?p=2' }, '', '/users/1/illustrations?p=3']]);
+		assert.equal(navigateCount, 0);
+	} finally {
+		delete page.history.state;
+		// 後のテストが元のメソッドとの一致を見るので、差し替えたものを戻しておく
+		page.window.dispatchEvent(new CustomEvent(NAV_EVENTS.UNHOOK));
+		page.history.replaceState = saved;
+	}
+});
+
+test('URL の差し替えの依頼は、包みを外した後も書ける', () => {
+	const written = [];
+	page.window.dispatchEvent(new CustomEvent(NAV_EVENTS.UNHOOK));
+	page.history.replaceState = function replaceState(...args) { written.push(args[2]); };
+	try {
+		page.window.dispatchEvent(new CustomEvent(NAV_EVENTS.REPLACE_URL, { detail: '/users/1?p=4' }));
+		assert.deepEqual(written, ['/users/1?p=4']);
+	} finally {
+		page.history.replaceState = page.originals.replaceState;
+	}
+});
+
+test('URL の差し替えの依頼は、文字列でなければ何もしない', () => {
+	const before = page.calls.length;
+	page.window.dispatchEvent(new CustomEvent(NAV_EVENTS.REPLACE_URL, { detail: { url: '/users/1' } }));
+	page.window.dispatchEvent(new CustomEvent(NAV_EVENTS.REPLACE_URL));
+	assert.equal(page.calls.length, before);
+});
+
+test('URL の差し替えに失敗しても例外を外へ出さない', () => {
+	page.window.dispatchEvent(new CustomEvent(NAV_EVENTS.UNHOOK));
+	page.history.replaceState = () => { throw new Error('SecurityError'); };
+	try {
+		assert.doesNotThrow(() => page.window.dispatchEvent(new CustomEvent(NAV_EVENTS.REPLACE_URL, { detail: 'https://example.com/' })));
+	} finally {
+		page.history.replaceState = page.originals.replaceState;
+	}
+});

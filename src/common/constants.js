@@ -170,6 +170,12 @@ export const NAV_EVENTS = Object.freeze({
 	UNHOOK: 'xviewer:unhook',
 	/** content script -> 注入側。外したフックを張り直す */
 	REHOOK: 'xviewer:rehook',
+	/**
+	 * content script -> 注入側。今の履歴 state を保ったまま URL だけ差し替える。(detail は URL の文字列)
+	 * isolated world から読んだ history.state は古いことがあり、それを書き戻すと
+	 * Next.js の state を壊すので、読むのも書くのも page world に任せる。(SITE_SPEC §8)
+	 */
+	REPLACE_URL: 'xviewer:replace-url',
 });
 
 /** history をフック済みであることを示す window のプロパティ名。二重注入の防止に使う。 */

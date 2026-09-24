@@ -1,30 +1,39 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createRouter, isOwnHistoryEntry } from '../../src/content/router.js';
+import { createRouter, createEntryTracker, replaceUrlKeepingState } from '../../src/content/router.js';
+import { NAV_EVENTS } from '../../src/common/constants.js';
 
 /**
  * window の代わり。history と location の動きを記録する。
+ * history.state は読まれた回数を数える。(isolated world から読むと古い値が返るため、読まないことを確かめる)
  * @param {string} pathname 初期パス
  * @returns {object} 偽の window
  */
 function fakeWindow(pathname = '/users/1/artworks') {
 	const calls = [];
+	/** @type {Record<string, Function[]>} */
 	const listeners = {};
+	let state = null;
 	const win = {
 		calls,
+		stateReads: 0,
 		location: { pathname },
 		history: {
-			state: null,
+			get state() { win.stateReads += 1; return state; },
 			// 本物と同じく、pushState / replaceState で location と state も動く
-			pushState(state, _title, url) { calls.push(['push', url]); win.location.pathname = url; win.history.state = state; },
-			replaceState(state, _title, url) { calls.push(['replace', url]); win.location.pathname = url; win.history.state = state; },
+			pushState(next, _title, url) { calls.push(['push', url]); win.location.pathname = url; state = next; },
+			replaceState(next, _title, url) { calls.push(['replace', url]); win.location.pathname = url; state = next; },
 			back() { calls.push(['back']); },
 		},
-		addEventListener(type, fn) { listeners[type] = fn; },
+		/** テストから今のエントリの state を差し替える。(読んだ回数には数えない) */
+		setState(next) { state = next; },
+		addEventListener(type, fn) { (listeners[type] ||= []).push(fn); },
 		// 本物と同じく、登録した関数と一致したときだけ外す。(別の関数を渡す dispose を通さないため)
-		removeEventListener(type, fn) { if (listeners[type] === fn) delete listeners[type]; },
-		fire(type) { listeners[type]?.(); },
-		hasListener(type) { return Boolean(listeners[type]); },
+		removeEventListener(type, fn) { listeners[type] = (listeners[type] || []).filter((f) => f !== fn); },
+		dispatchEvent(event) { for (const fn of [...(listeners[event.type] || [])]) fn(event); return true; },
+		/** popstate を配る。本物と同じく、戻った先のエントリの state を event.state に載せる */
+		fire(type, eventState = state) { for (const fn of [...(listeners[type] || [])]) fn({ type, state: eventState }); },
+		hasListener(type) { return (listeners[type] || []).length > 0; },
 	};
 	return win;
 }
@@ -64,17 +73,76 @@ test('popstate が届く前に close を重ねても履歴は 1 つしか戻ら�
 	assert.deepEqual(win.calls, [['back'], ['back']]);
 });
 
-test('isOwnHistoryEntry は自分が積んだ state だけを認める', () => {
+test('createEntryTracker は自分が積んだエントリだけを認める', () => {
 	// pixiv 本体が /artworks/{id} へ遷移したときの state は本体のもの
 	const win = fakeWindow();
-	assert.equal(isOwnHistoryEntry(win), false);
-	const router = createRouter(() => {}, { window: win });
+	const entry = createEntryTracker(win);
+	assert.equal(entry.isOwn(), false);
+	const router = createRouter(() => {}, { window: win, entry });
 	router.open('1');
-	assert.equal(isOwnHistoryEntry(win), true);
-	win.history.state = { __N: true };
-	assert.equal(isOwnHistoryEntry(win), false);
-	win.history.state = null;
-	assert.equal(isOwnHistoryEntry(win), false);
+	assert.equal(entry.isOwn(), true);
+	router.replace('2');
+	assert.equal(entry.isOwn(), true);
+	// 戻る / 進むでは、戻った先の state で判定し直す
+	win.fire('popstate', { __N: true });
+	assert.equal(entry.isOwn(), false);
+	win.fire('popstate', { xviewer: true });
+	assert.equal(entry.isOwn(), true);
+	win.fire('popstate', null);
+	assert.equal(entry.isOwn(), false);
+});
+
+test('pixiv 本体が履歴を動かしたら自分のエントリではなくなる', () => {
+	const win = fakeWindow();
+	const entry = createEntryTracker(win);
+	const router = createRouter(() => {}, { window: win, entry });
+	router.open('1');
+	win.dispatchEvent({ type: NAV_EVENTS.NAVIGATE });
+	assert.equal(entry.isOwn(), false);
+});
+
+test('ルーターとエントリの判定は history.state を読まない', () => {
+	// isolated world の history.state は、ページ側が先に読むと古い値を返す。(SITE_SPEC §8)
+	// 読んで書き戻すと Next.js の state を拡張の目印で上書きしてしまい、戻るで画面が切り替わらなくなる
+	const win = fakeWindow();
+	const entry = createEntryTracker(win);
+	const router = createRouter(() => {}, { window: win, entry });
+	router.open('1');
+	entry.isOwn();
+	router.replace('2');
+	win.fire('popstate', { __N: true });
+	entry.isOwn();
+	router.close();
+	assert.equal(win.stateReads, 0);
+});
+
+test('createEntryTracker の dispose で購読を解除する', () => {
+	const win = fakeWindow();
+	const entry = createEntryTracker(win);
+	entry.dispose();
+	assert.equal(win.hasListener('popstate'), false);
+	assert.equal(win.hasListener(NAV_EVENTS.NAVIGATE), false);
+});
+
+test('replaceUrlKeepingState は URL を注入側へ渡して書き換えさせる', () => {
+	const win = fakeWindow();
+	win.location.href = 'https://www.pixiv.net/users/1/illustrations?p=2';
+	const received = [];
+	// 注入側の代役。page world で history.state を保ったまま URL だけ差し替える
+	win.addEventListener(NAV_EVENTS.REPLACE_URL, (event) => {
+		received.push(event.detail);
+		win.location.href = event.detail;
+	});
+	replaceUrlKeepingState('https://www.pixiv.net/users/1/illustrations?p=3', win);
+	assert.deepEqual(received, ['https://www.pixiv.net/users/1/illustrations?p=3']);
+	assert.equal(win.stateReads, 0);
+});
+
+test('replaceUrlKeepingState は注入側が書き換えなかったら投げる', () => {
+	// 注入スクリプトが居ないと URL は変わらない。黙って成功扱いにすると ?p= の記憶だけがずれる
+	const win = fakeWindow();
+	win.location.href = 'https://www.pixiv.net/users/1/illustrations?p=2';
+	assert.throws(() => replaceUrlKeepingState('https://www.pixiv.net/users/1/illustrations?p=3', win));
 });
 
 test('popstate で今の作品 ID を通知する', () => {
