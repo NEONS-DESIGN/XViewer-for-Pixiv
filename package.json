@@ -10,6 +10,7 @@
 		"build:symbols": "node scripts/build-symbols.mjs",
 		"build:icons": "node scripts/build-icons.mjs",
 		"build:site-images": "node scripts/build-site-images.mjs",
+		"build:screenshots": "node scripts/build-screenshots.mjs",
 		"pack:crx": "node scripts/pack-crx.mjs",
 		"test": "node --test \"test/**/*.test.js\""
 	},

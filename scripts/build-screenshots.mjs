@@ -8,7 +8,7 @@
  * ストアの要求は「1280x800 の JPEG または 24 ビット PNG (アルファなし)」なので、
  * resvg が返す RGBA からアルファを落として PNG (カラータイプ 2) で書き出す。
  *
- * 実行: node store/build-screenshots.mjs
+ * 実行: npm run build:screenshots
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -33,9 +33,10 @@ const COLOR = Object.freeze({
 /** 見出しと本文の書体。Windows に載っているものを順に指定する。 */
 const FONT = "'Yu Gothic UI','Yu Gothic','Meiryo','Segoe UI',sans-serif";
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-const SOURCES = path.join(HERE, 'sources');
-const OUT = path.join(HERE, 'screenshots');
+/** ストア素材の置き場所。このスクリプトは scripts/ にあるので、1 つ上の store/ を指す。(実行時のカレントに依らない) */
+const STORE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'store');
+const SOURCES = path.join(STORE_DIR, 'sources');
+const OUT = path.join(STORE_DIR, 'screenshots');
 
 /** 1〜3 枚目で共通の、図を置く箱。 */
 const STAGE = Object.freeze({ x: 56, y: 216, width: 1168, height: 560 });

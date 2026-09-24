@@ -212,6 +212,7 @@ If you prefer GitHub, [Issues](https://github.com/NEONS-DESIGN/XViewer-for-Pixiv
 | `npm run build:icons` | Regenerates the extension icon PNGs (the output is committed) |
 | `npm run build:symbols` | Regenerates the UI icon shape data (the output is committed) |
 | `npm run build:site-images` | Exports the website images (WebP, plus JPEG for OGP) (the output is committed. The source PNGs are not in the repository, so it will not run on a fresh clone) |
+| `npm run build:screenshots` | Composes the Chrome Web Store screenshots (the source captures are not in the repository, so it will not run on a fresh clone) |
 | `npm run pack:crx -- --key <private key>` | Builds the signed CRX uploaded to the store (for the Chrome Web Store's verified CRX uploads. Only the author holds the signing key) |
 
 The single source of the version is `version` in `package.json`; the build writes it into
