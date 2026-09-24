@@ -82,7 +82,7 @@ pixiv のユーザーページで作品をクリックすると、**ページ遷
 
 Manifest V3 に対応した Chromium 系ブラウザ。(Chrome / Brave / Edge など)**Chrome 120 以上**が必要です。
 (コンテンツスクリプトの `"world": "MAIN"`、`color-mix()`、CSS nesting を使っています)
-Firefox / Safari には対応していません。
+Firefox 版 (Firefox 140 以上のデスクトップ版) は Firefox Add-ons で**審査中**です。Safari には対応していません。
 
 ## 対応言語
 
@@ -105,6 +105,7 @@ Firefox / Safari には対応していません。
 ## インストール
 
 **[Chrome ウェブストア](https://chromewebstore.google.com/detail/xviewer-for-pixiv/hbnpmpiipnocflhikmpamobpodadfbpd)** からインストールできます。Brave / Edge などの Chromium 系ブラウザでも、同じストアのページから入れられます。
+Firefox 版は Firefox Add-ons で審査中です。公開までお待ちください。
 
 ストアを使わずに入れたいときは、次のどちらかの方法で読み込んでください。
 
@@ -198,7 +199,7 @@ GitHub をお使いの方は [Issues](https://github.com/NEONS-DESIGN/XViewer-fo
 
 | コマンド | 内容 |
 | --- | --- |
-| `npm run build` | Chrome 系用の `dist/` と Firefox 用の `dist-firefox/` を作る (Firefox 版はストア未公開の開発用) |
+| `npm run build` | Chrome 系用の `dist/` と Firefox 用の `dist-firefox/` を作る (Firefox 版はストアで審査中) |
 | `npm run build:chrome` / `npm run build:firefox` | 片方だけを作る |
 | `npm run watch` | ビルドの監視モード |
 | `npm test` | `node --test` でテストを走らせる (1084 tests) |
