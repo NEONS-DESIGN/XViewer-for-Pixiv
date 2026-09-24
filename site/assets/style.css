@@ -2,7 +2,7 @@
  * XViewer for Pixiv 紹介サイトの配色と体裁。
  * 配色トークンの名前と値は拡張本体の UI_DESIGN_KIT.md §2 に合わせてある。
  * --accent / --on-accent は pixiv 本体のブランド色 (#0096fa + 白文字) で、両テーマ共通。
- * --brand-x は X のブランド色。ライトは #15202b、ダークでは背景に沈むので X のダーク時の文字色 #e7e9ea。
+ * --brand-x は X のブランド色。ライトは #15202b を少し明るく紺寄りにした #30466a (周りの黒文字と見分けるため)、ダークでは背景に沈むので X のダーク時の文字色 #e7e9ea。
  * 色は必ずここの変数で決め、個々の規則に直書きしない。
  */
 
@@ -48,7 +48,7 @@
 		--accent: #0096fa;
 		--on-accent: #ffffff;
 		--accent-soft: rgba(0, 150, 250, 0.10);
-		--brand-x: #15202b;
+		--brand-x: #30466a;
 		--hover: rgba(0, 0, 0, 0.05);
 		--shadow: 0 18px 50px rgba(20, 24, 35, 0.14);
 	}
@@ -67,7 +67,7 @@
 	--accent: #0096fa;
 	--on-accent: #ffffff;
 	--accent-soft: rgba(0, 150, 250, 0.10);
-	--brand-x: #15202b;
+	--brand-x: #30466a;
 	--hover: rgba(0, 0, 0, 0.05);
 	--shadow: 0 18px 50px rgba(20, 24, 35, 0.14);
 }
