@@ -82,7 +82,7 @@ pixiv のユーザーページで作品をクリックすると、**ページ遷
 
 Manifest V3 に対応した Chromium 系ブラウザ。(Chrome / Brave / Edge など)**Chrome 120 以上**が必要です。
 (コンテンツスクリプトの `"world": "MAIN"`、`color-mix()`、CSS nesting を使っています)
-Edge アドオンでの公開は**審査中**です。(それまでは Edge でも Chrome ウェブストアから入れられます)
+Edge は [Edge アドオン](https://microsoftedge.microsoft.com/addons/detail/pmkplomaebdlciailfpopkocnfpcdmgl) からも入れられます。
 Firefox 版 (Firefox 140 以上のデスクトップ版) は Firefox Add-ons で**審査中**です。Safari には対応していません。
 
 ## 対応言語
@@ -106,7 +106,8 @@ Firefox 版 (Firefox 140 以上のデスクトップ版) は Firefox Add-ons で
 ## インストール
 
 **[Chrome ウェブストア](https://chromewebstore.google.com/detail/xviewer-for-pixiv/hbnpmpiipnocflhikmpamobpodadfbpd)** からインストールできます。Brave / Edge などの Chromium 系ブラウザでも、同じストアのページから入れられます。
-Edge アドオンと Firefox Add-ons は審査中です。公開までお待ちください。
+Edge は **[Edge アドオン](https://microsoftedge.microsoft.com/addons/detail/pmkplomaebdlciailfpopkocnfpcdmgl)** からも入れられます。
+Firefox Add-ons は審査中です。公開までお待ちください。
 
 ストアを使わずに入れたいときは、次のどちらかの方法で読み込んでください。
 
