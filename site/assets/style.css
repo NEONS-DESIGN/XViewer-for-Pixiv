@@ -244,10 +244,12 @@ code {
 	background: var(--hover);
 }
 
+/* 幅が足りないときに縮ませない。縮むと言語名が折り返してボタンの形が崩れる */
 .header-tools {
 	display: flex;
 	align-items: center;
 	gap: 8px;
+	flex: none;
 }
 
 .lang-switch {
@@ -265,6 +267,7 @@ code {
 	color: var(--muted);
 	text-decoration: none;
 	line-height: 1.6;
+	white-space: nowrap;
 }
 
 .lang-switch a[aria-current="true"] {
@@ -849,8 +852,9 @@ td.default {
 
 .keys {
 	display: grid;
-	/* 説明が 1 行に収まる程度の下限。240px だと Esc の段が 3 行に折れる */
-	grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+	/* 説明が 1 行に収まる程度の下限。240px だと Esc の段が 3 行に折れる。
+	   本文幅が 320px に満たない画面では本文幅を下限にする。(はみ出して横スクロールが出るため) */
+	grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
 	gap: 12px;
 }
 
@@ -1089,5 +1093,21 @@ kbd {
 
 	.cta-row {
 		gap: 10px;
+	}
+}
+
+/* ヘッダーの 1 行 (ブランド名 + 言語切り替え + 配色ボタン) は約 404px 要る。
+   フォントの違いも見込んで 440px 以下ではブランド名を隠し、アイコンだけにする。
+   文字は .visually-hidden と同じ形で隠し、リンクの名前として読み上げには残す */
+@media (max-width: 440px) {
+	.site-header .brand span {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		margin: -1px;
+		padding: 0;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
 	}
 }
