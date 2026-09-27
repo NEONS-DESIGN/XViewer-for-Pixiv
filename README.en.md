@@ -90,7 +90,7 @@ The caption, tags, post date, counters and comments sit beside the image in a si
 Any Chromium-based browser with Manifest V3 support. (Chrome / Brave / Edge and so on) **Chrome 120 or newer** is required.
 (It uses `"world": "MAIN"` content scripts, `color-mix()` and CSS nesting)
 Edge can also install it from [Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/pmkplomaebdlciailfpopkocnfpcdmgl).
-The Firefox version (desktop, Firefox 140 or newer) is **in review** on Firefox Add-ons. Safari is not supported.
+Firefox (desktop, Firefox 140 or newer) can install it from [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/xviewer-for-pixiv/). Safari is not supported.
 
 ## Languages
 
@@ -114,7 +114,7 @@ If you would like another language, please ask through "Bugs, questions and requ
 
 Install it from the **[Chrome Web Store](https://chromewebstore.google.com/detail/xviewer-for-pixiv/hbnpmpiipnocflhikmpamobpodadfbpd)**. Brave, Edge and other Chromium browsers can install it from the same store page.
 Edge can also install it from **[Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/pmkplomaebdlciailfpopkocnfpcdmgl)**.
-The Firefox Add-ons listing is in review. Please wait until it is published.
+Firefox can install it from **[Firefox Add-ons](https://addons.mozilla.org/firefox/addon/xviewer-for-pixiv/)**.
 
 To install it without the store, load the extension in one of the two ways below.
 
@@ -211,7 +211,7 @@ If you prefer GitHub, [Issues](https://github.com/NEONS-DESIGN/XViewer-for-Pixiv
 
 | Command | What it does |
 | --- | --- |
-| `npm run build` | Builds `dist/` for Chromium browsers and `dist-firefox/` for Firefox (the Firefox version is in review on Firefox Add-ons) |
+| `npm run build` | Builds `dist/` for Chromium browsers and `dist-firefox/` for Firefox |
 | `npm run build:chrome` / `npm run build:firefox` | Builds only one of them |
 | `npm run watch` | Build in watch mode |
 | `npm test` | Runs the tests with `node --test` (1084 tests) |
