@@ -4,7 +4,7 @@
 
 # XViewer for Pixiv
 
-**A Chrome extension that adds an X.com-style image viewer to pixiv user pages**
+**A browser extension that adds an X.com-style image viewer to pixiv user pages**
 
 [![version](https://img.shields.io/github/package-json/v/NEONS-DESIGN/XViewer-for-Pixiv?color=0096fa)](package.json)
 [![license](https://img.shields.io/github/license/NEONS-DESIGN/XViewer-for-Pixiv?color=0096fa)](LICENSE)
