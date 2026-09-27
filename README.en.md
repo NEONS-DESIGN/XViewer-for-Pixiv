@@ -214,7 +214,7 @@ If you prefer GitHub, [Issues](https://github.com/NEONS-DESIGN/XViewer-for-Pixiv
 | `npm run build` | Builds `dist/` for Chromium browsers and `dist-firefox/` for Firefox |
 | `npm run build:chrome` / `npm run build:firefox` | Builds only one of them |
 | `npm run watch` | Build in watch mode |
-| `npm test` | Runs the tests with `node --test` (1084 tests) |
+| `npm test` | Runs the tests with `node --test` (1111 tests) |
 | `npm run build:icons` | Regenerates the extension icon PNGs (the output is committed) |
 | `npm run build:symbols` | Regenerates the UI icon shape data (the output is committed) |
 | `npm run build:site-images` | Exports the website images (WebP, plus JPEG for OGP) (the output is committed. The source PNGs are not in the repository, so it will not run on a fresh clone) |

@@ -15,6 +15,8 @@ const EMPTY_VIEW_BOX = '0 0 24 24';
  * アイコンの svg 要素を作る。
  * viewBox は図形ごとの値をそのまま使う。(Material Symbols は 0 -960 960 960)
  * 返す svg は寸法を持たない。大きさは使う側の CSS が決める約束。
+ * 中身は innerHTML を使わず createElementNS で組み立てる。
+ * (innerHTML はホストページが Trusted Types を強制すると例外になり、アイコンが空になる)
  * @param {Document} doc 対象のドキュメント
  * @param {string} name ICON_SHAPES のキー
  * @returns {SVGSVGElement} svg 要素。未知の名前なら中身が空の svg (warn で名前を残す)
@@ -28,13 +30,29 @@ export function createIcon(doc, name) {
 	svg.setAttribute('fill', 'currentColor');
 	svg.setAttribute('aria-hidden', 'true');
 	svg.setAttribute('focusable', 'false');
-	// 中身は定数だけで外部入力は混ざらない。ホストページが Trusted Types を強制していると
-	// innerHTML 代入自体が TypeError を投げるため守る。失敗しても空のアイコンで続行し、
-	// UI 構築を途中で落とさない (ボタンの aria-label / title が意味を補う)
+	// 図形は生成物の定数だけなので通常は失敗しない。万一どこかで投げても UI 構築を途中で落とさず、
+	// 空のアイコンで続行する (ボタンの aria-label / title が意味を補う)
 	try {
-		svg.innerHTML = shape?.markup ?? '';
-	} catch {
-		// 空のまま返す
+		const children = createShapeElements(doc, shape?.elements ?? []);
+		// 全部作れてから入れる。途中で失敗したときに図形の一部だけが描かれるのを避ける
+		svg.append(...children);
+	} catch (error) {
+		warn('アイコンを描けませんでした', name, error);
 	}
 	return svg;
+}
+
+/**
+ * 図形データから svg の子要素を作る。
+ * 子要素も SVG の名前空間で作る。(createElement で作ると HTML の要素になり、何も描かれない)
+ * @param {Document} doc 対象のドキュメント
+ * @param {ReadonlyArray<{tag: string, attrs: Record<string, string>}>} elements 要素名と属性の組
+ * @returns {SVGElement[]} 作った要素。まだどこにも入っていない
+ */
+function createShapeElements(doc, elements) {
+	return elements.map(({ tag, attrs }) => {
+		const element = doc.createElementNS(SVG_NS, tag);
+		for (const [attribute, value] of Object.entries(attrs)) element.setAttribute(attribute, value);
+		return element;
+	});
 }

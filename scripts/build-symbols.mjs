@@ -2,8 +2,10 @@
  * Material Symbols と Font Awesome (ブランドロゴ) から必要な図形だけを抜き出し、
  * 自前で描いた図形と混ぜて icon-shapes.js を生成する。
  * 生成物はコミットする。src/ を素の import で読めるようにするため。(UI_DESIGN_KIT §5)
+ * 図形は文字列ではなく要素名と属性の組で持つ。実行時に innerHTML を使わず組み立てるため。
  */
 import { readFile, writeFile } from 'node:fs/promises';
+import { parseSvgElements } from './svg-elements.mjs';
 
 /** 抜き出す図形。左がコード側の名前、右が Material Symbols のファイル名。 */
 const ICON_SOURCES = {
@@ -46,6 +48,7 @@ const BRAND_SOURCES = {
  *       (SITE_SPEC §8) Material Symbols の mood は顔を丸い枠で囲っていて別物に見えるため、
  *       pixiv と同じ「枠の無い顔」を比率だけ合わせて描き起こす。
  *       塗りは svg 側の fill=currentColor に任せ、口だけ線で描く。
+ * 原本の SVG と同じく文字列で書き、同じ分解 (parseSvgElements) の検査を通してから混ぜる。
  */
 const CUSTOM_SHAPES = {
 	like: {
@@ -71,7 +74,7 @@ const OUTPUT_PATH = 'src/common/icon-shapes.js';
 /**
  * SVG の中のコメント。Font Awesome は各ファイルの先頭に帰属のコメントを持つ。
  * 帰属は HEADER と NOTICE に書いてあるので、図形データには残さない。
- * (残すと createIcon のたびに innerHTML でコメントノードが注入され、生成物も膨らむ)
+ * (残すと parseSvgElements が要素の並びとして読めずに止まる)
  */
 const SVG_COMMENT_PATTERN = /<!--[\s\S]*?-->/g;
 
@@ -79,8 +82,9 @@ const SVG_COMMENT_PATTERN = /<!--[\s\S]*?-->/g;
  * SVG から viewBox と中身を取り出す。
  * @param {string} svg SVG の中身
  * @param {string} source 読み込み元 (エラー表示用)
- * @returns {{viewBox: string, markup: string}} 図形
- * @throws {Error} svg 要素か viewBox が見つからないとき (パッケージの更新で形式が変わった等)
+ * @returns {{viewBox: string, elements: Array<{tag: string, attrs: Record<string, string>}>}} 図形
+ * @throws {Error} svg 要素か viewBox が見つからないとき、中身を要素の並びに分解できないとき
+ *   (パッケージの更新で形式が変わった等)
  */
 function extract(svg, source) {
 	if (!/<svg[\s>]/.test(svg)) {
@@ -97,14 +101,14 @@ function extract(svg, source) {
 		.replace(/^[\s\S]*?<svg[^>]*>/, '')
 		.replace(/<\/svg>\s*$/, '')
 		.trim();
-	return { viewBox, markup };
+	return { viewBox, elements: parseSvgElements(markup, source) };
 }
 
 /**
  * 原本の SVG を読み、名前ごとの図形にする。
  * @param {Record<string, string>} sources 左がコード側の名前、右がファイル名 (拡張子なし)
  * @param {string} dir 原本の置き場
- * @returns {Promise<Record<string, {viewBox: string, markup: string}>>} 図形
+ * @returns {Promise<Record<string, {viewBox: string, elements: Array<{tag: string, attrs: Record<string, string>}>}>>} 図形
  * @throws {Error} 原本が読めない・形式が違うとき
  */
 async function loadShapes(sources, dir) {
@@ -120,6 +124,36 @@ async function loadShapes(sources, dir) {
 	}));
 	return Object.fromEntries(entries);
 }
+
+/**
+ * 自前の図形を要素の組に分ける。原本から読む図形と同じ検査を通す。
+ * @returns {Record<string, {viewBox: string, elements: Array<{tag: string, attrs: Record<string, string>}>}>} 図形
+ * @throws {Error} 中身を要素の並びに分解できないとき
+ */
+function loadCustomShapes() {
+	return Object.fromEntries(Object.entries(CUSTOM_SHAPES).map(([name, { viewBox, markup }]) => (
+		[name, { viewBox, elements: parseSvgElements(markup, `CUSTOM_SHAPES.${name}`) }]
+	)));
+}
+
+/**
+ * 生成物に書き出す、入れ子まで凍らせる関数。
+ * Object.freeze は一段目しか凍らせないので、elements や attrs を誤って書き換えると以後のすべてのアイコンが変わる。
+ */
+const DEEP_FREEZE_SOURCE = `/**
+ * 入れ子まで凍らせる。図形データを誤って書き換えると、以後のすべてのアイコンが変わるため。
+ * @template T
+ * @param {T} value 凍らせる値
+ * @returns {T} 同じ値
+ */
+function deepFreeze(value) {
+	if (value !== null && typeof value === 'object') {
+		for (const child of Object.values(value)) deepFreeze(child);
+		Object.freeze(value);
+	}
+	return value;
+}
+`;
 
 /** 生成物の先頭に付ける注意書きと出典。 */
 const HEADER = `/**
@@ -142,11 +176,11 @@ async function build() {
 		...(await loadShapes(ICON_SOURCES, SOURCE_DIR)),
 		...(await loadShapes(BRAND_SOURCES, BRAND_SOURCE_DIR)),
 		// 自前の図形は最後に混ぜる。同じ名前があれば自前を優先する
-		...CUSTOM_SHAPES,
+		...loadCustomShapes(),
 	};
 	await writeFile(
 		OUTPUT_PATH,
-		`${HEADER}export const ICON_SHAPES = Object.freeze(${JSON.stringify(shapes, null, '\t')});\n`,
+		`${HEADER}\n${DEEP_FREEZE_SOURCE}\nexport const ICON_SHAPES = deepFreeze(${JSON.stringify(shapes, null, '\t')});\n`,
 		'utf8',
 	);
 	return Object.keys(shapes).length;
