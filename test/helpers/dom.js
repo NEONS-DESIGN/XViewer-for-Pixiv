@@ -485,12 +485,13 @@ export function fakeDoc(options = {}) {
 
 /**
  * createIcon が描いた svg から図形の名前を割り出す。
- * 偽の要素は innerHTML を覚えるだけなので、図形データと突き合わせて名前へ戻す。
+ * 子要素の要素名と属性を図形データ (elements) と突き合わせて名前へ戻す。
  * @param {object} icon svg の代わり
- * @returns {string|undefined} ICON_SHAPES のキー
+ * @returns {string|undefined} ICON_SHAPES のキー。中身が空か、どの図形とも合わなければ undefined
  */
 export function iconName(icon) {
-	return Object.keys(ICON_SHAPES).find((name) => ICON_SHAPES[name].markup === icon.innerHTML);
+	const drawn = JSON.stringify(icon.children.map((child) => ({ tag: child.tag, attrs: child.attributes })));
+	return Object.keys(ICON_SHAPES).find((name) => JSON.stringify(ICON_SHAPES[name].elements) === drawn);
 }
 
 /**
