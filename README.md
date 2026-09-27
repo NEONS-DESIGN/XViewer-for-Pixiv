@@ -4,7 +4,7 @@
 
 # XViewer for Pixiv
 
-**pixiv のユーザーページに、X.com のメディア閲覧に近い画像ビュワーを追加する Chrome 拡張機能**
+**pixiv のユーザーページに、X.com のメディア閲覧に近い画像ビュワーを追加するブラウザ拡張機能**
 
 [![version](https://img.shields.io/github/package-json/v/NEONS-DESIGN/XViewer-for-Pixiv?color=0096fa)](package.json)
 [![license](https://img.shields.io/github/license/NEONS-DESIGN/XViewer-for-Pixiv?color=0096fa)](LICENSE)
