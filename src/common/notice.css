@@ -1,7 +1,5 @@
 /* 上部中央に積む。下の画像やクリック領域の操作を妨げないよう、入れ物は押せない */
 .notice-area {
-	/* 配色トークンに無い影だけの値。ここでまとめて持ち、.notice からは var() で引く */
-	--notice-shadow: rgb(0 0 0 / 0.35);
 	position: absolute;
 	inset: 12px 0 auto 0;
 	z-index: 3;
