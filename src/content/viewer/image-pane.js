@@ -329,8 +329,8 @@ export function createImagePane(deps) {
 	 * 原寸表示を開く。
 	 * 開いた先でページを送られたら、こちらの表示も合わせる。
 	 * (閉じたときに違うページが出ていると、見ていた場所を見失う)
-	 * 解像度の設定が原寸でなければ、手元にある標準画質を仮表示用として渡す。
-	 * 通信は増やさない (読み込み済みのものしか渡さない) ので、設定に関わらず渡してよい
+	 * 解像度の設定が原寸でなければ、手元にある読み込み済みの標準画質と実寸を仮表示用として渡す。
+	 * 設定が原寸のときは表示中の画像が既に原寸なので、仮表示用の情報 (placeholderAt / sizes) は渡さない
 	 * @param {string} alt 画像の代替文言 (作品名)
 	 * @returns {void}
 	 */
@@ -358,11 +358,13 @@ export function createImagePane(deps) {
 	 * ページ番号を動かす。
 	 * /pages 待ちの間 (urls.length が total に満たない間) は行き先だけ覚え、
 	 * 届いたときに反映する。(枚数を先に出しているので、実際のページはまだ無い)
+	 * 待っている間に続けて押された分は、覚えている行き先を起点に足し引きする
 	 * @param {number} offset 相対位置
 	 * @returns {void}
 	 */
 	function move(offset) {
-		const next = index + offset;
+		const base = pendingIndex ?? index;
+		const next = base + offset;
 		if (next < 0 || next >= total) return;
 		lastDirection = offset > 0 ? 1 : -1;
 		if (urls.length < total) {

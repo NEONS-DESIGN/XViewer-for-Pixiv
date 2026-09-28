@@ -192,6 +192,34 @@ test('/pages の前に押された → は届いた時点で反映される', as
 	assert.equal(find(container, 'img').src, cdn('r1'));
 });
 
+test('/pages の前に → → と押すと、届いた時点で 3 ページ目へ進む', async () => {
+	let respond;
+	const fetchImpl = () => new Promise((resolve) => { respond = resolve; });
+	const { container, pane } = build({ fetchImpl });
+	const rendering = pane.render(DETAIL);
+	pane.next();
+	pane.next();
+	// 分母を超える分は捨てる
+	pane.next();
+	respond({ ok: true, status: 200, text: async () => JSON.stringify({ error: false, body: PAGES }) });
+	await rendering;
+	assert.equal(find(container, '.counter').textContent, '3/3');
+	assert.equal(find(container, 'img').src, cdn('r2'));
+});
+
+test('/pages の前に → ← と押すと、届いた時点で 1 ページ目のまま', async () => {
+	let respond;
+	const fetchImpl = () => new Promise((resolve) => { respond = resolve; });
+	const { container, pane } = build({ fetchImpl });
+	const rendering = pane.render(DETAIL);
+	pane.next();
+	pane.prev();
+	respond({ ok: true, status: 200, text: async () => JSON.stringify({ error: false, body: PAGES }) });
+	await rendering;
+	assert.equal(find(container, '.counter').textContent, '1/3');
+	assert.equal(find(container, 'img').src, cdn('r0'));
+});
+
 test('1 枚だけの作品では矢印を隠し、/pages を叩かない', async () => {
 	const { impl, calls } = fakeApiFetch(PAGES);
 	const { container, pane } = build({ fetchImpl: impl });
