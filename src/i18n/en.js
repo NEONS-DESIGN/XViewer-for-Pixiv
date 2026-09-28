@@ -47,6 +47,7 @@ export default {
 		LABEL: 'Actual size',
 		PREV_PAGE: 'Previous page',
 		NEXT_PAGE: 'Next page',
+		PREVIEW_NOTICE: 'Showing the standard-size image while the original loads…',
 	},
 	sidebar: {
 		OPEN_ORIGINAL: 'Open artwork page',

@@ -62,6 +62,7 @@ export default {
 		LABEL: '查看原图',
 		PREV_PAGE: '上一页',
 		NEXT_PAGE: '下一页',
+		PREVIEW_NOTICE: '正在以标准画质临时显示，原图加载中…',
 	},
 	sidebar: {
 		OPEN_ORIGINAL: '打开作品页面',

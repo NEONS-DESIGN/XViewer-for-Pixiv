@@ -1,0 +1,47 @@
+/* 上部中央に積む。下の画像やクリック領域の操作を妨げないよう、入れ物は押せない */
+.notice-area {
+	/* 配色トークンに無い影だけの値。ここでまとめて持ち、.notice からは var() で引く */
+	--notice-shadow: rgb(0 0 0 / 0.35);
+	position: absolute;
+	inset: 12px 0 auto 0;
+	z-index: 3;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+	pointer-events: none;
+}
+.notice {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	max-width: min(90%, 560px);
+	padding: 8px 14px;
+	border: 1px solid var(--muted);
+	border-radius: 8px;
+	background: var(--surface);
+	color: var(--fg);
+	font-size: 13px;
+	line-height: 1.5;
+	box-shadow: 0 2px 8px var(--notice-shadow);
+}
+.notice svg {
+	flex: 0 0 auto;
+	width: 18px;
+	height: 18px;
+}
+.notice-spinner {
+	flex: 0 0 auto;
+	width: 14px;
+	height: 14px;
+	border: 2px solid color-mix(in srgb, currentColor 25%, transparent);
+	border-top-color: currentColor;
+	border-radius: 50%;
+	animation: notice-spin 0.8s linear infinite;
+}
+@keyframes notice-spin {
+	to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+	.notice-spinner { animation-duration: 2.4s; }
+}

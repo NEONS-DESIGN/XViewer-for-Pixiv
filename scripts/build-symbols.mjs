@@ -21,6 +21,7 @@ const ICON_SOURCES = {
 	pause: 'pause-fill',
 	openInNew: 'open_in_new-fill',
 	error: 'error-fill',
+	info: 'info-fill',
 	refresh: 'refresh-fill',
 	share: 'share-fill',
 	link: 'link-fill',

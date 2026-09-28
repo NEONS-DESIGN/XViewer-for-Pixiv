@@ -62,6 +62,7 @@ export default {
 		LABEL: '原寸表示',
 		PREV_PAGE: '前のページ',
 		NEXT_PAGE: '次のページ',
+		PREVIEW_NOTICE: '標準画質で仮表示しています。原寸を読み込み中…',
 	},
 	sidebar: {
 		OPEN_ORIGINAL: '作品ページを開く',
