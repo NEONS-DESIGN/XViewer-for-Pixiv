@@ -3,7 +3,8 @@
  *
  * profile/all の ID を数値降順にして 48 件ずつ区切る。pixiv 本体のページャと同じ区切りになる。
  * 「全作品 ID の並び」はビュワーの作品間移動 (content/sequence.js) も使う。
- * 取得とキャッシュはここ 1 か所に置き、種別の絞り込みはキャッシュの後段で行う。
+ * 取得とキャッシュはここ 1 か所に置く。キャッシュには応答から組んだ種別ごとの降順 ID の索引
+ * (イラスト / 漫画 / 両方を繋いだもの) を覚え、種別の絞り込みは索引から該当の配列を引くだけにする。
  */
 import { getJson } from './client.js';
 import { userProfileAllUrl, userProfileIllustsUrl } from './endpoints.js';
@@ -14,14 +15,14 @@ import { WORK_CATEGORY, WORKS_PER_PAGE } from '../common/constants.js';
 const PROFILE_CACHE_LIMIT = 20;
 
 /**
- * profile/all の応答本体を覚える。キーはユーザー ID。
+ * profile/all の応答から組んだ、種別ごとの数値降順 ID の索引 (凍結済み) を覚える。キーはユーザー ID。
  * Promise のまま覚え、失敗は覚えず、上限を超えたら最古から捨てる。
- * 種別 (イラスト / 漫画) を問わず応答は同じなので、種別では分けない。
+ * 1 つの索引が全種別 (と両方を繋いだ並び) を持つので、種別ではキーを分けない。
  */
 const profileCache = createPromiseCache(PROFILE_CACHE_LIMIT);
 
 /**
- * 覚えている応答を捨てる。テスト用。(本体は上限 PROFILE_CACHE_LIMIT の押し出しに任せる)
+ * 覚えている索引を捨てる。テスト用。(本体は上限 PROFILE_CACHE_LIMIT の押し出しに任せる)
  * @returns {void}
  */
 export function clearPageSourceCache() {

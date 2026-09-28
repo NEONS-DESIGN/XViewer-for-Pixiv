@@ -734,6 +734,25 @@ test('dispose 後に先読みが終わっても投げない', async () => {
 	assert.deepEqual(loaded, [2, 3], 'dispose 後に読み直している');
 });
 
+test('撤去で止めた先読みの失敗は warn しない', async (t) => {
+	const warnSpy = t.mock.method(console, 'warn', () => {});
+	let rejectPrefetch = () => {};
+	let entered = () => {};
+	const reached = new Promise((resolve) => { entered = resolve; });
+	const { source } = sourceOf((page) => {
+		if (page !== 3) return Promise.resolve([singleWork(page)]);
+		entered();
+		return new Promise((_resolve, reject) => { rejectPrefetch = reject; });
+	}, 5);
+	const { handle, observer } = setup({ cards: [makeCard({ id: '1' })], source, mode: INFINITE_SCROLL.PREFETCH });
+	await observer.trigger();
+	await reached;
+	handle.dispose();
+	rejectPrefetch(new DOMException('aborted', 'AbortError'));
+	await tick();
+	assert.equal(warnSpy.mock.callCount(), 0, '撤去で止めた先読みを warn している');
+});
+
 test('dispose 後の currentPage は null', async () => {
 	// 動いていなければ null。呼び出し側は「継ぎ足しが無い」として ?p= を触らない
 	const { handle, observer } = setup({ startPage: 3, pages: 5 });
