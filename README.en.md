@@ -174,6 +174,7 @@ bundled third-party assets.
 | Viewer | Sidebar scrolling | Scroll the whole sidebar | Scroll caption and comments as one, or pin the caption and scroll only the comments |
 | Image | Resolution | Regular (1200px on the long edge) | Original is sharper but slower to load |
 | Image | Prefetch | 1 each way | How many neighbouring pages to load ahead of time (none / 1 each way / 3 each way) |
+| Image | Also preload the adjacent work | Off | After a work finishes showing, loads just one work `↑` `↓` may move to next. Moving is faster, but data is used even if you close without moving |
 | Image | Click to view full size | Off | Clicking the image opens it at its original resolution, filling the screen. It loads the original regardless of the resolution setting above |
 | User page | Hide the pickup section | Off | Hides the "pickup" block on a profile home |
 | User page | Infinite scroll | Off | Load when you reach the bottom, or always keep one page ahead |
