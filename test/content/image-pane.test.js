@@ -315,6 +315,26 @@ test('表示中の画像が error でも先読みは始まる', async () => {
 	assert.deepEqual(created.map((img) => img.src), [cdn('r1')]);
 });
 
+test('1 枚目が /pages より先に失敗しても、届いた後に先読みが始まる', async () => {
+	// 失敗済みの画像は実ブラウザで complete: true / naturalWidth: 0 になり、
+	// error は既に発火済みで二度と来ない。/pages 到着時の再描画では URL が変わらず
+	// load/error も発生しないため、schedulePrefetch が complete だけで判定できないと
+	// 先読みが一生始まらない
+	let respond;
+	const fetchImpl = () => new Promise((resolve) => { respond = resolve; });
+	const { container, pane, created } = build({ fetchImpl, prefetch: 1 });
+	const rendering = pane.render(DETAIL);
+	const image = find(container, 'img');
+	image.complete = true;
+	image.naturalWidth = 0;
+	await image.dispatch('error');
+	// /pages がまだ届いていないので先読み先の URL が無い
+	assert.equal(created.length, 0);
+	respond({ ok: true, status: 200, text: async () => JSON.stringify({ error: false, body: PAGES }) });
+	await rendering;
+	assert.deepEqual(created.map((img) => img.src), [cdn('r1')]);
+});
+
 test('先読みはページ番号ごとに 1 度だけ Image を作り、空の URL は飛ばす', async () => {
 	// 3 ページ目が CDN 以外で弾かれた作品
 	const pages = [PAGES[0], PAGES[1], { urls: { regular: 'https://evil.example.com/x.jpg' } }];

@@ -218,14 +218,17 @@ export function createImagePane(deps) {
 
 	/**
 	 * 先読みを始めるきっかけを整える。
-	 * 表示中の画像が既に読み終えていればすぐに始め、読み込み中なら load / error を待つ。
-	 * (偽の DOM で complete を持たない画像は「読み終えていない」扱い)
+	 * 表示中の画像が既に読み込みを終えていれば (成功でも失敗でも) すぐに始め、
+	 * 読み込み中なら load / error を待つ。1 枚目が /pages より先に失敗した場合、
+	 * その後 /pages が届いて同じ URL のまま再描画されても error は再発火しないため、
+	 * 「読み終えたか」は naturalWidth を見ず complete だけで判定する。
+	 * (偽の DOM で complete を持たない画像は「読み込み中」扱い)
 	 * @returns {void}
 	 */
 	function schedulePrefetch() {
 		clearPrefetchReadyHandler();
 		if (!image) return;
-		if (image.complete && image.naturalWidth > 0) {
+		if (image.complete) {
 			prefetch();
 			return;
 		}
