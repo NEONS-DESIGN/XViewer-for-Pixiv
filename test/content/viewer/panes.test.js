@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { planPanes, MAIN_PANE } from '../../../src/content/viewer/panes.js';
+import { planPanes, MAIN_PANE, renderWork, disposeAll } from '../../../src/content/viewer/panes.js';
 import { ILLUST_TYPES } from '../../../src/pixiv/normalize.js';
+import { fakeDoc, fakeElement } from '../../helpers/dom.js';
+import { createStrings } from '../../../src/i18n/index.js';
 
 /**
  * 作品詳細の代わり。planPanes が見るキーだけを持つ。
@@ -104,4 +106,98 @@ test('コメント無効と 0 件でもコメント区画は作る', () => {
 test('showSidebar が真偽値でなければサイドバーを出さない', () => {
 	// 設定が壊れていても描けること。storage 側で丸めているが、ここでも倒す
 	assert.equal(planPanes(detail(), LOGGED_IN, { showSidebar: undefined }).sidebar, false);
+});
+
+/**
+ * サイドバーの代わり。commentsSlot / countsSlot / followSlot は
+ * createComments / createActionsBar (実物) がそのまま使うので、器になる要素を返す。
+ * @param {string[]} order 呼ばれた順番を書き込む配列
+ * @returns {object} サイドバーペインの代わり
+ */
+function fakeSidebarPane(order) {
+	return {
+		render() { order.push('sidebar'); },
+		commentsSlot: () => fakeElement('div'),
+		countsSlot: () => fakeElement('div'),
+		followSlot: () => fakeElement('div'),
+		bumpCommentCount() {},
+		setCommentCount() {},
+		consumeKey: () => false,
+		dispose() {},
+	};
+}
+
+/**
+ * renderWork へ渡す描画先の代わり。
+ * コメントは commentOff で受け付けを止め、実物のコメント区画が通信をしないようにする。
+ * アクション区画は fakeDoc に __NEXT_DATA__ が無く未ログイン扱いになるので、通信の手前で止まる。
+ * @returns {{doc: object, stage: object, sidebar: object, strings: object}} 描画先
+ */
+function targets() {
+	const doc = fakeDoc();
+	return {
+		doc,
+		stage: fakeElement('div'),
+		sidebar: fakeElement('div'),
+		strings: createStrings('ja'),
+	};
+}
+
+test('主役の描画 (src の代入) はサイドバーより先に始まる', async () => {
+	const order = [];
+	await renderWork(detail({ commentOff: true }), LOGGED_IN, settings(true), {
+		...targets(),
+		createImagePane: () => ({
+			render: () => { order.push('main'); return Promise.resolve(); },
+			dispose() {},
+		}),
+		createSidebar: () => fakeSidebarPane(order),
+	});
+	disposeAll();
+	assert.deepEqual(order.slice(0, 2), ['main', 'sidebar']);
+});
+
+test('うごイラでも主役の描画はサイドバーより先に始まる', async () => {
+	const order = [];
+	await renderWork(detail({ illustType: ILLUST_TYPES.UGOIRA, commentOff: true }), LOGGED_IN, settings(true), {
+		...targets(),
+		createUgoiraPlayer: () => ({
+			render: () => { order.push('main'); return Promise.resolve(); },
+			dispose() {},
+		}),
+		createSidebar: () => fakeSidebarPane(order),
+	});
+	disposeAll();
+	assert.deepEqual(order.slice(0, 2), ['main', 'sidebar']);
+});
+
+test('主役の render は await の前、サイドバーより前に呼ばれている', async () => {
+	// renderWork が返る前に主役の Promise を待っていることも確かめる。
+	// 待っていなければ、この then が走る前に renderWork が返ってしまう
+	let mainSettled = false;
+	await renderWork(detail({ commentOff: true }), LOGGED_IN, settings(true), {
+		...targets(),
+		createImagePane: () => ({
+			render: () => Promise.resolve().then(() => { mainSettled = true; }),
+			dispose() {},
+		}),
+		createSidebar: () => fakeSidebarPane([]),
+	});
+	disposeAll();
+	assert.equal(mainSettled, true);
+});
+
+test('ブロック表示は今どおりサイドバーを先に作ってから描く', async () => {
+	const order = [];
+	await renderWork(detail({ xRestrict: 2, commentOff: true }), LOGGED_IN, settings(true), {
+		...targets(),
+		createImagePane: () => ({
+			render: () => { order.push('main'); return Promise.resolve(); },
+			dispose() {},
+		}),
+		createSidebar: () => fakeSidebarPane(order),
+	});
+	disposeAll();
+	// ブロック表示では画像ペインの工場を一切呼ばない
+	assert.deepEqual(order, ['sidebar']);
 });

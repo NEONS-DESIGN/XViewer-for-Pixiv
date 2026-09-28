@@ -74,17 +74,20 @@ export function planPanes(detail, session, settings) {
  * @property {{open: (pages: object) => void}} [zoom] 原寸表示のレイヤ (zoom.js)。画像ペインだけが使う
  * @property {(userId: string, lang: string) => Promise<object>} [fetchUser] 作者情報の取得。(サイドバーとアクションの両方へ渡す) テストから通信させないために使う
  * @property {object} strings 文言のカタログ (src/i18n)
+ * @property {typeof createImagePane} [createImagePane] 画像ペインの差し替え口。テストが組み立ての順番を記録するために使う
+ * @property {typeof createUgoiraPlayer} [createUgoiraPlayer] うごイラペインの差し替え口。テストが組み立ての順番を記録するために使う
+ * @property {typeof createSidebar} [createSidebar] サイドバーの差し替え口。テストが組み立ての順番を記録するために使う
  */
 
 /**
  * 判断に従ってペインを組み立てる。
  * 呼ぶ前に disposeAll() を済ませておくこと。(取得を待つ前に解体するのが決まり)
  *
- * サイドバーの中身 (本文・コメント・アクション) は主役の取得を待たずに先に作る。
- * うごイラの zip や /pages の往復を待ってからでは、コメントとボタンが数秒出ない。
- * await をまたがずに全ペインを作り終えるので、別の作品へ移ったあとに
- * 古い作品のコメントやいいねを新しいサイドバーへ差し込む事故も起きない。
+ * 主役 (画像 / うごイラ) の読み込みを先に始め、その同期部分 (1 枚目の src の代入など) の
+ * 直後にサイドバー・コメント・アクションを作る。await をまたがずに全ペインを作り終えるので、
+ * 別の作品へ移ったあとに古い作品のコメントやいいねを新しいサイドバーへ差し込む事故も起きない。
  * (いいねは取り消せないので、対象を間違えると実害が出る)
+ * ブロック表示のときは画像を読まないので、今どおりサイドバーを先に作る。
  * @param {object} detail 正規化した作品詳細
  * @param {{isLoggedIn: boolean, self: object|null}} session セッション
  * @param {object} settings 設定
@@ -93,17 +96,43 @@ export function planPanes(detail, session, settings) {
  */
 export async function renderWork(detail, session, settings, targets) {
 	const { doc, stage, sidebar, strings } = targets;
+	const makeImagePane = targets.createImagePane ?? createImagePane;
+	const makeUgoiraPlayer = targets.createUgoiraPlayer ?? createUgoiraPlayer;
+	const makeSidebar = targets.createSidebar ?? createSidebar;
 	const plan = planPanes(detail, session, settings);
 
 	// hidden は毎回明示的に設定する。片方でしか触らないと、
 	// 設定を戻したときに hidden が立ったままになって出てこなくなる
 	sidebar.hidden = !plan.sidebar;
 
-	// サイドバーを先に出す。文章とカウンタは画像の読み込みを待つ理由が無い。
+	if (plan.main === MAIN_PANE.BLOCKED) {
+		// 見られない作品は画像を読まないので、サイドバーを先に作って構わない
+		if (plan.sidebar) {
+			sidebarPane = makeSidebar({ doc, container: sidebar, fetchUser: targets.fetchUser, strings });
+			sidebarPane.render(detail);
+		}
+		blockedPane = createBlocked({ doc, container: stage, strings });
+		blockedPane.render(detail, plan.reason);
+		return;
+	}
+
+	// 主役の読み込みをまず始める。同期部分で 1 枚目の src を代入するところまでは
+	// サイドバーより先に走らせ、画面に絵が出るまでの体感を縮める
+	let mainDone;
+	if (plan.main === MAIN_PANE.UGOIRA) {
+		ugoiraPane = makeUgoiraPlayer({ doc, container: stage, settings, strings });
+		mainDone = ugoiraPane.render(detail);
+	} else {
+		// 原寸表示を開けるのは静止画だけ。うごイラ (canvas) と見られない作品には渡さない
+		imagePane = makeImagePane({ doc, container: stage, settings, zoom: targets.zoom, strings });
+		mainDone = imagePane.render(detail);
+	}
+
+	// サイドバーの中身 (本文・コメント・アクション) は主役の取得を待たずに組み立てる。
 	// コメントとアクションはサイドバーの中に入るので (plan.comments / plan.actions は
 	// plan.sidebar を含意する)、この 1 ブロックで済ませる
 	if (plan.sidebar) {
-		sidebarPane = createSidebar({ doc, container: sidebar, fetchUser: targets.fetchUser, strings });
+		sidebarPane = makeSidebar({ doc, container: sidebar, fetchUser: targets.fetchUser, strings });
 		sidebarPane.render(detail);
 
 		if (plan.comments) {
@@ -139,20 +168,7 @@ export async function renderWork(detail, session, settings, targets) {
 		}
 	}
 
-	if (plan.main === MAIN_PANE.BLOCKED) {
-		blockedPane = createBlocked({ doc, container: stage, strings });
-		blockedPane.render(detail, plan.reason);
-		return;
-	}
-
-	if (plan.main === MAIN_PANE.UGOIRA) {
-		ugoiraPane = createUgoiraPlayer({ doc, container: stage, settings, strings });
-		await ugoiraPane.render(detail);
-	} else {
-		// 原寸表示を開けるのは静止画だけ。うごイラ (canvas) と見られない作品には渡さない
-		imagePane = createImagePane({ doc, container: stage, settings, zoom: targets.zoom, strings });
-		await imagePane.render(detail);
-	}
+	await mainDone;
 }
 
 /**
