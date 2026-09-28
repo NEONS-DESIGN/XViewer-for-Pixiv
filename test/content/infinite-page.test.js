@@ -50,8 +50,3 @@ test('上端が読めない印は飛ばす', () => {
 	const { marks, topOf } = marksOf([[1, -900], [2, Number.NaN], [3, 500]]);
 	assert.equal(pickVisiblePage(marks, topOf), 1);
 });
-
-test('閾値は差し替えられる', () => {
-	const { marks, topOf } = marksOf([[1, -900], [2, 80]]);
-	assert.equal(pickVisiblePage(marks, topOf, 100), 2);
-});

@@ -26,14 +26,13 @@ export const VISIBLE_PAGE_TOP = 0;
  * 上端が数として読めない印 (DOM から外れた等) は飛ばす。
  * @param {PageMark[]} marks ページの先頭カードの印。page の昇順
  * @param {(el: object) => number} topOf 要素の上端 (ビューポート基準の px) を読む
- * @param {number} [threshold] この位置より上に来た印を「越えた」と見なす
  * @returns {number|null} ページ番号。印が無ければ null
  */
-export function pickVisiblePage(marks, topOf, threshold = VISIBLE_PAGE_TOP) {
+export function pickVisiblePage(marks, topOf) {
 	if (!Array.isArray(marks) || marks.length === 0) return null;
 	for (let i = marks.length - 1; i >= 0; i -= 1) {
 		const top = topOf(marks[i].el);
-		if (Number.isFinite(top) && top <= threshold) return marks[i].page;
+		if (Number.isFinite(top) && top <= VISIBLE_PAGE_TOP) return marks[i].page;
 	}
 	return marks[0].page;
 }
