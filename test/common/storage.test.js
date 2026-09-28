@@ -27,6 +27,7 @@ test('normalizeSettings は正しい値をそのまま通す', () => {
 		enabled: false,
 		imageQuality: IMAGE_QUALITY.ORIGINAL,
 		prefetch: 1,
+		prefetchNeighbor: true,
 		showSidebar: false,
 		sidebarScroll: SIDEBAR_SCROLL.WHOLE,
 		closeOnBackdrop: false,
@@ -37,6 +38,12 @@ test('normalizeSettings は正しい値をそのまま通す', () => {
 		popupTheme: POPUP_THEMES.LIGHT,
 	};
 	assert.deepEqual(normalizeSettings(input), input);
+});
+
+test('normalizeSettings は prefetchNeighbor を既定 false にし、真偽値だけを通す', () => {
+	assert.equal(normalizeSettings({}).prefetchNeighbor, false);
+	assert.equal(normalizeSettings({ prefetchNeighbor: true }).prefetchNeighbor, true);
+	assert.equal(normalizeSettings({ prefetchNeighbor: 'yes' }).prefetchNeighbor, false);
 });
 
 test('normalizeSettings はピックアップ非表示を真偽値へ丸める', () => {

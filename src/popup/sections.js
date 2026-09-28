@@ -130,6 +130,12 @@ export function createSections(strings) {
 				}),
 				Object.freeze({
 					kind: 'toggle',
+					key: 'prefetchNeighbor',
+					label: f.prefetchNeighbor.label,
+					description: f.prefetchNeighbor.description,
+				}),
+				Object.freeze({
+					kind: 'toggle',
 					key: 'clickZoom',
 					label: f.clickZoom.label,
 					description: f.clickZoom.description,

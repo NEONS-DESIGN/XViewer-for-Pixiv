@@ -64,6 +64,7 @@ export function normalizeSettings(raw) {
 		enabled: asBoolean(source.enabled, d.enabled),
 		imageQuality: oneOf(source.imageQuality, Object.values(IMAGE_QUALITY), d.imageQuality),
 		prefetch: oneOf(source.prefetch, PREFETCH_CHOICES, d.prefetch),
+		prefetchNeighbor: asBoolean(source.prefetchNeighbor, d.prefetchNeighbor),
 		showSidebar: asBoolean(source.showSidebar, d.showSidebar),
 		sidebarScroll: oneOf(source.sidebarScroll, Object.values(SIDEBAR_SCROLL), d.sidebarScroll),
 		closeOnBackdrop: asBoolean(source.closeOnBackdrop, d.closeOnBackdrop),
