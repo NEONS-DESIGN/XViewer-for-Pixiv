@@ -265,8 +265,8 @@ export default {
 					}),
 			},
 			prefetchNeighbor: {
-				label: 'Preload the next work',
-				description: 'After a work is shown, loads the one you are likely to move to with ↑ ↓. Moving is faster, but data is used even if you close without moving.',
+				label: 'Also preload the adjacent work',
+				description: 'After a work finishes showing, loads just one work you may move to next with ↑ ↓. Moving is faster, but data is used even if you close without moving.',
 			},
 			clickZoom: {
 				label: 'Click to view at actual size',

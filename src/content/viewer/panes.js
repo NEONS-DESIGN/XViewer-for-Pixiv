@@ -88,7 +88,7 @@ export function planPanes(detail, session, settings) {
  * 直後にサイドバー・コメント・アクションを作る。await をまたがずに全ペインを作り終えるので、
  * 別の作品へ移ったあとに古い作品のコメントやいいねを新しいサイドバーへ差し込む事故も起きない。
  * (いいねは取り消せないので、対象を間違えると実害が出る)
- * ブロック表示のときは画像を読まないので、今どおりサイドバーを先に作る。
+ * ブロック表示のときは画像を読まないので、サイドバーを先に作る。
  * @param {object} detail 正規化した作品詳細
  * @param {{isLoggedIn: boolean, self: object|null}} session セッション
  * @param {object} settings 設定

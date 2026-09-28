@@ -307,7 +307,7 @@ export function attachInfiniteScroll(doc, options) {
 	const sending = new WeakSet();
 	/**
 	 * 継ぎ足しの取得を束ねる中断の合図。dispose() で中断する。
-	 * setMode() の dropPrefetch() では中断しない。(応答が HTTP キャッシュへ残り、次の advance() で使えるため)
+	 * setMode() の dropPrefetch() は走っている取得を中断せず、応答を持ち分にしないだけ
 	 */
 	const aborter = new AbortController();
 	/** @type {Set<string>} 自分が継ぎ足した作品 ID。重複判定は ul 全体を数え直さずここを見る */
@@ -519,6 +519,8 @@ export function attachInfiniteScroll(doc, options) {
 			const works = await source.loadPage(page, { signal: aborter.signal });
 			return Array.isArray(works) ? works : null;
 		} catch (error) {
+			// 撤去で中断した分は失敗ではない
+			if (disposed) return null;
 			// 先読みは失敗しても実害が無い。下まで来たときに読み直す
 			warn('infinite scroll prefetch failed', error);
 			return null;
@@ -916,7 +918,7 @@ export function attachInfiniteScroll(doc, options) {
 		dispose() {
 			if (disposed) return;
 			disposed = true;
-			// 走っている取得を中断する。応答が HTTP キャッシュに残っていれば無駄にはならない
+			// 走っている取得 (先読みを含む) を中断する
 			aborter.abort();
 			dropPrefetch();
 			stopObserving();
