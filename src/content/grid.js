@@ -22,6 +22,12 @@ const NON_GRID_CONTAINER_SELECTOR = 'section';
 const DOCUMENT_NODE_TYPE = 9;
 
 /**
+ * 押し始めの合図を拾わない入力の種類。
+ * 指のスクロールはカードの上から始まることが多く、そのたびに詳細を取りに行かないため。
+ */
+const PRESS_IGNORED_POINTER_TYPE = 'touch';
+
+/**
  * リンクの href から作品 ID を取り出す。
  * /users/{id}/artworks/{タグ} のようなタグ絞り込みリンクは弾く。
  * @param {string|null} href リンクの href
@@ -98,7 +104,7 @@ function openableWorkId(event, origin) {
 
 /**
  * グリッドのクリックを購読する。
- * `deps.onPress` を渡すと、押し始めた時点 (pointerdown) でも同じ条件で `onPress` を呼ぶ。
+ * `deps.onPress` を渡すと、押し始めた時点 (pointerdown) でも同じ条件で `onPress` を呼ぶ。(マウスとペンだけ。タッチは呼ばない)
  * 先読みの開始に使うためのもので、click とは別に働く (preventDefault はしない)。
  * 押し始めたあと選択やドラッグで取り消されたときは `pointercancel` / `dragstart` で
  * `deps.onPressCancel` を呼ぶ。
@@ -134,10 +140,20 @@ export function attachGridListener(doc, onOpen, deps = {}) {
 	const pressOptions = { capture: true, passive: true };
 
 	if (deps.onPress) {
+		/**
+		 * マウスとペンの押し始めで、開ける作品なら onPress を呼ぶ。タッチは拾わない。
+		 * @param {PointerEvent} event 押し始め
+		 * @returns {void}
+		 */
 		pressListener = (event) => {
+			if (event.pointerType === PRESS_IGNORED_POINTER_TYPE) return;
 			const workId = openableWorkId(event, origin);
 			if (workId) deps.onPress(workId);
 		};
+		/**
+		 * 押し始めが選択やドラッグで取り消されたことを onPressCancel へ伝える。
+		 * @returns {void}
+		 */
 		cancelListener = () => deps.onPressCancel?.();
 		doc.addEventListener('pointerdown', pressListener, pressOptions);
 		doc.addEventListener('pointercancel', cancelListener, true);

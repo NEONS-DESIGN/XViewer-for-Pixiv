@@ -275,6 +275,17 @@ test('pointerdown は click と同じ条件のときだけ onPress を呼ぶ', (
 	assert.deepEqual(pressed, ['123']);
 });
 
+test('pointerdown はタッチでは onPress を呼ばず、マウスとペンだけ拾う', () => {
+	// 一覧を指でスクロールするたびに詳細を取りに行かないため
+	const doc = fakeDoc();
+	const pressed = [];
+	attachGridListener(doc, () => {}, { origin: ORIGIN, onPress: (id) => pressed.push(id) });
+	doc.dispatch('pointerdown', fakeClick('/artworks/1', { pointerType: 'touch' }));
+	doc.dispatch('pointerdown', fakeClick('/artworks/2', { pointerType: 'mouse' }));
+	doc.dispatch('pointerdown', fakeClick('/artworks/3', { pointerType: 'pen' }));
+	assert.deepEqual(pressed, ['2', '3']);
+});
+
 test('pointerdown は preventDefault を呼ばない', () => {
 	// 選択やドラッグを壊さないため
 	const doc = fakeDoc();
