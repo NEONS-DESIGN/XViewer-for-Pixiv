@@ -4,6 +4,8 @@
  * page world へ注入する inject.js は world が違うので別の束にする。
  * viewer.css と common/tokens.css は text loader で文字列として取り込み、Shadow DOM へ注入する。
  * tokens.css は popup.html も <link> で読むので、静的ファイルとして <出力先>/common/ にも置く。(static-files.mjs)
+ * popup は拡張のページとして開くので ESM を読める。content/inject とは別の設定で束ね、
+ * 言語のカタログを分割して使う 1 言語だけを読む。(popupOptionsFor)
  *
  * 出力はブラウザごとに分ける。(scripts/browsers.mjs) Chrome 系は dist、Firefox は dist-firefox。
  * 束ねる元のソースは同じで、違うのは esbuild の target と manifest に差し込むキーだけ。
@@ -38,8 +40,10 @@ const ENTRY_POINTS = Object.freeze({
 	content: 'src/content/main.js',
 	// page world へ注入する分。content.js とは別 world なので束を分ける
 	inject: 'src/inject/inject.js',
-	'popup/popup': 'src/popup/popup.js',
 });
+
+/** popup だけの束ねる入口。popup は拡張のページなので ESM で言語のカタログを分割できる。 */
+const POPUP_ENTRY_POINTS = Object.freeze({ 'popup/popup': 'src/popup/popup.js' });
 
 /**
  * ブラウザごとの esbuild の設定を作る。
@@ -58,6 +62,23 @@ function buildOptionsFor(target) {
 		// viewer.css と common/tokens.css を圧縮してから文字列として import する
 		plugins: [cssTextPlugin(target.esbuildTarget)],
 		logLevel: 'info',
+	};
+}
+
+/**
+ * popup の esbuild の設定を作る。
+ * popup は拡張のページなので ESM を読める。言語のカタログを分割し、使う 1 言語だけを読む。
+ * @param {import('./browsers.mjs').BrowserTarget} target 作るブラウザ
+ * @returns {import('esbuild').BuildOptions} esbuild の設定
+ */
+function popupOptionsFor(target) {
+	return {
+		...buildOptionsFor(target),
+		entryPoints: POPUP_ENTRY_POINTS,
+		format: 'esm',
+		splitting: true,
+		// 分割した断片は popup/ の下へ置く。(web_accessible にしない。拡張のページからしか読まない)
+		chunkNames: 'popup/chunks/[name]-[hash]',
 	};
 }
 
@@ -166,7 +187,9 @@ async function build(targets) {
 		for (const target of targets) {
 			await resetOutDir(target);
 			const ctx = await context(buildOptionsFor(target));
+			const popupCtx = await context(popupOptionsFor(target));
 			await ctx.watch();
+			await popupCtx.watch();
 			await emitAssets(target, packageVersion);
 			completed.add(target.name);
 		}
@@ -179,6 +202,7 @@ async function build(targets) {
 	for (const target of targets) {
 		await resetOutDir(target);
 		await bundle(buildOptionsFor(target));
+		await bundle(popupOptionsFor(target));
 		await emitAssets(target, packageVersion);
 		completed.add(target.name);
 	}
