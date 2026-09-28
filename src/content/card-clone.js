@@ -3,7 +3,7 @@
  *
  * 自分でカードを描かずに本体の li を cloneNode するのは、styled-components の
  * ハッシュクラスを再現せずに見た目を完全に一致させるため。掴んでよいのは
- * 計測用の data 属性と位置関係だけで、クラス名は読まない。(SPEC §2)
+ * 計測用の data 属性と位置関係だけで、クラス名は読まない。
  */
 import {
 	ARTWORK_LINK_SELECTOR,
@@ -61,7 +61,7 @@ export function heartPaths(card) {
 /**
  * カードのハートを塗る。
  * ブックマーク済みなら BOOKMARKED_FILL を inline で書き、未ブックマークなら inline を外して本体の CSS に戻す。
- * 未ブックマークの色はテーマで変わる (SITE_SPEC §3) ので、値を持ち歩かず CSS に任せる。
+ * 未ブックマークの色はテーマで変わるので、値を持ち歩かず CSS に任せる。
  * カードを組むときと、継ぎ足したカードのハートを押されたときの両方から呼ぶ。
  * @param {object} card カード (li)
  * @param {boolean} bookmarked ブックマーク済みの色にするか
@@ -76,7 +76,7 @@ export function paintHeart(card, bookmarked) {
 
 /**
  * カードが複数枚バッジを持つか。
- * バッジはサムネリンクのオーバーレイ層にだけ現れる数字。(SITE_SPEC §3)
+ * バッジはサムネリンクのオーバーレイ層にだけ現れる数字。
  * @param {object} card カード (li)
  * @returns {object|null} バッジのノード。無ければ null
  */
@@ -130,11 +130,11 @@ function pickTemplates(cards, accept) {
  * サムネのオーバーレイ層にある、雛形の作品に紐づいたラベルを集める。
  *
  * 「R-18」「非公開」のような表示で、**複数枚バッジと同じ層に、バッジより前に並ぶ**。
- * (SITE_SPEC §3 で実測) 雛形を cloneNode するとこれも付いてくるので、
- * 組み立てのときに落とす。残すと別の作品に他人のラベルが付く。
+ * 雛形を cloneNode するとこれも付いてくるので、組み立てのときに落とす。
+ * 残すと別の作品に他人のラベルが付く。
  *
  * 掴み方は findBadge と同じく「祖先の祖先が thumb」。そこから画像の入れ物 (文字を持たない) と
- * バッジ (数字だけ) を除いたものがラベルになる。クラス名は読まない。(SPEC §2-2)
+ * バッジ (数字だけ) を除いたものがラベルになる。クラス名は読まない。
  * @param {object} card カード (li)
  * @returns {object[]} ラベルのノード
  */
@@ -164,7 +164,7 @@ export function findOverlayLabels(card) {
  * ハートが塗られた見た目になるので雛形にしない。
  *
  * **1 枚もハートが無ければ、ハート無しのカードで組む。** 自分のユーザーページでは pixiv が
- * 自分の作品にブックマークボタンを描かない (SITE_SPEC §4) ので、ここで諦めると
+ * 自分の作品にブックマークボタンを描かないので、ここで諦めると
  * 自分のページだけ無限スクロールが起動しなくなる。
  * 優先順位を付けるのは混在への備え — 読み込み途中などで 1 枚だけハートが欠けたカードを掴むと、
  * 継ぎ足したカードだけブックマークできなくなる。
@@ -192,7 +192,7 @@ export function captureTemplates(ul, deps = {}) {
 /**
  * 1 作品ぶんのカードを組む。
  *
- * 画像 URL が pximg でなければカードを作らない。API の値をそのまま img へ渡さないため。(SPEC §9.2)
+ * 画像 URL が pximg でなければカードを作らない。API の値をそのまま img へ渡さないため。
  * @param {{single: object, multi: object|null}} templates 雛形
  * @param {object} work 作品サマリ (profile/illusts の 1 件)
  * @param {{loggedIn: boolean, localePrefix?: string}} deps セッションの状態。
@@ -233,7 +233,7 @@ export function buildCard(templates, work, deps) {
 		if (titleLink) titleLink.textContent = String(work.title ?? '');
 
 		// 雛形の作品に紐づくラベル (R-18 / 非公開) を落とす。作品ごとに付け直す手当てが無いので、
-		// 残すと別の作品に他人のラベルが付く。出さないほうを選ぶ (SPEC §16)
+		// 残すと別の作品に他人のラベルが付くので、出さない
 		for (const label of findOverlayLabels(card)) label.remove();
 
 		const badge = findBadge(card);
@@ -243,7 +243,7 @@ export function buildCard(templates, work, deps) {
 			if (count) count.textContent = String(work.pageCount);
 		}
 
-		// 自分のユーザーページでは雛形にハートが無い。(SITE_SPEC §4) 塗る先も外す先も無いだけで、
+		// 自分のユーザーページでは雛形にハートが無い。塗る先も外す先も無いだけで、
 		// カードは組める。ブックマーク ID も書かない (押せるハートが無いので使い道がない)
 		const heartBox = card.querySelector(BOOKMARK_BUTTON_SELECTOR);
 		if (!deps.loggedIn) heartBox?.remove();

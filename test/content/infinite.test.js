@@ -15,7 +15,7 @@ const SENTINEL_TEXT = createStrings('ja').infinite;
 /** 継ぎ足しの既定の総ページ数 */
 const DEFAULT_PAGES = 3;
 
-/** 画像 URL が pximg でない作品。buildCard が null を返す (SPEC §9.2) */
+/** 画像 URL が pximg でない作品。buildCard が null を返す */
 const UNBUILDABLE_URL = 'https://example.com/99.jpg';
 
 // ハートを押すテストは readSession() を通り、session.js のモジュール共有キャッシュに
@@ -315,7 +315,7 @@ test('strings に英語のカタログを渡すと sentinel の文言も英語�
 
 test('sentinel は中身が入る前から読み上げの領域として置かれる', () => {
 	// role="status" は「空の領域が先にあって、後から中身が変わる」形でないと鳴らない。
-	// 中身入りで差し込むと読み上げられず、出していないのと同じになる (UI_DESIGN_KIT §6)
+	// 中身入りで差し込むと読み上げられず、出していないのと同じになる
 	const { wrap } = setup();
 	const sentinel = sentinelOf(wrap);
 	assert.equal(sentinel.getAttribute('role'), 'status');
@@ -340,7 +340,7 @@ test('sentinel のスタイルは同じ doc に 1 枚しか入らない', () => 
 });
 
 test('dispose で sentinel / ページャ / カードのスタイルが全て外れる', () => {
-	// 「オフにしたら元へ戻す」を 3 枚とも揃える (SPEC §6.7)。
+	// 「オフにしたら元へ戻す」を 3 枚とも揃える。
 	// ページャが隠れたまま残ると、拡張をオフにしたのにページ送りの手段が無い
 	const { doc, handle } = setup();
 	for (const id of [SENTINEL_STYLE_ID, PAGER_STYLE_ID, CARD_STYLE_ID]) {
@@ -485,7 +485,7 @@ test('失敗したら sentinel に文言と再試行ボタンが出る', async (
 	// 読み上げの領域は sentinel の 1 つだけ。中に role="alert" を入れて入れ子にすると、
 	// 実装によっては外側の polite 領域も鳴って二重に読み上げられる
 	assert.equal(sentinelOf(wrap).querySelector('p').getAttribute('role'), null, 'live region が入れ子になっている');
-	// 失敗は気づいてほしいので、sentinel 側の強さを assertive へ切り替える (UI_DESIGN_KIT §6)
+	// 失敗は気づいてほしいので、sentinel 側の強さを assertive へ切り替える
 	assert.equal(sentinelOf(wrap).getAttribute('aria-live'), 'assertive');
 	const button = retryButton(wrap);
 	assert.ok(button, '再試行ボタンが出ていない');
@@ -509,7 +509,7 @@ test('再試行ボタンを押すと読み直し、成功したら表示が消�
 
 /**
  * 作品は返るのに 1 枚も組めない供給で継ぎ足しを組み立てる。
- * 画像 URL が pximg でなければ buildCard が null を返す。(SPEC §9.2)
+ * 画像 URL が pximg でなければ buildCard が null を返す。
  * @param {{onPageChange?: Function}} [options] 上書き
  * @returns {{ul: object, wrap: object, loaded: number[], observer: object}} 材料一式
  */
@@ -630,7 +630,7 @@ function setupSlowPrefetch() {
 }
 
 test('先読みの間は読み込み中を出さず、並べ終えた時点で表示を戻す', async () => {
-	// 先読みは黙って読む。(SPEC §6.8) 手元の作品を並べるだけのときにスピナーと
+	// 先読みは黙って読む。手元の作品を並べるだけのときにスピナーと
 	// 「作品を読み込んでいます」の読み上げを出さない
 	const { wrap, observer, reached, release } = setupSlowPrefetch();
 	const pending = observer.trigger();
@@ -782,7 +782,7 @@ test('sentinel を置けなければページャを隠さない', () => {
 });
 
 test('雛形が採れたら継ぎ足したカードの display を取り戻す CSS が入る', () => {
-	// pixiv のグリッドは 1 ページぶんより先の li を display:none にする。(SITE_SPEC §3)
+	// pixiv のグリッドは 1 ページぶんより先の li を display:none にする。
 	// 打ち消さないと、継ぎ足したカードが DOM にだけ積み上がって画面に出ない
 	const { doc } = setup();
 	const styles = stylesIn(doc, CARD_STYLE_ID);
@@ -904,7 +904,7 @@ test('prefetch は sentinel を 1 画面ぶん手前から見張る', () => {
 
 test('先読みのほうが手前で発火する', () => {
 	// 2 つの値を取り違えると「下まで来たら」のほうが早く読み始めてしまい、
-	// 設定画面の説明と逆になる (0.22.1 までの不具合)
+	// 設定画面の説明と逆になる
 	const onReach = setup({ mode: INFINITE_SCROLL.ON_REACH }).observer.state.init.rootMargin;
 	const prefetch = setup({ mode: INFINITE_SCROLL.PREFETCH }).observer.state.init.rootMargin;
 	const distance = (margin) => Number.parseFloat(margin);
@@ -1079,7 +1079,7 @@ test('未ログインならハートの購読を張らない', () => {
 });
 
 test('雛形にハートが無ければ購読を張らない', () => {
-	// 自分のユーザーページ。pixiv が自分の作品にブックマークボタンを描かないので (SITE_SPEC §4)、
+	// 自分のユーザーページ。pixiv が自分の作品にブックマークボタンを描かないので、
 	// 継ぎ足したカードにも押せるハートは無い。購読は全クリックで空振りするだけになる
 	const doc = fakeDoc();
 	const bound = recordCalls(doc, 'addEventListener');

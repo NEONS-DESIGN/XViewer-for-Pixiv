@@ -1,10 +1,7 @@
 /**
  * 設定画面の定義表。
  * 構造 (並び・キー・kind・選択肢の値) はここが持ち、文言はカタログ (strings) から引く。
- * 画面に出る文字列を構造ごとカタログへ写すと、言語ごとに同じ構造が写経され、
- * 片方の言語だけ直す事故が起きる。
- * 項目を足すときは createSections へ 1 行足す。キーは SETTINGS_DEFAULTS と 1 対 1 に対応させる。
- * (対応は test/popup/popup-ui.test.js が見張る)
+ * 項目を足すときは createSections へ 1 行足す。
  */
 import {
 	IMAGE_QUALITY,
@@ -56,7 +53,7 @@ function prefetchOption(count, strings) {
 /**
  * 設定画面の定義表を組み立てる。
  * **構造 (並び・キー・kind・選択肢の値) はここが持ち、文言はカタログから引く。**
- * 両方をカタログへ写すと、言語ごとに同じ構造が写経され片方だけ直す事故が起きる。
+ * 構造をカタログへ移さないこと。言語ごとに同じ構造が複製され、片方だけ直したずれが起きる。
  * キーは SETTINGS_DEFAULTS と 1 対 1 に対応させる。(test/popup/popup-ui.test.js が見張る)
  *
  * kind が 'toggle' ならスイッチ、'choice' なら選択肢。

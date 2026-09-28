@@ -43,7 +43,7 @@ function capture(cards) {
 
 /**
  * 複数枚バッジの枚数 (数字だけの span の文字) を読む。
- * バッジのアイコンも span で包まれている (SITE_SPEC §3) ので、最初の span を見てはいけない
+ * バッジのアイコンも span で包まれているので、最初の span を見てはいけない
  * @param {object} node 探し始める要素
  * @returns {string|null} 枚数。無ければ null
  */
@@ -121,7 +121,7 @@ test('ハートを持つカードがあれば、ハート無しのカードは�
 });
 
 test('どのカードにもハートが無ければ、ハート無しのまま雛形にする', () => {
-	// 自分のユーザーページ。pixiv が自分の作品にブックマークボタンを描かない。(SITE_SPEC §4)
+	// 自分のユーザーページ。pixiv が自分の作品にブックマークボタンを描かない。
 	// ここで諦めると自分のページだけ無限スクロールが起動しない
 	const { ul } = makeGrid([makeCard({ id: '1', heart: false }), makeCard({ id: '2', heart: false })]);
 	const templates = captureTemplates(ul, { computedStyle: fakeComputedStyle });
@@ -192,7 +192,7 @@ test('画像の src と alt を差し替え、遅延読み込みにする', () =
 });
 
 test('pximg 以外の画像 URL は捨ててカードを作らない', () => {
-	// API が返した URL をそのまま img へ渡さない (SPEC §9.2)
+	// API が返した URL をそのまま img へ渡さない
 	const templates = capture([makeCard({ id: '1' })]);
 	const card = buildCard(templates, work({ url: 'https://evil.example.com/x.jpg' }), { loggedIn: true });
 	assert.equal(card, null);
@@ -275,7 +275,7 @@ test('ブックマーク済みならハートを ff4060 にする', () => {
 });
 
 test('未ブックマークならハートに色を書かない (本体の CSS に任せる)', () => {
-	// 未ブックマークの色はテーマで変わる。(SITE_SPEC §3) inline で焼き付けると
+	// 未ブックマークの色はテーマで変わる。inline で焼き付けると
 	// テーマを切り替えたときに継ぎ足したカードだけ前の色で残る
 	const templates = capture([makeCard({ id: '1' })]);
 	const card = buildCard(templates, work(), { loggedIn: true });
@@ -324,7 +324,7 @@ test('paintHeart は色の控えが無くても落ちない', () => {
 
 test('雛形のラベルは継ぎ足したカードに引き継がない', () => {
 	// R-18 / 非公開 は雛形になった作品のもの。残すと別の作品に他人のラベルが付く。
-	// 作品ごとに付け直す手当ては無いので、出さないほうを選ぶ (SPEC §16)
+	// 作品ごとに付け直す手当ては無いので、出さない
 	const { ul } = makeGrid([makeCard({ id: '1', label: '非公開' })]);
 	const templates = captureTemplates(ul, { computedStyle: fakeComputedStyle });
 	const card = buildCard(templates, work(), { loggedIn: true });

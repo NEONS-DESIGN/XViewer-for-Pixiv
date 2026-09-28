@@ -1,9 +1,8 @@
 /**
  * ブラウザごとのビルド設定。build.mjs がこの表を回して出力を作る。
- * (副作用なしのモジュール。build.mjs は import した時点で走るので、表だけをここへ出してテストから読む)
+ * テストからも読むので副作用を持たせない。
  *
- * **Chrome 系の出力 (dist) は Firefox 対応の前と同じ形に保つ。** Firefox 用のキーや target は
- * Firefox の出力 (dist-firefox) にだけ入れ、Chrome 系へは何も足さない。
+ * **Firefox 用のキーや target は Firefox の出力 (dist-firefox) にだけ入れ、Chrome 系 (dist) へは何も足さない。**
  */
 import { applyVersion, applyMinimumChromeVersion, applyFirefoxSettings, assertNoBrowserOnlyKeys } from './manifest-version.mjs';
 import { OUT_DIR, FIREFOX_OUT_DIR } from './static-files.mjs';

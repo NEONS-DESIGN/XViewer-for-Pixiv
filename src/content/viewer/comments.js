@@ -29,7 +29,7 @@ const CACHE_BUSTER = '_';
 /** 返信の 1 ページ目。replies API は offset ではなく 1 始まりの page で送る。 */
 const FIRST_REPLY_PAGE = 1;
 
-/** API の commentDate の形。'YYYY-MM-DD HH:mm' で時差を持たない。(SITE_SPEC.md) */
+/** API の commentDate の形。'YYYY-MM-DD HH:mm' で時差を持たない。 */
 const COMMENT_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/;
 
 /**
@@ -75,7 +75,7 @@ export function normalizeComment(raw, strings) {
  * 投稿者に付けるラベルを決める。
  *
  * **自分が最優先。** 自分の作品に自分でコメントすると両方に当てはまるが、
- * pixiv 本体は「あなた」だけを出す。(実測)
+ * pixiv 本体は「あなた」だけを出す。
  * ID が読めなかったときに空文字どうしが一致して無関係なコメントへラベルが付かないよう、
  * 比べる前に両側が揃っていることを確かめる。
  * @param {{userId: string}} comment コメント
@@ -258,8 +258,8 @@ export function createComments(deps) {
 	/**
 	 * 更新系の失敗を文言にする。投稿にも削除にも使う。
 	 * 401 はログインが切れている。(別タブでログアウトした等) 覚えているセッションを捨て、
-	 * 再読み込みまで案内する。__NEXT_DATA__ は SPA 遷移で変わらないので捨てても
-	 * 新しいトークンは得られない (SPEC §9.4)
+	 * 再読み込みまで案内する。__NEXT_DATA__ は SPA 遷移で変わらないので、捨てても
+	 * 再読み込みまで新しいトークンは得られない
 	 * @param {unknown} error 失敗の中身
 	 * @param {string} [fallback] 401 以外で出す文言。省略すると投稿の失敗
 	 * @returns {string} 出す文言
@@ -294,8 +294,8 @@ export function createComments(deps) {
 				// 破棄された後に押されていれば送らない。(消えた作品へ投稿しない)
 				if (!detailRef) return;
 				const requestedWorkId = workId;
-				// 同じ作品で load() を呼び直されたときも捨てられるよう、一覧そのものも世代の印にする
-				// (loadMore() と同じ。workId だけでは気付けず、組み直した一覧へ差し込んでしまう)
+				// 同じ作品で load() を呼び直されたときも捨てられるよう、一覧そのものも世代の印にする。
+				// workId だけでは気付けず、組み直した一覧へ差し込んでしまう
 				const requestedList = list;
 				// トークンは押された時点で読む。失効時にキャッシュを捨てれば全ての入力欄が追従する
 				const token = readSession(doc).csrfToken;
@@ -799,9 +799,8 @@ export function createComments(deps) {
 	 * 削除のあとのコメント件数を pixiv から引き直す。
 	 *
 	 * **手元で 1 を引くだけでは合わない。** ルートを消すとぶら下がっていた返信も
-	 * 道連れになり (SITE_SPEC §4-8 実測)、開いていない返信の数は分からないため。
-	 * 削除の反映は即時で、消した直後に引いても正しい値が返ることを実測で確認している。
-	 * (ブックマークの削除と違って遅れない)
+	 * 道連れになり、開いていない返信の数は分からないため。
+	 * 削除は即時に反映されるので、消した直後に引いてよい。
 	 * 引けなかったときは null を返し、呼び出し側が手元で 1 を引く側へ倒す。
 	 * @param {string} illustId 作品 ID
 	 * @returns {Promise<number|null>} 新しい件数。引けなければ null
@@ -809,7 +808,7 @@ export function createComments(deps) {
 	async function countAfterDelete(illustId) {
 		try {
 			// 同じ URL を作品を開いた時点で引いているため、そのまま引き直すと
-			// ブラウザのキャッシュが**削除前の件数**を返すことがある。(実機で確認)
+			// ブラウザのキャッシュが**削除前の件数**を返すことがある。
 			// 数え直しの意味が消えるので、毎回違う URL にして必ず取り直す
 			const body = await fetchJson(`${illustUrl(illustId, strings.lang)}&${CACHE_BUSTER}=${Date.now()}`);
 			const count = body?.commentCount;

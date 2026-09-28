@@ -1,7 +1,6 @@
 /**
  * pixiv の /ajax/* エンドポイントの URL を組み立てる。
  * すべて同一オリジンの相対 URL を返す純粋関数。
- * 仕様の根拠は SITE_SPEC.md。
  */
 
 import { WORK_CATEGORY_QUERY, WORK_CATEGORY_QUERY_BOTH } from '../common/constants.js';
@@ -10,19 +9,14 @@ import { WORK_CATEGORY_QUERY, WORK_CATEGORY_QUERY_BOTH } from '../common/constan
 const AJAX = '/ajax';
 
 /**
- * pixiv API へ渡してよいと実測で確認できている言語。
- *
- * pixiv は lang= に未知の値を渡してもエラーにせず、常に 200 で黙って英語の翻訳へ倒す。
- * だから綴りを外しても API 呼び出しは壊れない。ただし**英語になってしまう**ので、
- * 実測で翻訳が返ると確かめられた値だけをここへ足す。(2026-09-23 実測: ja / en / ko / zh / zh_tw は効く。
- * ハイフン形 (zh-TW / zh-cn) や th / ru / es などその他の言語は英語へ倒れる)
- *
- * キーは UI の言語 (strings.lang)、値は pixiv が受け付ける綴り。中国語だけ綴りが違い、
- * 簡体字は `zh`、繁体字は `zh_tw` (アンダースコア) でないと翻訳が返らない。
+ * pixiv API の lang= へ渡す言語。
+ * キーは UI の言語 (strings.lang)、値は pixiv が受け付ける綴り。
+ * 未知の綴りはエラーにならず黙って英語になるので、翻訳が返ると分かっている値だけを置く。
+ * 中国語は簡体字が `zh`、繁体字が `zh_tw` (アンダースコア) でないと翻訳が返らない。
  */
 const API_LANGUAGES = Object.freeze({ ja: 'ja', en: 'en', ko: 'ko', 'zh-CN': 'zh', 'zh-TW': 'zh_tw' });
 
-/** 未検証の言語のときに送る値。 */
+/** API_LANGUAGES に無い言語のときに送る値。 */
 const DEFAULT_API_LANGUAGE = 'ja';
 
 /**
@@ -42,15 +36,10 @@ export const PIXIV_ORIGIN = 'https://www.pixiv.net';
 export const VIEWING_SETTINGS_URL = `${PIXIV_ORIGIN}/settings/viewing`;
 
 /*
- * ページのパス (artworkPath / userPath / tagWorksPath) に付ける表示言語の接頭辞 localePrefix について。
- *
- * 英語表示の pixiv はパスの先頭へ `/en` を挟む。(SITE_SPEC §3 実測)
- * 付けずに組むと、モーダルを開いた直後の URL もサイドバーのリンクも日本語ページを指し、
- * リロードやリンク遷移でユーザーの表示言語が勝手に日本語へ戻ってしまう。
- *
- * 値は呼び出し側が `common/locale.js` の `currentLocalePrefix()` で取って渡す。
- * (ここは純粋関数だけを置く層なので `location` を読まない)
- * 既定は空文字 = 日本語。
+ * ページのパス (artworkPath / userPath / tagWorksPath) に付ける表示言語の接頭辞 localePrefix。
+ * 英語表示の pixiv はパスの先頭へ `/en` を挟むので、付け忘れると表示言語が日本語へ戻る。
+ * 値は呼び出し側が `currentLocalePrefix()` (common/locale.js) で取って渡す。
+ * ここは `location` を読まない。既定は空文字 = 日本語。
  */
 
 /**
@@ -85,7 +74,7 @@ export function tagWorksPath(tag, localePrefix = '') {
 }
 
 /**
- * 更新系 API の URL。フォローだけ /ajax ではなく旧来の PHP。(SITE_SPEC §4)
+ * 更新系 API の URL。フォロー系とコメント系は /ajax ではなく旧来の PHP。
  * 使うのは pixiv/actions.js だけだが、URL の出どころをここに揃える。
  */
 export const ACTION_URLS = Object.freeze({
@@ -96,13 +85,13 @@ export const ACTION_URLS = Object.freeze({
 	UNFOLLOW: '/rpc_group_setting.php',
 	/** コメントと返信の投稿。/ajax ではない旧 RPC だが応答は {error, body} で包まれる */
 	POST_COMMENT: '/rpc/post_comment.php',
-	/** コメントと返信の削除。投稿とは別のパスで、/rpc/ 配下ですらない (SITE_SPEC §4 実測) */
+	/** コメントと返信の削除。投稿とは別のパスで、/rpc/ 配下ではない */
 	DELETE_COMMENT: '/rpc_delete_comment.php',
 });
 
 /**
  * 画像と zip を読み込んでよいホスト。
- * pixiv の CDN は画像・うごイラ zip の i.pximg.net と静的ファイルの s.pximg.net。(SITE_SPEC §2)
+ * pixiv の CDN は画像・うごイラ zip の i.pximg.net と静的ファイルの s.pximg.net。
  */
 const CDN_HOSTS = Object.freeze(['i.pximg.net', 's.pximg.net']);
 
@@ -130,7 +119,7 @@ export function safeCdnUrl(url) {
 
 /**
  * pixiv が絵文字・スタンプの画像を置いている場所。
- * どちらも s.pximg.net の静的ファイルで、年齢制限も認証も掛かっていない。(SITE_SPEC 実測)
+ * どちらも s.pximg.net の静的ファイルで、年齢制限も認証も掛かっていない。
  */
 const COMMON_IMAGES = 'https://s.pximg.net/common/images/';
 
@@ -202,7 +191,7 @@ export function commentRootsUrl(illustId, offset, limit, lang) {
 
 /**
  * ルートコメントへの返信。
- * offset/limit ではなく 1 始まりの page で送る。(SITE_SPEC §4 実測)
+ * offset/limit ではなく 1 始まりの page で送る。
  * @param {string} commentId ルートコメントの ID
  * @param {number} page ページ番号。1 始まり
  * @param {string} lang 言語コード (strings.lang)
@@ -236,7 +225,7 @@ export function userProfileAllUrl(userId, lang) {
  * ID を並べて作品サマリを一括取得する。
  * sensitiveFilterMode は userSetting 以外を受け付けず、省略しても結果が同じなので付けない。
  * work_category は pixiv 本体と同じ値を送る。イラスト / 漫画タブなら illust / manga、
- * 両方を並べる artworks タブなら illustManga。(SITE_SPEC §3 実測)
+ * 両方を並べる artworks タブなら illustManga。
  * @param {string} userId ユーザー ID
  * @param {string[]} ids 作品 ID の配列
  * @param {boolean} isFirstPage 一覧の 1 ページ目か

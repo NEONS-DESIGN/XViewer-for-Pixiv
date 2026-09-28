@@ -105,7 +105,7 @@ test('isProfileHome はプロフィールのホームだけを true にする', 
 });
 
 test('無限スクロールの対象は作品グリッドの 3 タブだけ', () => {
-	// ページャ (?p=) が出るのはこの 3 つだけ (SITE_SPEC §3)
+	// ページャ (?p=) が出るのはこの 3 つだけ
 	assert.equal(isInfiniteScrollTarget('/users/123/artworks'), true);
 	assert.equal(isInfiniteScrollTarget('/users/123/illustrations'), true);
 	assert.equal(isInfiniteScrollTarget('/users/123/manga'), true);
@@ -167,7 +167,7 @@ test('parsePageParam は 10 進の数字以外を 1 に倒す', () => {
 });
 
 test('英語表示 (/en 付き) のユーザーページも認識する', () => {
-	// 表示言語を英語にすると pixiv は全てのパスの先頭へ /en を挟む。(SITE_SPEC §3 実測)
+	// 表示言語を英語にすると pixiv は全てのパスの先頭へ /en を挟む。
 	// ここを落として判定しないと、拡張がそもそも起動しない
 	const works = { userId: '54734418', isWorksGrid: true, isTagFiltered: false, category: null };
 	assert.deepEqual(parseUserPage('/en/users/54734418'), works);

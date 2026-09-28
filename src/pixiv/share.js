@@ -1,6 +1,6 @@
 /**
  * 作品のシェア先を組み立てる。
- * 文言もパラメータの並びも pixiv 本体のシェアメニューの実測値に合わせている。(SITE_SPEC §4)
+ * 文言もパラメータの並びも pixiv 本体のシェアメニューに合わせる。
  * 通信はしない純粋関数だけを置く。
  */
 import { PIXIV_ORIGIN, artworkPath } from './endpoints.js';
@@ -25,7 +25,6 @@ const SHARE_TAG = '#pixiv';
  * シェア先は外部サイトなので相対 URL では渡せない。
  *
  * 表示言語の接頭辞 (`/en`) は**付けない**。配る先は他人で、開いた人自身の表示設定で出るべきだから。
- * (接頭辞を付ける他の URL 組み立てとはここだけ方針が違う。`pixiv/endpoints.js` 参照)
  * @param {string} illustId 作品 ID
  * @returns {string} URL
  */
@@ -46,7 +45,7 @@ export function shareText(detail) {
  * シェア先を並べる。
  *
  * パラメータは URLSearchParams ではなく encodeURIComponent で組む。
- * URLSearchParams は空白を + にするので、pixiv 本体が作る URL と文字列が変わる。(実測確認済み)
+ * URLSearchParams は空白を + にするので、pixiv 本体が作る URL と文字列が変わる。
  *
  * ブランド名 (`X` / `Facebook` / `Pawoo`)・リンク先・アイコンは言語に依らない。訳すのはコピーの項目だけ。
  * @param {{id: string, title: string, userName: string}} detail 正規化した作品詳細
@@ -79,8 +78,7 @@ export function buildShareTargets(detail, strings) {
 			href: `https://pawoo.net/share?text=${encodeURIComponent(`${text} ${url}`)}`,
 		},
 		{
-			// pixiv 本体には無い項目。「コレクションを作成」は拡張の中では再現できないので、
-			// 代わりに URL をコピーできるようにする (docs/DECISIONS.md)
+			// pixiv 本体には無い項目。本体の「コレクションを作成」の位置に、URL のコピーを置く
 			key: 'copy',
 			label: strings.share.COPY_LINK,
 			icon: 'link',

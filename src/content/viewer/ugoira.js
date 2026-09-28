@@ -1,13 +1,10 @@
 /**
  * うごイラの再生。
  *
- * SITE_SPEC §4 の実測により、次のことが分かっている:
- *   - img-zip-ugoira は CORS 可。ページから直接 fetch できる (background 不要)
- *   - zip の中身は全て STORE (無圧縮)。zip ライブラリ不要
- *   - 70 フレームで 4.7MB (600x600) / 12.7MB (原寸)
- *
- * ImageBitmap を全フレーム持つと 540x960 x 70 枚で約 145MB になるため、
- * Blob URL + Image にしてデコードはブラウザへ任せる。
+ * zip (img-zip-ugoira) は CORS 可なので、ページから直接 fetch する。(background を通さない)
+ * zip の中身は全て STORE (無圧縮) なので、zip ライブラリは使わず parseStoredZip で読む。
+ * フレームは ImageBitmap で持たず、Blob URL + Image にしてデコードはブラウザへ任せる。
+ * (全フレームを ImageBitmap で持つとメモリを大きく食う)
  * Blob URL は閉じるときに必ず revoke する。
  */
 import { getJson } from '../../pixiv/client.js';
@@ -37,13 +34,13 @@ const FALLBACK_DELAY = 100;
 
 /**
  * 遅れを取り戻すときに一気に進めてよい上限 (ミリ秒)。
- * タブが非可視の間は requestAnimationFrame が止まる。(SITE_SPEC §8) 戻ってきたときに
+ * タブが非可視の間は requestAnimationFrame が止まる。戻ってきたときに
  * 止まっていた時間ぶんを全部コマ送りすると一瞬で数十フレーム飛ぶので、
  * これを超える遅れは捨てて今の時刻から数え直す。
  */
 const MAX_CATCHUP_MS = 500;
 
-/** zip 内の画像の形式が meta に無いときの既定値。SITE_SPEC §4 の実測では常に image/jpeg。 */
+/** zip 内の画像の形式が meta に無いときの既定値。 */
 const DEFAULT_FRAME_MIME = 'image/jpeg';
 
 /**
@@ -229,7 +226,7 @@ export function createUgoiraPlayer(deps) {
 			return new Promise((resolve) => {
 				const image = createImage();
 				// decode() は使わない。DOM に繋がっていない Image では
-				// 画像が読めていても解決しないことがあり (実機で確認)、
+				// 画像が読めていても解決しないことがあり、
 				// そうなると Promise.all が永久に待って再生が始まらないまま静止画で止まる。
 				// load / error は繋がっていなくても必ず発火する。
 				// 失敗しても再生は続けたいので、error でも image を返して次の関門に任せる
@@ -261,7 +258,7 @@ export function createUgoiraPlayer(deps) {
 
 			canvas = doc.createElement('canvas');
 			canvas.className = 'ugoira-canvas';
-			// 再生が始まると poster は隠れる。canvas にも読み上げ用の名前を持たせる (UI_DESIGN_KIT §6)
+			// 再生が始まると poster は隠れる。canvas にも読み上げ用の名前を持たせる
 			canvas.setAttribute('role', 'img');
 			canvas.setAttribute('aria-label', detail.title);
 			canvas.hidden = true;
@@ -300,7 +297,7 @@ export function createUgoiraPlayer(deps) {
 				// API が返した値をそのまま外部オリジンへ投げない
 				const zipUrl = safeCdnUrl(pickZipUrl(meta, deps.settings.imageQuality));
 				if (!zipUrl) throw new Error(REASONS.ZIP_NOT_CDN);
-				// 作品を送られたら途中でも転送を止める。zip は最大 12.7MB あり、
+				// 作品を送られたら途中でも転送を止める。zip は 10MB を超えることがあり、
 				// 見ていない作品の分が流れ続けると今見ている作品の取得が遅れる
 				const response = await fetchImpl(zipUrl, { mode: 'cors', signal: aborter.signal });
 				if (!response.ok) throw new Error(`${REASONS.ZIP_FETCH}: ${response.status}`);

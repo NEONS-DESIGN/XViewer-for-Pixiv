@@ -59,7 +59,7 @@ test('枠を出すのはキーボード操作のサムネイルだけ', () => {
 });
 
 test('pixiv 標準のフォーカスリングを消さない', () => {
-	// UI_DESIGN_KIT の原則。代わりの表示が出なくなったとき、何も見えなくなるのを防ぐ
+	// 代わりの表示が出なくなったとき、何も見えなくなるのを防ぐ
 	assert.doesNotMatch(GRID_FOCUS_CSS, /outline\s*:\s*none/);
 });
 
@@ -79,9 +79,8 @@ test('カンマ区切りの並びに擬似クラスを継ぎ足すと先頭が�
 	// ARTWORK_LINK_SELECTOR は `a[href^="/artworks/"],a[href^="/en/artworks/"]` のような
 	// カンマ区切りの並び。CSS のカンマは優先度が最も低いので、この並びの後ろへ
 	// `:focus-visible:has(img)` のような擬似クラスを継ぎ足すと、末尾の 1 本にしか掛からず
-	// 先頭のセレクタが裸のまま残ってしまう (0.30.5 以来の不具合、日本語ページで実害)。
-	// この事故を再発させないため、カンマで区切った各セレクタの「すべて」が
-	// :focus-visible を含むことを確かめる。
+	// 先頭のセレクタが裸のまま残ってしまう。
+	// カンマで区切った各セレクタの「すべて」が :focus-visible を含むことを確かめる。
 	for (const group of selectorGroups(GRID_FOCUS_CSS)) {
 		const selectors = group.split(',').map((s) => s.trim());
 		assert.ok(selectors.length > 0, `セレクタが取れていない: ${group}`);

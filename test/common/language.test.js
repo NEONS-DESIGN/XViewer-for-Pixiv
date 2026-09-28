@@ -18,7 +18,7 @@ test('normalizeLanguage は BCP 47 を言語サブタグへ切り詰める', () 
 });
 
 test('normalizeLanguage は中国語だけ繁体字と簡体字を分ける', () => {
-	// pixiv は zh-CN / zh-TW を返す。(SITE_SPEC §0) ブラウザの UI 言語は地域や字体の付き方がまちまち
+	// pixiv は zh-CN / zh-TW を返す。ブラウザの UI 言語は地域や字体の付き方がまちまち
 	for (const tag of ['zh-TW', 'zh-tw', 'zh_TW', 'zh-Hant', 'zh-Hant-TW', 'zh-HK', 'zh-MO', 'zh-Hant-HK']) {
 		assert.equal(normalizeLanguage(tag), 'zh-TW', tag);
 	}

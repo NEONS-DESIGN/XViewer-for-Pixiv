@@ -5,12 +5,12 @@
  */
 import { PixivError, PIXIV_ERROR_KINDS, kindFromStatus } from './errors.js';
 
-/** 更新系で共通のヘッダ名。SITE_SPEC の実測値。 */
+/** 送るヘッダの名前。x-csrf-token は更新系で必須。 */
 const HEADER_CSRF = 'x-csrf-token';
 const HEADER_ACCEPT = 'accept';
 const HEADER_CONTENT_TYPE = 'content-type';
 
-/** 実測した content-type。 */
+/** 送る content-type と accept の値。pixiv 本体が送るものと同じ。 */
 const CONTENT_TYPE_JSON = 'application/json; charset=utf-8';
 const CONTENT_TYPE_FORM = 'application/x-www-form-urlencoded; charset=utf-8';
 const ACCEPT_JSON = 'application/json';
@@ -48,8 +48,7 @@ function parseJson(text) {
  * 応答を JSON として読む。見るのはステータスと「JSON のオブジェクトか」だけで、
  * pixiv の {error, message, body} 形までは求めない。
  * 順序: 本文を読む → ステータス → JSON の形。
- * ステータスを JSON 解析より先に見るのは、ログイン失効時のログインページ (HTML) や
- * ranking.php の 403 (HTML) を PARSE に化けさせないため。(SITE_SPEC §6)
+ * ステータスを先に見るので、HTML のエラーページは PARSE ではなくステータスの種別になる。
  * @param {Response} response fetch の応答
  * @param {string} url 例外メッセージ用
  * @returns {Promise<object>} 読めた JSON (配列を含む)
@@ -74,7 +73,7 @@ async function readJson(response, url) {
 }
 
 /**
- * 応答を読み、{error, body} を展開する。/ajax/* はすべてこの形。(SITE_SPEC §4)
+ * 応答を読み、{error, body} を展開する。/ajax/* はすべてこの形。
  * この形を返さない旧 PHP エンドポイント (フォロー系) には使わないこと。
  * @param {Response} response fetch の応答
  * @param {string} url 例外メッセージ用
@@ -167,10 +166,9 @@ export function postJson(url, payload, token, deps = {}) {
  * urlencoded を POST し、応答の JSON を展開せずそのまま返す。
  * フォロー (/bookmark_add.php) とフォロー解除 (/rpc_group_setting.php) で使う。
  *
- * この 2 つは /ajax/* ではない旧 PHP エンドポイントで、{error, message, body} で包まない。
- * (フォローは素の配列、フォロー解除は {user_id}。SITE_SPEC §4-5/6)
- * unwrap() に通すと body が無いため成功しても PARSE になるので、読み方を分けている。
- * 成功か失敗かの判定は応答の形を知っている actions.js が行う。
+ * この 2 つは {error, message, body} で包まない旧 PHP エンドポイントで、
+ * unwrap() に通すと成功しても PARSE になる。(フォローは素の配列、フォロー解除は {user_id})
+ * 成功か失敗かの判定は呼び出し側 (actions.js) が行う。
  * 同じ urlencoded でも {error, body} を展開する版は postForm()。
  * @param {string} url URL
  * @param {Record<string, string>} params 送るパラメータ
@@ -186,9 +184,8 @@ export function postFormRaw(url, params, token, deps = {}) {
  * urlencoded を POST し、応答の {error, body} を展開する。
  * コメントの投稿 (/rpc/post_comment.php) と削除 (/rpc_delete_comment.php) で使う。
  *
- * 同じ urlencoded でも postFormRaw() とは読み方が違う。
- * フォロー系の旧 PHP は {error, message, body} で包まないので展開してはいけないが、
- * post_comment.php は旧 RPC でありながら /ajax/* と同じ形で包んで返す。(SITE_SPEC §4 実測)
+ * コメント系は旧 RPC だが /ajax/* と同じ {error, message, body} で包んで返す。
+ * 包まないフォロー系には postFormRaw() を使う。
  * @param {string} url URL
  * @param {Record<string, string>} params 送るパラメータ
  * @param {string} token CSRF トークン

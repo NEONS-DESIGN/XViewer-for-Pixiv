@@ -148,7 +148,7 @@ test('createIcon は知っている名前では warn を出さない', () => {
 
 test('createIcon は innerHTML に触れないので、innerHTML が投げるページでも図形を描ける', () => {
 	// Trusted Types を強制するページでは innerHTML への代入が TypeError になる。
-	// 以前はそこで空のアイコンになっていた。今は代入しないので図形がそのまま出る
+	// createIcon は代入しないので、それでも図形がそのまま出ることを見る
 	const doc = fakeDoc();
 	doc.createElementNS = (_ns, tag) => {
 		const element = fakeElement(tag);
@@ -214,7 +214,7 @@ test('createIcon は setAttribute が投げても空の svg で続行する', ()
 });
 
 test('ICON_SHAPES に自前の like (pixiv 式の顔) が入っている', () => {
-	// pixiv の「いいね」はハートではなく顔。ハートはブックマークを指す (SITE_SPEC §8)
+	// pixiv の「いいね」はハートではなく顔。ハートはブックマークを指す
 	assert.equal(ICON_SHAPES.like.viewBox, '0 0 24 24');
 	assert.equal(ICON_SHAPES.like.elements.filter((element) => element.tag === 'circle').length, 2);
 	assert.ok(ICON_SHAPES.like.elements.some((element) => element.attrs['stroke-linecap'] === 'round'));

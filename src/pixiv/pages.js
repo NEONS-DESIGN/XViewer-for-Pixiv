@@ -1,9 +1,8 @@
 /**
  * ユーザーページの作品 ID と、それを 1 ページ (48 件) ずつ切り出す供給口。
  *
- * pixiv 本体のページャは profile/all の ID を数値降順にしたものを 48 件ずつ区切ったものと
- * 完全に一致する。(SITE_SPEC §3 で実測) ここでも同じ規則で切り出す。
- * 「全作品 ID の並び」はビュワーの作品間移動 (content/sequence.js) も使うので、
+ * profile/all の ID を数値降順にして 48 件ずつ区切る。pixiv 本体のページャと同じ区切りになる。
+ * 「全作品 ID の並び」はビュワーの作品間移動 (content/sequence.js) も使う。
  * 取得とキャッシュはここ 1 か所に置き、種別の絞り込みはキャッシュの後段で行う。
  */
 import { getJson } from './client.js';
@@ -16,14 +15,13 @@ const PROFILE_CACHE_LIMIT = 20;
 
 /**
  * profile/all の応答本体を覚える。キーはユーザー ID。
- * 覚え方 (Promise のまま覚える・失敗は覚えない・上限で最古を捨てる) は promise-cache.js。
- * 種別 (イラスト / 漫画) で分けないのは、応答が同じものだから。
+ * Promise のまま覚え、失敗は覚えず、上限を超えたら最古から捨てる。
+ * 種別 (イラスト / 漫画) を問わず応答は同じなので、種別では分けない。
  */
 const profileCache = createPromiseCache(PROFILE_CACHE_LIMIT);
 
 /**
- * 覚えている応答を捨てる。今はテストからだけ呼ぶ。(本体に呼び出し元は無い)
- * 本体では上限 PROFILE_CACHE_LIMIT の押し出しに任せていて、明示的に捨てる場面が無い。
+ * 覚えている応答を捨てる。テスト用。(本体は上限 PROFILE_CACHE_LIMIT の押し出しに任せる)
  * @returns {void}
  */
 export function clearPageSourceCache() {

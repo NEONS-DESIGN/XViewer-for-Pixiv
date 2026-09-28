@@ -8,7 +8,7 @@ import { el, makeCard as makeCardNode, makeGrid } from '../helpers/card.js';
 
 /**
  * 作品カードを 1 枚組み、中の要素を取り出しておく。
- * 実測どおり「サムネ → ブックマーク → タイトル」の並び。(helpers/card.js が SITE_SPEC §3 に合わせてある)
+ * pixiv のカードと同じ「サムネ → ブックマーク → タイトル」の並び。
  * @param {string} [id] 作品 ID
  * @param {{alt?: string, loaded?: boolean}} [options] alt でサムネの img の alt を上書きする。loaded: false で img を figure のままにする
  * @returns {{card: object, thumb: object, button: object, title: object}}
@@ -201,7 +201,7 @@ test('img が無いサムネイル (未読込) にも作品名を補う', () => 
 });
 
 test('サムネイルの img に alt があれば aria-label を足さない', () => {
-	// 実機の alt は「#タグ タイトル - 作者のイラスト」で作品名を含む。(SITE_SPEC §3)
+	// pixiv の alt は「#タグ タイトル - 作者のイラスト」で作品名を含む。
 	// aria-label を足すと alt 由来の名前を上書きし、タグと作者名が読み上げから消える
 	const cards = [makeCard('7', { alt: '#タグ 作品7 - 作者のイラスト' })];
 	const { deps } = fakeObserverDeps();

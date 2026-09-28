@@ -8,7 +8,7 @@ import { DEFAULT_X_RESTRICT } from '../common/constants.js';
 import { safeCdnUrl } from './endpoints.js';
 import { PixivError, PIXIV_ERROR_KINDS } from './errors.js';
 
-/** 作品の種別。SITE_SPEC の実測値。 */
+/** 作品の種別。API の illustType の値。 */
 export const ILLUST_TYPES = Object.freeze({
 	ILLUST: 0,
 	MANGA: 1,
@@ -60,7 +60,7 @@ function tagNames(tags) {
  * @property {number} illustType ILLUST_TYPES のいずれか
  * @property {number} pageCount
  * @property {number} xRestrict 0=全年齢 1=R-18 2=R-18G
- * @property {number} aiType 1=非AI 2=AI生成。未使用。SPEC §16 のとおり AI 生成の表示は未実装で、出せるように残してある
+ * @property {number} aiType 1=非AI 2=AI生成。未使用。
  * @property {string|null} thumbUrl
  * @property {string} userId
  * @property {string} userName
@@ -79,8 +79,8 @@ function tagNames(tags) {
 
 /**
  * 作品を今のユーザーが見られるか。
- * 表示できるかどうかは error フラグでも urls でも判定できない。
- * 作品の xRestrict とユーザー設定の xRestrict を比べるのが唯一の正攻法。(SITE_SPEC §6)
+ * 作品の xRestrict とユーザー設定の xRestrict を比べて決める。
+ * error フラグや urls では判定できないので、そちらを判定に使わないこと。
  * @param {{xRestrict: number}} work 対象の作品
  * @param {{xRestrict: number}|null} self ログイン中のユーザー設定。未ログインなら null
  * @returns {boolean} 見られるなら true
@@ -93,8 +93,8 @@ export function canView(work, self) {
 /**
  * その作品が今ログインしているユーザー自身のものか。
  *
- * 自分の作品にはいいね・ブックマーク・フォローのどれもできない。pixiv 本体もこの 3 つを
- * 描かず、代わりに「作品を編集」を出す。(SITE_SPEC §4) 押せば必ず失敗するボタンは出さない。
+ * 自分の作品にはいいね・ブックマーク・フォローのどれもできないので、
+ * 押せば必ず失敗するボタンを出さないために使う。
  *
  * 判定材料は ID の一致だけ。どちらかが読めなければ「自分ではない」に倒す。
  * (空同士を一致とみなすと、他人の作品まで操作できなくなる)

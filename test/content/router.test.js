@@ -102,7 +102,7 @@ test('pixiv 本体が履歴を動かしたら自分のエントリではなく�
 });
 
 test('ルーターとエントリの判定は history.state を読まない', () => {
-	// isolated world の history.state は、ページ側が先に読むと古い値を返す。(SITE_SPEC §8)
+	// isolated world の history.state は、ページ側が先に読むと古い値を返す。
 	// 読んで書き戻すと Next.js の state を拡張の目印で上書きしてしまい、戻るで画面が切り替わらなくなる
 	const win = fakeWindow();
 	const entry = createEntryTracker(win);

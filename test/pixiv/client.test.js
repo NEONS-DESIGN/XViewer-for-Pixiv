@@ -17,7 +17,7 @@ test('getJson は Cookie を送る', async () => {
 });
 
 test('getJson は 401 を unauthorized として投げる', async () => {
-	// SITE_SPEC 実測: 未ログインで follow_latest 等が 401 を返す
+	// 未ログインで follow_latest 等が 401 を返す
 	const { impl } = fakeFetch({ status: 401, json: { error: true, message: '不明なエラーが発生しました' } });
 	await assert.rejects(
 		() => getJson('/ajax/follow_latest/illust', { fetchImpl: impl }),
@@ -26,7 +26,7 @@ test('getJson は 401 を unauthorized として投げる', async () => {
 });
 
 test('getJson は 404 を not-found として投げる', async () => {
-	// SITE_SPEC 実測: R-18 を表示できないときの /pages
+	// R-18 を表示できないときの /pages
 	const { impl } = fakeFetch({ status: 404, json: { error: true, message: '' } });
 	await assert.rejects(
 		() => getJson('/ajax/illust/1/pages', { fetchImpl: impl }),
@@ -70,7 +70,7 @@ test('getJson は非 JSON の 401 を parse ではなく unauthorized として�
 });
 
 test('getJson は非 JSON の 403 を api として投げる', async () => {
-	// SITE_SPEC 実測: ranking.php?mode=daily_r18 は 403 で HTML を返す
+	// ranking.php?mode=daily_r18 は 403 で HTML を返す
 	const { impl } = fakeFetch({ status: 403 });
 	await assert.rejects(
 		() => getJson('/ranking.php', { fetchImpl: impl }),

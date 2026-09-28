@@ -1,15 +1,13 @@
 /**
  * 画像要素へ読み込み先の URL を入れる。
  *
- * **i.pximg.net は Referer が pixiv.net でないと 403 を返す。** (SITE_SPEC §2)
- * Chrome はもちろん、Firefox の Release 版でも content script が入れた src にはページの Referer が付く。
- * ただし Firefox の Nightly は、content script が読ませた資源に Referer を付けない。
- * (Bug 1957355。pref `privacy.antitracking.isolateContentScriptResources`。既定は Nightly だけ有効)
- * これが Release に降りてくると、ビュワーの画像もサムネイルも全部 403 になる。
+ * **i.pximg.net は Referer が pixiv.net でないと 403 を返す。**
+ * Firefox は content script が読ませた資源に Referer を付けないことがある。
+ * (`privacy.antitracking.isolateContentScriptResources` が有効な版) そのままだと画像が全部 403 になる。
  *
  * Firefox では `wrappedJSObject` (Xray を外したページ側の要素) を通して入れると、
- * ページが入れたのと同じ扱いになって Referer が付く。(実機で確認済み)
- * Chrome の isolated world には `wrappedJSObject` が無いので、今までどおりの代入になる。
+ * ページが入れたのと同じ扱いになって Referer が付く。
+ * Chrome の isolated world には `wrappedJSObject` が無いので、ただの代入になる。
  *
  * 入れる URL は呼び出し側で検証済みのもの (safeCdnUrl 等) に限ること。
  * Xray を外すとページ側が書き換えた setter を通る。(Firefox のみ) 渡すのは文字列だけなので

@@ -1,5 +1,5 @@
 /**
- * pixiv の更新系 API。すべて SITE_SPEC §4 で実機観測して確定した仕様。
+ * pixiv の更新系 API。(いいね / ブックマーク / フォロー / コメント)
  * 追加と削除でエンドポイントも本体の形式も違うので、ここに閉じ込める。
  */
 import { postJson, postForm, postFormRaw, postFormData } from './client.js';
@@ -12,7 +12,7 @@ import { PixivError, PIXIV_ERROR_KINDS } from './errors.js';
 const RESTRICT_PUBLIC = 0;
 const RESTRICT_PRIVATE = 1;
 
-/** 応答が予期しない形だったときの文言。開発者向け (errors.js の方針どおり日本語)。 */
+/** 応答が予期しない形だったときの文言。開発者向けなので日本語。 */
 const FOLLOW_REJECTED = 'フォローが拒否されました';
 const FOLLOW_UNEXPECTED = 'フォローの応答が配列ではありません';
 const UNFOLLOW_REJECTED = 'フォロー解除が反映されませんでした';
@@ -73,7 +73,7 @@ export async function deleteBookmark(bookmarkId, token, deps) {
  * ユーザーをフォローする。
  *
  * 応答は /ajax/* の {error, message, body} ではなく**素の配列**で、空なら成功。
- * (中身があるときはエラー文言。SITE_SPEC §4-5) pixiv 本体も長さだけで成否を決めている。
+ * 中身があればそれがエラー文言。
  * @param {string} userId ユーザー ID
  * @param {string} token CSRF トークン
  * @param {ClientDeps} [deps] テスト用の依存
@@ -102,7 +102,7 @@ export async function followUser(userId, token, deps) {
 /**
  * フォローを外す。追加とはエンドポイントもパラメータ名も違う。
  *
- * 応答は {user_id} で、送った ID が返れば成功。(SITE_SPEC §4-6)
+ * 応答は {user_id} で、送った ID が返れば成功。
  * こちらも {error, message, body} では包まれない。
  * @param {string} userId ユーザー ID
  * @param {string} token CSRF トークン
@@ -123,7 +123,7 @@ export async function unfollowUser(userId, token, deps) {
 	}
 }
 
-/** 投稿の種類。同じエンドポイントを type で振り分ける。(SITE_SPEC §4) */
+/** 投稿の種類。同じエンドポイントを type で振り分ける。 */
 const COMMENT_TYPES = Object.freeze({ TEXT: 'comment', STAMP: 'stamp' });
 
 /**
@@ -139,7 +139,7 @@ const COMMENT_TYPES = Object.freeze({ TEXT: 'comment', STAMP: 'stamp' });
  * コメントを投稿して、投稿された 1 件を返す。
  *
  * 応答の値は snake_case なので、ここで画面側の語彙へそろえる。
- * アバターの URL は応答に入らない。(pixiv 本体も自分のセッションの値を使う)
+ * アバターの URL は応答に入らない。呼び出し側がセッションの profileImg で補うこと。
  * @param {Record<string, string>} params 送るパラメータ
  * @param {string} token CSRF トークン
  * @param {ClientDeps} [deps] テスト用の依存
@@ -219,9 +219,7 @@ export function postStamp(illustId, authorUserId, stampId, parentId, token, deps
  * (自分のコメントと、自分の作品に付いたコメント) 呼び出し側で出し分けること。
  * **削除は取り消せない。** UI 側で誤爆を防ぐこと。
  *
- * 応答は {error, message, body} で包まれる。pixiv 本体も投稿と同じ口へ通しており、
- * その口は body が無ければ例外にするので、body は必ず付いてくる。(SITE_SPEC §4)
- * 中身は使わないので読まない。
+ * 応答は投稿と同じく {error, message, body} で包まれる。body の中身は使わない。
  * @param {string} illustId 作品 ID
  * @param {string} commentId 消すコメントの ID
  * @param {string} token CSRF トークン

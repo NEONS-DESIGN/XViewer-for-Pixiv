@@ -5,8 +5,7 @@
    data-theme は popup-ui.js が設定 (popupTheme) と OS の設定から決めて html 要素に付ける。
    ここにはこの画面でしか使わないトークンだけを置く。 */
 :root {
-	/* スイッチ (チェックボックス) の色。pixiv 本体のスイッチと同じ値で、
-	   ビュワーの --bookmark と同じく本体に合わせる判断なのでテーマで変えない。
+	/* スイッチ (チェックボックス) の色。pixiv 本体のスイッチと同じ値で、テーマで変えない。
 	   ノブだけは地に合わせて明るさを変える */
 	--switch-on: #0096fa;
 	--switch-off: #858585;
@@ -20,7 +19,6 @@
 }
 
 /* data-theme が付く前 (設定を読む前の最初の描画) だけ OS の設定に従ってライトで描く。
-   仕組みの説明は tokens.css の同じメディアクエリにある。
    宣言は上の :root[data-theme='light'] と同じ内容にする */
 @media (prefers-color-scheme: light) {
 	:root:not([data-theme]) {
@@ -29,7 +27,7 @@
 }
 
 body {
-	/* Chrome 拡張の popup は幅を固定する。(UI_DESIGN_KIT §10)
+	/* Chrome 拡張の popup は幅を固定する。
 	   中身に合わせると、説明の長さで画面ごとに幅が変わる */
 	width: 320px;
 	margin: 0;
@@ -120,7 +118,7 @@ h1 {
 	display: flex;
 	align-items: center;
 	gap: 8px;
-	/* クリック領域は 30px を下回らない。(UI_DESIGN_KIT §6)
+	/* クリック領域は 30px を下回らない。
 	   スイッチ 16px とテキスト行だけでは 22px ほどにしかならず、
 	   セレクト (30px) とも高さが揃わない */
 	min-height: 30px;
@@ -129,7 +127,7 @@ h1 {
 
 .label { flex: 1 1 auto; }
 
-/* 説明文。設定項目には必ず 1 行付ける (UI_DESIGN_KIT §1 原則 6) */
+/* 説明文。設定項目には必ず 1 行付ける */
 .description {
 	margin: 1px 0 0;
 	color: var(--muted);
@@ -140,7 +138,7 @@ h1 {
 .field.choice .description { margin-bottom: 3px; }
 
 /* 保存の失敗など。読み上げには role="alert" で届く。
-   やり直せる失敗なので --danger は使わない (--danger は取り消せない操作専用。UI_DESIGN_KIT §2) */
+   やり直せる失敗なので --danger は使わない。(--danger は取り消せない操作専用) */
 .notice {
 	flex: none;
 	margin: 0;
@@ -154,7 +152,7 @@ h1 {
 
 /* --- 操作部品 --------------------------------------------------------- */
 
-/* 操作部品の高さを揃える (UI_DESIGN_KIT §3) */
+/* 操作部品の高さを揃える */
 button {
 	height: 30px;
 	border: 1px solid var(--control-border);
@@ -167,7 +165,7 @@ button {
 
 button:hover { background: var(--control-hover); }
 
-/* 取り消せない操作のボタン (UI_DESIGN_KIT §4.1) */
+/* 取り消せない操作のボタン */
 button.danger {
 	border-color: var(--danger);
 	color: var(--danger);
@@ -178,7 +176,6 @@ button.danger:hover {
 }
 
 /* チェックボックスは pixiv 本体 (charcoal) のスイッチと同じ見た目にする。
-   寸法・動き・色はすべて実測値。(SITE_SPEC.md「スイッチ」)
    28x16 の外周のうち 2px は透明な枠で、内側 24x12 の中を 12px のノブが
    左端と右端 (translateX(12px)) の間を動く */
 input[type='checkbox'] {
@@ -226,8 +223,8 @@ input[type='checkbox']:checked::after {
 	}
 }
 
-/* すべての操作部品に同じ輪郭を出す。(UI_DESIGN_KIT §6) 1 規則にまとめて出方を 1 種類に保つ。
-   offset は外側 (+2px)。KIT の -2px (内側) だと 16px のスイッチでは輪郭が本体に埋もれる */
+/* すべての操作部品に同じ輪郭を出す。1 規則にまとめて出方を 1 種類に保つ。
+   offset は外側 (+2px)。内側にすると 16px のスイッチでは輪郭が本体に埋もれる */
 :is(button, select, input[type='checkbox'], .panel, .license a):focus-visible {
 	outline: var(--focus-ring);
 	outline-offset: 2px;
@@ -400,7 +397,7 @@ select selectedcontent [data-role='option-hint'] {
 
 .tab:hover { background: var(--hover); }
 
-/* 選択状態は aria-selected だけで持つ。(UI_DESIGN_KIT §4.3) クラスと二重に持たない */
+/* 選択状態は aria-selected だけで持つ。クラスと二重に持たない */
 .tab[aria-selected='true'] {
 	color: var(--fg);
 	border-bottom-color: var(--accent);

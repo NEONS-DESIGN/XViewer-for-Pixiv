@@ -2,8 +2,7 @@
  * コメントの入力欄。作品へのコメントと、コメントへの返信で同じ部品を使う。
  *
  * 投稿そのものは知らない。onSubmit に値を渡し、解決したら入力を空にするだけ。
- * pixiv 本体はスタンプを選んだ瞬間に投稿するが、ここは一段挟んで「送信」で確定する。
- * (モーダルの中の小さいパネルで誤爆すると実害が出る。設計書 §4.3)
+ * スタンプは選んだだけでは送らず、「送信」で確定する。(小さいパネルでの誤爆を防ぐ)
  */
 import { createIcon } from '../../common/icons.js';
 import { setImageSrcAttribute } from '../../common/image-source.js';
@@ -83,7 +82,7 @@ export function createCommentForm(deps) {
 	 * この入力欄の中にフォーカスがあるか。Escape を食い止めるかの判断に使う。
 	 *
 	 * 真偽値で覚えないこと。`disabled` にした瞬間にブラウザがフォーカスを外すので、
-	 * 送信のたびに嘘になる。(書きかけを Escape で失う原因だった)
+	 * 送信のたびに嘘になり、書きかけを Escape で失う。
 	 * @returns {boolean} 中にフォーカスがあれば true
 	 */
 	function isFocusInside() {

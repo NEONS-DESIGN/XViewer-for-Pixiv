@@ -1,8 +1,8 @@
 /*
  * XViewer for Pixiv 紹介サイトの配色と体裁。
- * 配色トークンの名前と値は拡張本体の UI_DESIGN_KIT.md §2 に合わせてある。
+ * 配色トークンの名前と値は拡張本体の汎用の配色トークンに合わせてある。
  * --accent / --on-accent は pixiv 本体のブランド色 (#0096fa + 白文字) で、両テーマ共通。
- * --brand-x は X のブランド色。ライトは #15202b を少し明るく紺寄りにした #30466a (周りの黒文字と見分けるため)、ダークは周りの白文字と見分けられるよう紺寄りにした #b3c4e2。(#15202b だと背景に沈む)
+ * --brand-x は見出しの「X」の色。X のブランド色を元に、周りの文字と見分けられるよう紺寄りにしてある。
  * 色は必ずここの変数で決め、個々の規則に直書きしない。
  */
 
@@ -143,7 +143,7 @@ a:hover {
 	text-decoration-color: currentColor;
 }
 
-/* 輪郭はサイト全体で 1 つの規則にそろえる (UI_DESIGN_KIT §6) */
+/* 輪郭はサイト全体で 1 つの規則にそろえる */
 :where(a, button, summary, [tabindex]):focus-visible {
 	outline: 2px solid var(--accent);
 	outline-offset: 2px;
@@ -925,7 +925,7 @@ td.default {
 
 .keys {
 	display: grid;
-	/* 説明が 1 行に収まる程度の下限。240px だと Esc の段が 3 行に折れる。
+	/* 説明が 1 行に収まる程度の下限。
 	   本文幅が 320px に満たない画面では本文幅を下限にする。(はみ出して横スクロールが出るため) */
 	grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
 	gap: 12px;

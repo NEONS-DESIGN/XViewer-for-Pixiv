@@ -25,10 +25,9 @@ const USER_PROFILE_CACHE_LIMIT = 100;
 
 /**
  * ユーザー ID → 取得中または取得済みの Promise。
- * 覚え方 (Promise のまま覚える・失敗は覚えない・上限で最古を捨てる) は promise-cache.js。
- * キーは userId だけで lang を含まない。表示言語の切り替えは pixiv 側のページ全体の
- * リロードを伴うため、このモジュールの状態 (このキャッシュを含む) ごと消える前提に乗っている。
- * 同一セッション中に lang だけが変わることは無い、という前提が崩れたらキーの見直しが要る。
+ * Promise のまま覚え、失敗は覚えず、上限を超えたら最古から捨てる。
+ * キーは userId だけで lang を含まない。表示言語の切り替えはページ全体のリロードを伴い、
+ * このキャッシュごと消える前提に乗っている。同じページで lang が変わるならキーの見直しが要る。
  */
 const cache = createPromiseCache(USER_PROFILE_CACHE_LIMIT);
 

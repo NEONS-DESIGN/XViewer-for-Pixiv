@@ -8,7 +8,7 @@
 export const LOG_PREFIX = '[XViewer]';
 
 /**
- * 警告を出す。握りつぶした例外の詳細を残すときに使う。(SPEC §12)
+ * 警告を出す。握りつぶした例外の詳細を残すときに使う。
  * @param {string} message 何が起きたか
  * @param {...unknown} details 例外や値
  * @returns {void}

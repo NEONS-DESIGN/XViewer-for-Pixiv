@@ -20,7 +20,7 @@ test('並びは pixiv 本体と同じ 3xx -> 4xx -> 2xx -> 1xx', () => {
 });
 
 test('本体が隠しているグループは持たない', () => {
-	// 601-610 / 701-710 は hidden: true で本体も出さない (SITE_SPEC 実測)
+	// 601-610 / 701-710 は hidden: true で本体も出さない
 	const ids = stampIds();
 	assert.equal(ids.some((id) => id.startsWith('6') || id.startsWith('7')), false);
 });

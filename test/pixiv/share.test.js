@@ -18,7 +18,7 @@ test('artworkUrl は作品ページの絶対 URL を返す', () => {
 });
 
 test('shareText は pixiv 本体と同じ「タイトル | 作者 #pixiv」にする', () => {
-	// SITE_SPEC §4 実測。区切りは半角スペース + 縦棒 + 半角スペース
+	// 区切りは半角スペース + 縦棒 + 半角スペース
 	assert.equal(shareText(DETAIL), 'モンブラン | チャイ #pixiv');
 });
 
@@ -52,7 +52,7 @@ test('Pawoo は本文と URL を 1 つの text にまとめる', () => {
 });
 
 test('空白は + ではなく %20 になる', () => {
-	// URLSearchParams で組むと + になり、pixiv 本体と違う文字列になる (実測で確認済み)
+	// URLSearchParams で組むと + になり、pixiv 本体と違う文字列になる
 	for (const target of buildShareTargets(DETAIL, STRINGS)) {
 		if (target.href) assert.equal(target.href.includes('+'), false);
 	}

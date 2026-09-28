@@ -1,7 +1,6 @@
 /**
  * ビルドがそのままコピーする静的ファイルの表。
- * build.mjs は import した時点でビルドが走るため、表だけをここへ出してテストから読めるようにした。
- * (副作用なし。build.mjs と test/common/licenses.test.js / test/popup/popup-css.test.js が読む)
+ * 副作用を持たせない。(build.mjs と test/common/licenses.test.js / test/popup/popup-css.test.js が読む)
  *
  * 出力先はブラウザごとに分かれる。(scripts/browsers.mjs) コピーする中身は同じで、置き場所だけが違う。
  */
@@ -44,7 +43,7 @@ export function staticFilesFor(outDir) {
 			`${outDir}/_locales/${locale}/messages.json`,
 		]),
 		// ライセンス文。配布する zip は出力先をそのまま固めるので、ここに無いと受け取った人に届かない。
-		// Apache-2.0 §4(a) は本文の写しを渡すことを求める (Material Symbols の図形を同梱しているため)
+		// Apache-2.0 はライセンス本文の写しを渡すことを求める。(Material Symbols の図形を同梱している)
 		['LICENSE', `${outDir}/LICENSE`],
 		['NOTICE', `${outDir}/NOTICE`],
 		['LICENSES/Apache-2.0.txt', `${outDir}/LICENSES/Apache-2.0.txt`],

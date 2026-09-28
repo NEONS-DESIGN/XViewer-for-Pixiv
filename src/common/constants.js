@@ -7,8 +7,7 @@
  * 表示言語ごとに URL の先頭へ挟まる接頭辞。(先頭の `/` は含めない)
  *
  * pixiv は表示言語が英語のとき、全てのパスの先頭へ `/en` を挟む。(`/en/users/11`)
- * 日本語は接頭辞を持たない。**この 2 つ以外は存在しない**。`/ko` `/zh` `/zh-tw` `/th` は
- * いずれも 404 で、他の言語は接頭辞なしのパスのまま表示される。(SITE_SPEC §3 実測)
+ * 日本語は接頭辞を持たない。**この 2 つ以外は存在しない**。他の言語は接頭辞なしのパスのまま表示される。
  *
  * 接頭辞を増やすときはここへ足すだけでよい。パスの判定 (`LOCALE_PATH_PATTERN`) も
  * 作品リンクのセレクタ (`ARTWORK_LINK_SELECTOR`) もこの配列から組み立てている。
@@ -44,13 +43,13 @@ export const ARTWORK_LINK_SELECTORS = Object.freeze(
  */
 export const ARTWORK_LINK_SELECTOR = ARTWORK_LINK_SELECTORS.join(',');
 
-/** カードのサムネリンク。pixiv の計測用属性で、クラス名より寿命が長い。(SITE_SPEC §3 実測) */
+/** カードのサムネリンク。pixiv の計測用属性で、クラス名より寿命が長い。 */
 export const THUMB_LINK_SELECTOR = 'a[data-ga4-label="thumbnail_link"]';
 
 /** カードのブックマークボタンの入れ物。 */
 export const BOOKMARK_BUTTON_SELECTOR = '[data-ga4-label="bookmark_button"]';
 
-/** ブックマーク済みのハートの色。(SITE_SPEC §3 実測) 未ブックマーク側はテーマで変わるので雛形から採る。 */
+/** ブックマーク済みのハートの色。未ブックマーク側はテーマで変わるので雛形から採る。 */
 export const BOOKMARKED_FILL = '#ff4060';
 
 /** 自分が継ぎ足したカードの目印。撤去と重複判定とクリック判定に使う。 */
@@ -61,7 +60,7 @@ export const XV_BOOKMARK_ID_ATTR = 'data-xv-bookmark-id';
 
 /**
  * グリッドのカード 1 枚を指す要素と、その中のブックマークボタン。
- * pixiv のグリッドは ul > li で、ボタンは li の中の button 1 つだけ。(SITE_SPEC §3 実測)
+ * pixiv のグリッドは ul > li で、ボタンは li の中の button 1 つだけ。
  * 構造の前提なので、散らさずここで持つ。
  */
 export const CARD_SELECTOR = 'li';
@@ -76,8 +75,8 @@ export const TAB_SKIP_LABEL_ATTR = 'data-xv-label';
 
 /**
  * プロフィールのホームに出る「ピックアップ」欄を指すセレクタ。
- * 実測ではホームの `section` はこの 1 個だけで、作品グリッドは `div` なので掛からない。
- * (SITE_SPEC §3) 見出しの文言は表示言語で変わるため当てにしない。
+ * ホームの `section` はこの 1 個だけで、作品グリッドは `div` なので掛からない。
+ * 見出しの文言は表示言語で変わるため当てにしない。
  * 作品リンクを持つことまで求めるのは、pixiv が作品と無関係な section を足したときに
  * 巻き込まないため。
  */
@@ -105,7 +104,7 @@ export const USER_TAG_PATH_PATTERN = /^\/users\/\d+\/(?:artworks|illustrations|m
  * ユーザーページのうち、その人自身の作品グリッドを出すパス。
  * ブックマーク (/users/{id}/bookmarks/artworks) やフォロー中 (/users/{id}/following) にも
  * 作品リンクは並ぶが、そこに出ているのは他人の作品なので、
- * 「この作者の全作品」へ並びを広げてはいけない。(SITE_SPEC §3)
+ * 「この作者の全作品」へ並びを広げてはいけない。
  */
 export const USER_WORKS_PATH_PATTERN = /^\/users\/\d+(?:\/(?:artworks|illustrations|manga)(?:\/.*)?)?\/?$/;
 
@@ -117,7 +116,7 @@ export const USER_WORKS_CATEGORY_PATTERN = /^\/users\/\d+\/(illustrations|manga)
 
 /**
  * ユーザーページのうち、プロフィールのホームタブ。
- * 「ピックアップ」欄が出るのはここだけで、/users/{id}/artworks などには出ない。(SITE_SPEC §3)
+ * 「ピックアップ」欄が出るのはここだけで、/users/{id}/artworks などには出ない。
  */
 export const PROFILE_HOME_PATH_PATTERN = /^\/users\/\d+\/?$/;
 
@@ -130,7 +129,7 @@ export const PROFILE_HOME_PATH_PATTERN = /^\/users\/\d+\/?$/;
 export const USER_WORKS_TAB_PATH_PATTERN = /^\/users\/\d+\/(?:artworks|illustrations|manga)\/?$/;
 
 /**
- * 作品の種別。値は profile/all の応答キー (SITE_SPEC §3) と合わせてある。
+ * 作品の種別。値は profile/all の応答キーと合わせてある。
  * タブのパス名 (illustrations / manga) とは綴りが違うので WORK_CATEGORY_BY_TAB で引く。
  */
 export const WORK_CATEGORY = Object.freeze({
@@ -145,7 +144,7 @@ export const WORK_CATEGORY_BY_TAB = Object.freeze({
 });
 
 /**
- * 作品の種別から profile/illusts の work_category クエリの値を引く。(SITE_SPEC §3)
+ * 作品の種別から profile/illusts の work_category クエリの値を引く。
  * profile/all の応答キー (illusts) とは綴りが違うので、そのまま送らずここで変換する。
  */
 export const WORK_CATEGORY_QUERY = Object.freeze({
@@ -173,7 +172,7 @@ export const NAV_EVENTS = Object.freeze({
 	/**
 	 * content script -> 注入側。今の履歴 state を保ったまま URL だけ差し替える。(detail は URL の文字列)
 	 * isolated world から読んだ history.state は古いことがあり、それを書き戻すと
-	 * Next.js の state を壊すので、読むのも書くのも page world に任せる。(SITE_SPEC §8)
+	 * Next.js の state を壊すので、読むのも書くのも page world に任せる。
 	 */
 	REPLACE_URL: 'xviewer:replace-url',
 });
@@ -189,7 +188,7 @@ export const LOCATION_CHECK_DELAY_MS = 200;
 
 /**
  * ログイン情報が読めないときの閲覧設定。(R-18 を出さない)
- * SITE_SPEC §6 の xRestrict の値と同じ尺度で、0 は全年齢のみ。
+ * pixiv の xRestrict と同じ尺度で、0 は全年齢のみ。
  */
 export const DEFAULT_X_RESTRICT = 0;
 
@@ -219,7 +218,7 @@ export const TAB_SKIP_REFRESH_MS = 200;
 /**
  * グリッドで Tab を送ったときに、何をフォーカス順から外すか。
  * pixiv のカードは「サムネ → ブックマーク → タイトル」の 3 ステップで 1 作品なので、
- * 外さないと次の作品まで 3 回押すことになる。(SITE_SPEC 参照)
+ * 外さないと次の作品まで 3 回押すことになる。
  */
 export const GRID_TAB_SKIP = Object.freeze({
 	/** ブックマークボタンとタイトルリンクの両方 */
@@ -230,7 +229,7 @@ export const GRID_TAB_SKIP = Object.freeze({
 	NONE: 'none',
 });
 
-/** 1 ページに並ぶ作品の数。pixiv 本体のページャと同じ数。(SITE_SPEC §3 実測) */
+/** 1 ページに並ぶ作品の数。pixiv 本体のページャと同じ数。 */
 export const WORKS_PER_PAGE = 48;
 
 /**
@@ -271,13 +270,11 @@ export const SENTINEL_MARGIN = Object.freeze({
 /**
  * pixiv 本体のページャ (1 2 3 ... 次へ)。ページ番号のリンクを含む nav で掴む。
  * ページ内の nav はタブ行とページャの 2 つだけで、?p= を持つのはページャだけ。
- * (SITE_SPEC §3「ページャ」実測) クラス名 (sc-xxxx) は版ごとに変わるので掴まない。
+ * クラス名 (sc-xxxx) は版ごとに変わるので掴まない。
  * 作品が 1 ページに収まるページャは描かれないが、その場合は当たる nav が無いだけで害は無い。
  *
- * 探すのは "p=" ではなく "?p=" (クエリの先頭)。実機のページャのリンクは
- * /users/{id}/illustrations?p=2 の形なので同じものに当たるが、"p=" だけで探すと
- * p を含むパス (/users/{id}/bookmarks/artworks 等) やクエリ付きのタブ行にも当たり、
- * 将来 pixiv がタブ行のリンクにクエリを足した版でタブ行ごと消してしまう。
+ * 探すのは "p=" ではなく "?p=" (クエリの先頭)。"p=" だけだと p を含むパスや
+ * クエリ付きのタブ行にも当たり、タブ行ごと消してしまう。
  */
 export const PAGER_SELECTOR = 'nav:has(a[href*="?p="])';
 
@@ -295,7 +292,7 @@ export const SIDEBAR_SCROLL = Object.freeze({
 /**
  * popup の配色。
  * SYSTEM は OS の設定 (prefers-color-scheme) に従う。
- * 明示の選択 (DARK / LIGHT) は常に OS より優先する。(UI_DESIGN_KIT §10)
+ * 明示の選択 (DARK / LIGHT) は常に OS より優先する。
  */
 export const POPUP_THEMES = Object.freeze({
 	SYSTEM: 'system',
@@ -351,7 +348,7 @@ export const KEYS = Object.freeze({
 
 /**
  * モーダルの中で Tab を巡回させる対象。
- * role="dialog" を名乗る以上、フォーカスは中に閉じ込める。(UI_DESIGN_KIT §6)
+ * role="dialog" を名乗る以上、フォーカスは中に閉じ込める。
  */
 export const FOCUSABLE_SELECTOR = [
 	'a[href]',

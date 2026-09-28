@@ -437,7 +437,7 @@ test('ライセンスタブに第三者の成果物が並ぶ', () => {
 });
 
 test('第三者の成果物のライセンス名は本文へのリンクになっている', () => {
-	// CC BY 4.0 §3(a)(1)(C) はライセンスの URI (かハイパーリンク) の表示を求める
+	// CC BY 4.0 の 3(a)(1)(C) 項はライセンスの URI (かハイパーリンク) の表示を求める
 	const { root } = build();
 	const links = collect(findRole(root, 'panel-license'), 'a');
 	for (const item of THIRD_PARTY) {

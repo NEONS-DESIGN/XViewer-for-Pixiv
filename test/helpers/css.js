@@ -12,11 +12,8 @@ const REPO_ROOT = new URL('../../', import.meta.url);
 /**
  * CSS を読んで改行を LF に揃え、コメントを落とす。
  *
- * **改行を揃えるのは必須。** このリポジトリは `.gitattributes` を持たず、Windows の
- * `core.autocrlf=true` では作業ツリーの CSS が CRLF になる。`block()` は選択子を
- * 改行込みの文字列 (`:root,` の次の行が `:host {`) で探すので、CRLF のままだと
- * 1 つも見つからず、チェックアウト直後だけテストが落ちる。(実際に踏んだ)
- * 見張りたいのは宣言の中身であって改行の種類ではないので、読み込みの時点で潰す。
+ * **改行を揃えるのは必須。** 作業ツリーの CSS は CRLF のことがあり、`block()` は選択子を
+ * 改行込みの文字列 (`:root,` の次の行が `:host {`) で探すので、CRLF のままだと 1 つも見つからない。
  * @param {string} relative リポジトリの根から見た CSS の場所 (`src/common/tokens.css`)
  * @returns {Promise<string>} LF に揃えてコメントを落とした CSS
  */

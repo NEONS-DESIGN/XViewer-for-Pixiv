@@ -1,14 +1,14 @@
 /**
  * ライセンスタブと、設定タブの末尾に残す非公式の断り。
  * 言語に依らない値の出どころは `common/licenses.js`、文言の出どころは `strings` (src/i18n)。
- * ここでは並べるだけにする。(SPEC §11.1.1)
+ * ここでは並べるだけにする。
  */
 import { PROJECT_LICENSE, THIRD_PARTY } from '../common/licenses.js';
 import { createDescription } from './description.js';
 
 /**
  * 外部サイトへのリンクを組み立てる。
- * popup から開くので必ず新しいタブにし、参照元を渡さない。(SPEC §13-3)
+ * popup から開くので必ず新しいタブにし、参照元を渡さない。
  * @param {Document} doc 対象のドキュメント
  * @param {string} url 行き先
  * @param {string} [label] 表示する文字。省略すると URL をそのまま出す

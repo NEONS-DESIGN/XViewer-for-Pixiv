@@ -102,8 +102,8 @@ test('renderWork は fetchUser をサイドバーとアクションの両方へ�
 
 test('サイドバーを OFF から ON へ戻すと hidden が下りる', async (t) => {
 	t.after(disposeAll);
-	// Task 17 で実際に壊れた組み合わせ。hidden を立てる側しか書いていなかったため、
-	// 設定を戻して次の作品へ移ってもサイドバーが出てこなかった。
+	// hidden は立てるだけでなく下ろす側も要る。下ろさないと、設定を戻して次の作品へ移っても
+	// サイドバーが出てこない。
 	// 判断 (planPanes) ではなく、毎回明示的に代入する renderWork 側を見る必要がある
 	const { stage, sidebar, fetchUser, strings } = fakeTargets();
 	const doc = fakeDoc();
@@ -140,7 +140,7 @@ test('コメントとアクションは主役の描画を待たずに作る', as
 test('consumeKey はシェアメニューが開いているときだけ上下キーを食い止める', async (t) => {
 	t.after(disposeAll);
 	// 本体は上下キーを作品の移動に使う。開いたメニューの項目送りを横取りされないように先に聞く。
-	// Escape も同じ経路で聞く (viewer.test.js が固定している)
+	// Escape も同じ経路で聞く
 	const { stage, sidebar, fetchUser, strings } = fakeTargets();
 	await renderWork(DETAIL, ANONYMOUS, SETTINGS, { doc: fakeDoc(), stage, sidebar, fetchUser, strings });
 	const down = { key: 'ArrowDown', preventDefault() {} };

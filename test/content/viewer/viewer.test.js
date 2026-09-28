@@ -268,7 +268,7 @@ test('画像の上で押して余白で離しても閉じない', async () => {
 });
 
 test('ページカウンタや文言の上で押しても閉じない', async () => {
-	// .counter / .pane-error / .status は p なので、以前は余白扱いで閉じていた
+	// .counter / .pane-error / .status は p だが、余白扱いにして閉じてはいけない
 	const { viewer, stage, closed } = setup();
 	await viewer.open('1');
 	for (const className of ['counter', 'pane-error', 'status']) {
@@ -457,8 +457,8 @@ test('編集できる要素の中でも効かせない', () => {
 });
 
 test('入力欄の中では上下キーで作品が送られない', async () => {
-	// document の捕捉フェーズで全キーを取っているため、コメントを書いている最中の
-	// 上下キーで作品が送られていた。composedPath の先頭を入力欄にして確かめる
+	// document の捕捉フェーズで全キーを取っているので、入力欄を素通しにしないと
+	// コメントを書いている最中の上下キーで作品が送られる。composedPath の先頭を入力欄にして確かめる
 	const { viewer, doc, fetched } = setup();
 	await viewer.open('1', fakeSequence(['1', '2']));
 	assert.equal(fetched.length, 1);

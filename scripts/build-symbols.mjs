@@ -1,7 +1,7 @@
 /**
  * Material Symbols と Font Awesome (ブランドロゴ) から必要な図形だけを抜き出し、
  * 自前で描いた図形と混ぜて icon-shapes.js を生成する。
- * 生成物はコミットする。src/ を素の import で読めるようにするため。(UI_DESIGN_KIT §5)
+ * 生成物はコミットする。src/ を素の import で読めるようにするため。
  * 図形は文字列ではなく要素名と属性の組で持つ。実行時に innerHTML を使わず組み立てるため。
  */
 import { readFile, writeFile } from 'node:fs/promises';
@@ -44,9 +44,8 @@ const BRAND_SOURCES = {
 /**
  * Material Symbols に無い図形。自前で描いてここに置く。
  *
- * like: pixiv の「いいね」は顔 (目 2 つ + 笑った口) で、ハートはブックマークを指す。
- *       (SITE_SPEC §8) Material Symbols の mood は顔を丸い枠で囲っていて別物に見えるため、
- *       pixiv と同じ「枠の無い顔」を比率だけ合わせて描き起こす。
+ * like: pixiv の「いいね」は枠の無い顔 (目 2 つ + 笑った口) で、ハートはブックマークを指す。
+ *       pixiv と同じ形を比率だけ合わせて描き起こしたもの。
  *       塗りは svg 側の fill=currentColor に任せ、口だけ線で描く。
  * 原本の SVG と同じく文字列で書き、同じ分解 (parseSvgElements) の検査を通してから混ぜる。
  */

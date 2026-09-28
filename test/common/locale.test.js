@@ -4,7 +4,7 @@ import { stripLocale, localePrefix, currentLocalePrefix } from '../../src/common
 import { LOCALE_PREFIXES, ARTWORK_LINK_SELECTOR } from '../../src/common/constants.js';
 
 test('英語表示の接頭辞を落とす', () => {
-	// SITE_SPEC §3 実測。英語にすると全てのパスの先頭へ /en が挟まる
+	// 英語表示では全てのパスの先頭へ /en が挟まる
 	assert.equal(stripLocale('/en/users/11'), '/users/11');
 	assert.equal(stripLocale('/en/users/11/illustrations'), '/users/11/illustrations');
 	assert.equal(stripLocale('/en/artworks/149425016'), '/artworks/149425016');

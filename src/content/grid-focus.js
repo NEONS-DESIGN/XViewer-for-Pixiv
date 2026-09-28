@@ -3,7 +3,7 @@
  *
  * pixiv 標準のフォーカスリングは白に近い 1px で、しかもサムネイルの親に
  * overflow: hidden が実寸ぴったりで掛かっているため、外側へ出る枠は切り取られて見えない。
- * (SITE_SPEC 実測) そこでリンクの内側に重ねて描く。
+ * そこでリンクの内側に重ねて描く。
  * 外側に暗い縁、内側にアクセント色の二重にして、明るい絵でも暗い絵でも輪郭が出るようにする。
  */
 import { ARTWORK_LINK_SELECTORS } from '../common/constants.js';
@@ -12,7 +12,7 @@ import { createStyleHandle } from '../common/style-injector.js';
 /** 差し込む style 要素の id。二重注入を防ぐ目印も兼ねる。 */
 export const FOCUS_STYLE_ID = 'xviewer-grid-focus';
 
-/** 枠の色。UI_DESIGN_KIT の --accent (ダーク側)。絵の上に乗るのでテーマでは変えない。 */
+/** 枠の色。拡張の UI のアクセント色 (ダーク側)。絵の上に乗るのでテーマでは変えない。 */
 const FOCUS_COLOR = '#0096fa';
 
 /** 枠の外側に敷く縁の色。明るい絵でも輪郭が沈まないようにする。 */
@@ -24,7 +24,7 @@ const FOCUS_EDGE_WIDTH_PX = 2;
 /** 縁を含めた枠全体の太さ (px)。差分がアクセント色の幅になる。 */
 const FOCUS_RING_WIDTH_PX = 5;
 
-/** 角の丸み (px)。pixiv のサムネイル画像に合わせた実測値。 */
+/** 角の丸み (px)。pixiv のサムネイル画像の角丸に合わせる。 */
 const FOCUS_RADIUS_PX = 4;
 
 /**
@@ -41,7 +41,7 @@ function eachArtworkLink(suffix) {
  * light DOM へ差し込む CSS。
  * :focus-visible なのでキーボードで移ったときだけ出る。(クリックでは出ない)
  * :has(img) でサムネイルのリンクだけに絞る。(同じ href のタイトルリンクに枠を出さないため)
- * pixiv 標準のリングは消さない。(UI_DESIGN_KIT §10)
+ * pixiv 標準のリングは消さない。
  */
 export const GRID_FOCUS_CSS = `
 ${eachArtworkLink(':focus-visible:has(img)')} {

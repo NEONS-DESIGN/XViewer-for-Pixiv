@@ -95,7 +95,7 @@ test('テーマ切り替えの保存に失敗しても切り替えボタンへ�
 });
 
 test('失敗の通知は次の保存が成功したときに消える', async () => {
-	// 出しっぱなしだと、直った後も「保存できませんでした」が画面に残る (UI_DESIGN_KIT §4.8)
+	// 出しっぱなしだと、直った後も「保存できませんでした」が画面に残る
 	let ok = false;
 	const { renders, last, change } = await boot({ save: async () => ok });
 	change({ enabled: false });

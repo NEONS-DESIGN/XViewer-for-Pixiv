@@ -5,11 +5,10 @@
  * 積むと 30 作品見たあとグリッドへ戻るのに 30 回戻ることになるため。
  * 閉じる操作 (Esc・背景クリック・戻るボタン) はすべて history.back() に集約する。
  *
- * 履歴方式 (pushState + state の目印) を採る。pixiv 本体のルーターと衝突する場合は
- * このモジュールだけをハッシュ方式へ差し替える。
+ * 履歴は pushState と state の目印で積む。
  *
  * **isolated world では history.state を読まない。** Chrome は history.state の値を world ごとに
- * 覚えていて、別の world (pixiv 本体) が先に読むと古い値を返す。(SITE_SPEC §8)
+ * 覚えていて、別の world (pixiv 本体) が先に読むと古い値を返す。
  * 自分の目印が付いたエントリかどうかは、読む代わりに自分で覚えておく。(createEntryTracker)
  */
 import { parseArtworkPath } from './page.js';
@@ -76,7 +75,7 @@ export function createEntryTracker(win = window) {
 /**
  * 今の履歴 state を保ったまま URL だけ差し替える。書き換えは注入側 (page world) に任せる。
  * isolated world で history.state を読んで書き戻すと、古い値で Next.js の state を
- * 上書きしてしまうため。(SITE_SPEC §8) イベントは同期に配られるので、戻った時点で書き終わっている。
+ * 上書きしてしまうため。イベントは同期に配られるので、戻った時点で書き終わっている。
  * @param {string} url 差し替え先の URL (絶対 URL)
  * @param {object} [win] テスト用の window
  * @returns {void}

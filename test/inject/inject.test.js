@@ -101,7 +101,7 @@ test('包んだメソッドは this をそのまま元のメソッドへ渡す',
 });
 
 test('通知に失敗しても pushState は元どおり動き、例外を外へ出さない', () => {
-	// SPEC §12: 通知はサイト本体の遷移の経路に割り込んでいるので、ここで投げてはいけない
+	// 通知はサイト本体の遷移の経路に割り込んでいるので、ここで投げてはいけない
 	page.window.dispatchEvent = () => { throw new Error('dispatch failed'); };
 	try {
 		assert.equal(globalThis.history.pushState({}, '', '/users/9'), 'push-result');
@@ -158,7 +158,7 @@ test('プロトタイプのメソッドを包んでいたら、unhook は own pr
 });
 
 test('URL の差し替えの依頼は、今の state を保ったまま元の replaceState で書く', () => {
-	// isolated world からは history.state を正しく読めないので、page world で読んで書き戻す。(SITE_SPEC §8)
+	// isolated world からは history.state を正しく読めないので、page world で読んで書き戻す。
 	// 包みを通さないのは、自分の書き込みを pixiv の遷移として知らせないため
 	const written = [];
 	const saved = page.originals.replaceState;

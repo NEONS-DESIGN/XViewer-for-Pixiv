@@ -4,7 +4,7 @@ import { readStripped, block, variable } from '../../helpers/css.js';
 
 /**
  * viewer.css だけの約束事。CSS はテストで実行できないので、文字列として読んで見張る。
- * tokens.css との関係 (共通トークンの再定義・スクロールバー) は test/popup/popup-css.test.js にある
+ * tokens.css との関係 (共通トークンの再定義・スクロールバー) はここでは見ない。
  */
 
 /** ビュワーの Shadow DOM の規則。 */
@@ -12,7 +12,7 @@ const viewer = await readStripped('src/content/viewer/viewer.css');
 
 test('ビュワーのフォーカスの輪郭は 1 本にまとめる', () => {
 	// 部品ごとに :focus-visible を書くと、新しく足したリンクやボタンだけ輪郭が抜け、
-	// ブラウザ既定の白っぽい 1px が出る。(作者リンク・タグ・作品ページへのリンクで実際に起きた)
+	// ブラウザ既定の白っぽい 1px が出る。
 	// 共通の 1 本にしておけば、部品が増えても自動で揃う
 	const selectors = [...viewer.matchAll(/([^{}]*:focus-visible[^{}]*)\{/g)]
 		.map((match) => match[1].replace(/\s+/g, ' ').trim());
@@ -50,7 +50,7 @@ test('原寸表示のクリック領域は左右で同じ幅', () => {
 
 test('原寸表示の幕は透けない', () => {
 	// --backdrop (92%) をそのまま使うと、背後のサイドバーの文字が読めてしまう。
-	// (0.24.0 の実機確認で判明) 原寸表示は画像だけを見るための画面なので不透明にする
+	// 原寸表示は画像だけを見るための画面なので不透明にする
 	assert.ok(block(viewer, '.zoom').includes('background: var(--zoom-backdrop)'), '専用の幕を使っていない');
 	const value = variable(block(viewer, ':host'), '--zoom-backdrop');
 	assert.ok(value, '--zoom-backdrop が無い');

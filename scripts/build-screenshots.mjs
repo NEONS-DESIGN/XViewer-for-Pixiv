@@ -20,7 +20,7 @@ import { Resvg } from '@resvg/resvg-js';
 const WIDTH = 1280;
 const HEIGHT = 800;
 
-/** 配色。拡張本体の UI_DESIGN_KIT.md §2 に合わせる。 */
+/** 配色。ダーク配色の汎用トークンと同じ値。 */
 const COLOR = Object.freeze({
 	bg: '#14161c',
 	surface: '#1d212b',
@@ -88,7 +88,7 @@ function readSize(name) {
 
 /**
  * 箱の中に、比率を保ったまま中央で収める。
- * 枠と素材の比率が違うと端が切れる (実際にアドレスバーを切り落とした) ので毎回ここで出す。
+ * 枠と素材の比率が違うと端が切れるので、枠は素材の実寸から毎回ここで出す。
  * @param {string} name 素材のファイル名
  * @param {{x: number, y: number, width: number, height: number}} box 収める箱
  * @returns {{x: number, y: number, width: number, height: number}} 枠
