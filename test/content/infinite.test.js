@@ -89,7 +89,8 @@ function fakeSource(pages, options = {}) {
 
 /**
  * 任意の応答を返すページ供給。読んだページ番号を loaded に積む。
- * @param {(page: number) => object[]|Promise<object[]>} loadPage ページの応答。投げれば通信の失敗
+ * @param {(page: number, options: {signal?: AbortSignal}) => object[]|Promise<object[]>} loadPage
+ *   ページの応答。投げれば通信の失敗。第 2 引数で attachInfiniteScroll が渡した signal を受け取れる
  * @param {number|(() => number)} [pageCount] 総ページ数。関数なら呼んで決める (投げれば取得の失敗)
  * @returns {{source: object, loaded: number[]}} 供給と読んだページ番号
  */
@@ -99,9 +100,9 @@ function sourceOf(loadPage, pageCount = DEFAULT_PAGES) {
 		loaded,
 		source: {
 			async pageCount() { return typeof pageCount === 'function' ? pageCount() : pageCount; },
-			async loadPage(page) {
+			async loadPage(page, options = {}) {
 				loaded.push(page);
-				return loadPage(page);
+				return loadPage(page, options);
 			},
 		},
 	};
@@ -162,6 +163,7 @@ function retryButton(wrap) {
 function fakeDoc() {
 	const doc = el('#document');
 	doc.createElement = (tag) => withIdProperty(el(tag));
+	doc.createDocumentFragment = () => el('#fragment');
 	doc.head = el('head');
 	// style-injector は id で二重注入を見る。head の中だけを引く。
 	// readSession() が引く __NEXT_DATA__ は head に無い = 未ログイン扱い (トークンは空)
@@ -361,6 +363,18 @@ test('下まで来たら次のページを継ぎ足す', async () => {
 	assert.equal(added[0].getAttribute(XV_CARD_ATTR), '21');
 });
 
+test('継ぎ足しは ul への挿入 1 回にまとまる', async () => {
+	// 1 枚ずつ appendChild すると、pixiv 側の描き直しがそのたびに走ってしまう
+	const works = Array.from({ length: 48 }, (_, i) => singleWork(`9${String(i).padStart(2, '0')}`));
+	const { source } = sourceOf(() => works, 2);
+	const { ul, observer } = setup({ cards: [makeCard({ id: '1' })], source });
+	const appendChildCalls = recordCalls(ul, 'appendChild');
+	const appendCalls = recordCalls(ul, 'append');
+	await observer.trigger();
+	assert.equal(addedCards(ul).length, 48, '48 件並べ切れていない');
+	assert.equal(appendChildCalls.length + appendCalls.length, 1, 'ul への挿入が複数回に分かれている');
+});
+
 test('読み込み中に下まで来ても二重に読まない', async () => {
 	const { loaded, observer } = setup();
 	const first = observer.trigger();
@@ -401,6 +415,33 @@ test('先読みした空のページは読み直さずに終わる', async () =>
 test('onReach は先読みしない', async () => {
 	const { loaded, observer } = setup({ mode: INFINITE_SCROLL.ON_REACH });
 	await observer.trigger();
+	assert.deepEqual(loaded, [2]);
+});
+
+test('先読みモードは組み立ての直後に空き時間で 1 ページ先読みする', async () => {
+	// 通信は最小が約束の onReach と違い、prefetch は手が空き次第すぐ先読みを始める
+	const idle = [];
+	const { loaded } = setup({ mode: INFINITE_SCROLL.PREFETCH, deps: { runWhenIdle: (fn) => idle.push(fn) } });
+	assert.equal(idle.length, 1, '組み立て直後に空き時間を予約していない');
+	idle[0]();
+	await tick();
+	assert.deepEqual(loaded, [2], '1 ページ目の次を先読みしていない');
+});
+
+test('onReach では組み立ての直後に先読みしない', () => {
+	const idle = [];
+	setup({ mode: INFINITE_SCROLL.ON_REACH, deps: { runWhenIdle: (fn) => idle.push(fn) } });
+	assert.deepEqual(idle, [], 'onReach なのに空き時間を予約している');
+});
+
+test('setMode で prefetch になったら空き時間に 1 本先読みする', async () => {
+	const idle = [];
+	const { handle, loaded } = setup({ mode: INFINITE_SCROLL.ON_REACH, deps: { runWhenIdle: (fn) => idle.push(fn) } });
+	assert.deepEqual(idle, []);
+	handle.setMode(INFINITE_SCROLL.PREFETCH);
+	assert.equal(idle.length, 1, 'setMode 直後に空き時間を予約していない');
+	idle[0]();
+	await tick();
 	assert.deepEqual(loaded, [2]);
 });
 
@@ -553,6 +594,19 @@ test('既に並んでいる作品は継ぎ足さない', async () => {
 	await observer.trigger();
 	const added = addedCards(ul);
 	assert.deepEqual(added.map((li) => li.getAttribute(XV_CARD_ATTR)), ['21'], 'ID 2 が二重に並んでいる');
+});
+
+test('重複の判定は継ぎ足した ID を覚え、pixiv のカードだけを数え直す', async () => {
+	// 継ぎ足した ID は ownIds が覚えるので、重複判定のために自分のカードを数え直す必要は無い。
+	// 自分のカードの querySelectorAll が壊れていても継ぎ足しが止まらないことで確かめる
+	const { ul, wrap, observer } = setup({ pages: 3 });
+	await observer.trigger();
+	for (const card of addedCards(ul)) {
+		card.querySelectorAll = () => { throw new Error('own card should not be re-scanned'); };
+	}
+	await observer.trigger();
+	assert.equal(addedCards(ul).length, 4, '3 ページ目まで継ぎ足していない');
+	assert.equal(sentinelMessage(wrap), SENTINEL_TEXT.DONE, '自分のカードの走査に失敗して止まっている');
 });
 
 test('全件が既に並んでいたページは失敗にせず、ページを進めて次を読む', async () => {
@@ -853,6 +907,55 @@ test('dispose で継ぎ足したカードと sentinel が消える', async () =>
 	assert.equal([...wrap.querySelectorAll(`[${SENTINEL_ATTR}]`)].length, 0);
 	assert.equal(observer.state.disconnected, 1);
 	assert.equal(handle.isActive(), false, 'dispose 後は動いていない');
+});
+
+test('撤去は後ろから外す', async () => {
+	// 末尾からの削除は子の並びを詰め直す量が少ない
+	const { ul, handle, observer } = setup({ pages: 2 });
+	await observer.trigger();
+	const cards = addedCards(ul);
+	assert.ok(cards.length >= 2, '撤去順を確かめるにはカードが 2 枚以上要る');
+	const order = [];
+	for (const card of cards) {
+		const original = card.remove;
+		card.remove = () => { order.push(card.getAttribute(XV_CARD_ATTR)); original.call(card); };
+	}
+	handle.dispose();
+	assert.deepEqual(order, [...cards].reverse().map((card) => card.getAttribute(XV_CARD_ATTR)), '撤去の順が後ろからになっていない');
+});
+
+test('撤去すると走っている loadPage を中断する', async () => {
+	let capturedSignal = null;
+	let release = () => {};
+	const gate = new Promise((resolve) => { release = resolve; });
+	const { source } = sourceOf(async (page, options) => {
+		capturedSignal = options.signal;
+		await gate;
+		return [singleWork(page)];
+	});
+	const { handle, observer } = setup({ cards: [makeCard({ id: '1' })], source });
+	const pending = observer.trigger();
+	await tick();
+	assert.ok(capturedSignal, 'loadPage に signal を渡していない');
+	assert.equal(capturedSignal.aborted, false);
+	handle.dispose();
+	assert.equal(capturedSignal.aborted, true, '撤去で走っている取得を中断していない');
+	release();
+	await pending;
+});
+
+test('撤去の後に届いた失敗は sentinel に書かず warn もしない', async (t) => {
+	const warnSpy = t.mock.method(console, 'warn', () => {});
+	let rejectLoad = () => {};
+	const { source } = sourceOf(() => new Promise((_resolve, reject) => { rejectLoad = reject; }));
+	const { wrap, handle, observer } = setup({ cards: [makeCard({ id: '1' })], source });
+	const pending = observer.trigger();
+	await tick();
+	handle.dispose();
+	rejectLoad(new Error('boom'));
+	await pending;
+	assert.equal(sentinelMessage(wrap), '', '撤去後の失敗を sentinel に書いている');
+	assert.equal(warnSpy.mock.callCount(), 0, '撤去後の失敗を warn している');
 });
 
 test('observe() が投げても observer は切られ、sentinel も残らない', () => {

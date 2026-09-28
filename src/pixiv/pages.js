@@ -39,30 +39,52 @@ export function sortIdsDesc(ids) {
 	return [...ids].sort((a, b) => Number(b) - Number(a));
 }
 
+/** 種別で絞らないとき (loadAllWorkIds(userId, null, ...)) に引くキー。両方を繋いだ降順の並び。 */
+const ALL_CATEGORIES_KEY = 'all';
+
 /**
- * profile/all の応答本体を取る。失敗は覚えない。
+ * profile/all の応答から、種別ごとの数値降順 ID 配列を組む。
+ * 呼び出しのたびに並べ替えないよう、配列は凍結してそのまま使い回す。
+ * @param {object} body profile/all の応答 body
+ * @returns {Readonly<Record<string, ReadonlyArray<string>>>} 種別ごとの ID 配列。両方を繋いだものは 'all'
+ */
+function sortedIndex(body) {
+	const index = Object.fromEntries(
+		Object.values(WORK_CATEGORY).map((name) => [name, Object.freeze(sortIdsDesc(Object.keys(body?.[name] ?? {})))]),
+	);
+	index[ALL_CATEGORIES_KEY] = Object.freeze(
+		sortIdsDesc(Object.values(WORK_CATEGORY).flatMap((name) => index[name])),
+	);
+	return Object.freeze(index);
+}
+
+/**
+ * profile/all の応答から、種別ごとに並べ替えた ID の索引を取る。失敗は覚えない。
  * @param {string} userId ユーザー ID
  * @param {string} lang 言語コード (strings.lang)
  * @param {Function} get getJson の差し替え
- * @returns {Promise<object>} 応答の body
+ * @returns {Promise<Readonly<Record<string, ReadonlyArray<string>>>>} 種別ごとの ID 配列
  */
 function loadProfileAll(userId, lang, get) {
-	return profileCache.get(userId) ?? profileCache.remember(userId, () => get(userProfileAllUrl(userId, lang)));
+	return profileCache.get(userId) ?? profileCache.remember(userId, async () => {
+		const body = await get(userProfileAllUrl(userId, lang));
+		return sortedIndex(body);
+	});
 }
 
 /**
  * 作者の全作品 ID を数値降順で取る。
+ * 返す配列は凍結済みで、呼び出し側は書き換えない。同じ userId・lang なら同じ配列を返す。
  * @param {string} userId ユーザー ID
  * @param {string|null} category 絞り込む種別 (WORK_CATEGORY)。null なら両方
  * @param {string} lang 言語コード (strings.lang)
  * @param {{getJsonImpl?: Function}} [deps] テスト用の依存
- * @returns {Promise<string[]>} ID の並び
+ * @returns {Promise<ReadonlyArray<string>>} ID の並び
  */
 export async function loadAllWorkIds(userId, category, lang, deps = {}) {
 	const get = deps.getJsonImpl ?? getJson;
-	const body = await loadProfileAll(userId, lang, get);
-	const categories = category ? [category] : Object.values(WORK_CATEGORY);
-	return sortIdsDesc(categories.flatMap((name) => Object.keys(body?.[name] ?? {})));
+	const index = await loadProfileAll(userId, lang, get);
+	return index[category ?? ALL_CATEGORIES_KEY];
 }
 
 /**
@@ -71,7 +93,7 @@ export async function loadAllWorkIds(userId, category, lang, deps = {}) {
  * @param {string|null} category 絞り込む種別 (WORK_CATEGORY)。null なら両方
  * @param {string} lang 言語コード (strings.lang)
  * @param {{getJsonImpl?: Function}} [deps] テスト用の依存
- * @returns {{pageCount: () => Promise<number>, loadPage: (page: number) => Promise<object[]>}} ページ供給
+ * @returns {{pageCount: () => Promise<number>, loadPage: (page: number, options?: {signal?: AbortSignal}) => Promise<object[]>}} ページ供給
  */
 export function createPageSource(userId, category, lang, deps = {}) {
 	const get = deps.getJsonImpl ?? getJson;
@@ -80,12 +102,19 @@ export function createPageSource(userId, category, lang, deps = {}) {
 			const ids = await loadAllWorkIds(userId, category, lang, deps);
 			return Math.ceil(ids.length / WORKS_PER_PAGE);
 		},
-		async loadPage(page) {
+		/**
+		 * 1 ページぶんの作品サマリを取る。
+		 * profile/all (作品 ID の索引) はビュワーの作品間移動とも共有するので signal を渡さない。
+		 * @param {number} page ページ番号 (1 始まり)
+		 * @param {{signal?: AbortSignal}} [options] 中断の合図。profile/illusts の取得だけに使う
+		 * @returns {Promise<object[]>} 作品サマリ
+		 */
+		async loadPage(page, options = {}) {
 			if (page < 1) return [];
 			const ids = await loadAllWorkIds(userId, category, lang, deps);
 			const slice = ids.slice((page - 1) * WORKS_PER_PAGE, page * WORKS_PER_PAGE);
 			if (slice.length === 0) return [];
-			const body = await get(userProfileIllustsUrl(userId, slice, page === 1, category, lang));
+			const body = await get(userProfileIllustsUrl(userId, slice, page === 1, category, lang), { signal: options.signal });
 			const works = body?.works ?? {};
 			// 応答は ID をキーにした Map で順序を持たない。渡した順に並べ直す。
 			// 応答に無い ID (非公開になった作品など) は落とす

@@ -27,12 +27,32 @@ export function el(tag, attrs = {}) {
 		children: [],
 		parent: null,
 		attributes: { ...attrs },
+		/** @type {[string, string][]} setAttribute が呼ばれた順の記録。呼び出し順を確かめるテスト用 */
+		attributeCalls: [],
 		style: {
 			values: {},
 			setProperty(name, value) { this.values[name] = value; },
 			removeProperty(name) { delete this.values[name]; },
 		},
-		appendChild(child) { child.parent = node; node.children.push(child); return child; },
+		/**
+		 * 子を足す。DocumentFragment (#fragment) を渡された場合は本物の DOM と同じく
+		 * その子だけを移し、fragment 自身は入れない (fragment は空になる)。
+		 * @param {object} child 足す子、または DocumentFragment
+		 * @returns {object} 渡された引数
+		 */
+		appendChild(child) {
+			if (child.tag === '#fragment') {
+				for (const grandchild of [...child.children]) {
+					grandchild.parent = node;
+					node.children.push(grandchild);
+				}
+				child.children = [];
+				return child;
+			}
+			child.parent = node;
+			node.children.push(child);
+			return child;
+		},
 		append(...nodes) { for (const one of nodes) node.appendChild(one); },
 		// 本物と同じく、参照ノードが null なら末尾、子でなければ投げる
 		insertBefore(child, reference) {
@@ -93,7 +113,10 @@ export function el(tag, attrs = {}) {
 			node.parent.children = node.parent.children.filter((one) => one !== node);
 			node.parent = null;
 		},
-		setAttribute(name, value) { node.attributes[name] = String(value); },
+		setAttribute(name, value) {
+			node.attributes[name] = String(value);
+			node.attributeCalls.push([name, String(value)]);
+		},
 		getAttribute(name) { return node.attributes[name] ?? null; },
 		hasAttribute(name) { return name in node.attributes; },
 		removeAttribute(name) { delete node.attributes[name]; },
