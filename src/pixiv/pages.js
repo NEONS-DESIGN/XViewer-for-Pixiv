@@ -32,11 +32,13 @@ export function clearPageSourceCache() {
  * 作品 ID を数値の降順に並べる。
  * pixiv の作品 ID は単調増加なので、降順が新しい順になる。
  * 文字列のまま比べると桁数の違う ID の順序が壊れるため数値で比べる。
+ * 比較のたびに Number() を呼ぶと要素数の対数倍の回数だけ変換が走るので、
+ * 先に 1 回ずつ数値へ変換してから並べ替える (渡された配列は書き換えない)。
  * @param {string[]} ids 作品 ID
  * @returns {string[]} 降順に並べた ID
  */
 export function sortIdsDesc(ids) {
-	return [...ids].sort((a, b) => Number(b) - Number(a));
+	return ids.map((id) => [Number(id), id]).sort((a, b) => b[0] - a[0]).map(([, id]) => id);
 }
 
 /** 種別で絞らないとき (loadAllWorkIds(userId, null, ...)) に引くキー。両方を繋いだ降順の並び。 */
