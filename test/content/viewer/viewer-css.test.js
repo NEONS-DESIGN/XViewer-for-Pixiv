@@ -56,3 +56,15 @@ test('原寸表示の幕は透けない', () => {
 	assert.ok(value, '--zoom-backdrop が無い');
 	assert.ok(!/rgba|hsla|transparent/.test(value), `--zoom-backdrop が透ける値 (${value})`);
 });
+
+test('原寸表示の通知はスクロールに流されず、画面に貼り付く', () => {
+	// 置き場はスクロールする .zoom の中にあるので、absolute のままだと画像と一緒に流れる
+	assert.ok(block(viewer, '.zoom > .notice-area').includes('position: fixed'), '通知の置き場が fixed でない');
+	// 先祖に transform / filter / contain があると fixed の基準が画面でなくなる
+	for (const selector of ['.overlay', '.zoom']) {
+		const body = block(viewer, selector);
+		for (const property of ['transform:', 'filter:', 'contain:', 'will-change:', 'perspective:']) {
+			assert.ok(!body.includes(property), `${selector} が ${property} を持つと fixed が画面基準にならない`);
+		}
+	}
+});

@@ -19,6 +19,16 @@ function setup() {
 	return { doc, container, area, timers };
 }
 
+test('createNoticeArea は中身より先に空の live region を置く', () => {
+	// 既にある live region の中身が変わったときだけ読み上げる支援技術があるため
+	const { container } = setup();
+	const areas = findAll(container, '.notice-area');
+	assert.equal(areas.length, 1);
+	assert.equal(areas[0].getAttribute('role'), 'status');
+	assert.equal(areas[0].getAttribute('aria-live'), 'polite');
+	assert.equal(findAll(container, '.notice').length, 0);
+});
+
 test('show は上部の入れ物に 1 件出し、role=status の入れ物は 1 つだけ作る', () => {
 	const { container, area } = setup();
 	area.show({ id: 'a', message: 'one' });
@@ -38,11 +48,15 @@ test('同じ id の show は差し替えで、重ならない', () => {
 	assert.match(items[0].textContent, /two/);
 });
 
-test('dismiss と handle.dismiss で消え、空になったら入れ物も外す', () => {
+test('dismiss と handle.dismiss で消えても、空の入れ物は残す', () => {
 	const { container, area } = setup();
 	const handle = area.show({ id: 'a', message: 'one' });
+	const before = findAll(container, '.notice-area')[0];
 	handle.dismiss();
-	assert.equal(findAll(container, '.notice-area').length, 0);
+	assert.equal(findAll(container, '.notice').length, 0);
+	const after = findAll(container, '.notice-area');
+	assert.equal(after.length, 1);
+	assert.equal(after[0], before);
 });
 
 test('timeoutMs を渡したときだけ自動で消える', () => {
@@ -77,15 +91,27 @@ test('dismiss(id) は area.dismiss からも同じ 1 件を消せる', () => {
 	assert.equal(findAll(container, '.notice').length, 0);
 });
 
-test('clear は全件消し、dispose は clear と同じ', () => {
-	const { container, area } = setup();
+test('clear は全件消して入れ物を残し、dispose は入れ物ごと外す', () => {
+	const { container, area, timers } = setup();
 	area.show({ id: 'a', message: 'one' });
 	area.show({ id: 'b', message: 'two' });
 	area.clear();
 	assert.equal(findAll(container, '.notice').length, 0);
-	area.show({ id: 'c', message: 'three' });
+	assert.equal(findAll(container, '.notice-area').length, 1);
+	area.show({ id: 'c', message: 'three', timeoutMs: 1000 });
 	area.dispose();
 	assert.equal(findAll(container, '.notice-area').length, 0);
+	assert.equal(timers[0].fn, null);
+});
+
+test('dispose の後の show は何も出さない', () => {
+	const { container, area } = setup();
+	area.dispose();
+	const handle = area.show({ id: 'a', message: 'one' });
+	assert.equal(findAll(container, '.notice-area').length, 0);
+	assert.equal(findAll(container, '.notice').length, 0);
+	handle.update('two');
+	handle.dismiss();
 });
 
 test('info と error はアイコンを持ち、progress は回転する印を持つ', () => {

@@ -423,6 +423,15 @@
 	font-size: 12px;
 }
 
+/*
+ * 原寸表示の通知。置き場はダイアログ (.zoom) の中にあるが、.zoom は自分でスクロールするので
+ * クリック領域と同じく画面に貼り付けて上部に留める。重なり順は notice.css の z-index のまま
+ * (.zoom の中でクリック領域とカウンタより上)
+ */
+.zoom > .notice-area {
+	position: fixed;
+}
+
 /* うごイラの失敗表示は再生ボタンと同じ下端に並ぶので、ボタンの上へ逃がす */
 .ugoira > .pane-error {
 	bottom: 64px;
