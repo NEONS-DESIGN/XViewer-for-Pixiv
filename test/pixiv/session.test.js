@@ -68,7 +68,7 @@ test('preloadedState が壊れていてもログイン状態だけは読める',
 });
 
 test('自分のユーザー ID を self.id として読む', () => {
-	// 自分の作品にいいね・ブックマーク・フォローを出さないための判定材料 (SITE_SPEC §6)
+	// 自分の作品にいいね・ブックマーク・フォローを出さないための判定材料
 	const session = parseNextData(buildNextData({ self: { id: '16343044', xRestrict: 1 } }));
 	assert.equal(session.self.id, '16343044');
 });

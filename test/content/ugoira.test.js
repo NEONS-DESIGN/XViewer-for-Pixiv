@@ -15,7 +15,7 @@ const META = {
 };
 
 test('解像度の設定に応じて zip を選ぶ', () => {
-	// regular は 600x600 (実測 4.7MB) / original は 1920x1080 (実測 12.7MB)
+	// regular は 600x600、original は 1920x1080 の枠に収まる大きさの zip
 	assert.equal(pickZipUrl(META, 'regular'), META.src);
 	assert.equal(pickZipUrl(META, 'original'), META.originalSrc);
 });
@@ -46,7 +46,7 @@ test('buildFrames は空でも落ちない', () => {
 	assert.deepEqual(buildFrames([], []), []);
 });
 
-/** 30ms x 3 コマの待ち時間。SITE_SPEC §4 の実測作品と同じ刻み */
+/** 30ms x 3 コマの待ち時間。 */
 const TIMINGS = [{ delay: 30 }, { delay: 30 }, { delay: 30 }];
 
 test('advanceFrame は開始時刻を「前の開始 + delay」で繰り越し、rAF の刻みで遅れない', () => {
@@ -238,7 +238,7 @@ test('render は静止画を先に出し、読めたら canvas に切り替え�
 });
 
 test('dispose で Blob URL を全部 revoke し、rAF を止める', async (t) => {
-	// Blob URL は revoke しないとメモリに残る。rAF は止めないと捨てた canvas へ描き続ける (SPEC §10.8)
+	// Blob URL は revoke しないとメモリに残る。rAF は止めないと捨てた canvas へ描き続ける
 	const revoke = t.mock.method(URL, 'revokeObjectURL');
 	const { player, cancelled } = build();
 	await player.render(DETAIL);

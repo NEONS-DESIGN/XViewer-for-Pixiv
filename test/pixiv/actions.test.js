@@ -5,7 +5,7 @@ import { PIXIV_ERROR_KINDS } from '../../src/pixiv/errors.js';
 import { fakeApiFetch, fakeFetch } from '../helpers/pixiv.js';
 
 // /ajax/* と post_comment.php は {error, message, body} で包むので fakeApiFetch(body)。
-// フォロー系の旧 PHP は包まず値をそのまま返すので fakeFetch({ json })。(SITE_SPEC §4-5/6)
+// フォロー系の旧 PHP は包まず値をそのまま返すので fakeFetch({ json })。
 
 test('likeIllust は JSON を POST し、送信前のいいね状態を返す', async () => {
 	const { impl, calls } = fakeApiFetch({ is_liked: false });
@@ -131,7 +131,7 @@ test('addBookmark は数値の ID を文字列にして返す', async () => {
 	assert.equal(await addBookmark('1', false, 'T', { fetchImpl: impl }), '38764433361');
 });
 
-/** 投稿 API が返す body の実測値。(SITE_SPEC §4) */
+/** コメント投稿 API が返す body の形。 */
 const POSTED = Object.freeze({
 	user_id: '54734418',
 	user_name: 'NEONS',

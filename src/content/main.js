@@ -54,8 +54,8 @@ let infinite = null;
 /**
  * 今 infinite を張ろうとしたグリッドのキー (作者 + タブ)。張っていなければ null。
  * 同じグリッドを見続けている間は作り直さず、別のグリッドへ移ったら必ず捨てるための目印。
- * 雛形が採れずに張れなかったときも覚え、同じ ul に対して組み直しを繰り返さない
- * (試し直すのは別の ul が現れたか、ul の画像が増えたときだけ。infiniteListImages を参照)
+ * 雛形が採れずに張れなかったときも覚え、同じ ul に対して組み直しを繰り返さない。
+ * (試し直すのは別の ul が現れたか、ul の画像が増えたときだけ)
  */
 let infiniteKey = null;
 /**
@@ -83,8 +83,7 @@ let infiniteGridKey = null;
  * pixiv 自身がグリッドに並べているページ番号。(継ぎ足したぶんは数えない)
  * 継ぎ足しはこの次のページから読む。値が動くのは pixiv が `?p=` を動かしたとき
  * (別のグリッドを見始めた / ページャ / 戻る) だけ。pixiv はその値のページを並べている。
- * 同じグリッドを描き直されても変えない。Next.js の router state は自分の `replaceState` では
- * 動かないので、描き直しは pixiv が最後に遷移したクエリ (= この値) で起きる。(infinite-sync.js)
+ * 同じグリッドを描き直されても変えない。(描き直しは pixiv が最後に遷移したクエリで起きる)
  *
  * `?p=` をそのまま使えないのは、継ぎ足しに合わせて自分で書き換えているため。
  * 撤去して張り直す (オフ→オンなど) と、グリッドには pixiv が並べたぶんしか残らない
@@ -102,7 +101,7 @@ let infiniteOwnPage = null;
 let syncingInfinite = false;
 let router = null;
 /**
- * 今の履歴エントリが自分のモーダル用に積んだものか。history.state を読まずに追う。(router.js)
+ * 今の履歴エントリが自分のモーダル用に積んだものか。history.state を読まずに追う。
  * ルーターは作り直すが、これはページの寿命と同じだけ生かす。
  * popstate の購読を boot() の遷移監視より先に張るため、読み込んだ時点で作る
  */
@@ -293,7 +292,7 @@ function gridKeyOf(page) {
  * 最後に見た ul が DOM から外れたか。
  * pixiv がグリッドを描き直すと、継ぎ足したカードも sentinel もろとも外れ、
  * 見張っている sentinel が二度と画面に入らないまま継ぎ足しが黙って止まる。
- * この場合は張り直しが要る。(基準ページは変えない。infiniteBasePage の説明を参照)
+ * この場合は張り直しが要る。(基準ページは変えない)
  * @returns {boolean} 外れていれば true
  */
 function isGridDetached() {
@@ -505,7 +504,7 @@ function writePageParam(page) {
 		infiniteOwnPage = page;
 		// 既に同じ URL なら書かない。replaceState を呼び過ぎるとブラウザに絞られる。
 		// ここで history.replaceState(history.state, ...) としてはいけない。isolated world の
-		// history.state は古いことがあり、Next.js の state を拡張の目印で上書きしてしまう。(SITE_SPEC §8)
+		// history.state は古いことがあり、Next.js の state を拡張の目印で上書きしてしまう。
 		// state を保ったまま URL だけ差し替えるのは注入側 (page world) に任せる
 		if (url.href !== location.href) replaceUrlKeepingState(url.href);
 	} catch (error) {
@@ -643,11 +642,8 @@ function stopNavigationWatch() {
 async function boot() {
 	const pageLanguage = readPageLanguage(document);
 	strings = createStrings(uiLanguage(pageLanguage));
-	// popup は pixiv のページを持たないので、見た言語をここで残す。失敗しても先へ進む
-	// ここで保存しているのは strings.lang (uiLanguage() で解決した後の UI 言語) であって、
-	// pageLanguage (readPageLanguage() が返す生の表示言語) そのものではない。
-	// 現状は popup 側も loadPageLanguage() の結果を uiLanguage() に通すため挙動に差は出ないが、
-	// 対応言語が増えたときに「生の表示言語」と「解決後の UI 言語」の区別が必要になったら書き直すこと
+	// popup は pixiv のページを持たないので、見た言語をここで残す。失敗しても先へ進む。
+	// 残すのは uiLanguage() で解決した後の UI 言語 (strings.lang) で、生の表示言語 (pageLanguage) ではない
 	void savePageLanguage(strings.lang);
 	settings = await loadSettings();
 	// ビュワーの入切とは独立して効かせる。ピックアップ非表示や無限スクロールだけを使う人もいる
@@ -682,7 +678,7 @@ function handleSettingsChange(next) {
 		stop();
 	}
 	// 遷移の監視はビュワー・ピックアップ非表示・無限スクロールの全部が要らなくなったときだけ外す。
-	// apply() より先に張るのは popstate の配布順のため (boot の説明を参照)
+	// apply() より先に張る。(popstate は登録順に配られ、router.js の購読より先に動く必要がある)
 	if (needsNavigationWatch()) startNavigationWatch();
 	else stopNavigationWatch();
 	if (next.enabled) apply();

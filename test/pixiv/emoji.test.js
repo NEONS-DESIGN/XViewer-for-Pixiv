@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { PIXIV_EMOJI, parseCommentText } from '../../src/pixiv/emoji.js';
 
 test('絵文字の名前と ID の対応は pixiv の表と一致する', () => {
-	// SITE_SPEC 実測: pixiv のフロント JS が持つ表をそのまま写した
+	// pixiv のフロント JS が持つ表と同じ値であることを見る
 	assert.equal(PIXIV_EMOJI.normal, 101);
 	assert.equal(PIXIV_EMOJI.heaven, 104);
 	assert.equal(PIXIV_EMOJI.love3, 310);

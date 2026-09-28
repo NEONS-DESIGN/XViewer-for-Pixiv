@@ -4,8 +4,7 @@
  * 対応する Chrome の下限。esbuild の target と manifest の minimum_chrome_version の出どころはここ 1 か所。
  *
  * 下限を決めている機能:
- *   - content_scripts の "world": "MAIN" (111+)。これより古いと world が無視され、
- *     inject.js が isolated world で走って history のフックが効かないまま黙って壊れる
+ *   - content_scripts の "world": "MAIN" (111+)。これより古いと world が無視され、inject.js が黙って壊れる
  *   - color-mix() (111+)、CSS nesting (120+)
  * 上限側の機能 (appearance: base-select 等) は進行的強化で、無くても動く。
  */
@@ -25,8 +24,7 @@ export const MINIMUM_CHROME_VERSION = String(MINIMUM_CHROME_MAJOR);
  * 下限を決めている機能:
  *   - content_scripts の "world": "MAIN" (128+)
  *   - content_scripts を manifest の登録順に走らせる保証 (139+)
- *   - browser_specific_settings.gecko.data_collection_permissions の組み込みの同意画面 (140+)。
- *     AMO は新規登録にこのキーを求める。140 は ESR もある版
+ *   - browser_specific_settings.gecko.data_collection_permissions の組み込みの同意画面 (140+)
  * color-mix() (113+)、CSS nesting (117+)、:has() (121+) はこれより前に揃っている。
  * appearance: base-select は Firefox では既定で無効。Chrome と同じく進行的強化として無くても動く。
  */

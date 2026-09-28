@@ -1,7 +1,7 @@
 /**
  * 設定画面の組み立てと保存の橋渡し。
  * 設定を読んで popup-ui に描かせ、変更をそのまま保存する。
- * エントリ (popup.js) は import した時点で走るので、試せるように依存を引数で受ける形にここへ出した。(SPEC §15)
+ * 依存は引数で受け取り、テストで差し替えられるようにする。
  */
 import { loadSettings as loadSettingsImpl, saveSetting as saveSettingImpl, resetSettings as resetSettingsImpl } from '../common/storage.js';
 import { logError } from '../common/log.js';
@@ -90,7 +90,7 @@ export async function main({
 	doc.documentElement.lang = strings.lang;
 
 	// 保存の失敗だけを画面に出す。成功は画面がそのまま変わるので言葉を足さない。
-	// 出した通知は次の保存が成功したときに消す (UI_DESIGN_KIT §4.8)
+	// 出した通知は次の保存が成功したときに消す
 	let notice = null;
 
 	/** 直近に描いた画面。描き直すときに現在のタブを引き継ぐために持つ。 */
@@ -121,7 +121,7 @@ export async function main({
 
 	/**
 	 * 設定を読み直して描き直す。
-	 * 利用者の現在地 (開いているタブ・フォーカス) は描き直しの外で持って復元する。(UI_DESIGN_KIT §7)
+	 * 利用者の現在地 (開いているタブ・フォーカス) は描き直しの外で持って復元する。
 	 * 描画の例外はここで受けて記録する。呼び出し側は結果を待たないので、放すと素の unhandled rejection になる
 	 * @param {{focusRole?: string|null, settings?: object}} [options] 描き直した後にフォーカスを戻す要素の data-role。
 	 *   settings を渡すと読み直さずそれを使う (main() が言語の解決と同時に読んだ初回分の使い回し)

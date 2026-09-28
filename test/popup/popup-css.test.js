@@ -81,8 +81,8 @@ test('トークンは :root と :host の両方に当たる選択子で書く', 
 	for (const name of SHARED_TOKENS) {
 		assert.ok(dark.some((one) => one.startsWith(`${name}:`)), `ダークに ${name} が無い`);
 	}
-	assert.ok(dark.includes('color-scheme: dark'), 'color-scheme を両テーマに書く (UI_DESIGN_KIT §2)');
-	assert.ok(light.includes('color-scheme: light'), 'color-scheme を両テーマに書く (UI_DESIGN_KIT §2)');
+	assert.ok(dark.includes('color-scheme: dark'), 'ダークに color-scheme: dark が無い');
+	assert.ok(light.includes('color-scheme: light'), 'ライトに color-scheme: light が無い');
 	assert.ok(dark.some((one) => one.startsWith('font-family:')), '書体は tokens.css の 1 か所で決める');
 });
 
@@ -101,7 +101,7 @@ test('ライトの変数は明示の選択と OS 追従 (data-theme が付く前
 });
 
 test('OS 追従の規則は文書側だけに当てる (ビュワーは pixiv 本体のテーマに追従する)', () => {
-	// :host を並べると、OS がライトで pixiv がダークのときにビュワーがライトで描かれる (SPEC.md §10.2)
+	// :host を並べると、OS がライトで pixiv がダークのときにビュワーがライトで描かれる
 	const media = tokens.slice(tokens.indexOf('@media (prefers-color-scheme: light)'));
 	const body = media.slice(0, media.indexOf(`${FALLBACK_SELECTOR} {`));
 	assert.ok(!body.includes(':host'), 'OS 追従の規則に :host を並べない');
@@ -147,7 +147,7 @@ test('フォーカスの輪郭は --focus-ring の 1 本だけ', () => {
 });
 
 test('保存の失敗の通知に --danger を使わない', () => {
-	// --danger は取り消せない操作専用。(UI_DESIGN_KIT §2) 保存の失敗はやり直せる
+	// --danger は取り消せない操作専用。保存の失敗はやり直せる
 	assert.ok(!block(popup, '.notice').includes('--danger'));
 });
 

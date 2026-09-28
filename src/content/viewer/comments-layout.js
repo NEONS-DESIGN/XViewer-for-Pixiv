@@ -1,7 +1,7 @@
 /**
  * コメント区画の採寸。区画の下限 (min-height) と、見出しの「貼り付き」の判定を持つ。
  *
- * コメントの取得・描画・投稿 (comments.js) とは関心が別なので、SPEC §10.11 の指示どおりここへ分けた。
+ * コメントの取得・描画・投稿 (comments.js) とは関心が別なので分けてある。
  * 純関数 (`isHeadingStuck` / `commentsFloorHeight`) と、実際の要素を測る
  * `createCommentsLayout()` の 2 層。測る相手 (一覧・スクロール領域・見出し) は
  * comments.js が描き直すたびに変わるので、参照ではなく `parts()` で毎回引く。
@@ -165,7 +165,7 @@ export function createCommentsLayout(deps) {
 			scrollTarget.getBoundingClientRect().top,
 		);
 		header.classList.toggle(STUCK_CLASS, stuck);
-		// 押しても何も起きないボタンは見せない (UI_DESIGN_KIT §6)
+		// 押しても何も起きないボタンは見せない
 		if (toTopButton) toTopButton.hidden = !stuck;
 	}
 

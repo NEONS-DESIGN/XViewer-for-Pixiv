@@ -7,8 +7,8 @@
  */
 
 /**
- * 背景のアクセント色。UI_DESIGN_KIT §2 の --accent (ダーク) と同じ値で、
- * その実体は pixiv 本体のブランド色 --charcoal-brand。(SITE_SPEC.md §14)
+ * 背景のアクセント色。pixiv 本体のブランド色 (--charcoal-brand) で、tokens.css のダークの --accent と同じ値にする。
+ * (ずれは test/popup/popup-css.test.js が止める)
  */
 const ACCENT = '#0096fa';
 

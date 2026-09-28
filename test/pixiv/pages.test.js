@@ -44,7 +44,7 @@ test('sortIdsDesc は渡した配列を変えない', () => {
 });
 
 test('ID の数値降順で 48 件ずつ切り出す', async () => {
-	// 本体のページャと同じ並びになることが要 (SITE_SPEC §3 で実測確認済み)
+	// 本体のページャと同じ並びになることが要
 	const ids = Array.from({ length: 100 }, (_, i) => String(1000 + i));
 	const { impl } = fakeGet(ids);
 	const source = createPageSource('1', null, 'ja', { getJsonImpl: impl });

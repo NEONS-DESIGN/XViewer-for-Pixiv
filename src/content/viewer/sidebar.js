@@ -203,9 +203,8 @@ export function createSidebar(deps) {
 	/**
 	 * 今出しているコメントの件数。投稿のたびに手元で増やす。
 	 * 取り直さないのは、投稿の反映に間があり、直後に引くと古い数字が返るため。
-	 * (いいね・ブックマークと同じ方針。SPEC §10.12)
 	 * **削除だけは例外で、数え直した値で置き換える**。(ルートを消すと返信も道連れになり、
-	 * 手元では引く数が決まらないため。SPEC §10.11)
+	 * 手元では引く数が決まらないため)
 	 * @type {number}
 	 */
 	let commentCount = 0;
@@ -222,7 +221,7 @@ export function createSidebar(deps) {
 	 * (未ログイン・見られない作品) はこのまま押せない表示として残る。
 	 *
 	 * 何の数字かは視覚的に隠した文字で持つ。role の無い span の aria-label は
-	 * 読み上げに届かない (ARIA 1.2 で generic には付けられない) ので使わない。
+	 * 読み上げに届かないので使わない。
 	 * @param {string} iconName アイコン名
 	 * @param {string} label 読み上げ用のラベル
 	 * @param {number} value 値
@@ -423,7 +422,6 @@ export function createSidebar(deps) {
 		/**
 		 * コメントの件数を手元で増減する。
 		 * 取り直さないのは、投稿の反映に間があり、直後に引くと古い数字が返るため。
-		 * (いいね・ブックマークと同じ方針。SPEC §10.12)
 		 * render() より前や dispose() の後に呼ばれても何もしない。
 		 * @param {number} delta 増やす数 (減らすときは負数)
 		 * @returns {void}
@@ -437,7 +435,7 @@ export function createSidebar(deps) {
 		 *
 		 * 手元で足し引きできないときだけ使う。**ルートのコメントを消すと返信も道連れになり**、
 		 * 開いていない返信の数は分からないので、削除のあとは pixiv から引き直した値を入れる。
-		 * (SPEC §10.11) 投稿のように 1 件と分かっているときは bumpCommentCount() を使う。
+		 * 投稿のように 1 件と分かっているときは bumpCommentCount() を使う。
 		 * @param {number} next 新しい件数
 		 * @returns {void}
 		 */

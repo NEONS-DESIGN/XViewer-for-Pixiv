@@ -2,8 +2,8 @@
  * 設定画面の描画。
  * 画面の中身はすべて sections.js の定義表から組み立てる。項目を足すときは表へ 1 行足すだけで済む。
  *
- * 保存ボタンは作らず、変更のたびに保存する。(UI_DESIGN_KIT §4.4)
- * 見た目の反映は保存の完了を待たない。待つと押した手応えが遅れるため。
+ * 保存ボタンは作らず、変更のたびに保存する。
+ * 見た目の反映は保存の完了を待たない。
  */
 import { createIcon } from '../common/icons.js';
 import { supportsRichOptions } from '../common/rich-select.js';
@@ -180,8 +180,7 @@ function renderChoice(doc, field, settings, onChange, rich) {
 	const values = field.options.map((option) => option.value);
 	const saved = String(settings[field.key]);
 	const current = values.includes(saved) ? saved : String(SETTINGS_DEFAULTS[field.key]);
-	// select の値は常に文字列。保存の型は既定値から導く。手で印を付ける方式だと
-	// 数値の項目を足したときに付け忘れ、次の読み込みで型が合わず既定へ落ちる
+	// select の値は常に文字列。保存の型は既定値の型から導く
 	const numeric = typeof SETTINGS_DEFAULTS[field.key] === 'number';
 
 	const wrapper = doc.createElement('div');
@@ -211,9 +210,8 @@ function renderChoice(doc, field, settings, onChange, rich) {
 	for (const option of field.options) select.append(createChoiceOption(doc, option, rich));
 	select.value = current;
 
-	// 素の select は選んでいない項目の説明を出せない。説明を固定にすると、選び直した
-	// ときに手元の説明と実際の挙動が食い違うため、選択に追従させる。
-	// 対応環境では選択肢の中に説明があるので、外にも出すと同じ文が二度出る
+	// 非対応環境では、選んでいる選択肢の説明を select の下に出し、選び直しに追従させる。
+	// 対応環境では選択肢の中に説明があるので、外には出さない。(出すと同じ文が二度出る)
 	const hintId = `${field.key}-hint`;
 	const hint = rich ? null : createDescription(doc, '', hintId);
 

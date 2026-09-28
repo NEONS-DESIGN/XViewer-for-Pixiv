@@ -9,7 +9,7 @@
  * 上下キーで項目を移動、Home / End で端へ、Escape で閉じてボタンへ戻す。
  * Tab で項目の外へ出たら閉じる。(focusout)
  * キーは consumeKey() で受ける。ビュワー本体が document の捕捉フェーズで
- * 上下キーを作品の移動に使っているため、要素側のリスナでは間に合わない。(SPEC §10.5)
+ * 上下キーを作品の移動に使っているため、要素側のリスナでは間に合わない。
  */
 import { createIcon } from '../../common/icons.js';
 import { buildShareTargets } from '../../pixiv/share.js';

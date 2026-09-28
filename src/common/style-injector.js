@@ -36,7 +36,7 @@ export function createStyleHandle(doc, id, css, label) {
 			if (style) return;
 			style = doc.createElement('style');
 			style.id = id;
-			// innerHTML は使わない。(SPEC §13) CSS は textContent で入る
+			// innerHTML は使わない。CSS は textContent で入れる
 			style.textContent = css;
 			root.appendChild(style);
 		} catch (error) {

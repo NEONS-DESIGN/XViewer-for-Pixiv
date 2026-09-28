@@ -51,7 +51,7 @@ test('この拡張のライセンス表記は LICENSE と一致する', () => {
 	assert.ok(LICENSE.includes(PROJECT_LICENSE.copyright), 'LICENSE に著作権表示が無い');
 });
 
-// Apache-2.0 §4(a) は本文の写しを渡すことを求める。名前と URL だけでは足りない
+// Apache-2.0 の 4(a) 項は本文の写しを渡すことを求める。名前と URL だけでは足りない
 test('Apache License 2.0 の本文をリポジトリに持っている', () => {
 	assert.match(APACHE_2, /Apache License\s+Version 2\.0, January 2004/);
 	assert.match(APACHE_2, /END OF TERMS AND CONDITIONS/);

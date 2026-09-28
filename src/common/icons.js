@@ -1,6 +1,6 @@
 /**
  * アイコンを DOM へ起こす役。図形データは icon-shapes.js が持つ。
- * アイコンは常に装飾で、意味は親のテキストか aria-label が持つ。(UI_DESIGN_KIT §5)
+ * アイコンは常に装飾で、意味は親のテキストか aria-label が持つ。
  */
 import { ICON_SHAPES } from './icon-shapes.js';
 import { warn } from './log.js';
@@ -23,7 +23,7 @@ const EMPTY_VIEW_BOX = '0 0 24 24';
  */
 export function createIcon(doc, name) {
 	const shape = ICON_SHAPES[name];
-	// 文字列参照のタイプミスに気づけるよう警告だけ出す。UI 構築は止めない (SPEC §12)
+	// 文字列参照のタイプミスに気づけるよう警告だけ出す。UI 構築は止めない
 	if (!shape) warn('知らないアイコン名です', name);
 	const svg = doc.createElementNS(SVG_NS, 'svg');
 	svg.setAttribute('viewBox', shape?.viewBox ?? EMPTY_VIEW_BOX);

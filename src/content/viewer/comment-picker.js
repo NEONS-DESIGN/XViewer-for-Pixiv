@@ -14,7 +14,7 @@ import { setImageSrcAttribute } from '../../common/image-source.js';
 
 /**
  * タブを移るキー。選ばれていないタブは Tab の巡回から外してあるので、
- * これが無いとキーボードではスタンプのタブへ辿り着けない。(UI_DESIGN_KIT §4.3)
+ * これが無いとキーボードではスタンプのタブへ辿り着けない。
  */
 const TAB_KEYS = Object.freeze({ PREV: 'ArrowLeft', NEXT: 'ArrowRight' });
 
@@ -130,7 +130,7 @@ export function createCommentPicker(deps) {
 		for (const tab of tabs) {
 			const selected = tab.dataset.tab === current;
 			tab.setAttribute('aria-selected', String(selected));
-			// 選ばれていないタブは Tab の巡回から外す (roving tabindex。UI_DESIGN_KIT §4.3)
+			// 選ばれていないタブは Tab の巡回から外す。(roving tabindex)
 			tab.setAttribute('tabindex', selected ? '0' : '-1');
 			// 中身の見出しは選ばれているタブ。読み上げが「今どちらを見ているか」を言えるようにする
 			if (selected) grid.setAttribute('aria-labelledby', `${IDS.TAB_PREFIX}${current}`);
@@ -320,7 +320,7 @@ export function createCommentPicker(deps) {
 		 *
 		 * Escape で閉じ、タブにフォーカスがあるときだけ左右キーでタブを移る。
 		 * **ビュワーは document の捕捉フェーズで全キーを取っている** ので、タブ側に
-		 * keydown を付けても届かない。ここで奪わないと左右キーが作品のページ送りになる。(§10.5)
+		 * keydown を付けても届かない。ここで奪わないと左右キーが作品のページ送りになる。
 		 * 本文を書いている最中の左右キー (キャレットの移動) は奪わない。
 		 * @param {KeyboardEvent} event キー
 		 * @returns {boolean} 食い止めたなら true

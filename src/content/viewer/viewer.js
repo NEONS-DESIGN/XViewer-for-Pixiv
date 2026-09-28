@@ -36,12 +36,9 @@ const TEXT_ENTRY_TAGS = Object.freeze(['TEXTAREA', 'INPUT']);
 
 /**
  * 入力欄の中でも素通しするキー。
- * Tab は navigation.onKeyDown → focusNext が Shadow DOM の中だけへフォーカスを
- * 巡回させる役目を持ち、ここで止めるとモーダルを開いたまま背後の pixiv へフォーカスが抜ける。
- * Escape は navigation.onKeyDown がビュワーを閉じる最終段 (ピッカーも書きかけの文章も
- * 無ければ閉じる) を持ち、ここで止めると空の入力欄で Escape が無反応になる。
- * どちらも consumeKey() が先に判断しているので、割り込みたい側 (ピッカー・書きかけの文章)
- * があれば手前で食い止められる。
+ * Tab を止めるとフォーカスが Shadow DOM の外 (背後の pixiv) へ抜ける。
+ * Escape を止めると空の入力欄でビュワーが閉じなくなる。
+ * 割り込みたい側 (ピッカー・書きかけの文章) は consumeKey() が手前で食い止める。
  */
 const TEXT_ENTRY_PASSTHROUGH_KEYS = Object.freeze([KEYS.FOCUS_NEXT, KEYS.CLOSE]);
 
@@ -196,18 +193,18 @@ export function createViewer(deps) {
 		overlay.setAttribute('aria-label', strings.viewer.DIALOG_LABEL);
 		// 開いたときのフォーカスの受け皿。ダイアログを名乗る以上、開いたら中へフォーカスを
 		// 入れないと読み上げが文脈を失う。中のボタンではなく本体で受けるので、
-		// 十字キーを押したときにどのボタンにも輪郭が出ない。(§10.4)
+		// 十字キーを押したときにどのボタンにも輪郭が出ない。
 		// tabindex="-1" なので FOCUSABLE_SELECTOR には入らず、Tab の巡回先にはならない
 		overlay.setAttribute('tabindex', '-1');
 
 		stage = doc.createElement('div');
 		stage.className = 'stage';
 
-		// 閉じるボタン。開いた直後のフォーカス先ではない (フォーカスは overlay が受ける。§10.4)
+		// 閉じるボタン。開いた直後のフォーカス先ではない。(フォーカスは overlay が受ける)
 		const closeButton = doc.createElement('button');
 		closeButton.className = 'close';
 		closeButton.type = 'button';
-		// アイコンだけのボタンには必ず両方付ける (UI_DESIGN_KIT §6)
+		// アイコンだけのボタンには aria-label と title を必ず両方付ける
 		closeButton.setAttribute('aria-label', strings.viewer.CLOSE);
 		closeButton.title = strings.viewer.CLOSE_TITLE;
 		closeButton.appendChild(createIcon(doc, 'close'));
@@ -272,7 +269,7 @@ export function createViewer(deps) {
 	 *
 	 * overflow: hidden でスクロールバーが消えると、背後のページがその幅だけ広がって見える。
 	 * 消える前のスクロールバーの幅を測り、同じだけ padding-right を足して横幅を動かさない。
-	 * (X.com と同じ補正) 測れない環境 (偽の DOM) では 0 として扱う。
+	 * 測れない環境 (偽の DOM) では 0 として扱う。
 	 * @returns {void}
 	 */
 	function lockBody() {
@@ -393,7 +390,7 @@ export function createViewer(deps) {
 			return;
 		}
 		// 入力欄の中では移動系の割り当て (矢印キー等) を効かせない。
-		// Tab と Escape だけは TEXT_ENTRY_PASSTHROUGH_KEYS で通す (理由は定義側のコメント)
+		// Tab と Escape だけは TEXT_ENTRY_PASSTHROUGH_KEYS で通す
 		if (isTextEntry(event) && !TEXT_ENTRY_PASSTHROUGH_KEYS.includes(event.key)) return;
 		navigation.onKeyDown(event);
 	}
@@ -459,7 +456,7 @@ export function createViewer(deps) {
 		// 作品を送ったときは押していたボタンがペインごと消えてフォーカスが body へ落ちるので、
 		// 中に無くなっていたらダイアログ本体へ戻す。(読み上げが文脈を失わないように)
 		// 閉じるボタンなど中の部品へ当てないこと。次にキーを押した瞬間に :focus-visible が立ち、
-		// 十字キーでフォーカスが動いたように見える (§10.4)
+		// 十字キーでフォーカスが動いたように見える
 		if (!shadow.activeElement) overlay?.focus();
 		sidebar.hidden = !settings.showSidebar;
 		showStatus(strings.viewer.LOADING, STATUS_KINDS.INFO);

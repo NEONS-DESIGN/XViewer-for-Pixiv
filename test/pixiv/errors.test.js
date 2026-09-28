@@ -30,7 +30,7 @@ test('PIXIV_ERROR_KINDS に中断の種別がある', () => {
 });
 
 test('kindFromStatus は HTTP ステータスを種別へ写す', () => {
-	// 401 は未ログイン。SITE_SPEC 実測: follow_latest / discovery / bookmarks が返す
+	// 401 は未ログイン。follow_latest / discovery / bookmarks が返す
 	assert.equal(kindFromStatus(401), 'unauthorized');
 	// 404 は R-18 を表示できないときの /pages。異常ではなく正常な応答
 	assert.equal(kindFromStatus(404), 'not-found');

@@ -9,7 +9,7 @@ import { fakeElement, fakeDoc, iconName, flush, find } from '../helpers/dom.js';
 const STRINGS = createStrings('ja');
 
 test('formatDate は日本語の日時にする', () => {
-	// createDate は ISO 8601。タイムゾーンの表記が 2 種類あることを SITE_SPEC で確認済み
+	// createDate は ISO 8601。タイムゾーンの表記は 2 種類ある
 	assert.equal(formatDate('2026-09-08T17:45:00+09:00', STRINGS), '2026年9月8日 17:45');
 });
 
@@ -74,7 +74,7 @@ test('splitComment は実体参照を戻す', () => {
 });
 
 test('splitComment は数値参照を 10 進でも 16 進でも戻す', () => {
-	// pixiv が返す範囲を実測で固定できていないので、&#39; 以外の数値参照も生のまま出さない
+	// pixiv が返す数値参照の範囲は決まっていないので、&#39; 以外の数値参照も生のまま出さない
 	assert.deepEqual(splitComment('&#x27;a&#8217;b&#X1F600;'), [[{ type: 'text', value: '\'a’b\u{1F600}' }]]);
 });
 
@@ -302,7 +302,7 @@ test('カウンタはいいねを顔、ブックマークをハートで示す',
 });
 
 test('押せないカウンタは何の数字かを隠し文字で持ち、aria-label に頼らない', () => {
-	// role の無い span の aria-label は読み上げに届かない。(ARIA 1.2)
+	// role の無い span の aria-label は読み上げに届かない。
 	// 「いいね 2,740」と読まれるよう、名前を視覚的に隠した文字として置く
 	const { sidebar } = build();
 	sidebar.render(DETAIL);

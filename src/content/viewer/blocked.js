@@ -2,7 +2,7 @@
  * 表示できない作品のブロック表示。
  *
  * 判定は作品の xRestrict とユーザー設定の xRestrict の比較で行う。
- * error フラグや urls では判定できない (SITE_SPEC §6):
+ * error フラグや urls では判定できない:
  *   - 未ログイン      urls が全て null
  *   - 表示設定 OFF    urls は有効な URL が返る。/pages だけが 404
  *
@@ -118,8 +118,6 @@ export function createBlocked(deps) {
 
 		dispose() {
 			// 自分が作った DOM は自分で片付ける。
-			// 他のペインの消去セレクタに .blocked を足す形にすると、
-			// 無関係なペイン同士が互いのクラス名を知ることになる。
 			// これを外さないと、次に開いた作品の画像と横に並んで両方潰れる
 			root?.remove();
 			root = null;

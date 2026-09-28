@@ -20,7 +20,7 @@ const OUT_DIR = 'site/assets/img';
 
 /**
  * 非可逆 WebP の設定。
- * - quality 90: 文字の輪郭に崩れが出ない下限。旧 JPEG (-q:v 5-6) より SSIM が高い
+ * - quality 90: 文字の輪郭に崩れが出ない下限
  * - smartSubsample: 色差を間引くときの滲みを抑える。(青いリンク文字の縁が濁るのを防ぐ)
  * - effort 6: 最も時間を掛けて小さくする
  */
@@ -71,7 +71,7 @@ async function assertSource(path) {
 	try {
 		await stat(path);
 	} catch {
-		throw new Error(`元素材が見つかりません: ${path} (WEB_SPEC.md §7 の手順で撮り直してください)`);
+		throw new Error(`元素材が見つかりません: ${path} (store/sources/ に撮影素材を置いてから実行してください)`);
 	}
 }
 

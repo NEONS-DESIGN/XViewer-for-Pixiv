@@ -1,7 +1,7 @@
 /**
  * うごイラの zip を解析する。
- * pixiv のうごイラ zip は全エントリが STORE (無圧縮) であることを実測済み。(SITE_SPEC §4)
- * そのため展開処理は不要で、ローカルファイルヘッダを辿って中身を切り出すだけでよい。
+ * pixiv のうごイラ zip は全エントリが STORE (無圧縮) なので、展開はせず
+ * ローカルファイルヘッダを辿って中身を切り出すだけにする。
  */
 
 /** ローカルファイルヘッダの署名。 */
@@ -53,9 +53,8 @@ export function parseStoredZip(buffer) {
 		// 途中で切れているなら、そこで打ち切って読めた分を返す
 		if (dataStart + size > buffer.byteLength) break;
 
-		// subarray() は使わない。Firefox の content script では fetch が返す ArrayBuffer がページ側の
-		// compartment にあり、subarray() が内部で constructor を引いて Permission denied になる。
-		// コンストラクタで同じ buffer を指す view を直接作れば constructor を引かない。(Chrome でも中身は同じ)
+		// subarray() は使わない。Firefox の content script では Permission denied になるので、
+		// 同じ buffer を指す view をコンストラクタで直接作る。
 		// 範囲は直前の判定 (dataStart + size <= byteLength) の内側に収まるので RangeError にはならない
 		entries.push({
 			name: decoder.decode(new Uint8Array(buffer, nameStart, nameLength)),

@@ -283,7 +283,7 @@ test('/pages が届く前でも詳細の原寸 URL で開ける', async () => {
 });
 
 test('原寸が無い作品では標準の画像で開く', async () => {
-	// 未ログインでは urls.original が落ちる (SITE_SPEC §未ログイン)
+	// 未ログインでは urls.original が落ちる
 	const pages = PAGES.map((page) => ({ urls: { regular: page.urls.regular } }));
 	const { impl } = fakeApiFetch(pages);
 	const { container, pane, zoom } = build({ fetchImpl: impl, clickZoom: true });

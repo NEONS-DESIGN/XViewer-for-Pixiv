@@ -1,10 +1,9 @@
 /**
  * package.json の version を Chrome 拡張の manifest が受け付ける形へ整える。
  *
- * ビルド本体 (build.mjs) は import した時点で走ってしまい単体で確かめられないので、
- * 判断だけをここへ切り出してある。(SPEC.md §15)
+ * テストから読むので副作用を持たせない。
  *
- * manifest の version の規則 (developer.chrome.com/docs/extensions/reference/manifest/version):
+ * manifest の version の規則:
  *   - 1 個から 4 個の整数をドットで繋いだもの
  *   - 各整数は 0 以上 65535 以下
  *   - 0 以外の整数は 0 で始められない (032 は不正)
@@ -71,7 +70,7 @@ export function toManifestVersion(version) {
  * manifest の内容に version を差し込む。
  * 渡された manifest は書き換えず、新しいオブジェクトを返す。
  * 雛形に version / version_name が残っていたら止める。黙って上書きすると、
- * 書き戻した人が「出どころは 1 か所」の規約 (CLAUDE.md) に気づけない。
+ * 書き戻した人が「出どころは package.json 1 か所」の決まりに気づけない。
  * @param {object} manifest src/manifest.json の内容 (version を持たない)
  * @param {string} packageVersion package.json の version
  * @returns {object} version を差し込んだ manifest

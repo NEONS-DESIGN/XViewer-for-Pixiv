@@ -4,7 +4,7 @@
  * 本体の ul の直後に sentinel を置き、見えたら次のページを継ぎ足す。
  * 継ぎ足し先は本体の ul そのもの。別のコンテナへ足すと、1 ページ目の最終行が
  * 途中で終わっているときに空白ができて地続きにならない。
- * React は外から append した li を消さない前提で組む。(SITE_SPEC §3 の tabindex の扱いと同じ)
+ * React は外から append した li を消さない前提で組む。
  */
 import { captureTemplates, buildCard, paintHeart, heartPaths } from './card-clone.js';
 import { readSession, clearSessionCache } from './session.js';
@@ -27,9 +27,9 @@ import {
 
 /**
  * sentinel が示す状態。
- * idle は何も出さない。それ以外は sentinel の中に表示を出す。(SPEC §6.8.3)
+ * idle は何も出さない。それ以外は sentinel の中に表示を出す。
  * error は通信の失敗、buildFailed は「作品は返ったのに 1 枚も組めなかった」。
- * どちらも再試行ボタンを出すが、文言を分けるのは原因が違うため。(後者は再試行しても
+ * どちらも再試行ボタンを出すが、原因が違うので文言を分ける。(後者は再試行しても
  * 同じ結果になりやすい)
  */
 const SENTINEL_STATE = Object.freeze({
@@ -60,7 +60,7 @@ export const SENTINEL_TEXT_KEYS = Object.freeze([
 	...Object.values(FAILURE_TEXT_KEY),
 ]);
 
-/** sentinel の中の部品のクラス名。pixiv 側と衝突しないよう xv- を付ける。(UI_DESIGN_KIT §10) */
+/** sentinel の中の部品のクラス名。pixiv 側と衝突しないよう xv- を付ける。 */
 const SENTINEL_CLASS = Object.freeze({
 	TEXT: 'xv-sentinel-text',
 	ERROR: 'xv-sentinel-error',
@@ -77,8 +77,7 @@ export const PAGER_STYLE_ID = 'xviewer-hide-pager';
 /**
  * 本体のページャを隠す CSS。
  * 継ぎ足しが動いている間はページ送りのリンクが要らないので消す。
- * pickup.js と同じく、要素を消したり属性を足したりはせず style を 1 枚差し込むだけにする。
- * (pixiv は React で何度も描き直すので、JS で当てる方式だと描き直しのたびに一瞬見えてしまう)
+ * 要素を消したり属性を足したりはせず、style を 1 枚差し込むだけにする。(React の描き直しに追従させるため)
  * pixiv 側の指定に競り負けないよう !important を付け、規則はこの 1 本だけに留める。
  */
 const PAGER_HIDE_CSS = `
@@ -93,14 +92,12 @@ export const CARD_STYLE_ID = 'xviewer-show-cards';
 /**
  * 継ぎ足したカードの display を取り戻す CSS。
  *
- * pixiv のグリッドは li 自身に「ページ 1 枚ぶんより先は出さない」規則を持っている。
- * (`li:nth-child(n+61) { display: none }`。閾値は幅で変わる。SITE_SPEC §3)
- * ここは同じ ul へ 48 枚ずつ足すので、この規則に当たったカードは DOM にだけ積み上がり、
- * 画面には 1 枚も出ない。グリッドの高さも増えないので sentinel が画面内に居座り、
- * 少しスクロールし直すたびに ?p= だけが進む。
- * 打ち消す対象は自分が足したカードだけなので、目印 (XV_CARD_ATTR) で選ぶ。
+ * pixiv のグリッドは li 自身に「ページ 1 枚ぶんより先は出さない」規則
+ * (`li:nth-child(n+61) { display: none }` の形。閾値は幅で変わる) を持つ。
+ * 同じ ul へ足したカードはこれに当たって画面に出ないので、打ち消す。
+ * 対象は自分が足したカードだけなので、目印 (XV_CARD_ATTR) で選ぶ。
  * pixiv 側は :nth-child() 付きで詳細度が高いため !important で競り勝つ。
- * 戻す値は li の既定 (list-item)。本体の可視カードの computed 値と同じ。
+ * 戻す値は li の既定 (list-item)。
  */
 const CARD_SHOW_CSS = `
 [${XV_CARD_ATTR}] {
@@ -111,9 +108,9 @@ const CARD_SHOW_CSS = `
 /**
  * sentinel の中の表示の CSS。
  *
- * pixiv のページへ直接入る UI なので (UI_DESIGN_KIT §10):
+ * pixiv のページへ直接入る UI なので:
  * - 色は pixiv の charcoal トークンから引き、取れなければ currentColor へ倒す。
- *   こうすると本体のテーマ切り替えに自動で追従し、地の色から浮かない (§2 の「守ること」)
+ *   本体のテーマ切り替えに自動で追従し、地の色から浮かない
  * - 外部リソース (フォント・画像) は読まない
  * - セレクタは全て [data-xv-sentinel] の中に閉じ、クラス名には xv- を付ける
  */
@@ -255,7 +252,7 @@ export function attachInfiniteScroll(doc, options) {
 	let lastPage = Number.isFinite(start) && start >= 1 ? Math.floor(start) : 1;
 	/**
 	 * @type {import('./infinite-page.js').PageMark[]} 各ページの先頭に並んだカードの印。page の昇順。
-	 * `?p=` はこの印と画面の位置から決める (読み込んだ最後のページではない。SPEC §6.8.5)
+	 * `?p=` はこの印と画面の位置から決める。(読み込んだ最後のページではない)
 	 */
 	const pageMarks = [];
 	/** 最後に知らせたページ。同じ値を何度も知らせない (replaceState を呼び過ぎるとブラウザに絞られる) */
@@ -348,9 +345,7 @@ export function attachInfiniteScroll(doc, options) {
 	 * sentinel の中に文言を 1 行出す。
 	 *
 	 * 読み上げは永続する sentinel の live region が丸ごと受け持つので、
-	 * 中の段落には role を付けない。失敗の段落へ role="alert" を持たせると
-	 * role="status" の内側で live region が入れ子になり、実装によっては
-	 * 外側の polite 領域も鳴って二重に読み上げられる余地が残る。
+	 * 中の段落には role を付けない。(live region を入れ子にすると二重に読み上げられることがある)
 	 * 失敗を強く伝えるのは sentinel 側の aria-live の切り替えで行う。(showState)
 	 * @param {string} text 文言
 	 * @param {boolean} [isError] 失敗の文言か (色を変えるためだけに使う)
@@ -364,7 +359,7 @@ export function attachInfiniteScroll(doc, options) {
 	}
 
 	/**
-	 * sentinel の中身を今の状態に合わせて作り直す。(SPEC §6.8.3)
+	 * sentinel の中身を今の状態に合わせて作り直す。
 	 * 失敗したときだけ再試行ボタンを出す。自動では読み直さない。
 	 * sentinel 自身は入れ替えない。読み上げの領域は作り直すと鳴らなくなる。
 	 * @param {string} next SENTINEL_STATE のいずれか
@@ -376,8 +371,7 @@ export function attachInfiniteScroll(doc, options) {
 		try {
 			// live region の強さは中身を変える前に決める。後から変えると
 			// 変更前の値で読み上げられることがある。失敗だけは気づいてほしいので
-			// assertive、それ以外は polite。(UI_DESIGN_KIT §6)
-			// 中に role="alert" の段落を入れる手は採らない (appendMessage の注記)
+			// assertive、それ以外は polite
 			sentinel.setAttribute('aria-live', RETRYABLE_STATES.has(next) ? 'assertive' : 'polite');
 			// innerHTML は使わない。textContent = '' で子をまとめて落とす
 			sentinel.textContent = '';
@@ -787,7 +781,7 @@ export function attachInfiniteScroll(doc, options) {
 		// React より先に受けたいので capture で張る。
 		// 押せるハートが無いなら購読も張らない。(全クリックで空振りするだけ)
 		// 未ログインでは buildCard がボタンごと外し、自分のユーザーページでは
-		// そもそも雛形にハートが無い (pixiv が自分の作品に描かない。SITE_SPEC §4)
+		// そもそも雛形にハートが無い。(pixiv が自分の作品に描かない)
 		if (loggedIn && heartPaths(templates.single).length > 0) {
 			heartBound = true;
 			doc.addEventListener('click', onHeartClick, true);
@@ -796,7 +790,7 @@ export function attachInfiniteScroll(doc, options) {
 		sentinel.setAttribute(SENTINEL_ATTR, '');
 		// 読み上げの領域は「空のものが先にあって、後から中身が変わる」形でないと鳴らない。
 		// (中身入りで差し込むと status は読まれない) 永続する sentinel 自身に持たせ、
-		// 中の要素だけを差し替える。(UI_DESIGN_KIT §6)
+		// 中の要素だけを差し替える。
 		// 領域はここ 1 つだけ。中に role="alert" を入れて入れ子にはしない。
 		// 強さ (polite / assertive) は状態に応じて showState が切り替える
 		sentinel.setAttribute('role', 'status');

@@ -24,14 +24,14 @@ test('langParam は UI の言語を pixiv が受け付ける綴りへ直して�
 	assert.equal(langParam('ja'), 'lang=ja');
 	assert.equal(langParam('en'), 'lang=en');
 	assert.equal(langParam('ko'), 'lang=ko');
-	// pixiv は簡体字を zh、繁体字を zh_tw (アンダースコア) でしか受け付けない。(SITE_SPEC §0)
+	// pixiv は簡体字を zh、繁体字を zh_tw (アンダースコア) でしか受け付けない
 	assert.equal(langParam('zh-CN'), 'lang=zh');
 	assert.equal(langParam('zh-TW'), 'lang=zh_tw');
 });
 
 test('langParam は翻訳が確認できていない言語を既定へ倒す', () => {
 	// pixiv は未知の lang= でもエラーにせず黙って英語へ倒すが、
-	// 翻訳が返ると実測できていない値をこちらから送る理由はないので既定 (ja) へ倒す
+	// 翻訳が返ると分かっている値だけを送り、それ以外は既定 (ja) へ倒す
 	assert.equal(langParam('th'), 'lang=ja');
 	assert.equal(langParam('xx'), 'lang=ja');
 	assert.equal(langParam(''), 'lang=ja');
@@ -64,7 +64,7 @@ test('コメントの URL に offset と limit が入る', () => {
 });
 
 test('返信の URL は page 始まりで組み立てる', () => {
-	// SITE_SPEC §4 実測: offset/limit ではなく 1 始まりの page
+	// 返信の API は offset/limit ではなく 1 始まりの page を取る
 	assert.equal(
 		commentRepliesUrl('233573595', 1),
 		'/ajax/illusts/comments/replies?comment_id=233573595&page=1&lang=ja',
@@ -81,7 +81,7 @@ test('ユーザーまわりの URL を組み立てる', () => {
 });
 
 test('profile/illusts は ids[] を URL エンコードして並べる', () => {
-	// SITE_SPEC 実測: ids%5B%5D= 形式。sensitiveFilterMode は省略してよい
+	// ids%5B%5D= 形式。sensitiveFilterMode は省略してよい
 	assert.equal(
 		userProfileIllustsUrl('54734418', ['1', '2'], true),
 		'/ajax/user/54734418/profile/illusts?ids%5B%5D=1&ids%5B%5D=2'
@@ -90,7 +90,7 @@ test('profile/illusts は ids[] を URL エンコードして並べる', () => {
 });
 
 test('profile/illusts の work_category はタブの種別に合わせる', () => {
-	// SITE_SPEC 実測: pixiv 本体はイラストタブで illust を送る。
+	// pixiv 本体はイラストタブで illust を送る。
 	// WORK_CATEGORY.ILLUST は profile/all の応答キー (illusts) なので、そのままでは送れない
 	assert.ok(
 		userProfileIllustsUrl('54734418', ['1'], true, WORK_CATEGORY.ILLUST)
@@ -125,7 +125,7 @@ test('profile/illusts は is_first_page が false なら 0 を入れる', () => 
 });
 
 test('絵文字の画像 URL を組み立てる', () => {
-	// SITE_SPEC 実測: 静的ファイルの CDN に ID そのままの png が置いてある
+	// 静的ファイルの CDN に ID そのままの png が置いてある
 	assert.equal(emojiUrl(104), 'https://s.pximg.net/common/images/emoji/104.png');
 });
 
@@ -173,7 +173,7 @@ test('コメント投稿は旧 RPC のパス', () => {
 });
 
 test('コメント削除も旧 RPC のパス', () => {
-	// 投稿とは別のパス。/ajax でも /rpc/ 配下でもなくルート直下 (SITE_SPEC §4 実測)
+	// 投稿とは別のパス。/ajax でも /rpc/ 配下でもなくルート直下
 	assert.equal(ACTION_URLS.DELETE_COMMENT, '/rpc_delete_comment.php');
 });
 

@@ -11,7 +11,7 @@ export const PIXIV_ERROR_KINDS = Object.freeze({
 	NETWORK: 'network',
 	/** 呼び出し側が AbortSignal で中断した。dispose 後の応答を黙って捨てるための種別で、異常ではない */
 	ABORTED: 'aborted',
-	/** 未ログイン。SITE_SPEC の実測では 401 が返る。CSRF トークンが無いときも往復せずにここへ倒す */
+	/** 未ログイン (HTTP 401)。CSRF トークンが無いときも往復せずにここへ倒す */
 	UNAUTHORIZED: 'unauthorized',
 	/** 対象が無い。R-18 を表示できないときの /pages もここに来る (異常ではない) */
 	NOT_FOUND: 'not-found',

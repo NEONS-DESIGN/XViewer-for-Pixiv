@@ -1,8 +1,7 @@
 /**
  * テスト用の DOM の代わり。
  * jsdom を入れずに済ませるため、src が使う口だけを備える。
- * 以前は各テストが似た偽物を持っていたが、足りない口を足すたびに 6 か所を直すことになるので
- * ここへ寄せた。本物との違いは「children / listeners / attributes を素の配列や辞書で覗ける」こと。
+ * 本物との違いは「children / listeners / attributes を素の配列や辞書で覗ける」こと。
  *
  * 本物に寄せてある挙動 (テストで不具合を捕まえるために要る):
  * - `id` / `hidden` / `disabled` / `dataset.*` は属性 (`attributes`) と相互に反映する。

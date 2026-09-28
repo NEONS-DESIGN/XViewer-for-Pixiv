@@ -4,7 +4,7 @@ import { canView, isOwnWork, normalizeDetail, ILLUST_TYPES } from '../../src/pix
 import { PIXIV_ERROR_KINDS } from '../../src/pixiv/errors.js';
 
 test('canView は作品の xRestrict とユーザー設定を比べる', () => {
-	// SITE_SPEC 実測: 設定 OFF (self.xRestrict=0) では R-18 の /pages が 404 になる
+	// 設定 OFF (self.xRestrict=0) では R-18 の /pages が 404 になる
 	assert.equal(canView({ xRestrict: 0 }, { xRestrict: 0 }), true);
 	assert.equal(canView({ xRestrict: 1 }, { xRestrict: 0 }), false);
 	assert.equal(canView({ xRestrict: 1 }, { xRestrict: 1 }), true);

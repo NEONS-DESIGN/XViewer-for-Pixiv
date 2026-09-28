@@ -155,7 +155,7 @@ test('押せるカウンタは差し替えた時点の件数を出す', () => {
 });
 
 test('未ブックマークのカウンタは title にだけ Shift で非公開になる手掛かりを添える', () => {
-	// 非公開の入れ方はコードと SPEC にしか無かった。操作の説明は title に持たせる。(UI_DESIGN_KIT §6)
+	// 非公開の入れ方 (Shift) は画面から分かるよう、操作の説明として title に持たせる。
 	// 読み上げ (aria-label) には足さない。件数の後ろに長い説明が付くと毎回読まれて邪魔になる
 	const { bar, bookmark } = setup();
 	bar.render(DETAIL);
@@ -234,7 +234,7 @@ test('ブックマーク削除で件数は負の数にならない', async () =>
 });
 
 test('ブックマークの応答を待つ間に破棄されたら、外れたボタンを触らない', async () => {
-	// SPEC §10.12「すべての await の後に if (disposed) return」。
+	// await の後は破棄済みかを見て抜ける。
 	// 作品を送った直後に前の作品の応答が返っても、古いボタンの見た目と件数を書き換えない
 	let finish;
 	const { bar, bookmark } = setup({
@@ -365,7 +365,7 @@ test('既にいいね済みだったと返ってきたら件数を増やさな�
 });
 
 test('ログインが切れていたら (401) 再読み込みまで案内する', async () => {
-	// __NEXT_DATA__ は SPA 遷移で更新されない。(SITE_SPEC §0)
+	// __NEXT_DATA__ は SPA 遷移で更新されない。
 	// 別タブでログインし直しても古い CSRF トークンを読むので、押し直しでは復帰できない
 	const unauthorized = new PixivError(PIXIV_ERROR_KINDS.UNAUTHORIZED, '401', 401);
 	const { bar, like, container } = setup({ actions: { likeIllust: async () => { throw unauthorized; } } });
@@ -379,7 +379,7 @@ test('ログインが切れていたら (401) 再読み込みまで案内する'
 
 test('自分の作品ではカウンタを差し替えずフォローも出さない', () => {
 	// 自分にはいいね・ブックマーク・フォローのどれもできない。
-	// pixiv 本体も自分の作品では 3 つとも描かない。(SITE_SPEC §4)
+	// pixiv 本体も自分の作品では 3 つとも描かない。
 	// 押せば必ず失敗するボタンを出さないのが正しい
 	const container = fakeCounts();
 	const followContainer = fakeElement('div');

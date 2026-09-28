@@ -40,7 +40,7 @@ test('コメントを共通の形にする', () => {
 });
 
 test('スタンプのコメントは stampId を持ち回る', () => {
-	// SITE_SPEC 実測: スタンプのときは comment が空で stampId に文字列が入る
+	// スタンプのときは comment が空で stampId に文字列が入る
 	const comment = normalizeComment({ id: '1', userId: '2', userName: 'x', img: '', comment: '', stampId: '304', commentDate: '', hasReplies: false }, STRINGS);
 	assert.equal(comment.isStamp, true);
 	assert.equal(comment.stampId, '304');
@@ -982,7 +982,7 @@ test('書きかけがあるうちは Escape をビュワーへ渡さない', asy
 });
 
 test('commentDate は実行環境のタイムゾーンに依らず JST の時刻として読む', () => {
-	// API は時差を持たない 'YYYY-MM-DD HH:mm' で返す。(SITE_SPEC 実測)
+	// API は時差を持たない 'YYYY-MM-DD HH:mm' で返す。
 	assert.equal(parseCommentDate('2026-09-10 09:20').toISOString(), '2026-09-10T00:20:00.000Z');
 	assert.equal(parseCommentDate('2026-01-01 08:59').toISOString(), '2025-12-31T23:59:00.000Z');
 });
@@ -1159,7 +1159,7 @@ test('投稿できたコメントにも返信の導線を付ける', async () =>
 });
 
 test('0 件の作品へ投稿した 1 件も一覧に出す', async () => {
-	// 一覧を作るのは load() だけだったので、0 件の作品では投稿の 1 件が黙って捨てられていた
+	// 一覧が無い (0 件で読み込んだ) ときは投稿した側で一覧を作る。作らないと投稿の 1 件が黙って捨てられる
 	const { container, comments } = buildPostable();
 	await comments.load({ ...POST_DETAIL, commentCount: 0 });
 	assert.equal(find(container, '.status').textContent, 'まだコメントはありません');
@@ -1205,13 +1205,13 @@ test('コメントを受け付けていない作品には一覧も入力欄も�
 });
 
 test('コメントは削除できるかを持ち回る', () => {
-	// editable は一覧 API が付けてくる。自分のコメントと自分の作品のコメントで true (SITE_SPEC §4)
+	// editable は一覧 API が付けてくる。自分のコメントと自分の作品のコメントで true
 	assert.equal(normalizeComment({ id: '1', comment: 'a', commentDate: '', editable: true }, STRINGS).editable, true);
 	assert.equal(normalizeComment({ id: '1', comment: 'a', commentDate: '' }, STRINGS).editable, false);
 });
 
 test('投稿者のラベルは自分が最優先', () => {
-	// 自分の作品に自分でコメントすると両方に当てはまる。pixiv 本体は「あなた」を出す (実測)
+	// 自分の作品に自分でコメントすると両方に当てはまる。pixiv 本体は「あなた」を出す
 	assert.equal(commentLabel({ userId: '99' }, '99', '99', STRINGS), 'あなた');
 	assert.equal(commentLabel({ userId: '99' }, '99', '54734418', STRINGS), 'あなた');
 	assert.equal(commentLabel({ userId: '54734418' }, '99', '54734418', STRINGS), '作者');
@@ -1241,7 +1241,7 @@ test('自分のコメントには「あなた」、作者には「作者」が�
 	// 名前のすぐ後ろに置く (pixiv 本体と同じ並び)
 	const body = find(items[0], '.comment-body');
 	assert.deepEqual(body.children.slice(0, 2).map((child) => child.className), ['comment-name', 'comment-label is-self']);
-	// pixiv 本体は「あなた」が緑、「作者」が青。(実測) 印を付けるのは「あなた」だけで、地の色は CSS が is-self で切り替える
+	// pixiv 本体は「あなた」が緑、「作者」が青。印を付けるのは「あなた」だけで、地の色は CSS が is-self で切り替える
 	assert.equal(find(items[1], '.comment-label').classList.contains('is-self'), false);
 });
 
@@ -1364,7 +1364,7 @@ test('投稿した直後の 1 件も自分で消せる', async () => {
 });
 
 test('返信にも削除ボタンが付く', async () => {
-	// 実際に消す経路は「返信を消すと返信一覧から外れ…」が見る
+	// ここで見るのはボタンが付くことだけ。押して消す流れは見ない
 	const { container, comments } = buildPostable({
 		fetchJson: async (url) => (url.includes('replies')
 			? { comments: [{ ...REPLY, editable: true }], hasNext: false }

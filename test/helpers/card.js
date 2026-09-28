@@ -1,12 +1,11 @@
 /**
- * pixiv の作品カード (li) を模した偽 DOM。
- * 実測した形 (SITE_SPEC §3) に合わせてある:
+ * pixiv の作品カード (li) を模した偽 DOM。形は次のとおり:
  *   li > div > [ div > div[width] > [a.thumbnail_link > [div > div[radius] > img|figure, div(overlay)],
  *                                    div > div[bookmark_button] > button > svg > path x2],
  *                div > a(title) ]
  *   overlay > [ div > div(ラベル "R-18" / "非公開"),
  *               div > div > [span > span > svg, span(枚数)] (複数枚バッジ) ]
- *   ラベルとバッジはどちらも任意で、ラベルが先・バッジが後 (SITE_SPEC §3 実測)
+ *   ラベルとバッジはどちらも任意で、ラベルが先・バッジが後
  * 既定のカードは pixiv が描いたままの形 (tab-skip の印なし)。印付きが要るテストは tabSkipped: true を渡す。
  * dom.js とは別に、タグ名と属性だけを見る簡易セレクタを持つ。(closest / nextSibling / cloneNode も要るため)
  */
@@ -194,9 +193,9 @@ function matchesOne(node, selector) {
  *   bookmarked?: boolean, tabSkipped?: boolean, heart?: boolean, label?: string|null,
  *   localePrefix?: string}} [options] カードの内容。
  *   tabSkipped: true で tab-skip.js が当てた後の形 (aria-label / tabindex="-1" と目印) にする。既定は素のカード
- *   heart: false でブックマークボタンごと落とす。(自分のユーザーページ。SITE_SPEC §4)
- *   label で公開範囲・年齢制限のラベル ('R-18' / '非公開') をオーバーレイ層に足す (SITE_SPEC §3)
- *   localePrefix で href の先頭へ表示言語の接頭辞 ('/en') を付ける (SITE_SPEC §3)
+ *   heart: false でブックマークボタンごと落とす。(自分のユーザーページの形)
+ *   label で公開範囲・年齢制限のラベル ('R-18' / '非公開') をオーバーレイ層に足す
+ *   localePrefix で href の先頭へ表示言語の接頭辞 ('/en') を付ける
  * @returns {object} li の代わり
  */
 export function makeCard(options = {}) {
@@ -222,7 +221,7 @@ export function makeCard(options = {}) {
 		: el('figure'));
 
 	const overlay = thumb.appendChild(el('div'));
-	// ラベルは複数枚バッジと同じ層に、バッジより前に入る (SITE_SPEC §3 実測)
+	// ラベルは複数枚バッジと同じ層に、バッジより前に入る
 	if (label) {
 		const box = overlay.appendChild(el('div'));
 		box.appendChild(el('div')).textContent = label;
@@ -230,7 +229,7 @@ export function makeCard(options = {}) {
 	if (pages > 1) {
 		const badge = overlay.appendChild(el('div'));
 		const inner = badge.appendChild(el('div'));
-		// アイコンは span > span > svg の 3 段 (SITE_SPEC §3 実測)。
+		// アイコンは span > span > svg の 3 段。
 		// バッジのアイコンも path を持つ。ハートを塗る処理がここまで塗らないことを見られるようにする
 		inner.appendChild(el('span')).appendChild(el('span')).appendChild(el('svg'))
 			.appendChild(el('path', { 'data-fill': 'rgb(255, 255, 255)' }));
@@ -238,7 +237,7 @@ export function makeCard(options = {}) {
 		count.textContent = String(pages);
 	}
 
-	// 自分の作品には pixiv がブックマークボタンを描かない (SITE_SPEC §4)
+	// 自分の作品には pixiv がブックマークボタンを描かない
 	if (heart) {
 		const heartBox = thumbBox.appendChild(el('div')).appendChild(el('div', { 'data-ga4-label': 'bookmark_button' }));
 		const button = heartBox.appendChild(el('button', {

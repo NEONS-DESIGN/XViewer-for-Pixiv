@@ -4,7 +4,7 @@
  * content script は isolated world で動くため、そちらで history.pushState を包んでも
  * pixiv 本体のルーターが呼ぶ pushState は捕まらない。(world ごとにラッパを共有しない)
  * SPA 遷移を確実に捕まえるには、サイト本体と同じ world で history そのものを包む必要がある。
- * 捕まえた結果は DOM イベントで isolated world へ渡す。(SITE_SPEC §0)
+ * 捕まえた結果は DOM イベントで isolated world へ渡す。
  *
  * ここはサイト本体の動作の経路に割り込む。壊さないことを最優先にし、
  * 元の戻り値をそのまま返す・例外を外へ出さない・外せるようにする、の 3 点を守る。
@@ -73,10 +73,9 @@ function unhook() {
 /**
  * 今の履歴 state を保ったまま URL だけ差し替える。(無限スクロールの ?p= の追従)
  *
- * content script からは history.state を正しく読めない。world ごとに読んだ値を覚えていて、
- * 別の world が先に読むと古い値を返す。(SITE_SPEC §8) それを書き戻すと Next.js の state
- * (`__N`) が拡張の目印で上書きされ、そのエントリへ戻っても Next.js が popstate を無視する。
- * ここで読んで書けば、読むのが page world だけになるので正しい値が返る。
+ * content script (isolated world) から読んだ history.state は古いことがあり、それを書き戻すと
+ * Next.js の state (`__N`) が拡張の目印で上書きされ、そのエントリへ戻っても Next.js が popstate を無視する。
+ * 読むのも書くのも page world のここで行う。
  *
  * 包みは通さない。自分の書き込みを pixiv の遷移として isolated world へ知らせないため。
  * (content script は書く前に自分の値を覚えており、通知が要らない)

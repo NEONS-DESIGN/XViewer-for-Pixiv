@@ -73,7 +73,7 @@ test('最初のエントリから切れていれば空配列を返す', () => {
 });
 
 test('STORE 以外の圧縮方式は例外を投げる', () => {
-	// 8 = deflate。pixiv では実測上あり得ないが、仕様が変わったときに黙って壊れないようにする
+	// 8 = deflate。pixiv のうごイラの zip は STORE だが、仕様が変わったときに黙って壊れないようにする
 	const zip = buildZip([{ name: 'a.jpg', data: [1, 2, 3], method: 8 }]);
 	assert.throws(() => parseStoredZip(zip), /未対応の圧縮方式/);
 });

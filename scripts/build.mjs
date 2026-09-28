@@ -12,7 +12,7 @@
  *   node scripts/build.mjs --target=firefox   Firefox だけ
  *
  * version の出どころは package.json 1 か所。src/manifest.json は version を持たず、
- * ここで差し込む。(SPEC.md §5.1) minimum_chrome_version / strict_min_version も同様に
+ * ここで差し込む。minimum_chrome_version / strict_min_version も同様に
  * scripts/targets.mjs から差し込む。
  */
 import { build as bundle, context } from 'esbuild';

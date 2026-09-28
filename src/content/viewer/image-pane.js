@@ -2,7 +2,7 @@
  * 画像の表示とページ切替。
  *
  * ページ一覧は /pages から取る。ここが 404 のときは表示できない作品なので、
- * 呼び出し側が可視判定で先に弾いている前提。(SITE_SPEC §6)
+ * 呼び出し側が可視判定で先に弾いている前提。
  */
 import { getJson } from '../../pixiv/client.js';
 import { illustPagesUrl, safeCdnUrl } from '../../pixiv/endpoints.js';
@@ -293,7 +293,7 @@ export function createImagePane(deps) {
 			// これを外すと、読み込み中に前の作品の矢印とカウンタが残る
 			frame?.remove();
 			// 読み込み途中の先読みは参照を捨てても転送が続く。src を空にして取り消し、
-			// 見ていない作品の分が今見ている作品の取得と帯域を取り合わないようにする (うごイラの abort と同じ理由)
+			// 見ていない作品の分が今見ている作品の取得と帯域を取り合わないようにする
 			for (const img of prefetched.values()) assignImageSrc(img, '');
 			prefetched.clear();
 			image = null;

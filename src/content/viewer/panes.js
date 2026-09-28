@@ -108,7 +108,7 @@ export async function renderWork(detail, session, settings, targets) {
 
 		if (plan.comments) {
 			// 「上部へ」はサイドバーそのものを先頭へ戻す。区画の中からは届かないので渡す。
-			// 投稿できたらサイドバーのコメント件数を手元で +1 する (再取得はしない。SPEC §10.12)
+			// 投稿できたらサイドバーのコメント件数を手元で +1 する (再取得はしない)
 			commentsPane = createComments({
 				doc,
 				container: sidebarPane.commentsSlot(),

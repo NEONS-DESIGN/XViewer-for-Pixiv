@@ -1,12 +1,12 @@
 /**
  * コメントに貼れるスタンプの一覧。
- * pixiv 本体は API で引かず、グループ番号から ID を組み立てている。(SITE_SPEC §4 実測)
+ * API では引かず、pixiv 本体と同じくグループ番号から ID を組み立てる。
  * 画像の URL は endpoints.js の stampUrl() が組み立てる。
  */
 
 /**
  * 出すグループの番号と並び。pixiv 本体の並びに合わせてある。
- * 6 と 7 は本体が hidden: true にしていて画面に出さないので持たない。
+ * 6 と 7 は pixiv 本体が画面に出さないので持たない。
  * @type {readonly number[]}
  */
 export const STAMP_GROUPS = Object.freeze([3, 4, 2, 1]);

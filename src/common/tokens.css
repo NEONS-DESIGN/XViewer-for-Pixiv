@@ -5,9 +5,9 @@
    選択子は :root と :host を並べる。文書側では :host が当たらず、Shadow DOM の中では :root が
    当たらないので、同じ 1 本の CSS を両方へそのまま読ませられる。
    - 設定画面: popup.html が <link> で読む。data-theme は popup-ui.js が設定 (popupTheme) と
-     OS の設定から html 要素に付ける (SPEC.md §11.2)
+     OS の設定から html 要素に付ける
    - ビュワー: viewer.js が文字列として import し、viewer.css の前に <style> へ入れる。
-     data-theme は applyTheme() が pixiv 本体の html[data-theme] を写してホスト要素に付ける (SPEC.md §10.2)
+     data-theme は applyTheme() が pixiv 本体の html[data-theme] を写してホスト要素に付ける
    画面ごとにしか使わないトークン (ビュワーのフォロー・幕・幅、設定画面のスイッチ) は
    それぞれの CSS に残してある。ここに置くのは両方で同じ値になるものだけ。 */
 :root,
@@ -15,10 +15,9 @@
 	/* ブラウザ標準の部品 (チェックボックス、セレクトのピッカー、スクロールバー) も
 	   配色に追従させる。これが無いとライトにしても白い枠の中に暗いピッカーが出る */
 	color-scheme: dark;
-	/* ダークの地の色は pixiv 本体 (charcoal) の実測値。
-	   --charcoal-background1 (#1f1f1f) = pixiv の body、つまり利用者が地として見ている色。
-	   --charcoal-background2 (#000000) は html 側で、実際にはほぼ body に覆われて見えないため使わない。
-	   (popup では黒が強すぎた) ビュワーは pixiv の上に重なるので、地の色がずれると本体から浮く (SITE_SPEC.md) */
+	/* ダークの地の色は pixiv 本体 (charcoal) の --charcoal-background1 (#1f1f1f)。
+	   pixiv の body の色、つまり利用者が地として見ている色。
+	   ビュワーは pixiv の上に重なるので、地の色がずれると本体から浮く */
 	--bg: #1f1f1f;
 	--surface: #1f1f1f;
 	--fg: #eff0f4;
@@ -31,21 +30,20 @@
 	--control-border: #3a3a3a;
 	--control-hover: #333333;
 	--hover: rgba(255, 255, 255, 0.08);
-	/* pixiv 本体のブランド色 --charcoal-brand そのもの (SITE_SPEC.md §14)。
+	/* pixiv 本体のブランド色 --charcoal-brand そのもの。
 	   本体の青と同じ色を使うことで、拡張の UI が pixiv の一部として読める。
 	   拡張機能のアイコン (scripts/icon-svg.mjs) の背景もこの値。
 	   食い違いは test/popup/popup-css.test.js が止める */
 	--accent: #0096fa;
 	/* var(--accent) で塗りつぶした面に載せる文字色。pixiv 本体がブランド色の上に
-	   白を載せているので、ここも白で揃える。比は約 3.1:1 で WCAG AA (4.5:1) には
-	   届かないが、本体と同じ見え方にすることを優先した判断 (docs/DECISIONS.md 0.30.2)。
+	   白を載せているので、ここも白で揃える。比は約 3.1:1 で WCAG AA (4.5:1) には届かない。
 	   --accent はテーマで変えないので、この値もライトと同じ。
 	   今この拡張に --accent の塗りつぶしは無く (塗りは --brand-bg 側に寄せてある)、
-	   実際に読んでいるのは紹介サイトの CTA ボタン (site/assets/style.css)。
-	   新しく塗りつぶしを足すときの出どころとして残している */
+	   読んでいるのは紹介サイトの CTA ボタン (site/assets/style.css)。
+	   新しく塗りつぶしを足すときはこの値を使う */
 	--on-accent: #ffffff;
 	/* 取り返しの付かない操作 (設定の初期化の確定など) の枠と文字。
-	   やり直せる失敗 (保存の失敗の通知) には使わない (UI_DESIGN_KIT §2) */
+	   やり直せる失敗 (保存の失敗の通知) には使わない */
 	--danger: #e5737a;
 	/* スクロールバーの太さ */
 	--scrollbar-size: 6px;
@@ -53,7 +51,7 @@
 	--scrollbar-track: rgba(255, 255, 255, 0.07);
 	--scrollbar-thumb: rgba(255, 255, 255, 0.26);
 	--scrollbar-thumb-hover: rgba(255, 255, 255, 0.4);
-	/* フォーカスの輪郭。すべての操作部品で同じ 1 本にする。(UI_DESIGN_KIT §6)
+	/* フォーカスの輪郭。すべての操作部品で同じ 1 本にする。
 	   --accent を参照するのでテーマごとに書き直さなくてよい */
 	--focus-ring: 2px solid var(--accent);
 
@@ -64,13 +62,12 @@
 
 /* ライトの値。下のメディアクエリの中にも同じ宣言がある。
    片方だけ直さないこと。(中身が同じであることは test/popup/popup-css.test.js が見張る)
-   ライトも pixiv 本体 (charcoal) の実測値。地は --charcoal-background1 (#ffffff)。
-   線は pixiv が実際に引いている rgba(0,0,0,0.08) (ダーク側の rgba(255,255,255,0.12) と対) と、
+   ライトも pixiv 本体 (charcoal) の値。地は --charcoal-background1 (#ffffff)。
+   線は pixiv の rgba(0,0,0,0.08) (ダーク側の rgba(255,255,255,0.12) と対) と、
    それを白地で不透明にした #ebebeb。地との明暗差はダークの #1f1f1f/#333333 と同じ比に揃えてある。
    枠 (--control-border) は --charcoal-surface1-press。ホバーの地 (#ebebeb) より濃いので、ホバー中も輪郭が残る。
    --accent / --on-accent はライトでも差し替えない。pixiv 本体のブランド色 --charcoal-brand は
-   両テーマ共通で #0096fa、その上の文字も白だからで、片方だけ暗くすると本体と色がずれる。
-   (以前はコントラストのためライトだけ #1a6b9e に落としていた。docs/DECISIONS.md 0.30.2) */
+   両テーマ共通で #0096fa、その上の文字も白だからで、片方だけ暗くすると本体と色がずれる。 */
 :root[data-theme='light'],
 :host([data-theme='light']) {
 	color-scheme: light;
@@ -98,7 +95,7 @@
    宣言は上のライトのブロックと同じ内容にする。(CSS では 2 つの条件を 1 つの選択子に
    まとめられないため、やむを得ず 2 か所に書いている)
 
-   :host は並べない。ビュワーは OS ではなく pixiv 本体の html[data-theme] に追従する (SPEC.md §10.2) ので、
+   :host は並べない。ビュワーは OS ではなく pixiv 本体の html[data-theme] に追従するので、
    OS がライトでも pixiv がダークならダークのままでなければならない。
    :root は Shadow DOM の中では当たらないので、ビュワーにはこの規則が届かない */
 @media (prefers-color-scheme: light) {
@@ -127,7 +124,7 @@
    つまみの位置だけを見せるより読み進めた量が掴みやすい。
    標準の scrollbar-width / scrollbar-color と混ぜて書くと Chromium は
    ::-webkit-scrollbar を丸ごと無視するので、こちらだけに寄せる。
-   (丸みと余白まで決めたいのでこちらを使う。Chromium 系専用の拡張)
+   (丸みと余白まで決めたいのでこちらを使う。Firefox はこの擬似要素を読まず、標準の見た目になる)
    選択子を付けずに書き、その CSS が届く範囲 (文書 / Shadow DOM) のスクロールバーを
    すべて同じ見た目にする。ビュワーのサイドバーとコメント一覧、設定画面のパネルが対象。
    サイドバーだけ端から離す余白は viewer.css 側にある */
