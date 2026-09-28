@@ -22,6 +22,7 @@ import { toManifestVersion } from './manifest-version.mjs';
 // コピーする静的ファイルの表は static-files.mjs にある。(副作用なしのモジュールにしてテストからも読む)
 import { staticFilesFor } from './static-files.mjs';
 import { resolveTargets } from './browsers.mjs';
+import { cssTextPlugin } from './css-text-plugin.mjs';
 
 /** 監視モードで起動するか。 */
 const WATCH = process.argv.includes('--watch');
@@ -51,10 +52,11 @@ function buildOptionsFor(target) {
 		outdir: target.outDir,
 		bundle: true,
 		format: 'iife',
-		// manifest に書く下限と同じ出どころ (targets.mjs)
 		target: target.esbuildTarget,
-		// viewer.css と common/tokens.css を文字列として import するため。CSS 自体は変換しない
-		loader: { '.css': 'text' },
+		// 監視中は読みやすさを残す。配布物は縮める
+		minify: !WATCH,
+		// viewer.css と common/tokens.css を圧縮してから文字列として import する
+		plugins: [cssTextPlugin(target.esbuildTarget)],
 		logLevel: 'info',
 	};
 }
