@@ -513,28 +513,49 @@ test('response.body が無ければ全体を受け取ってから再生する', 
 	player.dispose();
 });
 
-test('data descriptor の zip は受信をやめ、同じ signal で取り直して全体から読む', async () => {
-	// 2 つ目のエントリに bit 3。受信しながらは切り出せない
-	const entries = ENTRIES5.slice(0, 3).map((entry, at) => ({ ...entry, flags: at === 1 ? 0x08 : 0 }));
+/**
+ * 受信しながらは読めない形の zip を 1 回だけ返す通信を作る。
+ * @param {Array<{name: string, bytes: Uint8Array, flags?: number, method?: number}>} entries zip のエントリ
+ * @returns {{fetchImpl: Function, stream: object, zipInits: object[], zip: Uint8Array}} 通信の代わりと記録
+ */
+function unreadableZip(entries) {
 	const zip = buildStoredZip(entries);
 	const stream = streamedZip(zip);
 	const zipInits = [];
 	const fetchImpl = async (url, init) => {
 		if (url.includes('ugoira_meta')) return metaResponse(META3);
 		zipInits.push(init);
-		if (zipInits.length === 1) return stream.respond(init);
-		return { ok: true, status: 200, arrayBuffer: async () => zip.buffer };
+		return stream.respond(init);
 	};
+	return { fetchImpl, stream, zipInits, zip };
+}
+
+test('data descriptor の zip は取り直さず、受信をやめて再生できないことを出す', async () => {
+	// 2 つ目のエントリに bit 3。受信しながらは切り出せず、全体を受け取っても parseStoredZip では読めない
+	const entries = ENTRIES5.slice(0, 3).map((entry, at) => ({ ...entry, flags: at === 1 ? 0x08 : 0 }));
+	const { fetchImpl, stream, zipInits, zip } = unreadableZip(entries);
+	const { container, player } = build({ fetchImpl });
+	const rendering = player.render(DETAIL);
+	stream.send(0, zip.length);
+	await rendering;
+	assert.equal(stream.state.cancelled, true, '途中まで読んだ body は取り消す');
+	assert.equal(zipInits.length, 1, 'zip を取り直している');
+	assert.equal(find(container, '.pane-error').textContent, 'うごイラを再生できませんでした');
+	assert.equal(find(container, '.ugoira-canvas').hidden, true);
+	player.dispose();
+});
+
+test('STORE 以外の zip は取り直さず、受信をやめて再生できないことを出す', async () => {
+	const entries = ENTRIES5.slice(0, 3).map((entry, at) => ({ ...entry, method: at === 0 ? 8 : 0 }));
+	const { fetchImpl, stream, zipInits, zip } = unreadableZip(entries);
 	const { container, player, images } = build({ fetchImpl });
 	const rendering = player.render(DETAIL);
 	stream.send(0, zip.length);
 	await rendering;
 	assert.equal(stream.state.cancelled, true, '途中まで読んだ body は取り消す');
-	assert.equal(zipInits.length, 2);
-	assert.equal(zipInits[1].signal, zipInits[0].signal);
-	// 受信中に読めた 1 つ目は二重に作らない
-	assert.equal(images.length, 3);
-	assert.equal(find(container, '.ugoira-canvas').hidden, false);
+	assert.equal(zipInits.length, 1, 'zip を取り直している');
+	assert.equal(images.length, 0);
+	assert.equal(find(container, '.pane-error').textContent, 'うごイラを再生できませんでした');
 	player.dispose();
 });
 

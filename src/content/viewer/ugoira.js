@@ -28,6 +28,7 @@ const REASONS = Object.freeze({
 	ZIP_FETCH: 'zip の取得に失敗しました',
 	NO_FRAMES: 'フレームがありません',
 	DECODE: 'フレームの画像をデコードできませんでした',
+	UNSUPPORTED_ZIP: '受信しながら読めない形式の zip です (data descriptor か STORE 以外)',
 });
 
 /** delay が読めなかったときに使う待ち時間 (ミリ秒)。 */
@@ -419,16 +420,15 @@ export function createUgoiraPlayer(deps) {
 
 	/**
 	 * zip を読み、エントリが揃うたびに onEntry へ渡す。
-	 * body を読めるなら受信しながら切り出す。読めない (body が無い) か、受信しながらは切り出せない形
-	 * (data descriptor か STORE 以外) だったら、同じ URL を取り直して全体を受け取ってから切り出す。
+	 * body を読めるなら受信しながら切り出す。body が無ければ同じ応答の全体を受け取ってから切り出す。
+	 * 受信しながらは切り出せない形 (data descriptor か STORE 以外) は全体を受け取っても読めないので、
+	 * 取り直さずに受信をやめて失敗にする。
 	 * @param {Response} response zip の応答
-	 * @param {string} zipUrl zip の URL (取り直しに使う)
 	 * @param {(entry: {name: string, parts: Uint8Array[]}) => void} onEntry エントリを受け取る関数
 	 * @returns {Promise<void>}
-	 * @throws {Error} 通信の失敗、STORE 以外の圧縮方式
+	 * @throws {Error} 通信の失敗、読めない形式の zip
 	 */
-	async function readFrames(response, zipUrl, onEntry) {
-		let whole = response;
+	async function readFrames(response, onEntry) {
 		if (typeof response.body?.getReader === 'function') {
 			const reader = response.body.getReader();
 			const zipReader = createStoredZipReader();
@@ -441,13 +441,13 @@ export function createUgoiraPlayer(deps) {
 					reader.cancel().catch(() => {});
 					return;
 				}
-				if (zipReader.needsFallback()) break;
+				if (zipReader.needsFallback()) {
+					reader.cancel().catch(() => {});
+					throw new Error(REASONS.UNSUPPORTED_ZIP);
+				}
 			}
-			reader.cancel().catch(() => {});
-			whole = await fetchImpl(zipUrl, { mode: 'cors', signal: aborter.signal });
-			if (!whole.ok) throw new Error(`${REASONS.ZIP_FETCH}: ${whole.status}`);
 		}
-		const buffer = await whole.arrayBuffer();
+		const buffer = await response.arrayBuffer();
 		if (disposed) return;
 		for (const entry of parseStoredZip(buffer)) onEntry({ name: entry.name, parts: [entry.bytes] });
 	}
@@ -525,7 +525,7 @@ export function createUgoiraPlayer(deps) {
 				const response = await fetchImpl(zipUrl, { mode: 'cors', signal: aborter.signal });
 				if (!response.ok) throw new Error(`${REASONS.ZIP_FETCH}: ${response.status}`);
 				try {
-					await readFrames(response, zipUrl, (entry) => addFrame(entry, metaFrames));
+					await readFrames(response, (entry) => addFrame(entry, metaFrames));
 				} catch (error) {
 					// 再生が始まっていれば、届いた分で繰り返す
 					if (disposed || !started) throw error;
