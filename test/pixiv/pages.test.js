@@ -37,6 +37,11 @@ test('sortIdsDesc は数値として降順に並べる', () => {
 	assert.deepEqual(sortIdsDesc(['9', '10', '100', '2']), ['100', '10', '9', '2']);
 });
 
+test('sortIdsDesc は桁数の違う ID でも数値として比べる', () => {
+	// 文字列のまま比べると '9' が '10' より前に来てしまう
+	assert.deepEqual(sortIdsDesc(['9', '100', '10']), ['100', '10', '9']);
+});
+
 test('sortIdsDesc は渡した配列を変えない', () => {
 	const ids = ['1', '3', '2'];
 	sortIdsDesc(ids);
