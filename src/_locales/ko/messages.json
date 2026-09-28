@@ -1,0 +1,10 @@
+{
+	"extName": {
+		"message": "XViewer for Pixiv",
+		"description": "拡張機能の名前。ブラウザの拡張機能一覧とストアに出る"
+	},
+	"extDescription": {
+		"message": "pixiv 유저 페이지에 X 스타일의 이미지 뷰어를 추가합니다. pixiv 플랫폼을 이용해 개발한 비공식 확장 프로그램이며, pixiv Inc.에서 제작·배포하는 것이 아닙니다.",
+		"description": "拡張機能の説明。商標ガイドラインが求める非公式である旨を含む"
+	}
+}

@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14161c" media="(prefers-color-scheme: dark)">
+<title>개인정보보호방침 - XViewer for Pixiv</title>
+<meta name="description" content="XViewer for Pixiv의 개인정보보호방침. 이 확장 프로그램은 어떠한 개인정보도 수집하지 않으며, 제작자의 서버로 보내지도 않습니다. 저장하는 것은 이용자가 고른 설정 항목과 마지막으로 본 pixiv의 표시 언어뿐입니다.">
+<!-- lang:head -->
+<link rel="canonical" href="https://xviewer.neonsdesign.com/ko/privacy.html">
+<link rel="alternate" hreflang="ja" href="https://xviewer.neonsdesign.com/privacy.html">
+<link rel="alternate" hreflang="en" href="https://xviewer.neonsdesign.com/en/privacy.html">
+<link rel="alternate" hreflang="ko" href="https://xviewer.neonsdesign.com/ko/privacy.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xviewer.neonsdesign.com/zh-cn/privacy.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xviewer.neonsdesign.com/zh-tw/privacy.html">
+<link rel="alternate" hreflang="x-default" href="https://xviewer.neonsdesign.com/privacy.html">
+<!-- /lang:head -->
+<link rel="icon" href="../assets/img/icon-32.png" sizes="32x32">
+<link rel="icon" href="../assets/img/icon-128.png" sizes="128x128">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="XViewer for Pixiv">
+<meta property="og:title" content="개인정보보호방침 - XViewer for Pixiv">
+<meta property="og:description" content="이 확장 프로그램은 어떠한 개인정보도 수집하지 않으며, 제작자의 서버로 보내지도 않습니다.">
+<meta property="og:url" content="https://xviewer.neonsdesign.com/ko/privacy.html">
+<meta property="og:locale" content="ko_KR">
+<link rel="stylesheet" href="../assets/style.css">
+<script>
+	/* 描画前に配色をあてて、切り替え時のちらつきを防ぐ */
+	(function () {
+		/* JS が動く印。先頭へ戻るボタンを描画前から隠しておくのに使う (style.css) */
+		document.documentElement.setAttribute('data-js', '');
+		try {
+			var saved = window.localStorage.getItem('xviewer-site-theme');
+			if (saved === 'dark' || saved === 'light') document.documentElement.setAttribute('data-theme', saved);
+		} catch (error) {
+			/* 保存領域が使えなくても OS の設定で描ける */
+		}
+	})();
+</script>
+<script src="../assets/site.js" defer></script>
+</head>
+<body id="top">
+
+<a class="skip-link" href="#main">본문으로 건너뛰기</a>
+
+<header class="site-header">
+	<div class="wrap">
+		<a class="brand" href="./">
+			<img src="../assets/img/icon-128.png" alt="" width="28" height="28">
+			<span>XViewer for Pixiv</span>
+		</a>
+		<nav class="site-nav" aria-label="페이지 내 이동">
+			<a href="./#features">기능</a>
+			<a href="./#settings">설정</a>
+			<a href="./#requirements">동작 환경</a>
+			<a href="privacy.html" aria-current="page">개인정보</a>
+		</nav>
+		<div class="header-tools">
+			<!-- lang:menu -->
+			<details class="lang-menu">
+				<summary>
+					<svg class="lang-menu-globe" viewBox="0 -960 960 960" aria-hidden="true"><path d="M323-111.5Q250-143 196-197t-85-127.5Q80-398 80-482t31-156.5Q142-711 196-765t127-84.5Q396-880 480-880t157 30.5Q710-819 764-765t85 126.5Q880-566 880-482t-31 157.5Q818-251 764-197t-127 85.5Q564-80 480-80t-157-31.5ZM480-138q35-36 58.5-82.5T577-331H384q14 60 37.5 108t58.5 85Zm-85-12q-25-38-43-82t-30-99H172q38 71 88 111.5T395-150Zm171-1q72-23 129.5-69T788-331H639q-13 54-30.5 98T566-151ZM152-391h159q-3-27-3.5-48.5T307-482q0-25 1-44.5t4-43.5H152q-7 24-9.5 43t-2.5 45q0 26 2.5 46.5T152-391Zm221 0h215q4-31 5-50.5t1-40.5q0-20-1-38.5t-5-49.5H373q-4 31-5 49.5t-1 38.5q0 21 1 40.5t5 50.5Zm275 0h160q7-24 9.5-44.5T820-482q0-26-2.5-45t-9.5-43H649q3 35 4 53.5t1 34.5q0 22-1.5 41.5T648-391Zm-10-239h150q-33-69-90.5-115T565-810q25 37 42.5 80T638-630Zm-254 0h194q-11-53-37-102.5T480-820q-32 27-54 71t-42 119Zm-212 0h151q11-54 28-96.5t43-82.5q-75 19-131 64t-91 115Z"/></svg>
+					<span class="visually-hidden">언어: </span><span>한국어</span>
+					<svg class="lang-menu-caret" viewBox="0 -960 960 960" aria-hidden="true"><path d="M469-358q-5-2-10-7L261-563q-9-9-8.5-21.5T262-606q9-9 21.5-9t21.5 9l175 176 176-176q9-9 21-8.5t21 9.5q9 9 9 21.5t-9 21.5L501-365q-5 5-10 7t-11 2q-6 0-11-2Z"/></svg>
+				</summary>
+				<ul class="lang-menu-list">
+					<li><a href="../privacy.html" hreflang="ja" lang="ja">日本語</a></li>
+					<li><a href="../en/privacy.html" hreflang="en" lang="en">English</a></li>
+					<li><a href="privacy.html" hreflang="ko" lang="ko" aria-current="true">한국어</a></li>
+					<li><a href="../zh-cn/privacy.html" hreflang="zh-CN" lang="zh-CN">简体中文</a></li>
+					<li><a href="../zh-tw/privacy.html" hreflang="zh-TW" lang="zh-TW">繁體中文</a></li>
+				</ul>
+			</details>
+			<!-- /lang:menu -->
+			<button type="button" class="theme-toggle" aria-label="라이트 모드로 전환"
+				data-label-light="라이트 모드로 전환" data-label-dark="다크 모드로 전환">
+				<svg class="icon-moon" viewBox="0 -960 960 960" aria-hidden="true"><path d="M480-120q-150 0-255-105T120-480q0-135 79.5-229T408-830q20-5 34-1t22 15q8 10 7.5 25t-8.5 35q-9 23-14 47t-5 49q0 90 63 153t153 63q25 0 48.5-4.5T754-461q22-8 38-7t26 9q10 8 13 23t-2 36q-27 121-121 200.5T480-120Z"/></svg>
+				<svg class="icon-sun" viewBox="0 -960 960 960" aria-hidden="true"><path d="M338.5-338.5Q280-397 280-480t58.5-141.5Q397-680 480-680t141.5 58.5Q680-563 680-480t-58.5 141.5Q563-280 480-280t-141.5-58.5ZM70-450q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32Q57.25-510 70-510h100q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H70Zm720 0q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h100q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H790ZM458.5-768.63Q450-777.25 450-790v-100q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v100q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63Zm0 720Q450-57.25 450-70v-100q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v100q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63ZM240-678l-57-56q-9-9-8.63-21.6.37-12.61 8.53-21.5 8.89-8.9 21.5-8.9 12.6 0 21.6 9l56 57q8 9 8 21t-8 20.5q-8 8.5-20.5 8.5t-21.5-8Zm494 495-56-57q-8-9-8-21.38 0-12.37 8.5-20.62 8.5-9 20.5-9t21 9l57 56q9 9 8.63 21.6-.37 12.61-8.53 21.5-8.89 8.9-21.5 8.9-12.6 0-21.6-9Zm-56-495q-9-9-9-21t9-21l56-57q9-9 21.6-8.63 12.61.37 21.5 8.53 8.9 8.89 8.9 21.5 0 12.6-9 21.6l-57 56q-8 8-20.36 8-12.37 0-21.64-8ZM182.9-182.9q-8.9-8.89-8.9-21.5 0-12.6 9-21.6l57-56q8.8-9 20.9-9 12.1 0 20.71 9 9.39 9 9.39 21t-9 21l-56 57q-9 9-21.6 8.63-12.61-.37-21.5-8.53Z"/></svg>
+			</button>
+		</div>
+	</div>
+</header>
+
+<main id="main" class="doc">
+	<div class="wrap">
+
+		<h1>개인정보보호방침</h1>
+		<p class="doc-meta">최종 수정일: 2026년 9월 27일 / 제정일: 2026년 9월 17일</p>
+
+		<div class="summary-box">
+			<p>이 확장 프로그램은 어떠한 개인정보도 수집하지 않습니다.</p>
+			<p>
+				사용자가 열어 둔 pixiv 이외의 곳으로 데이터를 보내지 않습니다.
+				저장하는 것은 사용자가 고른 설정 항목과 마지막으로 본 pixiv의 표시 언어뿐입니다. 아래는 그 자세한 내용입니다.
+			</p>
+		</div>
+
+		<h2>1. 적용 범위</h2>
+		<p>
+			본 방침은 브라우저 확장 프로그램 ‘XViewer for Pixiv’ (Chrome 웹 스토어·Edge 추가 기능·Firefox Add-ons에서 배포하는 것. 이하 ‘본 확장 프로그램’) 및 본 사이트
+			(<code>xviewer.neonsdesign.com</code>)에 적용됩니다.
+		</p>
+		<p>
+			본 확장 프로그램은 pixiv (https://www.pixiv.net/)의 유저 페이지에 독자적인 이미지 뷰어를 추가하는 비공식 도구입니다.
+			pixiv Inc.에서 제작·배포하는 것이 아니며, 이 회사와는 아무런 관계가 없습니다.
+			pixiv 자체의 개인정보 취급에 대해서는 pixiv Inc.의 개인정보보호방침을 확인해 주세요.
+		</p>
+
+		<h2>2. 수집하지 않는 정보</h2>
+		<p>본 확장 프로그램은 다음 중 어떠한 정보도 수집하지 않습니다. 가져오지도, 저장하지도, 전송하지도 않습니다.</p>
+		<ul>
+			<li><strong>개인 식별 정보</strong> — 이름, 주소, 이메일 주소, 나이, 개인 식별 번호 등</li>
+			<li><strong>건강 정보</strong></li>
+			<li><strong>재무 상황 및 결제 정보</strong></li>
+			<li><strong>인증 정보</strong> — 비밀번호, 자격 증명, 보안 질문, PIN 등</li>
+			<li><strong>개인 커뮤니케이션</strong> — 이메일, 메시지 등</li>
+			<li><strong>위치 정보</strong> — 지역, IP 주소, GPS 좌표 등</li>
+			<li><strong>웹 기록</strong> — 방문한 페이지 목록과 그 관련 데이터</li>
+			<li><strong>사용자 활동</strong> — 클릭, 마우스 위치, 스크롤, 키 입력 기록 등</li>
+			<li><strong>웹사이트 콘텐츠</strong> — 이미지, 텍스트, 음성, 동영상 등의 저장이나 외부 전송</li>
+		</ul>
+		<p>
+			본 확장 프로그램은 pixiv의 이미지와 작품 설명, 댓글을 뷰어에 표시하기 위해 불러오지만,
+			이는 화면에 그리기 위해 브라우저의 메모리에서 다뤄질 뿐입니다.
+			저장되지도 않고, 제작자를 포함한 제3자가 가져갈 수 있는 곳으로 보내지지도 않습니다.
+		</p>
+		<p>
+			사용자가 모달 안에서 쓴 댓글이나 답변도 마찬가지입니다.
+			전송 버튼을 눌렀을 때 pixiv 자체의 API로 그대로 전달할 뿐이며, 본 확장 프로그램이 저장하거나
+			제작자를 포함한 제3자에게 보내는 일은 없습니다. 작성한 댓글의 공개 범위와 취급은
+			pixiv 본체의 댓글란에서 작성한 경우와 완전히 같습니다.
+		</p>
+
+		<h2>3. 저장하는 정보</h2>
+		<p>
+			본 확장 프로그램이 저장하는 정보는 두 가지입니다. 하나는 팝업 화면에서 고른 설정,
+			다른 하나는 마지막으로 본 pixiv의 표시 언어입니다. 저장 위치는 각각 다르며, 자세한 내용은 다음과 같습니다.
+		</p>
+		<p>
+			설정은 브라우저의 설정 동기화 영역 (<code>chrome.storage.sync</code>)에 저장되며,
+			사용자의 브라우저와, 사용자가 브라우저 동기화를 켜 둔 경우에는 해당 브라우저의 계정
+			(Chrome이라면 Google 계정, Edge라면 Microsoft 계정, Firefox라면 Mozilla 계정) 안에 놓입니다.
+			제작자를 포함한 제3자는 이를 읽을 수 없습니다.
+		</p>
+		<p>저장되는 설정은 다음 11개입니다. 모두 참/거짓 값이거나 정해진 선택지 중 하나입니다.</p>
+		<ul>
+			<li>뷰어를 사용할지 여부</li>
+			<li>이미지 해상도</li>
+			<li>미리 불러올 장수</li>
+			<li>사이드바를 표시할지 여부</li>
+			<li>사이드바 스크롤 방식</li>
+			<li>배경 클릭으로 닫을지 여부</li>
+			<li>클릭하여 원본 크기로 볼지 여부</li>
+			<li>그리드의 Tab 이동 처리</li>
+			<li>픽업 영역을 숨길지 여부</li>
+			<li>무한 스크롤 동작</li>
+			<li>설정 화면의 색상 구성</li>
+		</ul>
+		<p>
+			열람한 작품의 ID, 유저 ID, 열람 기록, 좋아요나 북마크 기록은 일절 저장하지 않습니다.
+		</p>
+		<p>
+			설정 화면 (팝업)은 pixiv 페이지를 가지고 있지 않으므로 표시 언어를 스스로 판단할 수 없습니다.
+			그래서 pixiv 페이지에서 작동하는 스크립트가 확인한 표시 언어를 <code>chrome.storage.local</code>에 저장하고,
+			설정 화면이 이를 읽습니다. 저장하는 값은 <code>ja</code>나 <code>en</code> 같은 언어 코드 하나뿐이며,
+			개인을 식별하는 정보는 포함되지 않습니다. 이 영역은 기기 안에만 놓이며, 브라우저의 동기화 대상이 되지 않습니다.
+		</p>
+
+		<h3>저장한 정보 삭제</h3>
+		<p>
+			설정 화면의 ‘설정 초기화’를 누르면 저장한 값이 기본값으로 돌아갑니다.
+			브라우저에서 본 확장 프로그램을 삭제하면 저장 영역째 삭제됩니다.
+		</p>
+
+		<h2>4. 통신 대상</h2>
+		<p>
+			본 확장 프로그램은 서버를 가지고 있지 않습니다. 제작자가 관리하는 서버와의 통신은 일절 발생하지 않습니다.
+			통신하는 곳은 사용자가 이미 열어 둔 pixiv와 그 이미지 전송용 서버뿐입니다.
+		</p>
+		<ul>
+			<li><code>https://www.pixiv.net/</code> — 작품 정보, 댓글, 작가 정보 가져오기. 좋아요, 북마크, 팔로우, 댓글과 답변 작성, 내 댓글 삭제의 전송 (모두 사용자가 버튼을 눌렀을 때만)</li>
+			<li><code>https://i.pximg.net/</code> — 작품 이미지와 움짤(우고이라) 데이터 불러오기</li>
+			<li><code>https://s.pximg.net/</code> — 댓글의 스탬프와 이모지 이미지 불러오기</li>
+		</ul>
+		<p>
+			이들은 모두 브라우저에서 pixiv를 평소처럼 열람할 때에도 발생하는 통신입니다.
+			접속 분석, 광고, 크래시 리포트와 같은 것은 일절 포함하지 않았습니다.
+		</p>
+
+		<h2>5. 요구하는 권한과 그 이유</h2>
+		<p>본 확장 프로그램이 요구하는 권한은 다음 두 가지뿐입니다. 다른 사이트에 대한 접근 권한은 요구하지 않습니다.</p>
+		<h3><code>storage</code></h3>
+		<p>
+			앞서 설명한 설정과 마지막으로 본 pixiv의 표시 언어를 저장하는 데 사용합니다. 설정은 툴바의 팝업에서 변경하고
+			pixiv 페이지에서 작동하는 스크립트가 읽으므로, 이 둘 사이에서 값을 공유할 수단이 필요합니다.
+			표시 언어는 그 반대로, pixiv 페이지에서 작동하는 스크립트가 쓰고 팝업이 읽습니다.
+		</p>
+		<h3><code>https://www.pixiv.net/*</code></h3>
+		<p>
+			뷰어를 표시하기 위해 pixiv 페이지에서 스크립트를 실행하는 권한입니다.
+			페이지 표시를 변경하는 것, pixiv 자체의 API를 사용자의 로그인 상태로 호출하는 것,
+			페이지 이동을 감지하는 것에 사용합니다. 이 한 사이트로 한정되어 있으며,
+			다른 사이트나 모든 사이트를 대상으로 하는 권한은 요구하지 않습니다.
+		</p>
+
+		<h2>6. 쿠키와 인증 정보의 취급</h2>
+		<p>
+			본 확장 프로그램은 사용자의 쿠키를 읽지 않습니다.
+			pixiv의 API를 호출할 때는 브라우저가 일반 페이지 열람과 똑같이 로그인 상태를 붙입니다.
+			본 확장 프로그램이 로그인 정보 자체를 다루는 일은 없습니다.
+		</p>
+		<p>
+			좋아요, 북마크, 팔로우, 댓글과 답변 작성, 내 댓글 삭제는
+			사용자가 모달 안의 버튼을 눌렀을 때만 실행됩니다. 자동으로 전송되는 일은 없습니다.
+			또한 좋아요는 pixiv의 사양상 취소할 수 없습니다. 댓글 삭제도 되돌릴 수 없으므로 2단계 확인을 거칩니다.
+		</p>
+
+		<h2>7. 제3자 제공</h2>
+		<p>
+			수집하는 정보가 없으므로 제3자에게 제공하는 정보도 없습니다.
+			본 확장 프로그램은 이용자의 데이터를 판매, 양도, 공유하지 않습니다.
+			또한 단일 용도 (pixiv 유저 페이지에 이미지 뷰어를 추가하는 것)와 무관한 목적으로
+			데이터를 사용하지 않습니다. 신용도 판단이나 대출 목적으로 사용하지도 않습니다.
+		</p>
+
+		<h2>8. 본 사이트에 대하여</h2>
+		<p>
+			본 사이트는 GitHub Pages (GitHub, Inc.)에서 공개하는 정적 페이지입니다.
+			접속 분석, 광고, 외부 글꼴, 외부 스크립트는 일절 사용하지 않습니다.
+			본 사이트가 쿠키를 설정하는 일도 없습니다.
+		</p>
+		<p>
+			다만 호스팅 사업자인 GitHub, Inc.가 서비스 제공에 따라 접속 로그
+			(IP 주소 등)를 기록할 수 있습니다. 이는 제작자가 관리하는 것이 아닙니다.
+			자세한 내용은 GitHub의 개인정보 보호 선언 (Privacy Statement)을 확인해 주세요.
+		</p>
+		<p>
+			또한 본 사이트에 게재한 정지 화면 스크린숏은 동작을 설명하기 위한 데모용 더미 데이터이며,
+			실제 작품 정보나 댓글이 아닙니다.
+		</p>
+		<p>
+			한편, 무한 스크롤을 설명하는 동영상은 pixiv의 공개 계정을 실제로 열람한 화면 녹화입니다.
+			표시된 작품 정보나 카운터에는 손대지 않았습니다.
+		</p>
+
+		<h2>9. 어린이의 이용에 대하여</h2>
+		<p>
+			본 확장 프로그램은 어떠한 이용자로부터도 개인정보를 수집하지 않습니다. 나이와 관계없이 이는 변하지 않습니다.
+			또한 연령 제한이 있는 작품의 표시는 pixiv 측의 설정을 따릅니다.
+			본 확장 프로그램이 연령 제한을 우회하는 일은 없습니다.
+		</p>
+
+		<h2>10. 본 방침의 변경</h2>
+		<p>
+			본 방침을 변경하는 경우에는 이 페이지를 갱신하고 첫머리의 최종 수정일을 고칩니다.
+			중요한 변경을 하는 경우에는 확장 프로그램의 업데이트 정보로도 알립니다.
+		</p>
+
+		<h2>11. 문의</h2>
+		<p>본 방침 및 본 확장 프로그램에 관한 문의, 버그 신고, 질문, 요청은 아래로 보내 주세요.</p>
+		<ul>
+			<li>문의 양식 (버그 신고·질문·요청): <a href="https://forms.gle/C7AWaUHWmwnoeDV66" target="_blank" rel="noopener">Google 양식 열기</a> (양식은 영어로 되어 있지만, 한국어로 작성하셔도 괜찮습니다)</li>
+			<li>GitHub Issues: <a href="https://github.com/NEONS-DESIGN/XViewer-for-Pixiv/issues" target="_blank" rel="noopener">개발자용 창구</a> (GitHub 계정이 필요합니다)</li>
+		</ul>
+
+		<h3>문의 양식으로 받는 정보</h3>
+		<p>문의 양식은 Google 양식을 사용합니다. 받는 것은 사용자가 입력한 다음 3개 항목뿐입니다.</p>
+		<ul>
+			<li><strong>문의 유형</strong> (필수) — 질문 / 버그 신고 / 기능 요청 중 하나</li>
+			<li><strong>문의 내용</strong> (필수)</li>
+			<li><strong>이메일 주소</strong> (선택) — 답변을 원하는 경우에만 입력해 주세요</li>
+		</ul>
+		<p>
+			양식은 Google 계정 로그인을 요구하지 않으며, 로그인 중인 계정의 이메일 주소를 자동으로 기록하지도 않습니다.
+			이메일 주소를 입력하지 않으면 제작자가 사용자에게 연락할 수단은 남지 않습니다.
+		</p>
+		<p>
+			받은 내용은 답변과 본 확장 프로그램의 버그 수정 및 개선을 위해서만 사용합니다.
+			제작자 이외의 제3자에게 제공하지 않습니다.
+		</p>
+		<p>
+			응답은 Google 서비스에 저장됩니다. 양식을 열거나 전송할 때 Google 측의 정보 취급은
+			Google의 개인정보처리방침을 따릅니다.
+			GitHub Issues에 쓴 내용은 누구나 읽을 수 있는 공개된 곳에 올라갑니다. 개인정보는 적지 마세요.
+		</p>
+
+	</div>
+</main>
+
+<!-- 先頭へ戻るボタン。1 画面分スクロールするまで site.js が隠す。図形は Material Symbols (Apache-2.0) -->
+<a class="to-top" href="#top" aria-label="페이지 맨 위로" title="페이지 맨 위로">
+	<svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M469-358q-5-2-10-7L261-563q-9-9-8.5-21.5T262-606q9-9 21.5-9t21.5 9l175 176 176-176q9-9 21-8.5t21 9.5q9 9 9 21.5t-9 21.5L501-365q-5 5-10 7t-11 2q-6 0-11-2Z"/></svg>
+</a>
+
+<footer class="site-footer">
+	<div class="wrap">
+		<div class="footer-grid">
+			<div>
+				<a class="brand" href="./">
+					<img src="../assets/img/icon-128.png" alt="" width="28" height="28">
+					<span>XViewer for Pixiv</span>
+				</a>
+			</div>
+			<ul class="footer-links">
+				<li><a href="./">홈</a></li>
+				<li><a href="https://github.com/NEONS-DESIGN/XViewer-for-Pixiv" target="_blank" rel="noopener">GitHub</a></li>
+				<li><a href="https://forms.gle/C7AWaUHWmwnoeDV66" target="_blank" rel="noopener">문의</a></li>
+				<!-- lang:footer -->
+				<li><a href="../privacy.html" hreflang="ja" lang="ja">日本語</a></li>
+				<li><a href="../en/privacy.html" hreflang="en" lang="en">English</a></li>
+				<li><a href="../zh-cn/privacy.html" hreflang="zh-CN" lang="zh-CN">简体中文</a></li>
+				<li><a href="../zh-tw/privacy.html" hreflang="zh-TW" lang="zh-TW">繁體中文</a></li>
+				<!-- /lang:footer -->
+			</ul>
+		</div>
+		<div class="footer-note">
+			<p>pixiv는 pixiv Inc.의 등록상표입니다. 이 사이트와 이 확장 프로그램은 pixiv Inc.와 아무런 관계가 없습니다.</p>
+			<p>아이콘 도형은 Material Symbols (<a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank" rel="noopener">Apache License 2.0</a>)와 Font Awesome Free (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>)를 사용합니다.</p>
+		</div>
+		<p class="footer-copyright">&copy; 2026 NEONS</p>
+	</div>
+</footer>
+
+</body>
+</html>

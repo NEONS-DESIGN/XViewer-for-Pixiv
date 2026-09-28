@@ -28,7 +28,7 @@ function defaultGetUILanguage() {
  *
  * pixiv の表示言語はアカウント設定で全タブ共通なので、タブへ問い合わせる必要はない。
  * @param {{loadPageLanguage?: () => Promise<string|null>, getUILanguage?: () => string}} [deps] 差し替え
- * @returns {Promise<string>} 言語サブタグ
+ * @returns {Promise<string>} 言語コード (SUPPORTED_LANGUAGES のどれか)
  */
 export async function resolvePopupLanguage(deps = {}) {
 	const load = deps.loadPageLanguage ?? loadPageLanguageImpl;

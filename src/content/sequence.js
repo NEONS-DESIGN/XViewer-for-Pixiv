@@ -62,7 +62,7 @@ export function createSequence(ids) {
  * @param {Sequence} fallback 取得に失敗したときに返す並び
  * @param {string} userId ユーザー ID
  * @param {string|null} category 絞り込む種別 (WORK_CATEGORY)。null なら両方
- * @param {string} lang 言語サブタグ (strings.lang)
+ * @param {string} lang 言語コード (strings.lang)
  * @param {{getJsonImpl?: Function}} [deps] テスト用の依存
  * @returns {Promise<Sequence>} 全作品の並び。失敗したら fallback
  */

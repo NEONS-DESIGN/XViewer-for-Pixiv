@@ -20,11 +20,13 @@ import {
 } from '../../src/pixiv/endpoints.js';
 import { WORK_CATEGORY } from '../../src/common/constants.js';
 
-test('langParam は検証済みの言語だけを送る', () => {
+test('langParam は UI の言語を pixiv が受け付ける綴りへ直して送る', () => {
 	assert.equal(langParam('ja'), 'lang=ja');
 	assert.equal(langParam('en'), 'lang=en');
 	assert.equal(langParam('ko'), 'lang=ko');
-	assert.equal(langParam('zh'), 'lang=zh');
+	// pixiv は簡体字を zh、繁体字を zh_tw (アンダースコア) でしか受け付けない。(SITE_SPEC §0)
+	assert.equal(langParam('zh-CN'), 'lang=zh');
+	assert.equal(langParam('zh-TW'), 'lang=zh_tw');
 });
 
 test('langParam は翻訳が確認できていない言語を既定へ倒す', () => {
@@ -36,11 +38,9 @@ test('langParam は翻訳が確認できていない言語を既定へ倒す', (
 	assert.equal(langParam(undefined), 'lang=ja');
 });
 
-test('langParam は zh_tw を受け取っても既定へ倒す (既知の制限)', () => {
-	// pixiv 側は zh_tw (アンダースコア) でないと繁体字の翻訳を返さないが、
-	// normalizeLanguage (common/language.js) が zh-TW を zh へ切り詰めるため
-	// langParam には zh_tw が渡ってこない。API_LANGUAGES にも入れていないので、
-	// 万一渡ってきても既定 (ja) へ倒れる。繁体字を出すなら normalizeLanguage 側から見直す
+test('langParam は pixiv 側の綴りをそのまま渡されても既定へ倒す', () => {
+	// 受け取るのは UI の言語 (strings.lang) だけ。API の綴りへの変換はここの仕事
+	assert.equal(langParam('zh'), 'lang=ja');
 	assert.equal(langParam('zh_tw'), 'lang=ja');
 });
 

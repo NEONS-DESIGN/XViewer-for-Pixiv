@@ -1,15 +1,15 @@
 <!doctype html>
-<html lang="ja">
+<html lang="zh-TW">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#14161c" media="(prefers-color-scheme: dark)">
-<title>XViewer for Pixiv - pixiv に X 風の画像ビュワーを追加するブラウザ拡張機能</title>
-<meta name="description" content="pixiv のユーザーページで作品をクリックすると、ページ遷移せずにその場でモーダルが開きます。複数枚の切り替え、うごイラの再生、投稿文やコメントの閲覧から投稿までモーダルの中で完結する非公式のブラウザ拡張機能です。Chrome / Edge / Firefox に対応しています。">
+<title>XViewer for Pixiv - 為 pixiv 加入 X 風格圖片檢視器的瀏覽器擴充功能</title>
+<meta name="description" content="在 pixiv 的用戶頁面點擊作品後，不必跳轉頁面，就會直接在原處開啟對話框。從切換多張圖片、播放動圖、閱讀作品說明與評論，到發表評論，全都能在對話框中完成的非官方瀏覽器擴充功能。支援 Chrome / Edge / Firefox。">
 <!-- lang:head -->
-<link rel="canonical" href="https://xviewer.neonsdesign.com/">
+<link rel="canonical" href="https://xviewer.neonsdesign.com/zh-tw/">
 <link rel="alternate" hreflang="ja" href="https://xviewer.neonsdesign.com/">
 <link rel="alternate" hreflang="en" href="https://xviewer.neonsdesign.com/en/">
 <link rel="alternate" hreflang="ko" href="https://xviewer.neonsdesign.com/ko/">
@@ -17,22 +17,22 @@
 <link rel="alternate" hreflang="zh-TW" href="https://xviewer.neonsdesign.com/zh-tw/">
 <link rel="alternate" hreflang="x-default" href="https://xviewer.neonsdesign.com/">
 <!-- /lang:head -->
-<link rel="icon" href="assets/img/icon-32.png" sizes="32x32">
-<link rel="icon" href="assets/img/icon-128.png" sizes="128x128">
-<link rel="apple-touch-icon" href="assets/img/icon-128.png">
+<link rel="icon" href="../assets/img/icon-32.png" sizes="32x32">
+<link rel="icon" href="../assets/img/icon-128.png" sizes="128x128">
+<link rel="apple-touch-icon" href="../assets/img/icon-128.png">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="XViewer for Pixiv">
 <meta property="og:title" content="XViewer for Pixiv">
-<meta property="og:description" content="pixiv のユーザーページに、X.com のメディア閲覧に近い画像ビュワーを追加するブラウザ拡張機能。Chrome / Edge / Firefox に対応。">
-<meta property="og:url" content="https://xviewer.neonsdesign.com/">
-<meta property="og:image" content="https://xviewer.neonsdesign.com/assets/img/og-viewer.jpg">
+<meta property="og:description" content="一款瀏覽器擴充功能，為 pixiv 的用戶頁面加入近似 X.com 媒體瀏覽體驗的圖片檢視器。支援 Chrome / Edge / Firefox。">
+<meta property="og:url" content="https://xviewer.neonsdesign.com/zh-tw/">
+<meta property="og:image" content="https://xviewer.neonsdesign.com/assets/img/og-viewer-en.jpg">
 <meta property="og:image:type" content="image/jpeg">
 <meta property="og:image:width" content="1920">
 <meta property="og:image:height" content="1024">
-<meta property="og:image:alt" content="pixiv の作品がモーダルで開き、右側のサイドバーに投稿文、タグ、カウンタ、コメントが並んでいる画面">
-<meta property="og:locale" content="ja_JP">
+<meta property="og:image:alt" content="pixiv 的作品在對話框中開啟，右側的側邊欄列出作品說明、標籤、計數及評論的畫面">
+<meta property="og:locale" content="zh_TW">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="../assets/style.css">
 <script>
 	/* 描画前に配色をあてて、切り替え時のちらつきを防ぐ */
 	(function () {
@@ -46,48 +46,48 @@
 		}
 	})();
 </script>
-<script src="assets/site.js" defer></script>
+<script src="../assets/site.js" defer></script>
 <script type="application/ld+json">
 {
 	"@context": "https://schema.org",
 	"@graph": [
 		{
 			"@type": "WebSite",
-			"url": "https://xviewer.neonsdesign.com/",
+			"url": "https://xviewer.neonsdesign.com/zh-tw/",
 			"name": "XViewer for Pixiv",
-			"inLanguage": "ja",
-			"description": "pixiv のユーザーページに X.com のメディア閲覧に近い画像ビュワーを追加するブラウザ拡張機能の紹介サイト。"
+			"inLanguage": "zh-TW",
+			"description": "瀏覽器擴充功能 XViewer for Pixiv 的介紹網站。此擴充功能為 pixiv 的用戶頁面加入近似 X.com 媒體瀏覽體驗的圖片檢視器。"
 		},
 		{
 			"@type": "SoftwareApplication",
 			"name": "XViewer for Pixiv",
-			"url": "https://xviewer.neonsdesign.com/",
+			"url": "https://xviewer.neonsdesign.com/zh-tw/",
 			"applicationCategory": "BrowserApplication",
 			"operatingSystem": "Windows, macOS, Linux, ChromeOS",
-			"softwareRequirements": "Chrome 120 以上の Chromium 系ブラウザ (Chrome / Brave / Edge)、または Firefox 140 以上 (デスクトップ版)",
-			"inLanguage": "ja",
-			"description": "pixiv のユーザーページで作品をクリックすると、ページ遷移せずにその場でモーダルが開く非公式のブラウザ拡張機能。複数枚の切り替え、うごイラの再生、投稿文やコメントの閲覧から投稿までモーダルの中で完結する。",
+			"softwareRequirements": "Chrome 120 以上的 Chromium 系瀏覽器（Chrome / Brave / Edge），或 Firefox 140 以上（桌面版）",
+			"inLanguage": "zh-TW",
+			"description": "在 pixiv 的用戶頁面點擊作品後，不必跳轉頁面，就會直接在原處開啟對話框的非官方瀏覽器擴充功能。從切換多張圖片、播放動圖、閱讀作品說明與評論，到發表評論，全都能在對話框中完成。",
 			"isAccessibleForFree": true,
 			"license": "https://opensource.org/licenses/MIT",
 			"sameAs": "https://github.com/NEONS-DESIGN/XViewer-for-Pixiv",
 			"offers": {
 				"@type": "Offer",
 				"price": "0",
-				"priceCurrency": "JPY"
+				"priceCurrency": "TWD"
 			},
 			"screenshot": [
-				"https://xviewer.neonsdesign.com/assets/img/shot-viewer.webp",
-				"https://xviewer.neonsdesign.com/assets/img/shot-comments.webp",
-				"https://xviewer.neonsdesign.com/assets/img/shot-comment-form.webp",
-				"https://xviewer.neonsdesign.com/assets/img/shot-popup.webp"
+				"https://xviewer.neonsdesign.com/assets/img/shot-viewer-en.webp",
+				"https://xviewer.neonsdesign.com/assets/img/shot-comments-en.webp",
+				"https://xviewer.neonsdesign.com/assets/img/shot-comment-form-en.webp",
+				"https://xviewer.neonsdesign.com/assets/img/shot-popup-en.webp"
 			],
 			"featureList": [
-				"ページ遷移せずにモーダルで作品を開く",
-				"複数枚の作品をキーボードで切り替える",
-				"うごイラを再生する",
-				"投稿文・タグ・カウンタ・コメントをサイドバーに表示する",
-				"いいね・ブックマーク・フォロー・コメントの投稿",
-				"ユーザーページの無限スクロール"
+				"不跳轉頁面，直接在對話框中開啟作品",
+				"用鍵盤切換多張圖片的作品",
+				"播放動圖",
+				"在側邊欄顯示作品說明、標籤、計數及評論",
+				"按讚、收藏、追蹤及發表評論",
+				"用戶頁面的無限捲動"
 			]
 		}
 	]
@@ -96,7 +96,7 @@
 </head>
 <body id="top">
 
-<a class="skip-link" href="#main">本文へ移動</a>
+<a class="skip-link" href="#main">跳至主要內容</a>
 
 <!-- アイコンの図形。出典は Material Symbols (Apache-2.0)。ブラウザのロゴは Wikimedia Commons から取り、svgo で縮めた。どちらもフッターに表示している -->
 <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
@@ -109,8 +109,6 @@
 		<symbol id="i-like" viewBox="0 -960 960 960"><path d="M458-144q-11-4-19-12l-53-49Q262-320 171-424.5T80-643q0-90 60.5-150.5T290-854q51 0 101 24.5t89 80.5q44-56 91-80.5t99-24.5q89 0 149.5 60.5T880-643q0 114-91 218.5T574-205l-53 49q-8 8-19 12t-22 4q-11 0-22-4Z"/></symbol>
 		<symbol id="i-scroll" viewBox="0 -960 960 960"><path d="M469-358q-5-2-10-7L261-563q-9-9-8.5-21.5T262-606q9-9 21.5-9t21.5 9l175 176 176-176q9-9 21-8.5t21 9.5q9 9 9 21.5t-9 21.5L501-365q-5 5-10 7t-11 2q-6 0-11-2Z"/></symbol>
 		<symbol id="i-theme" viewBox="0 -960 960 960"><path d="M480-120q-150 0-255-105T120-480q0-135 79.5-229T408-830q20-5 34-1t22 15q8 10 7.5 25t-8.5 35q-9 23-14 47t-5 49q0 90 63 153t153 63q25 0 48.5-4.5T754-461q22-8 38-7t26 9q10 8 13 23t-2 36q-27 121-121 200.5T480-120Z"/></symbol>
-		<symbol id="i-share" viewBox="0 -960 960 960"><path d="M686-80q-47.5 0-80.75-33.25T572-194q0-8 5-34L278-403q-16.28 17.34-37.64 27.17Q219-366 194-366q-47.5 0-80.75-33T80-480q0-48 33.25-81T194-594q24 0 45 9.3 21 9.29 37 25.7l301-173q-2-8-3.5-16.5T572-766q0-47.5 33.25-80.75T686-880q47.5 0 80.75 33.25T800-766q0 47.5-33.25 80.75T686-652q-23.27 0-43.64-9Q622-670 606-685L302-516q3 8 4.5 17.5t1.5 18q0 8.5-1 16t-3 15.5l303 173q16-15 36.09-23.5 20.1-8.5 43.07-8.5Q734-308 767-274.75T800-194q0 47.5-33.25 80.75T686-80Z"/></symbol>
-		<symbol id="i-follow" viewBox="0 -960 960 960"><path d="M730-530H630q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h100v-100q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v100h100q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H790v100q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63-8.5-8.62-8.5-21.37v-100Zm-478 7q-42-42-42-108t42-108q42-42 108-42t108 42q42 42 42 108t-42 108q-42 42-108 42t-108-42ZM40-220v-34q0-35 17.5-63.5T108-360q75-33 133.34-46.5t118.5-13.5Q420-420 478-406.5T611-360q33 15 51 43t18 63v34q0 24.75-17.62 42.37Q644.75-160 620-160H100q-24.75 0-42.37-17.63Q40-195.25 40-220Z"/></symbol>
 		<!-- ブラウザのロゴ (各社の商標)。Chrome: Google (パブリックドメイン) / Edge: Microsoft (MIT) / Firefox: Mozilla (MPL-2.0) -->
 		<symbol id="i-chrome" viewBox="0 0 48 48"><defs><linearGradient id="chrome-a" x1="3.22" x2="44.78" y1="15" y2="15" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#d93025"/><stop offset="1" stop-color="#ea4335"/></linearGradient><linearGradient id="chrome-b" x1="20.72" x2="41.5" y1="47.68" y2="11.68" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fcc934"/><stop offset="1" stop-color="#fbbc04"/></linearGradient><linearGradient id="chrome-c" x1="26.6" x2="5.82" y1="46.5" y2="10.51" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#1e8e3e"/><stop offset="1" stop-color="#34a853"/></linearGradient></defs><circle cx="24" cy="23.99" r="12" fill="#fff"/><path fill="none" d="M3.22 36A24 24 0 1 0 12 3.22 24 24 0 0 0 3.22 36m31.17-18A12 12 0 1 1 18 13.6 12 12 0 0 1 34.4 18"/><path fill="url(#chrome-a)" d="M24 12h20.78a24 24 0 0 0-41.56 0L13.6 30A11.99 11.99 0 0 1 24 12"/><circle cx="24" cy="24" r="9.5" fill="#1a73e8"/><path fill="url(#chrome-b)" d="M34.4 30 24 48a24 24 0 0 0 20.78-36H24v.01a11.99 11.99 0 0 1 10.4 18"/><path fill="url(#chrome-c)" d="M13.6 30 3.23 12A24 24 0 0 0 24 48l10.4-18h-.01a11.99 11.99 0 0 1-20.78 0"/></symbol>
 		<symbol id="i-edge" viewBox="0 0 256 256"><defs><radialGradient id="edge-b" cx="161.8" cy="68.9" r="95.4" gradientTransform="matrix(1 0 0 -.95 0 248.8)" gradientUnits="userSpaceOnUse"><stop offset=".7" stop-opacity="0"/><stop offset=".9" stop-opacity=".5"/><stop offset="1"/></radialGradient><radialGradient id="edge-d" cx="-340.3" cy="63" r="143.2" gradientTransform="matrix(.15 -.99 -.8 -.12 176.6 -125.4)" gradientUnits="userSpaceOnUse"><stop offset=".8" stop-opacity="0"/><stop offset=".9" stop-opacity=".5"/><stop offset="1"/></radialGradient><radialGradient id="edge-e" cx="113.4" cy="570.2" r="202.4" gradientTransform="matrix(-.04 1 2.13 .08 -1179.5 -106.7)" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#35c1f1"/><stop offset=".1" stop-color="#34c1ed"/><stop offset=".2" stop-color="#2fc2df"/><stop offset=".3" stop-color="#2bc3d2"/><stop offset=".7" stop-color="#36c752"/></radialGradient><radialGradient id="edge-f" cx="376.5" cy="568" r="97.3" gradientTransform="matrix(.28 .96 .78 -.23 -303.8 -148.5)" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#66eb6e"/><stop offset="1" stop-color="#66eb6e" stop-opacity="0"/></radialGradient><linearGradient id="edge-a" x1="63.3" x2="241.7" y1="84" y2="84" gradientTransform="matrix(1 0 0 -1 0 266)" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#0c59a4"/><stop offset="1" stop-color="#114a8b"/></linearGradient><linearGradient id="edge-c" x1="157.3" x2="46" y1="161.4" y2="40.1" gradientTransform="matrix(1 0 0 -1 0 266)" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#1b9de2"/><stop offset=".2" stop-color="#1595df"/><stop offset=".7" stop-color="#0680d7"/><stop offset="1" stop-color="#0078d4"/></linearGradient></defs><path fill="url(#edge-a)" d="M235.7 195.5a94 94 0 0 1-10.6 4.7 102 102 0 0 1-35.9 6.4c-47.3 0-88.5-32.5-88.5-74.3a31.5 31.5 0 0 1 16.4-27.3c-42.8 1.8-53.8 46.4-53.8 72.5 0 74 68.1 81.4 82.8 81.4 7.9 0 19.8-2.3 27-4.6l1.3-.4a128.3 128.3 0 0 0 66.6-52.8 4 4 0 0 0-5.3-5.6" transform="translate(-4.6 -5)"/><path fill="url(#edge-b)" d="M235.7 195.5a94 94 0 0 1-10.6 4.7 102 102 0 0 1-35.9 6.4c-47.3 0-88.5-32.5-88.5-74.3a31.5 31.5 0 0 1 16.4-27.3c-42.8 1.8-53.8 46.4-53.8 72.5 0 74 68.1 81.4 82.8 81.4 7.9 0 19.8-2.3 27-4.6l1.3-.4a128.3 128.3 0 0 0 66.6-52.8 4 4 0 0 0-5.3-5.6" opacity=".35" style="isolation:isolate" transform="translate(-4.6 -5)"/><path fill="url(#edge-c)" d="M110.3 246.3A79 79 0 0 1 87.6 225a80.7 80.7 0 0 1 29.5-120c3.2-1.5 8.5-4.1 15.6-4a32.4 32.4 0 0 1 25.7 13 32 32 0 0 1 6.3 18.7c0-.2 24.5-79.6-80-79.6-43.9 0-80 41.6-80 78.2a130 130 0 0 0 12.1 56 128 128 0 0 0 156.4 67 75.5 75.5 0 0 1-62.8-8Z" transform="translate(-4.6 -5)"/><path fill="url(#edge-d)" d="M110.3 246.3A79 79 0 0 1 87.6 225a80.7 80.7 0 0 1 29.5-120c3.2-1.5 8.5-4.1 15.6-4a32.4 32.4 0 0 1 25.7 13 32 32 0 0 1 6.3 18.7c0-.2 24.5-79.6-80-79.6-43.9 0-80 41.6-80 78.2a130 130 0 0 0 12.1 56 128 128 0 0 0 156.4 67 75.5 75.5 0 0 1-62.8-8Z" opacity=".41" style="isolation:isolate" transform="translate(-4.6 -5)"/><path fill="url(#edge-e)" d="M157 153.8c-.9 1-3.4 2.5-3.4 5.6 0 2.6 1.7 5.2 4.8 7.3 14.3 10 41.4 8.6 41.5 8.6a59.6 59.6 0 0 0 30.3-8.3 61.4 61.4 0 0 0 30.4-52.9c.3-22.4-8-37.3-11.3-43.9C228 28.8 182.3 5 132.6 5a128 128 0 0 0-128 126.2c.5-36.5 36.8-66 80-66 3.5 0 23.5.3 42 10a72.6 72.6 0 0 1 30.9 29.3c6.1 10.6 7.2 24.1 7.2 29.5s-2.7 13.3-7.8 19.9Z" transform="translate(-4.6 -5)"/><path fill="url(#edge-f)" d="M157 153.8c-.9 1-3.4 2.5-3.4 5.6 0 2.6 1.7 5.2 4.8 7.3 14.3 10 41.4 8.6 41.5 8.6a59.6 59.6 0 0 0 30.3-8.3 61.4 61.4 0 0 0 30.4-52.9c.3-22.4-8-37.3-11.3-43.9C228 28.8 182.3 5 132.6 5a128 128 0 0 0-128 126.2c.5-36.5 36.8-66 80-66 3.5 0 23.5.3 42 10a72.6 72.6 0 0 1 30.9 29.3c6.1 10.6 7.2 24.1 7.2 29.5s-2.7 13.3-7.8 19.9Z" transform="translate(-4.6 -5)"/></symbol>
@@ -122,34 +120,34 @@
 <header class="site-header">
 	<div class="wrap">
 		<a class="brand" href="./">
-			<img src="assets/img/icon-128.png" alt="" width="28" height="28">
+			<img src="../assets/img/icon-128.png" alt="" width="28" height="28">
 			<span>XViewer for Pixiv</span>
 		</a>
-		<nav class="site-nav" aria-label="ページ内の移動">
-			<a href="#features">機能</a>
+		<nav class="site-nav" aria-label="頁面內導覽">
+			<a href="#features">功能</a>
 			<a href="#settings">設定</a>
-			<a href="#requirements">動作環境</a>
-			<a href="privacy.html">プライバシー</a>
+			<a href="#requirements">運作環境</a>
+			<a href="privacy.html">隱私權</a>
 		</nav>
 		<div class="header-tools">
 			<!-- lang:menu -->
 			<details class="lang-menu">
 				<summary>
 					<svg class="lang-menu-globe" viewBox="0 -960 960 960" aria-hidden="true"><path d="M323-111.5Q250-143 196-197t-85-127.5Q80-398 80-482t31-156.5Q142-711 196-765t127-84.5Q396-880 480-880t157 30.5Q710-819 764-765t85 126.5Q880-566 880-482t-31 157.5Q818-251 764-197t-127 85.5Q564-80 480-80t-157-31.5ZM480-138q35-36 58.5-82.5T577-331H384q14 60 37.5 108t58.5 85Zm-85-12q-25-38-43-82t-30-99H172q38 71 88 111.5T395-150Zm171-1q72-23 129.5-69T788-331H639q-13 54-30.5 98T566-151ZM152-391h159q-3-27-3.5-48.5T307-482q0-25 1-44.5t4-43.5H152q-7 24-9.5 43t-2.5 45q0 26 2.5 46.5T152-391Zm221 0h215q4-31 5-50.5t1-40.5q0-20-1-38.5t-5-49.5H373q-4 31-5 49.5t-1 38.5q0 21 1 40.5t5 50.5Zm275 0h160q7-24 9.5-44.5T820-482q0-26-2.5-45t-9.5-43H649q3 35 4 53.5t1 34.5q0 22-1.5 41.5T648-391Zm-10-239h150q-33-69-90.5-115T565-810q25 37 42.5 80T638-630Zm-254 0h194q-11-53-37-102.5T480-820q-32 27-54 71t-42 119Zm-212 0h151q11-54 28-96.5t43-82.5q-75 19-131 64t-91 115Z"/></svg>
-					<span class="visually-hidden">表示言語: </span><span>日本語</span>
+					<span class="visually-hidden">語言：</span><span>繁體中文</span>
 					<svg class="lang-menu-caret" viewBox="0 -960 960 960" aria-hidden="true"><path d="M469-358q-5-2-10-7L261-563q-9-9-8.5-21.5T262-606q9-9 21.5-9t21.5 9l175 176 176-176q9-9 21-8.5t21 9.5q9 9 9 21.5t-9 21.5L501-365q-5 5-10 7t-11 2q-6 0-11-2Z"/></svg>
 				</summary>
 				<ul class="lang-menu-list">
-					<li><a href="./" hreflang="ja" lang="ja" aria-current="true">日本語</a></li>
-					<li><a href="en/" hreflang="en" lang="en">English</a></li>
-					<li><a href="ko/" hreflang="ko" lang="ko">한국어</a></li>
-					<li><a href="zh-cn/" hreflang="zh-CN" lang="zh-CN">简体中文</a></li>
-					<li><a href="zh-tw/" hreflang="zh-TW" lang="zh-TW">繁體中文</a></li>
+					<li><a href="../" hreflang="ja" lang="ja">日本語</a></li>
+					<li><a href="../en/" hreflang="en" lang="en">English</a></li>
+					<li><a href="../ko/" hreflang="ko" lang="ko">한국어</a></li>
+					<li><a href="../zh-cn/" hreflang="zh-CN" lang="zh-CN">简体中文</a></li>
+					<li><a href="./" hreflang="zh-TW" lang="zh-TW" aria-current="true">繁體中文</a></li>
 				</ul>
 			</details>
 			<!-- /lang:menu -->
-			<button type="button" class="theme-toggle" aria-label="配色をライトに切り替える"
-				data-label-light="配色をライトに切り替える" data-label-dark="配色をダークに切り替える">
+			<button type="button" class="theme-toggle" aria-label="將配色切換為淺色"
+				data-label-light="將配色切換為淺色" data-label-dark="將配色切換為深色">
 				<svg class="icon-moon" viewBox="0 -960 960 960" aria-hidden="true"><path d="M480-120q-150 0-255-105T120-480q0-135 79.5-229T408-830q20-5 34-1t22 15q8 10 7.5 25t-8.5 35q-9 23-14 47t-5 49q0 90 63 153t153 63q25 0 48.5-4.5T754-461q22-8 38-7t26 9q10 8 13 23t-2 36q-27 121-121 200.5T480-120Z"/></svg>
 				<svg class="icon-sun" viewBox="0 -960 960 960" aria-hidden="true"><path d="M338.5-338.5Q280-397 280-480t58.5-141.5Q397-680 480-680t141.5 58.5Q680-563 680-480t-58.5 141.5Q563-280 480-280t-141.5-58.5ZM70-450q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32Q57.25-510 70-510h100q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H70Zm720 0q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h100q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H790ZM458.5-768.63Q450-777.25 450-790v-100q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v100q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63Zm0 720Q450-57.25 450-70v-100q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v100q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63ZM240-678l-57-56q-9-9-8.63-21.6.37-12.61 8.53-21.5 8.89-8.9 21.5-8.9 12.6 0 21.6 9l56 57q8 9 8 21t-8 20.5q-8 8.5-20.5 8.5t-21.5-8Zm494 495-56-57q-8-9-8-21.38 0-12.37 8.5-20.62 8.5-9 20.5-9t21 9l57 56q9 9 8.63 21.6-.37 12.61-8.53 21.5-8.89 8.9-21.5 8.9-12.6 0-21.6-9Zm-56-495q-9-9-9-21t9-21l56-57q9-9 21.6-8.63 12.61.37 21.5 8.53 8.9 8.89 8.9 21.5 0 12.6-9 21.6l-57 56q-8 8-20.36 8-12.37 0-21.64-8ZM182.9-182.9q-8.9-8.89-8.9-21.5 0-12.6 9-21.6l57-56q8.8-9 20.9-9 12.1 0 20.71 9 9.39 9 9.39 21t-9 21l-56 57q-9 9-21.6 8.63-12.61-.37-21.5-8.53Z"/></svg>
 			</button>
@@ -161,35 +159,35 @@
 
 	<section class="hero">
 		<div class="wrap">
-			<p class="eyebrow">Chrome / Brave / Edge / Firefox 対応</p>
-			<h1><span class="brand-pixiv">pixiv</span> を、<span class="brand-x">X</span> のように見る。</h1>
+			<p class="eyebrow">支援 Chrome / Brave / Edge / Firefox</p>
+			<h1>像瀏覽 <span class="brand-x">X</span> 一樣，瀏覽 <span class="brand-pixiv">pixiv</span>。</h1>
 			<p class="lede">
-				ユーザーページで作品をクリックすると、ページ遷移せずにその場でモーダルが開きます。
-				複数枚の切り替え、うごイラの再生、投稿文やコメントの閲覧から、いいね・ブックマーク・フォロー・コメントの投稿まで、
-				すべてモーダルの中で完結します。
-				閉じれば、元のグリッドの元のスクロール位置に戻ります。
+				在用戶頁面點擊作品後，不必跳轉頁面，就會直接在原處開啟對話框。
+				從切換多張圖片、播放動圖、閱讀作品說明與評論，到按讚、收藏、追蹤及發表評論，
+				全都能在對話框中完成。
+				關閉後，就會回到原本的網格與原本的捲動位置。
 			</p>
 			<div class="cta-row">
 				<a class="btn btn-primary" href="https://chromewebstore.google.com/detail/xviewer-for-pixiv/hbnpmpiipnocflhikmpamobpodadfbpd" target="_blank" rel="noopener">
 					<svg aria-hidden="true"><use href="#i-chrome"></use></svg>
-					Chrome ウェブストアで入手
+					在 Chrome 線上應用程式商店取得
 				</a>
 				<a class="btn btn-primary" href="https://microsoftedge.microsoft.com/addons/detail/pmkplomaebdlciailfpopkocnfpcdmgl" target="_blank" rel="noopener">
 					<svg aria-hidden="true"><use href="#i-edge"></use></svg>
-					Edge アドオンで入手
+					在 Edge 附加元件取得
 				</a>
 				<a class="btn btn-primary" href="https://addons.mozilla.org/firefox/addon/xviewer-for-pixiv/" target="_blank" rel="noopener">
 					<svg aria-hidden="true"><use href="#i-firefox"></use></svg>
-					Firefox Add-ons で入手
+					在 Firefox 附加元件 取得
 				</a>
 				<a class="btn btn-secondary" href="https://github.com/NEONS-DESIGN/XViewer-for-Pixiv" target="_blank" rel="noopener">
 					<svg aria-hidden="true"><use href="#i-open"></use></svg>
-					GitHub で見る
+					在 GitHub 查看
 				</a>
 			</div>
 			<div class="hero-shot">
-				<img src="assets/img/shot-viewer.webp" width="1920" height="1024" fetchpriority="high" decoding="async"
-					alt="pixiv の作品がモーダルで開き、右側のサイドバーに投稿文、タグ、カウンタ、コメント入力欄、コメントが並んでいる画面">
+				<img src="../assets/img/shot-viewer-en.webp" width="1920" height="1024" fetchpriority="high" decoding="async"
+					alt="pixiv 的作品在對話框中開啟，右側的側邊欄列出作品說明、標籤、計數、評論輸入欄及評論的畫面">
 			</div>
 		</div>
 	</section>
@@ -199,41 +197,41 @@
 	<section class="section" id="features">
 		<div class="wrap">
 			<div class="section-head center">
-				<h2>一覧を離れずに、次の作品へ</h2>
-				<p>作品を開くたびにページが切り替わり、戻るたびにスクロール位置を見失う。その往復をなくすための拡張機能です。</p>
+				<h2>不離開列表，前往下一個作品</h2>
+				<p>每次開啟作品，頁面就會切換；每次返回，又找不到原本的捲動位置。這個擴充功能就是為了免去這樣的來回而生。</p>
 			</div>
 			<div class="card-grid">
 				<div class="card">
-					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-open"></use></svg></span>モーダルで開く</h3>
-					<p>グリッドのクリックを受け取り、ページ遷移せずに表示します。URL は作品ページのものへ差し替わるので、リロードも共有もできます。</p>
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-open"></use></svg></span>以對話框開啟</h3>
+					<p>接收網格中的點擊，不跳轉頁面直接顯示。網址會替換為作品頁面的網址，因此也能重新整理或分享。</p>
 				</div>
 				<div class="card">
-					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-next"></use></svg></span>複数枚の切り替え</h3>
-					<p>左右キーと画面端の矢印でページ送り。前後の画像を先読みするので、切り替えに待ち時間がありません。</p>
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-next"></use></svg></span>切換多張圖片</h3>
+					<p>用左右鍵或畫面兩端的箭頭翻頁。會預先載入前後的圖片，切換時不必等待。</p>
 				</div>
 				<div class="card">
-					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-scroll"></use></svg></span>作品から作品へ</h3>
-					<p>上下キーでグリッドの前後の作品へ移動します。端まで来たら次のページ分を自動で読み足します。イラストとマンガのタブでは、その種別の作品だけをたどります。</p>
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-scroll"></use></svg></span>從作品到作品</h3>
+					<p>用上下鍵移到網格中的上一個或下一個作品。到達盡頭時，會自動載入下一頁的作品。在插畫與漫畫分頁中，只會瀏覽該類型的作品。</p>
 				</div>
 				<div class="card">
-					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-play"></use></svg></span>うごイラの再生</h3>
-					<p>zip を展開してフレームを組み立て、その場で再生します。一時停止にも対応しています。</p>
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-play"></use></svg></span>播放動圖</h3>
+					<p>解壓縮 zip 並組合影格，直接在原處播放。也支援暫停。</p>
 				</div>
 				<div class="card">
-					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-zoom"></use></svg></span>原寸表示</h3>
-					<p>画像をクリックすると、原寸のまま画面いっぱいに開きます。開いたままページ送りもできるので、細部を確かめながら読み進められます。</p>
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-zoom"></use></svg></span>原尺寸顯示</h3>
+					<p>點擊圖片後，會以原尺寸填滿整個畫面開啟。開啟時也能直接翻頁，可以一邊確認細節一邊往下看。</p>
 				</div>
 				<div class="card">
-					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-comment"></use></svg></span>コメントを読む、書く</h3>
-					<p>スタンプと絵文字を画像で表示し、返信の展開や続きの読み込みにも対応しています。投稿と返信、自分のコメントの削除も、モーダルを開いたままできます。</p>
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-comment"></use></svg></span>閱讀、撰寫評論</h3>
+					<p>以圖片顯示貼圖與表情符號，也支援展開回覆與載入更多評論。發表評論、回覆及刪除自己的評論，都能在對話框開啟的狀態下進行。</p>
 				</div>
 				<div class="card">
-					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-like"></use></svg></span>いいねとブックマーク</h3>
-					<p>フォローと、X / Facebook / Pawoo / リンクのコピーへのシェアも含めて、モーダルの中から操作できます。ブックマークは Shift を押しながらで非公開。自分の作品には表示しません。</p>
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-like"></use></svg></span>按讚與收藏</h3>
+					<p>包括追蹤，以及分享到 X / Facebook / Pawoo / 複製連結，都能在對話框中操作。按住 Shift 收藏即為不公開。自己的作品不會顯示這些按鈕。</p>
 				</div>
 				<div class="card">
-					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-theme"></use></svg></span>ダークとライト</h3>
-					<p>ビュワーの配色は pixiv 本体の設定に追従します。設定を二重に持たせません。設定画面の配色は、右上のアイコンから切り替えられます。</p>
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-theme"></use></svg></span>深色與淺色</h3>
+					<p>檢視器的配色會跟隨 pixiv 本身的設定，不必重複設定。設定畫面的配色可從右上角的圖示切換。</p>
 				</div>
 			</div>
 		</div>
@@ -245,62 +243,62 @@
 		<div class="wrap">
 			<div class="showcase">
 				<div class="showcase-text">
-					<h3>投稿文もコメントも、画像の横に</h3>
+					<h3>作品說明和評論，都在圖片旁邊</h3>
 					<p>
-						サイドバーには投稿文、タグ、投稿日、いいね数、ブックマーク数、閲覧数、作者のアイコンとフォローボタンが並びます。
-						コメントはスタンプと絵文字を画像のまま描画し、返信もその場で開けます。
+						側邊欄會列出作品說明、標籤、投稿時間、讚數、收藏數、瀏覽量，以及作者的頭像與追蹤按鈕。
+						評論中的貼圖與表情符號會直接以圖片繪製，回覆也能在原處展開。
 					</p>
 					<ul class="feature-list">
-						<li>サイドバーごと送るか、コメントだけ送るかを選べます</li>
-						<li>読み込みに失敗しても、再試行から続きを読めます</li>
-						<li>別のタブで押したいいねを、二重に数えません</li>
-						<li>サイドバーを消して、画像だけを見ることもできます</li>
+						<li>可選擇整個側邊欄一起捲動，或只捲動評論</li>
+						<li>即使載入失敗，也能從「重試」繼續讀取</li>
+						<li>在其他分頁按過的讚不會重複計算</li>
+						<li>也可以隱藏側邊欄，只看圖片</li>
 					</ul>
 				</div>
 				<figure>
-					<img src="assets/img/shot-comments.webp" loading="lazy" decoding="async" width="1920" height="1024"
-						alt="サイドバーの上部にコメント入力欄があり、その下にコメントが並んでいる画面">
+					<img src="../assets/img/shot-comments-en.webp" loading="lazy" decoding="async" width="1920" height="1024"
+						alt="側邊欄上方有評論輸入欄，下方列出評論的畫面">
 				</figure>
 			</div>
 
 			<div class="showcase reverse">
 				<div class="showcase-text">
-					<h3>返信も、閉じずにそのまま</h3>
+					<h3>回覆也不必關閉，直接進行</h3>
 					<p>
-						コメントと返信は、モーダルを開いたまま投稿できます。入力欄は書いた行数に合わせて伸び、
-						絵文字とスタンプはパネルから選べます。<kbd>Ctrl</kbd> + <kbd>Enter</kbd> で送信、<kbd>Enter</kbd> は改行です。
+						評論與回覆可以在對話框開啟的狀態下發表。輸入欄會隨著輸入的行數延伸，
+						表情符號與貼圖可從面板中選擇。<kbd>Ctrl</kbd> + <kbd>Enter</kbd> 發送，<kbd>Enter</kbd> 為換行。
 					</p>
 					<ul class="feature-list">
-						<li>自分のコメントは、2 段階の確認を挟んで削除できます</li>
-						<li>書きかけの文章があるときは、<kbd>Esc</kbd> でモーダルを閉じません</li>
-						<li>投稿したコメントは、pixiv 本体で書いたものと同じ扱いです</li>
+						<li>自己的評論在經過兩段式確認後即可刪除</li>
+						<li>有尚未發送的內容時，按 <kbd>Esc</kbd> 不會關閉對話框</li>
+						<li>發表的評論與在 pixiv 本身撰寫的評論視為相同</li>
 					</ul>
 				</div>
 				<figure class="compact">
-					<img src="assets/img/shot-comment-form.webp" loading="lazy" decoding="async" width="1019" height="984"
-						alt="サイドバーのコメント入力欄に 3 行の文章が入り、右に絵文字ボタンと送信ボタンが並んでいる画面">
+					<img src="../assets/img/shot-comment-form-en.webp" loading="lazy" decoding="async" width="1019" height="984"
+						alt="側邊欄的評論輸入欄中輸入了 3 行文字，右側並排著表情符號按鈕與發送按鈕的畫面">
 				</figure>
 			</div>
 
 			<div class="showcase">
 				<div class="showcase-text">
-					<h3>一覧を、途切れさせない</h3>
+					<h3>讓列表不再中斷</h3>
 					<p>
-						イラストやマンガの一覧のページャーを、下に続けて読み込む形にできます。
-						URL のページ番号は画面に出ているページへ追従するので、リロードしても同じあたりへ戻れます。
+						可將插畫與漫畫列表的分頁改為往下持續載入的形式。
+						網址中的頁碼會跟隨畫面上顯示的頁面，因此重新整理後也能回到差不多的位置。
 					</p>
 					<ul class="feature-list">
-						<li>下まで来たら読み込む / 常に 1 ページ先を読んでおく、から選べます</li>
-						<li>プロフィールのピックアップ欄を隠して、作品一覧をすぐ目に入れられます</li>
+						<li>可從「捲到底部時載入」/「隨時預先載入下一頁」中選擇</li>
+						<li>可隱藏個人資料的精選欄，讓作品列表立刻映入眼簾</li>
 					</ul>
 				</div>
 				<figure class="has-video">
-					<video class="shot-video" src="assets/img/infinite-scroll.mp4"
-						poster="assets/img/infinite-scroll.webp" width="1280" height="688" preload="none"
+					<video class="shot-video" src="../assets/img/infinite-scroll.mp4"
+						poster="../assets/img/infinite-scroll.webp" width="1280" height="688" preload="none"
 						autoplay loop muted playsinline
-						aria-label="ユーザーページを下へスクロールし続けると、ページャーを押さずに次のページの作品が読み込まれ、URL のページ番号が追従していく様子"></video>
-					<button type="button" class="media-toggle" aria-label="動画を一時停止する"
-						data-label-pause="動画を一時停止する" data-label-play="動画を再生する">
+						aria-label="在用戶頁面持續往下捲動時，不必按分頁就會載入下一頁的作品，網址中的頁碼也隨之變化的樣子"></video>
+					<button type="button" class="media-toggle" aria-label="暫停影片"
+						data-label-pause="暫停影片" data-label-play="播放影片">
 						<svg class="icon-pause" viewBox="0 -960 960 960" aria-hidden="true"><path d="M615-200q-24.75 0-42.37-17.63Q555-235.25 555-260v-440q0-24.75 17.63-42.38Q590.25-760 615-760h55q24.75 0 42.38 17.62Q730-724.75 730-700v440q0 24.75-17.62 42.37Q694.75-200 670-200h-55Zm-325 0q-24.75 0-42.37-17.63Q230-235.25 230-260v-440q0-24.75 17.63-42.38Q265.25-760 290-760h55q24.75 0 42.38 17.62Q405-724.75 405-700v440q0 24.75-17.62 42.37Q369.75-200 345-200h-55Z"/></svg>
 						<svg class="icon-play" viewBox="0 -960 960 960" aria-hidden="true"><path d="M320-258v-450q0-14 9-22t21-8q4 0 8 1t8 3l354 226q7 5 10.5 11t3.5 14q0 8-3.5 14T720-458L366-232q-4 2-8 3t-8 1q-12 0-21-8t-9-22Z"/></svg>
 					</button>
@@ -309,24 +307,24 @@
 
 			<div class="showcase reverse">
 				<div class="showcase-text">
-					<h3>拡張機能を、細かく設定できる</h3>
+					<h3>細緻地設定擴充功能</h3>
 					<p>
-						ツールバーのアイコンから開きます。ビュワー、画像、ユーザーページ、操作の 4 区分で、見え方から操作の癖まで自分好みに合わせられます。
+						從工具列的圖示開啟。分為檢視器、圖片、用戶頁面、操作 4 個類別，從顯示方式到操作習慣，都能依自己的喜好調整。
 					</p>
 					<ul class="feature-list">
-						<li>画像の解像度と先読みの枚数を、回線や好みに合わせて選べます</li>
-						<li>サイドバーの出し方やスクロール方式、背景クリックで閉じるかまで変えられます</li>
-						<li>ビュワー自体をオフにすれば、pixiv 標準の動作に戻ります</li>
+						<li>可依網路環境或喜好，選擇圖片解析度與預先載入的張數</li>
+						<li>連側邊欄的顯示方式、捲動方式，以及點擊背景是否關閉都能變更</li>
+						<li>關閉檢視器本身，就會恢復為 pixiv 的標準行為</li>
 					</ul>
 				</div>
 				<!-- 設定ポップアップの上半分と下半分を一定時間ごとに重ねて切り替える (site.js)。JS が無ければ上半分のまま -->
 				<figure class="portrait has-slides">
-					<img src="assets/img/shot-popup.webp" loading="lazy" decoding="async" width="459" height="861" data-active
-						alt="拡張機能の設定ポップアップの上半分。ビュワーと画像の区分に設定項目が並んでいる">
-					<img src="assets/img/shot-popup-bottom.webp" loading="lazy" decoding="async" width="459" height="861"
-						alt="拡張機能の設定ポップアップの下半分。ユーザーページと操作の区分に設定項目が並び、末尾に設定の初期化ボタンがある">
-					<button type="button" class="media-toggle" aria-label="画像の切り替えを一時停止する"
-						data-label-pause="画像の切り替えを一時停止する" data-label-play="画像の切り替えを再開する">
+					<img src="../assets/img/shot-popup-en.webp" loading="lazy" decoding="async" width="459" height="861" data-active
+						alt="擴充功能設定彈出視窗的上半部。檢視器與圖片類別中列出了設定項目">
+					<img src="../assets/img/shot-popup-bottom-en.webp" loading="lazy" decoding="async" width="459" height="861"
+						alt="擴充功能設定彈出視窗的下半部。用戶頁面與操作類別中列出了設定項目，最下方有重設設定的按鈕">
+					<button type="button" class="media-toggle" aria-label="暫停切換圖片"
+						data-label-pause="暫停切換圖片" data-label-play="繼續切換圖片">
 						<svg class="icon-pause" viewBox="0 -960 960 960" aria-hidden="true"><path d="M615-200q-24.75 0-42.37-17.63Q555-235.25 555-260v-440q0-24.75 17.63-42.38Q590.25-760 615-760h55q24.75 0 42.38 17.62Q730-724.75 730-700v440q0 24.75-17.62 42.37Q694.75-200 670-200h-55Zm-325 0q-24.75 0-42.37-17.63Q230-235.25 230-260v-440q0-24.75 17.63-42.38Q265.25-760 290-760h55q24.75 0 42.38 17.62Q405-724.75 405-700v440q0 24.75-17.62 42.37Q369.75-200 345-200h-55Z"/></svg>
 						<svg class="icon-play" viewBox="0 -960 960 960" aria-hidden="true"><path d="M320-258v-450q0-14 9-22t21-8q4 0 8 1t8 3l354 226q7 5 10.5 11t3.5 14q0 8-3.5 14T720-458L366-232q-4 2-8 3t-8 1q-12 0-21-8t-9-22Z"/></svg>
 					</button>
@@ -340,95 +338,95 @@
 	<section class="section" id="settings">
 		<div class="wrap">
 			<div class="section-head">
-				<h2>設定でできること</h2>
-				<p>すべてツールバーのポップアップから変更できます。設定はブラウザの同期領域に保存され、外部には送信されません。</p>
+				<h2>設定可以做到的事</h2>
+				<p>全部都能從工具列的彈出視窗變更。設定會儲存在瀏覽器的同步儲存空間中，不會傳送到外部。</p>
 			</div>
 			<div class="table-scroll">
 				<table>
 					<thead>
 						<tr>
-							<th scope="col">区分</th>
+							<th scope="col">類別</th>
 							<th scope="col">項目</th>
-							<th scope="col">既定</th>
-							<th scope="col">効果</th>
+							<th scope="col">預設</th>
+							<th scope="col">效果</th>
 						</tr>
 					</thead>
 					<tbody>
 						<tr>
-							<td>ビュワー</td>
-							<td>ビュワーを使う</td>
-							<td class="default">オン</td>
-							<td>オフにすると pixiv 標準の動作に戻ります</td>
+							<td>檢視器</td>
+							<td>使用檢視器</td>
+							<td class="default">開啟</td>
+							<td>關閉後會恢復為 pixiv 的標準行為</td>
 						</tr>
 						<tr>
-							<td>ビュワー</td>
-							<td>サイドバーを表示する</td>
-							<td class="default">オン</td>
-							<td>投稿文、タグ、いいね数、コメントを画像の横に出します</td>
+							<td>檢視器</td>
+							<td>顯示側邊欄</td>
+							<td class="default">開啟</td>
+							<td>在圖片旁顯示作品說明、標籤、讚數及評論</td>
 						</tr>
 						<tr>
-							<td>ビュワー</td>
-							<td>サイドバーのスクロール</td>
-							<td class="default">サイドバーごと</td>
-							<td>投稿文からコメントまでを 1 つにつなげて送るか、投稿文を固定してコメントだけを送るか</td>
+							<td>檢視器</td>
+							<td>側邊欄的捲動方式</td>
+							<td class="default">整個側邊欄</td>
+							<td>要從作品說明到評論連成一體捲動，還是固定作品說明、只捲動評論</td>
 						</tr>
 						<tr>
-							<td>画像</td>
-							<td>画像の解像度</td>
+							<td>圖片</td>
+							<td>圖片解析度</td>
 							<td class="default">標準</td>
-							<td>原寸を選ぶと鮮明になりますが、読み込みは重くなります</td>
+							<td>選擇原尺寸會更清晰，但載入較慢</td>
 						</tr>
 						<tr>
-							<td>画像</td>
-							<td>先読み</td>
-							<td class="default">前後 1 枚</td>
-							<td>次のページを先に読み込んでおく枚数を選べます</td>
+							<td>圖片</td>
+							<td>預先載入</td>
+							<td class="default">前後 1 張</td>
+							<td>可選擇預先載入下一頁的張數</td>
 						</tr>
 						<tr>
-							<td>画像</td>
-							<td>クリックで原寸表示</td>
-							<td class="default">オフ</td>
-							<td>画像を押すと、原寸のまま画面いっぱいに開きます</td>
+							<td>圖片</td>
+							<td>點擊以原尺寸顯示</td>
+							<td class="default">關閉</td>
+							<td>點擊圖片後，以原尺寸填滿整個畫面開啟</td>
 						</tr>
 						<tr>
-							<td>ユーザーページ</td>
-							<td>ピックアップ欄を隠す</td>
-							<td class="default">オフ</td>
-							<td>プロフィールのホームに出るピックアップ欄を隠します</td>
+							<td>用戶頁面</td>
+							<td>隱藏精選欄</td>
+							<td class="default">關閉</td>
+							<td>隱藏個人資料首頁上的精選欄</td>
 						</tr>
 						<tr>
-							<td>ユーザーページ</td>
-							<td>無限スクロール</td>
-							<td class="default">使わない</td>
-							<td>下まで来たら読み込む / 常に 1 ページ先を読んでおく、から選べます</td>
-						</tr>
-						<tr>
-							<td>操作</td>
-							<td>背景クリックで閉じる</td>
-							<td class="default">オン</td>
-							<td>画像の外側をクリックしたときに閉じるかどうか</td>
+							<td>用戶頁面</td>
+							<td>無限捲動</td>
+							<td class="default">不使用</td>
+							<td>可從「捲到底部時載入」/「隨時預先載入下一頁」中選擇</td>
 						</tr>
 						<tr>
 							<td>操作</td>
-							<td>グリッドの Tab 移動</td>
-							<td class="default">飛ばさない</td>
-							<td>グリッドで Tab を押したときに、ブックマークとタイトルをフォーカス順から外すか</td>
+							<td>點擊背景關閉</td>
+							<td class="default">開啟</td>
+							<td>點擊圖片外側時是否關閉</td>
+						</tr>
+						<tr>
+							<td>操作</td>
+							<td>網格中的 Tab 移動</td>
+							<td class="default">不跳過</td>
+							<td>在網格中按 Tab 時，是否將收藏與標題從焦點順序中移除</td>
 						</tr>
 					</tbody>
 				</table>
 			</div>
 
-			<h3 style="margin-block:56px 20px;font-size:19px">キー操作</h3>
+			<h3 style="margin-block:56px 20px;font-size:19px">按鍵操作</h3>
 			<div class="keys">
-				<div class="key-row"><kbd>←</kbd><kbd>→</kbd><span>同じ作品のページ送り (原寸表示中も同じ)</span></div>
-				<div class="key-row"><kbd>↑</kbd><kbd>↓</kbd><span>前後の作品へ移動</span></div>
-				<div class="key-row"><kbd>Ctrl</kbd><kbd>Enter</kbd><span>コメントを送信 (Mac は <kbd>Cmd</kbd>)</span></div>
-				<div class="key-row"><kbd>Esc</kbd><span>手前にあるものから順に閉じる</span></div>
-				<div class="key-row"><kbd>Tab</kbd><span>モーダル内のフォーカス移動</span></div>
+				<div class="key-row"><kbd>←</kbd><kbd>→</kbd><span>在同一作品中翻頁（原尺寸顯示中也相同）</span></div>
+				<div class="key-row"><kbd>↑</kbd><kbd>↓</kbd><span>移到上一個或下一個作品</span></div>
+				<div class="key-row"><kbd>Ctrl</kbd><kbd>Enter</kbd><span>發送評論（Mac 為 <kbd>Cmd</kbd>）</span></div>
+				<div class="key-row"><kbd>Esc</kbd><span>從最上層的項目依序關閉</span></div>
+				<div class="key-row"><kbd>Tab</kbd><span>在對話框內移動焦點</span></div>
 			</div>
 			<p class="key-note">
-				<kbd>Esc</kbd> は絵文字パネル、原寸表示とシェアメニュー、モーダルの順に閉じます。書きかけのコメントがあるときはモーダルを閉じません。<br>
-				コメントを書いている間は <kbd>Enter</kbd> が改行になり、<kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> はキャレットの移動に使われます。(作品は動きません)
+				<kbd>Esc</kbd> 會依表情符號面板、原尺寸顯示與分享選單、對話框的順序關閉。有尚未發送的評論時，不會關閉對話框。<br>
+				撰寫評論時，<kbd>Enter</kbd> 為換行，<kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> 會用來移動游標（不會切換作品）。
 			</p>
 		</div>
 	</section>
@@ -438,69 +436,69 @@
 	<section class="section" id="requirements">
 		<div class="wrap">
 			<div class="section-head">
-				<h2>動作環境</h2>
-				<p>Manifest V3 に対応した Chromium 系ブラウザと Firefox で動作します。</p>
+				<h2>運作環境</h2>
+				<p>可在支援 Manifest V3 的 Chromium 系瀏覽器與 Firefox 上運作。</p>
 			</div>
 			<div class="card-grid">
 				<div class="card">
-					<h3>対応ブラウザ</h3>
-					<p>Chrome、Brave、Edge などの Chromium 系ブラウザ。<strong>Chrome 120 以上</strong>が必要です。Edge は Edge アドオンからも入れられます。Firefox (<strong>Firefox 140 以上</strong>のデスクトップ版) は Firefox Add-ons から入れられます。Safari には対応していません。</p>
+					<h3>支援的瀏覽器</h3>
+					<p>Chrome、Brave、Edge 等 Chromium 系瀏覽器。需要 <strong>Chrome 120 以上</strong>。Edge 也可以從 Edge 附加元件安裝。Firefox（<strong>Firefox 140 以上</strong>的桌面版）可以從 Firefox 附加元件 安裝。不支援 Safari。</p>
 				</div>
 				<div class="card">
-					<h3>対象ページ</h3>
-					<p><code>https://www.pixiv.net/</code> のユーザーページ。他のサイトでは動作しません。</p>
+					<h3>適用頁面</h3>
+					<p><code>https://www.pixiv.net/</code> 的用戶頁面。在其他網站上不會運作。</p>
 				</div>
 				<div class="card">
-					<h3>ライセンス</h3>
-					<p>ソースコードは GitHub で公開しています。免責事項と、同梱している第三者の成果物の表示は、設定画面のライセンスタブにあります。</p>
+					<h3>授權</h3>
+					<p>原始碼公開於 GitHub。免責聲明與隨附的第三方素材的標示，位於設定畫面的「授權」分頁。</p>
 				</div>
 				<div class="card wide">
-					<h3>対応言語</h3>
-					<p>拡張機能の表示言語は、pixiv の表示言語に合わせて切り替わります。表は pixiv が表示言語として選べる 7 言語です。「リクエスト次第」の言語で pixiv を表示しているときは、英語で表示します。</p>
+					<h3>支援語言</h3>
+					<p>擴充功能的顯示語言會配合 pixiv 的顯示語言切換。此表列出的是 pixiv 可選擇的 7 種顯示語言。當 pixiv 以「視需求而定」的語言顯示時，擴充功能會以英文顯示。</p>
 					<div class="table-scroll in-card">
 						<table class="lang-table">
 							<thead>
 								<tr>
-									<th scope="col">言語</th>
-									<th scope="col">対応状況</th>
+									<th scope="col">語言</th>
+									<th scope="col">支援狀況</th>
 								</tr>
 							</thead>
 							<tbody>
 								<tr>
-									<td>日本語</td>
-									<td><span class="lang-status yes">対応</span></td>
+									<td>日文</td>
+									<td><span class="lang-status yes">支援</span></td>
 								</tr>
 								<tr>
-									<td>英語</td>
-									<td><span class="lang-status yes">対応</span></td>
+									<td>英文</td>
+									<td><span class="lang-status yes">支援</span></td>
 								</tr>
 								<tr>
-									<td>韓国語</td>
-									<td><span class="lang-status yes">対応</span></td>
+									<td>韓文</td>
+									<td><span class="lang-status yes">支援</span></td>
 								</tr>
 								<tr>
-									<td>中国語 (簡体字)</td>
-									<td><span class="lang-status yes">対応</span></td>
+									<td>中文（簡體）</td>
+									<td><span class="lang-status yes">支援</span></td>
 								</tr>
 								<tr>
-									<td>中国語 (繁体字)</td>
-									<td><span class="lang-status yes">対応</span></td>
+									<td>中文（繁體）</td>
+									<td><span class="lang-status yes">支援</span></td>
 								</tr>
 								<tr>
-									<td>タイ語</td>
-									<td><span class="lang-status ask">リクエスト次第</span></td>
+									<td>泰文</td>
+									<td><span class="lang-status ask">視需求而定</span></td>
 								</tr>
 								<tr>
-									<td>マレー語</td>
-									<td><span class="lang-status ask">リクエスト次第</span></td>
+									<td>馬來文</td>
+									<td><span class="lang-status ask">視需求而定</span></td>
 								</tr>
 							</tbody>
 						</table>
 					</div>
 				</div>
 				<div class="card wide">
-					<h3>不具合の報告・ご要望</h3>
-					<p>バグの報告、ご質問、機能のリクエストは <a href="https://forms.gle/aWmu45UCpBqxuvqC9" target="_blank" rel="noopener">お問い合わせフォーム</a> へお送りください。GitHub をお使いの方は <a href="https://github.com/NEONS-DESIGN/XViewer-for-Pixiv/issues" target="_blank" rel="noopener">Issues</a> でも受け付けています。</p>
+					<h3>錯誤回報與需求</h3>
+					<p>錯誤回報、問題及功能需求，請透過<a href="https://forms.gle/C7AWaUHWmwnoeDV66" target="_blank" rel="noopener">聯絡表單</a>寄送。表單是英文的，但用中文填寫也沒有問題。有使用 GitHub 的話，也可以透過 <a href="https://github.com/NEONS-DESIGN/XViewer-for-Pixiv/issues" target="_blank" rel="noopener">Issues</a> 回報。</p>
 				</div>
 			</div>
 		</div>
@@ -511,25 +509,25 @@
 	<section class="section" id="privacy">
 		<div class="wrap">
 			<div class="section-head center">
-				<h2>データは、pixiv の外へ出ません</h2>
-				<p>この拡張機能には作者のサーバーがありません。通信するのは、あなたが開いている pixiv とその画像 CDN だけです。</p>
+				<h2>資料不會離開 pixiv</h2>
+				<p>本擴充功能沒有作者的伺服器。只會與您正在開啟的 pixiv 及其圖片 CDN 通訊。</p>
 			</div>
 			<div class="card-grid">
 				<div class="card">
-					<h3>収集しないもの</h3>
-					<p>閲覧履歴、作品 ID、ユーザー ID、Cookie、認証情報、個人情報。いずれも取得も保存も送信もしません。あなたが書いたコメントも、その場で pixiv へ渡すだけで、拡張側には残りません。</p>
+					<h3>不收集的資料</h3>
+					<p>瀏覽紀錄、作品 ID、用戶 ID、Cookie、認證資訊、個人資訊。這些都不會取得、儲存或傳送。您撰寫的評論也只會當場交給 pixiv，不會留在擴充功能中。</p>
 				</div>
 				<div class="card">
-					<h3>保存するもの</h3>
-					<p>あなたが選んだ 11 項目の設定と、最後に見た pixiv の表示言語。どちらもブラウザの中に留まり、外部サーバーへは出ません。</p>
+					<h3>儲存的資料</h3>
+					<p>您選擇的 11 項設定，以及最後看到的 pixiv 顯示語言。兩者都只保留在瀏覽器中，不會傳到外部伺服器。</p>
 				</div>
 				<div class="card">
-					<h3>要求する権限</h3>
-					<p><code>storage</code> と <code>https://www.pixiv.net/*</code> の 2 つだけ。他のサイトへのアクセス権限は求めません。</p>
+					<h3>要求的權限</h3>
+					<p>只有 <code>storage</code> 與 <code>https://www.pixiv.net/*</code> 這 2 項。不會要求存取其他網站的權限。</p>
 				</div>
 			</div>
 			<p style="text-align:center;margin-block:40px 0">
-				<a class="btn btn-secondary" href="privacy.html">プライバシーポリシーを読む</a>
+				<a class="btn btn-secondary" href="privacy.html">閱讀隱私政策</a>
 			</p>
 		</div>
 	</section>
@@ -537,18 +535,18 @@
 	<section class="section" style="padding-top:0">
 		<div class="wrap">
 			<div class="notice">
-				<p><strong>これは非公式の拡張機能です。</strong></p>
+				<p><strong>這是非官方的擴充功能。</strong></p>
 				<p>
-					pixiv プラットフォームを利用して開発したもので、ピクシブ株式会社が作成・配布しているアプリケーションではありません。
-					同社とは一切関係がなく、提携・支援・推奨を受けたものでもありません。
+					本擴充功能是利用 pixiv 平台開發的，並非由 pixiv Inc. 製作或發布的應用程式。
+					與該公司沒有任何關係，也未獲得其合作、支援或推薦。
 				</p>
 				<ul>
-					<li>利用は自己責任でお願いします。本拡張の利用によって生じた損害について、作者およびピクシブ株式会社は責任を負いません</li>
-					<li>R-18 作品の表示は pixiv 側の設定に従います。拡張側で年齢制限を回避することはしません</li>
-					<li>いいねは取り消せません。これは pixiv の仕様で、押し間違えても元には戻せません</li>
-					<li>コメントの投稿・削除は pixiv 本体と同じ扱いです。押した分だけそのまま pixiv へ送られます。削除は元に戻せないので、2 段階の確認を挟んでいます</li>
-					<li>作品を収集する機能はありません。ダウンロードも一括操作の自動化もなく、取得するのはいま開いている作品とその前後の数枚だけです</li>
-					<li>pixiv の仕様変更によって動作しなくなる場合があります</li>
+					<li>使用風險由您自行承擔。對於因使用本擴充功能而產生的損害，作者及 pixiv Inc. 概不負責</li>
+					<li>R-18 作品的顯示依照 pixiv 端的設定。擴充功能不會規避年齡限制</li>
+					<li>讚無法取消。這是 pixiv 的規格，即使按錯也無法復原</li>
+					<li>評論的發表與刪除，與在 pixiv 本身操作相同。每按一次都會直接送到 pixiv。刪除後無法復原，因此會經過兩段式確認</li>
+					<li>沒有收集作品的功能。既沒有下載功能，也沒有自動化的批次操作，只會取得目前開啟的作品及其前後的幾張圖片</li>
+					<li>可能因 pixiv 的規格變更而無法運作</li>
 				</ul>
 			</div>
 		</div>
@@ -557,7 +555,7 @@
 </main>
 
 <!-- 先頭へ戻るボタン。1 画面分スクロールするまで site.js が隠す。図形は Material Symbols (Apache-2.0) -->
-<a class="to-top" href="#top" aria-label="ページの先頭へ戻る" title="ページの先頭へ戻る">
+<a class="to-top" href="#top" aria-label="回到頁面頂端" title="回到頁面頂端">
 	<svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M469-358q-5-2-10-7L261-563q-9-9-8.5-21.5T262-606q9-9 21.5-9t21.5 9l175 176 176-176q9-9 21-8.5t21 9.5q9 9 9 21.5t-9 21.5L501-365q-5 5-10 7t-11 2q-6 0-11-2Z"/></svg>
 </a>
 
@@ -566,27 +564,27 @@
 		<div class="footer-grid">
 			<div>
 				<a class="brand" href="./">
-					<img src="assets/img/icon-128.png" alt="" width="28" height="28">
+					<img src="../assets/img/icon-128.png" alt="" width="28" height="28">
 					<span>XViewer for Pixiv</span>
 				</a>
 			</div>
 			<ul class="footer-links">
 				<li><a href="https://github.com/NEONS-DESIGN/XViewer-for-Pixiv" target="_blank" rel="noopener">GitHub</a></li>
-				<li><a href="privacy.html">プライバシーポリシー</a></li>
-				<li><a href="https://forms.gle/aWmu45UCpBqxuvqC9" target="_blank" rel="noopener">お問い合わせ</a></li>
+				<li><a href="privacy.html">隱私政策</a></li>
+				<li><a href="https://forms.gle/C7AWaUHWmwnoeDV66" target="_blank" rel="noopener">聯絡我們</a></li>
 				<!-- lang:footer -->
-				<li><a href="en/" hreflang="en" lang="en">English</a></li>
-				<li><a href="ko/" hreflang="ko" lang="ko">한국어</a></li>
-				<li><a href="zh-cn/" hreflang="zh-CN" lang="zh-CN">简体中文</a></li>
-				<li><a href="zh-tw/" hreflang="zh-TW" lang="zh-TW">繁體中文</a></li>
+				<li><a href="../" hreflang="ja" lang="ja">日本語</a></li>
+				<li><a href="../en/" hreflang="en" lang="en">English</a></li>
+				<li><a href="../ko/" hreflang="ko" lang="ko">한국어</a></li>
+				<li><a href="../zh-cn/" hreflang="zh-CN" lang="zh-CN">简体中文</a></li>
 				<!-- /lang:footer -->
 			</ul>
 		</div>
 		<div class="footer-note">
-			<p>pixiv はピクシブ株式会社の登録商標です。本サイトおよび本拡張機能は、ピクシブ株式会社とは一切関係がありません。</p>
-			<p>掲載している静止画のスクリーンショットは、動作を説明するためのデモ用のダミーデータです。実在の作品情報やコメントではありません。無限スクロールの動画は実際の画面録画で、作品情報とカウンタは加工していません。</p>
-			<p>アイコンの図形は Material Symbols (<a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank" rel="noopener">Apache License 2.0</a>) と Font Awesome Free (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>) を使用しています。</p>
-			<p>ブラウザのロゴは Google Chrome (Google)、Microsoft Edge (Microsoft。<a href="https://opensource.org/license/mit" target="_blank" rel="noopener">MIT License</a>)、Firefox (Mozilla。<a href="https://mozilla.org/MPL/2.0/" target="_blank" rel="noopener">MPL 2.0</a>) のもので、各社の商標です。各ストアへの案内のためにだけ使っています。</p>
+			<p>pixiv 是 pixiv Inc. 的註冊商標。本網站及本擴充功能與 pixiv Inc. 沒有任何關係。</p>
+			<p>本網站刊登的靜態螢幕截圖，是為了說明運作方式而使用的示範用假資料，並非真實的作品資訊或評論。無限捲動的影片是實際的螢幕錄影，作品資訊與計數均未經過加工。</p>
+			<p>圖示的圖形使用了 Material Symbols（<a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank" rel="noopener">Apache License 2.0</a>）與 Font Awesome Free（<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>）。</p>
+			<p>瀏覽器的標誌分別屬於 Google Chrome（Google）、Microsoft Edge（Microsoft，<a href="https://opensource.org/license/mit" target="_blank" rel="noopener">MIT License</a>）、Firefox（Mozilla，<a href="https://mozilla.org/MPL/2.0/" target="_blank" rel="noopener">MPL 2.0</a>），均為各公司的商標。僅用於引導至各商店。</p>
 		</div>
 		<p class="footer-copyright">&copy; 2026 NEONS</p>
 	</div>

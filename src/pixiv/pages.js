@@ -44,7 +44,7 @@ export function sortIdsDesc(ids) {
 /**
  * profile/all の応答本体を取る。失敗は覚えない。
  * @param {string} userId ユーザー ID
- * @param {string} lang 言語サブタグ (strings.lang)
+ * @param {string} lang 言語コード (strings.lang)
  * @param {Function} get getJson の差し替え
  * @returns {Promise<object>} 応答の body
  */
@@ -56,7 +56,7 @@ function loadProfileAll(userId, lang, get) {
  * 作者の全作品 ID を数値降順で取る。
  * @param {string} userId ユーザー ID
  * @param {string|null} category 絞り込む種別 (WORK_CATEGORY)。null なら両方
- * @param {string} lang 言語サブタグ (strings.lang)
+ * @param {string} lang 言語コード (strings.lang)
  * @param {{getJsonImpl?: Function}} [deps] テスト用の依存
  * @returns {Promise<string[]>} ID の並び
  */
@@ -71,7 +71,7 @@ export async function loadAllWorkIds(userId, category, lang, deps = {}) {
  * 1 ページぶんの作品を供給する口を作る。
  * @param {string} userId ユーザー ID
  * @param {string|null} category 絞り込む種別 (WORK_CATEGORY)。null なら両方
- * @param {string} lang 言語サブタグ (strings.lang)
+ * @param {string} lang 言語コード (strings.lang)
  * @param {{getJsonImpl?: Function}} [deps] テスト用の依存
  * @returns {{pageCount: () => Promise<number>, loadPage: (page: number) => Promise<object[]>}} ページ供給
  */

@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { TITLE } from '../../src/popup/sections.js';
+import { MANIFEST_LOCALES } from '../../scripts/static-files.mjs';
+
+/** Chrome ウェブストアが manifest の description に認める文字数の上限。 */
+const DESCRIPTION_MAX_LENGTH = 132;
 
 /**
  * messages.json を読む。
@@ -12,13 +16,43 @@ async function readMessages(lang) {
 	return JSON.parse(await readFile(new URL(`../../src/_locales/${lang}/messages.json`, import.meta.url), 'utf8'));
 }
 
+test('src/_locales のフォルダはすべてビルドのコピー対象に入っている', async () => {
+	// 足したフォルダを MANIFEST_LOCALES に書き忘れると、dist に入らずブラウザが訳を使わない
+	const entries = await readdir(new URL('../../src/_locales/', import.meta.url), { withFileTypes: true });
+	const folders = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+	assert.deepEqual(folders.sort(), [...MANIFEST_LOCALES].sort());
+});
+
 test('すべての言語の messages.json が同じキーを持つ', async () => {
 	const ja = await readMessages('ja');
-	const en = await readMessages('en');
-	assert.deepEqual(Object.keys(ja).sort(), Object.keys(en).sort());
-	for (const key of Object.keys(ja)) {
-		assert.equal(typeof ja[key].message, 'string', `${key} に message がありません`);
-		assert.notEqual(en[key].message.trim(), '', `${key} の英語が空です`);
+	for (const locale of MANIFEST_LOCALES) {
+		const other = await readMessages(locale);
+		assert.deepEqual(Object.keys(other).sort(), Object.keys(ja).sort(), `${locale} のキーが ja と違う`);
+		for (const key of Object.keys(ja)) {
+			assert.equal(typeof other[key].message, 'string', `${locale}: ${key} に message がありません`);
+			assert.notEqual(other[key].message.trim(), '', `${locale}: ${key} が空です`);
+		}
+	}
+});
+
+/**
+ * 文字数の上限を見ない言語。英語は 168 文字で公開済みで、ストアも受け付けている。
+ * 縮めると商標ガイドラインが求める非公式の旨を削ることになるので、そのままにしてある。
+ */
+const DESCRIPTION_LENGTH_EXEMPT = Object.freeze(['en']);
+
+test('説明はストアの文字数の上限に収まる', async () => {
+	for (const locale of MANIFEST_LOCALES.filter((one) => !DESCRIPTION_LENGTH_EXEMPT.includes(one))) {
+		const { extDescription } = await readMessages(locale);
+		assert.ok(extDescription.message.length <= DESCRIPTION_MAX_LENGTH, `${locale} の説明が ${extDescription.message.length} 文字ある`);
+	}
+});
+
+test('どの言語の説明にも pixiv Inc. と無関係である旨が残っている', async () => {
+	// 日英は文面まで下のテストで縛る。他の言語は社名の表記だけを見る
+	for (const locale of MANIFEST_LOCALES.filter((one) => one !== 'ja')) {
+		const { extDescription } = await readMessages(locale);
+		assert.match(extDescription.message, /pixiv Inc./, `${locale} の説明に pixiv Inc. が無い`);
 	}
 });
 
@@ -35,7 +69,7 @@ test('拡張の名前は _locales と popup の見出し・title で一致する
 	// 改名したときに片方だけ残らないよう、sections.js を出どころとして突き合わせる
 	const html = await readFile(new URL('../../src/popup/popup.html', import.meta.url), 'utf8');
 	assert.ok(html.includes(`<title>${TITLE}</title>`), 'popup.html の <title> が TITLE と違う');
-	for (const lang of ['ja', 'en']) {
+	for (const lang of MANIFEST_LOCALES) {
 		const messages = await readMessages(lang);
 		assert.equal(messages.extName.message, TITLE, `${lang} の extName が TITLE と違う`);
 	}

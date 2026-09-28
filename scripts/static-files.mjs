@@ -14,6 +14,12 @@ export const OUT_DIR = 'dist';
 export const FIREFOX_OUT_DIR = 'dist-firefox';
 
 /**
+ * manifest の name / description の訳を持つ言語。src/_locales/ のフォルダ名。
+ * 綴りは chrome.i18n の規則 (地域はアンダースコア区切り) で、UI の言語コード (zh-CN) とは違う。
+ */
+export const MANIFEST_LOCALES = Object.freeze(['ja', 'en', 'ko', 'zh_CN', 'zh_TW']);
+
+/**
  * そのままコピーする静的ファイルの表を作る。[コピー元, コピー先] の順。
  * アイコンは build-icons.mjs が作った生成物で、サイズの出どころは ICON_OUTPUTS 1 か所。
  * manifest は version を差し込むのでここには入れない。(build.mjs の writeManifest)
@@ -33,8 +39,10 @@ export function staticFilesFor(outDir) {
 		]),
 		// manifest の name / description の訳。__MSG_*__ の解決に使うので <出力先>/_locales に置く。
 		// ここだけは pixiv の表示言語ではなくブラウザの UI 言語に従う (chrome.i18n の仕様)
-		['src/_locales/ja/messages.json', `${outDir}/_locales/ja/messages.json`],
-		['src/_locales/en/messages.json', `${outDir}/_locales/en/messages.json`],
+		...MANIFEST_LOCALES.map((locale) => [
+			`src/_locales/${locale}/messages.json`,
+			`${outDir}/_locales/${locale}/messages.json`,
+		]),
 		// ライセンス文。配布する zip は出力先をそのまま固めるので、ここに無いと受け取った人に届かない。
 		// Apache-2.0 §4(a) は本文の写しを渡すことを求める (Material Symbols の図形を同梱しているため)
 		['LICENSE', `${outDir}/LICENSE`],
