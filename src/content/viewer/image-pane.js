@@ -5,6 +5,7 @@
  * 呼び出し側が可視判定で先に弾いている前提。
  */
 import { getJson } from '../../pixiv/client.js';
+import { PIXIV_ERROR_KINDS } from '../../pixiv/errors.js';
 import { illustPagesUrl, safeCdnUrl } from '../../pixiv/endpoints.js';
 import { createIcon } from '../../common/icons.js';
 import { assignImageSrc } from '../../common/image-source.js';
@@ -93,6 +94,8 @@ export function createImagePane(deps) {
 	 * 参照を持っておかないと解放されて意味がなくなり、作り直すとページ送りのたびに無駄が出る
 	 */
 	const prefetched = new Map();
+	/** /pages の取得を中断するためのもの。dispose() で abort する */
+	const aborter = new AbortController();
 	/** @type {HTMLImageElement|null} */
 	let image = null;
 	/** 今 img に入れている URL。同じ値を書き直して再デコードさせないために覚える */
@@ -262,7 +265,7 @@ export function createImagePane(deps) {
 			if (detail.pageCount <= 1) return;
 
 			try {
-				const pages = await getJson(illustPagesUrl(detail.id, strings.lang), { fetchImpl });
+				const pages = await getJson(illustPagesUrl(detail.id, strings.lang), { fetchImpl, signal: aborter.signal });
 				if (disposed) return;
 				const next = pickPageUrls(pages, deps.settings.imageQuality);
 				// body が配列でない応答をそのまま採ると、出ていた 1 枚目が消えて「1/0」になる。
@@ -272,7 +275,8 @@ export function createImagePane(deps) {
 				originalUrls = pickPageUrls(pages, IMAGE_QUALITY.ORIGINAL);
 				paint();
 			} catch (error) {
-				if (disposed) return;
+				// disposed の判定だけで中断による失敗も黙る。念のため種別でも確かめる
+				if (disposed || error?.kind === PIXIV_ERROR_KINDS.ABORTED) return;
 				// 1 枚目は出ているので、複数枚が開けないことだけを伝える
 				showPaneError(strings.imagePane.PAGES_FAILED);
 				warn('failed to load pages', detail.id, error);
@@ -283,6 +287,7 @@ export function createImagePane(deps) {
 		prev() { move(-1); },
 
 		dispose() {
+			aborter.abort();
 			disposed = true;
 			// 破棄したあとに古い画像の error が発火して、
 			// 新しく描いた画面にエラーを出すのを防ぐ

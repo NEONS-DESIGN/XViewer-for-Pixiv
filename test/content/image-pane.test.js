@@ -196,6 +196,25 @@ test('dispose した後に /pages が失敗してもエラーを出さない', a
 	assert.equal(find(frame, '.pane-error'), null);
 });
 
+test('dispose すると /pages の取得の signal を中断する', () => {
+	let capturedInit;
+	const fetchImpl = (url, init) => { capturedInit = init; return new Promise(() => {}); };
+	const { pane } = build({ fetchImpl });
+	void pane.render(DETAIL);
+	pane.dispose();
+	assert.equal(capturedInit.signal.aborted, true);
+});
+
+test('中断による失敗ではエラー行を出さない', async () => {
+	// fetch が中断されたときの例外 (DOMException 相当)。client.js が PixivError(ABORTED) に揃える
+	const abortError = new Error('aborted');
+	abortError.name = 'AbortError';
+	const { impl } = fakeFetch({ throws: abortError });
+	const { container, pane } = build({ fetchImpl: impl });
+	await pane.render(DETAIL);
+	assert.equal(find(container, '.pane-error'), null);
+});
+
 test('/pages が届いても 1 枚目の src を書き直さない', async () => {
 	// 同じ URL を代入し直すと img が読み込みをやり直す。1 枚目の失敗表示も消えてしまう
 	const { impl } = fakeApiFetch(PAGES);

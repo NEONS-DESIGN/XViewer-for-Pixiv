@@ -1696,3 +1696,43 @@ test('英語のカタログでコメント欄の文言が英語になる', async
 	await comments.load({ ...DETAIL, commentCount: 0 });
 	assert.equal(find(container, '.status').textContent, 'No comments yet');
 });
+
+test('dispose すると roots の取得の signal を中断する', () => {
+	let capturedInit;
+	const container = fakeElement('div');
+	const comments = createComments({
+		doc: loggedInDoc(),
+		container,
+		strings: STRINGS,
+		fetchJson: (url, init) => { capturedInit = init; return new Promise(() => {}); },
+	});
+	void comments.load(DETAIL);
+	comments.dispose();
+	assert.equal(capturedInit.signal.aborted, true);
+});
+
+test('同じインスタンスで load() を呼び直すと前の取得を中断する', () => {
+	const signals = [];
+	const container = fakeElement('div');
+	const comments = createComments({
+		doc: loggedInDoc(),
+		container,
+		strings: STRINGS,
+		fetchJson: (url, init) => { signals.push(init.signal); return new Promise(() => {}); },
+	});
+	void comments.load(DETAIL);
+	void comments.load({ ...DETAIL, id: '2' });
+	assert.equal(signals[0].aborted, true);
+	assert.equal(signals[1].aborted, false);
+});
+
+test('中断による失敗では読み込み失敗の表示を出さない', async () => {
+	// fetch が中断されたときの例外を client.js が PixivError(ABORTED) に揃える形を模す
+	const { container, comments } = build(async () => {
+		throw new PixivError(PIXIV_ERROR_KINDS.ABORTED, '中断されました');
+	});
+	await comments.load(DETAIL);
+	assert.equal(findAll(container, '.status').length, 0);
+	// 再試行にも切り替えない (中断は失敗として伝えない)
+	assert.equal(find(container, '.more').hidden, true);
+});
