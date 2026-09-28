@@ -82,12 +82,29 @@ export function collectWorkIds(root, origin) {
 }
 
 /**
- * グリッドのクリックを購読する。
- * 修飾キー付きのクリックと中クリックは拾わない。(新しいタブで開きたい操作を邪魔しないため)
+ * 作品を開く操作として拾ってよい押し方か。拾えるなら作品 ID を返す。
+ * 修飾キー付きの操作と中クリックは拾わない。(新しいタブで開きたい操作を邪魔しないため)
  * 拾うのはカード (li) の中の作品リンクだけ。ヘッダの通知などに出る作品リンクは本体に任せる。
+ * @param {MouseEvent|PointerEvent} event 押された合図
+ * @param {string} origin 相対 URL を解決するための基準
+ * @returns {string|null} 作品 ID。拾わないなら null
+ */
+function openableWorkId(event, origin) {
+	if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return null;
+	const link = event.target?.closest?.(ARTWORK_LINK_SELECTOR);
+	if (!link || !link.closest?.(CARD_SELECTOR)) return null;
+	return workIdFromLink(link.getAttribute('href'), origin);
+}
+
+/**
+ * グリッドのクリックを購読する。
+ * `deps.onPress` を渡すと、押し始めた時点 (pointerdown) でも同じ条件で `onPress` を呼ぶ。
+ * 先読みの開始に使うためのもので、click とは別に働く (preventDefault はしない)。
+ * 押し始めたあと選択やドラッグで取り消されたときは `pointercancel` / `dragstart` で
+ * `deps.onPressCancel` を呼ぶ。
  * @param {Document} doc 対象のドキュメント
  * @param {(workId: string) => void} onOpen 作品リンクが押されたときに呼ばれる
- * @param {{origin?: string}} [deps] テスト用の依存
+ * @param {{origin?: string, onPress?: (workId: string) => void, onPressCancel?: () => void}} [deps] テスト用の依存と押し始めの合図
  * @returns {{dispose: () => void}} 購読の解除
  */
 export function attachGridListener(doc, onOpen, deps = {}) {
@@ -98,12 +115,8 @@ export function attachGridListener(doc, onOpen, deps = {}) {
 	 * @param {MouseEvent} event クリック
 	 * @returns {void}
 	 */
-	const listener = (event) => {
-		// 新しいタブで開く操作は本来の動作に任せる
-		if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-		const link = event.target?.closest?.(ARTWORK_LINK_SELECTOR);
-		if (!link || !link.closest?.(CARD_SELECTOR)) return;
-		const workId = workIdFromLink(link.getAttribute('href'), origin);
+	const clickListener = (event) => {
+		const workId = openableWorkId(event, origin);
 		if (!workId) return;
 		event.preventDefault();
 		event.stopPropagation();
@@ -111,10 +124,34 @@ export function attachGridListener(doc, onOpen, deps = {}) {
 	};
 
 	// capture 段階で拾い、pixiv 本体のハンドラより先に止める
-	doc.addEventListener('click', listener, true);
+	doc.addEventListener('click', clickListener, true);
+
+	/** @type {((event: PointerEvent) => void)|null} */
+	let pressListener = null;
+	/** @type {(() => void)|null} */
+	let cancelListener = null;
+	// passive にして、選択やドラッグ開始の邪魔をしない (preventDefault は呼ばない)
+	const pressOptions = { capture: true, passive: true };
+
+	if (deps.onPress) {
+		pressListener = (event) => {
+			const workId = openableWorkId(event, origin);
+			if (workId) deps.onPress(workId);
+		};
+		cancelListener = () => deps.onPressCancel?.();
+		doc.addEventListener('pointerdown', pressListener, pressOptions);
+		doc.addEventListener('pointercancel', cancelListener, true);
+		doc.addEventListener('dragstart', cancelListener, true);
+	}
+
 	return {
 		dispose() {
-			doc.removeEventListener('click', listener, true);
+			doc.removeEventListener('click', clickListener, true);
+			if (pressListener) {
+				doc.removeEventListener('pointerdown', pressListener, pressOptions);
+				doc.removeEventListener('pointercancel', cancelListener, true);
+				doc.removeEventListener('dragstart', cancelListener, true);
+			}
 		},
 	};
 }

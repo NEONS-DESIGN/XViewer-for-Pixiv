@@ -24,11 +24,13 @@ import { createSequence, extendWithAllWorks } from './sequence.js';
 import { createPageSource } from '../pixiv/pages.js';
 import { loadSettings, watchSettings } from '../common/storage.js';
 import { warn, info } from '../common/log.js';
+import { runWhenIdle } from '../common/idle.js';
 import {
 	NAV_EVENTS,
 	LOCATION_CHECK_DELAY_MS,
 	INFINITE_SCROLL,
 	PAGE_KEY_SEPARATOR,
+	SESSION_WARMUP_TIMEOUT_MS,
 } from '../common/constants.js';
 import { readPageLanguage, uiLanguage } from '../common/language.js';
 import { savePageLanguage } from '../common/language-store.js';
@@ -231,7 +233,11 @@ function apply() {
 		canExtendSequence: () => Boolean(currentPage) && currentPage.isWorksGrid && !currentPage.isTagFiltered,
 		extendSequence: (current) => extendWithAllWorks(current, currentPage.userId, currentPage.category, strings.lang),
 	});
-	gridListener = attachGridListener(document, handleOpen);
+	gridListener = attachGridListener(document, handleOpen, {
+		// 押し始めの時点で作品詳細の取得を進める。離した先が同じ作品なら通信を待たずに描ける
+		onPress: (id) => viewer?.prefetchOnPress(id),
+		onPressCancel: () => viewer?.cancelPressPrefetch(),
+	});
 	// カード 1 枚につき 3 回 Tab を押さずに済むよう、作品を開く導線以外をフォーカス順から外す
 	tabSkip = attachTabSkip(document, settings.gridTabSkip);
 	// どこにフォーカスがあるか分かるようにする。gridTabSkip の設定とは独立して常に出す
@@ -655,6 +661,8 @@ async function boot() {
 		startNavigationWatch();
 		if (settings.enabled) apply();
 	}
+	// 最初に作品を開いたときの解析を先に済ませておく。失敗しても開くときに読み直す
+	if (settings.enabled) runWhenIdle(() => { try { readSession(document); } catch { /* 開くときに読み直す */ } }, { timeoutMs: SESSION_WARMUP_TIMEOUT_MS });
 	// 設定の購読は起動が済んでから。先に購読すると、loadSettings() を待つ間に届いた変更が
 	// pickupHider の無い状態で syncPickup() を走らせ、遷移監視を boot より先に張る
 	watchSettings(handleSettingsChange);
