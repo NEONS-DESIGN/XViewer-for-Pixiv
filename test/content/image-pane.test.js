@@ -1,9 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pickPageUrls, prefetchTargets, createImagePane } from '../../src/content/viewer/image-pane.js';
+import { pickPageUrls, prefetchTargets, releaseTargets, createImagePane } from '../../src/content/viewer/image-pane.js';
 import { fakeElement, fakeDoc, find, findAll } from '../helpers/dom.js';
 import { fakeFetch, fakeApiFetch } from '../helpers/pixiv.js';
 import { createStrings } from '../../src/i18n/index.js';
+import { PREFETCH_RELEASE_MARGIN } from '../../src/common/constants.js';
 
 /** 実際の CDN と同じ形の URL を作る。安全側の関門を通す必要があるため。 */
 const cdn = (name) => `https://i.pximg.net/img-master/img/2026/09/10/00/00/00/${name}.jpg`;
@@ -55,6 +56,17 @@ test('prefetchTargets は自分自身を含めない', () => {
 
 test('prefetchTargets は 0 枚指定で空配列を返す', () => {
 	assert.deepEqual(prefetchTargets(2, 5, 0), []);
+});
+
+test('prefetchTargets は進んだ向きの側を先に並べる', () => {
+	assert.deepEqual(prefetchTargets(2, 5, 1, 1), [3, 1]);
+	assert.deepEqual(prefetchTargets(2, 5, 1, -1), [1, 3]);
+});
+
+test('releaseTargets は prefetch + margin より離れたものだけを返す', () => {
+	const entries = [[0, 'a'], [5, 'b'], [20, 'c']];
+	assert.deepEqual(releaseTargets(entries, 9, 1, 10), []);
+	assert.deepEqual(releaseTargets(entries, 15, 1, 10), [0]);
 });
 
 /** 画像ペインへ渡す作品詳細の代わり。3 ページある作品 */
@@ -110,13 +122,13 @@ function build({ fetchImpl, prefetch = 0, clickZoom = false, zoom = fakeZoom(), 
 	return { container, pane, created, zoom };
 }
 
-test('render は 1 枚目を /pages を待たずに出し、届いたら矢印とカウンタを揃える', async () => {
+test('render は 1 枚目と分母を /pages を待たずに出す', async () => {
 	const { impl, calls } = fakeApiFetch(PAGES);
 	const { container, pane } = build({ fetchImpl: impl });
 	const rendering = pane.render(DETAIL);
-	// まだ /pages を待っている時点で 1 枚目は入っている
+	// まだ /pages を待っている時点で 1 枚目と分母 (detail.pageCount) は入っている
 	assert.equal(find(container, 'img').src, cdn('r0'));
-	assert.equal(find(container, '.counter').textContent, '1/1');
+	assert.equal(find(container, '.counter').textContent, '1/3');
 	await rendering;
 	assert.equal(calls[0].url, '/ajax/illust/149425016/pages?lang=ja');
 	assert.equal(find(container, '.counter').textContent, '1/3');
@@ -132,6 +144,34 @@ test('render は 1 枚目を /pages を待たずに出し、届いたら矢印�
 	assert.equal(prev.disabled, false);
 	pane.next();
 	assert.equal(next.disabled, true);
+});
+
+test('分母と矢印は detail.pageCount で先に出る', async () => {
+	let respond;
+	const fetchImpl = () => new Promise((resolve) => { respond = resolve; });
+	const { container, pane } = build({ fetchImpl });
+	const rendering = pane.render(DETAIL);
+	assert.equal(find(container, '.counter').textContent, '1/3');
+	assert.equal(find(container, '.arrow-prev').hidden, false);
+	assert.equal(find(container, '.arrow-next').hidden, false);
+	assert.equal(find(container, '.arrow-next').disabled, false);
+	respond({ ok: true, status: 200, text: async () => JSON.stringify({ error: false, body: PAGES }) });
+	await rendering;
+});
+
+test('/pages の前に押された → は届いた時点で反映される', async () => {
+	let respond;
+	const fetchImpl = () => new Promise((resolve) => { respond = resolve; });
+	const { container, pane } = build({ fetchImpl });
+	const rendering = pane.render(DETAIL);
+	pane.next();
+	// 実ページがまだ 1 枚しか無いので、行き先だけ覚えて表示は動かさない
+	assert.equal(find(container, '.counter').textContent, '1/3');
+	assert.equal(find(container, 'img').src, cdn('r0'));
+	respond({ ok: true, status: 200, text: async () => JSON.stringify({ error: false, body: PAGES }) });
+	await rendering;
+	assert.equal(find(container, '.counter').textContent, '2/3');
+	assert.equal(find(container, 'img').src, cdn('r1'));
 });
 
 test('1 枚だけの作品では矢印を隠し、/pages を叩かない', async () => {
@@ -178,9 +218,8 @@ test('dispose した後に /pages が届いても DOM を触らない', async ()
 	// 応答は client.js が text() で読む形にする。(json() だけだと network 失敗の経路に落ちて成功経路を通らない)
 	respond({ ok: true, status: 200, text: async () => JSON.stringify({ error: false, body: PAGES }) });
 	await rendering;
-	// 捨てた枠のカウンタも矢印も書き換えない (届いていれば 1/3 になり矢印が出る)
-	assert.equal(counter.textContent, '1/1');
-	assert.equal(find(frame, '.arrow-next').hidden, true);
+	// 捨てた枠は書き換えない。分母は破棄前に detail.pageCount で先に出ていた値のまま
+	assert.equal(counter.textContent, '1/3');
 	assert.equal(find(frame, '.pane-error'), null);
 });
 
@@ -239,12 +278,54 @@ test('/pages が届いても 1 枚目の src を書き直さない', async () =>
 	assert.equal(find(container, '.pane-error'), null);
 });
 
-test('先読みは URL ごとに 1 度だけ Image を作り、空の URL は飛ばす', async () => {
+test('表示中の画像は fetchPriority high、先読みは low', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { container, pane, created } = build({ fetchImpl: impl, prefetch: 1 });
+	const rendering = pane.render(DETAIL);
+	const image = find(container, 'img');
+	assert.equal(image.fetchPriority, 'high');
+	image.complete = true;
+	image.naturalWidth = 1;
+	await image.dispatch('load');
+	await rendering;
+	assert.equal(created[0].fetchPriority, 'low');
+});
+
+test('先読みは表示中の画像の load を待ってから始まる', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { container, pane, created } = build({ fetchImpl: impl, prefetch: 1 });
+	const rendering = pane.render(DETAIL);
+	await rendering;
+	// /pages が届いた直後は、表示中の画像がまだ読み終えていないので先読みは始まらない
+	assert.equal(created.length, 0);
+	const image = find(container, 'img');
+	image.complete = true;
+	image.naturalWidth = 1;
+	await image.dispatch('load');
+	assert.deepEqual(created.map((img) => img.src), [cdn('r1')]);
+});
+
+test('表示中の画像が error でも先読みは始まる', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { container, pane, created } = build({ fetchImpl: impl, prefetch: 1 });
+	const rendering = pane.render(DETAIL);
+	await rendering;
+	assert.equal(created.length, 0);
+	await find(container, 'img').dispatch('error');
+	assert.deepEqual(created.map((img) => img.src), [cdn('r1')]);
+});
+
+test('先読みはページ番号ごとに 1 度だけ Image を作り、空の URL は飛ばす', async () => {
 	// 3 ページ目が CDN 以外で弾かれた作品
 	const pages = [PAGES[0], PAGES[1], { urls: { regular: 'https://evil.example.com/x.jpg' } }];
 	const { impl } = fakeApiFetch(pages);
-	const { pane, created } = build({ fetchImpl: impl, prefetch: 3 });
-	await pane.render(DETAIL);
+	const { container, pane, created } = build({ fetchImpl: impl, prefetch: 3 });
+	const rendering = pane.render(DETAIL);
+	const image = find(container, 'img');
+	image.complete = true;
+	image.naturalWidth = 1;
+	await image.dispatch('load');
+	await rendering;
 	// 1 ページ目にいるので 2 ページ目だけ。3 ページ目は空文字なので読みに行かない
 	assert.deepEqual(created.map((img) => img.src), [cdn('r1')]);
 	pane.next();
@@ -254,17 +335,62 @@ test('先読みは URL ごとに 1 度だけ Image を作り、空の URL は飛
 	assert.deepEqual(created.map((img) => img.src), [cdn('r1'), cdn('r0')]);
 });
 
+test('離れた先読みを解放する', async () => {
+	// prefetch (1) + PREFETCH_RELEASE_MARGIN より離れると、途中で先読みした 0 ページ目の Image の src が空になる
+	const prefetch = 1;
+	const threshold = prefetch + PREFETCH_RELEASE_MARGIN;
+	const total = threshold + 5;
+	const detail = { ...DETAIL, pageCount: total };
+	const pages = Array.from({ length: total }, (_, i) => ({ urls: { regular: cdn(`r${i}`), original: cdn(`o${i}`) } }));
+	const { impl } = fakeApiFetch(pages);
+	const { container, pane, created } = build({ fetchImpl: impl, prefetch });
+	const rendering = pane.render(detail);
+	const image = find(container, 'img');
+	image.complete = true;
+	image.naturalWidth = 1;
+	await image.dispatch('load');
+	await rendering;
+	pane.next();
+	const page0Image = created.find((img) => img.src === cdn('r0'));
+	assert.ok(page0Image, '1 つ後ろの 0 ページ目を先読みしている');
+	// 既に 1 回進んでいるので、残り threshold 回で距離が threshold を超える
+	for (let i = 0; i < threshold; i += 1) pane.next();
+	assert.equal(page0Image.src, '');
+});
+
 test('dispose で先読みの読み込みを取り消し、画像の error を外す', async () => {
 	const { impl } = fakeApiFetch(PAGES);
 	const { container, pane, created } = build({ fetchImpl: impl, prefetch: 1 });
-	await pane.render(DETAIL);
+	const rendering = pane.render(DETAIL);
 	const image = find(container, 'img');
+	image.complete = true;
+	image.naturalWidth = 1;
+	await image.dispatch('load');
+	await rendering;
 	assert.deepEqual(created.map((img) => img.src), [cdn('r1')]);
 	pane.dispose();
 	assert.equal(image.src, '');
 	assert.equal((image.listeners.error ?? []).length, 0);
 	// 参照を捨てるだけでは読み込み途中の転送が続く。src を空にして取り消す
 	assert.deepEqual(created.map((img) => img.src), ['']);
+});
+
+test('loadedUrlAt は読み終えた画像だけ URL を返す', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { container, pane, created } = build({ fetchImpl: impl, prefetch: 1 });
+	const rendering = pane.render(DETAIL);
+	const image = find(container, 'img');
+	assert.equal(pane.loadedUrlAt(0), null, '読み込み中は null');
+	image.complete = true;
+	image.naturalWidth = 1;
+	await image.dispatch('load');
+	await rendering;
+	assert.equal(pane.loadedUrlAt(0), cdn('r0'), '表示中で読み終えていれば URL を返す');
+	assert.equal(pane.loadedUrlAt(1), null, '先読みの Image はまだ読み終えていない');
+	created[0].complete = true;
+	created[0].naturalWidth = 1;
+	assert.equal(pane.loadedUrlAt(1), cdn('r1'), '先読みが読み終えれば URL を返す');
+	assert.equal(pane.loadedUrlAt(2), null, '先読みしていないページは null');
 });
 
 test('クリックで原寸表示がオンなら、画像を押して原寸の並びを渡す', async () => {

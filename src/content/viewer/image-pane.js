@@ -9,7 +9,7 @@ import { PIXIV_ERROR_KINDS } from '../../pixiv/errors.js';
 import { illustPagesUrl, safeCdnUrl } from '../../pixiv/endpoints.js';
 import { createIcon } from '../../common/icons.js';
 import { assignImageSrc } from '../../common/image-source.js';
-import { IMAGE_QUALITY } from '../../common/constants.js';
+import { IMAGE_QUALITY, PREFETCH_RELEASE_MARGIN } from '../../common/constants.js';
 import { warn } from '../../common/log.js';
 
 /**
@@ -25,6 +25,12 @@ const ARROW_SHAPES = Object.freeze({
 const REASONS = Object.freeze({
 	PAGES_EMPTY: '/pages の body にページがありません',
 });
+
+/** 表示中の画像の fetchPriority。今見ている画像なので優先度を上げる。 */
+const SHOWN_IMAGE_PRIORITY = 'high';
+
+/** 先読みの Image の fetchPriority。表示中の画像より後に回す。 */
+const PREFETCH_IMAGE_PRIORITY = 'low';
 
 /**
  * ページ配列から表示に使う URL を並べる。
@@ -42,20 +48,50 @@ export function pickPageUrls(pages, quality) {
 /**
  * 先読みするページ番号を決める。
  * 今見ているページの前後を対象にし、端と自分自身は含めない。
+ * 最後に動いた向きの側を先に並べる。(進んでいる方向を優先して取りに行く)
  * @param {number} index 今のページ番号 (0 始まり)
  * @param {number} total 総ページ数
  * @param {number} count 前後それぞれ何枚先読みするか
- * @returns {number[]} 先読み対象のページ番号
+ * @param {1|-1} [direction] 最後に動いた向き。1 なら次へ、-1 なら前へ
+ * @returns {number[]} 先読み対象のページ番号 (進んだ向きの側が先)
  */
-export function prefetchTargets(index, total, count) {
+export function prefetchTargets(index, total, count, direction = 1) {
 	const targets = [];
 	for (let offset = 1; offset <= count; offset += 1) {
 		const before = index - offset;
 		const after = index + offset;
-		if (before >= 0) targets.push(before);
-		if (after < total) targets.push(after);
+		const ordered = direction > 0 ? [after, before] : [before, after];
+		for (const candidate of ordered) {
+			if (candidate >= 0 && candidate < total) targets.push(candidate);
+		}
 	}
 	return targets;
+}
+
+/**
+ * 先読みを手放すページ番号を決める。
+ * 現在位置から prefetch + margin より離れたものだけを対象にする純粋関数。
+ * 甘めに構えることで、数ページ戻る程度では取り直しの通信が出ないようにする。
+ * @param {Array<[number, unknown]>} entries 先読み中の Map の entries (ページ番号, Image)
+ * @param {number} index 今のページ番号
+ * @param {number} count 前後それぞれ何枚先読みするか
+ * @param {number} margin 解放までの余白 (PREFETCH_RELEASE_MARGIN)
+ * @returns {number[]} 手放すページ番号
+ */
+export function releaseTargets(entries, index, count, margin) {
+	const threshold = count + margin;
+	return entries.filter(([page]) => Math.abs(page - index) > threshold).map(([page]) => page);
+}
+
+/**
+ * 値を範囲へ収める。
+ * @param {number} value 値
+ * @param {number} min 下限
+ * @param {number} max 上限
+ * @returns {number} 収めた値
+ */
+function clamp(value, min, max) {
+	return Math.min(Math.max(value, min), max);
 }
 
 /**
@@ -72,7 +108,8 @@ export function prefetchTargets(index, total, count) {
 /**
  * 画像ペインを作る。
  * @param {ImagePaneDeps} deps 依存
- * @returns {{render: (detail: object) => Promise<void>, next: () => void, prev: () => void, dispose: () => void}}
+ * @returns {{render: (detail: object) => Promise<void>, next: () => void, prev: () => void,
+ *   loadedUrlAt: (index: number) => string | null, dispose: () => void}}
  */
 export function createImagePane(deps) {
 	const { doc, container, strings } = deps;
@@ -90,7 +127,19 @@ export function createImagePane(deps) {
 	/** 今見ているページ番号 */
 	let index = 0;
 	/**
-	 * @type {Map<string, HTMLImageElement>} 先読み用の Image。URL ごとに 1 つだけ作る。
+	 * @type {number|null} /pages 待ちの間に矢印が押された行き先。
+	 * 届いたら index へ反映する。待っていなければ null
+	 */
+	let pendingIndex = null;
+	/**
+	 * 分母と矢印に使う総ページ数。/pages が届く前は detail.pageCount を使い、
+	 * 届いたら実際の urls.length に置き換える。(枚数を先に出すため)
+	 */
+	let total = 1;
+	/** 最後に動いた向き。1 なら次へ、-1 なら前へ。先読みの順に使う */
+	let lastDirection = 1;
+	/**
+	 * @type {Map<number, HTMLImageElement>} 先読み用の Image。ページ番号ごとに 1 つだけ作る。
 	 * 参照を持っておかないと解放されて意味がなくなり、作り直すとページ送りのたびに無駄が出る
 	 */
 	const prefetched = new Map();
@@ -112,6 +161,11 @@ export function createImagePane(deps) {
 	let onImageError = null;
 	/** 画像を押したときのハンドラ (原寸表示)。設定がオフなら付けない。dispose で外すため参照を持つ */
 	let onImageClick = null;
+	/**
+	 * 表示中の画像の load / error を待って先読みを始めるハンドラ。
+	 * 次の schedulePrefetch() と dispose() で外すため参照を持つ
+	 */
+	let prefetchReadyHandler = null;
 	/** 破棄済みか。応答を待っている間に捨てられたときに DOM を触らないようにする */
 	let disposed = false;
 
@@ -151,6 +205,62 @@ export function createImagePane(deps) {
 	}
 
 	/**
+	 * 表示中の画像の load / error 待ちのリスナーを外す。
+	 * @returns {void}
+	 */
+	function clearPrefetchReadyHandler() {
+		if (image && prefetchReadyHandler) {
+			image.removeEventListener('load', prefetchReadyHandler);
+			image.removeEventListener('error', prefetchReadyHandler);
+		}
+		prefetchReadyHandler = null;
+	}
+
+	/**
+	 * 先読みを始めるきっかけを整える。
+	 * 表示中の画像が既に読み終えていればすぐに始め、読み込み中なら load / error を待つ。
+	 * (偽の DOM で complete を持たない画像は「読み終えていない」扱い)
+	 * @returns {void}
+	 */
+	function schedulePrefetch() {
+		clearPrefetchReadyHandler();
+		if (!image) return;
+		if (image.complete && image.naturalWidth > 0) {
+			prefetch();
+			return;
+		}
+		prefetchReadyHandler = () => {
+			clearPrefetchReadyHandler();
+			prefetch();
+		};
+		image.addEventListener('load', prefetchReadyHandler);
+		image.addEventListener('error', prefetchReadyHandler);
+	}
+
+	/**
+	 * 前後のページを先読みし、離れすぎた分を手放す。
+	 * 既に作ったページは作り直さない。CDN 以外を弾かれた空文字は読みに行かない
+	 * @returns {void}
+	 */
+	function prefetch() {
+		const count = deps.settings.prefetch;
+		for (const target of prefetchTargets(index, total, count, lastDirection)) {
+			if (prefetched.has(target)) continue;
+			const url = urls[target];
+			if (!url) continue;
+			const img = createImage();
+			img.fetchPriority = PREFETCH_IMAGE_PRIORITY;
+			assignImageSrc(img, url);
+			prefetched.set(target, img);
+		}
+		for (const page of releaseTargets([...prefetched.entries()], index, count, PREFETCH_RELEASE_MARGIN)) {
+			const img = prefetched.get(page);
+			if (img) assignImageSrc(img, '');
+			prefetched.delete(page);
+		}
+	}
+
+	/**
 	 * 今のページを描く。
 	 * @returns {void}
 	 */
@@ -164,32 +274,17 @@ export function createImagePane(deps) {
 			frame?.querySelector('.pane-error')?.remove();
 			assignImageSrc(image, next);
 		}
-		if (counter) counter.textContent = `${index + 1}/${urls.length}`;
-		const single = urls.length <= 1;
+		if (counter) counter.textContent = `${index + 1}/${total}`;
+		const single = total <= 1;
 		if (prevButton) {
 			prevButton.hidden = single;
 			prevButton.disabled = index === 0;
 		}
 		if (nextButton) {
 			nextButton.hidden = single;
-			nextButton.disabled = index === urls.length - 1;
+			nextButton.disabled = index === total - 1;
 		}
-		prefetch();
-	}
-
-	/**
-	 * 前後のページを先読みする。
-	 * 既に作った URL は作り直さない。CDN 以外を弾かれた空文字は読みに行かない
-	 * @returns {void}
-	 */
-	function prefetch() {
-		for (const target of prefetchTargets(index, urls.length, deps.settings.prefetch)) {
-			const url = urls[target];
-			if (!url || prefetched.has(url)) continue;
-			const img = createImage();
-			assignImageSrc(img, url);
-			prefetched.set(url, img);
-		}
+		schedulePrefetch();
 	}
 
 	/**
@@ -213,12 +308,19 @@ export function createImagePane(deps) {
 
 	/**
 	 * ページ番号を動かす。
+	 * /pages 待ちの間 (urls.length が total に満たない間) は行き先だけ覚え、
+	 * 届いたときに反映する。(枚数を先に出しているので、実際のページはまだ無い)
 	 * @param {number} offset 相対位置
 	 * @returns {void}
 	 */
 	function move(offset) {
 		const next = index + offset;
-		if (next < 0 || next >= urls.length) return;
+		if (next < 0 || next >= total) return;
+		lastDirection = offset > 0 ? 1 : -1;
+		if (urls.length < total) {
+			pendingIndex = next;
+			return;
+		}
 		index = next;
 		paint();
 	}
@@ -236,6 +338,7 @@ export function createImagePane(deps) {
 
 			image = doc.createElement('img');
 			image.alt = detail.title;
+			image.fetchPriority = SHOWN_IMAGE_PRIORITY;
 			onImageError = () => showPaneError(strings.imagePane.IMAGE_FAILED);
 			image.addEventListener('error', onImageError);
 			// クリックで原寸表示。設定がオフのときはリスナも付けず、カーソルも変えない
@@ -260,6 +363,10 @@ export function createImagePane(deps) {
 			// 原寸が無い作品 (未ログインでは urls.original が落ちる) は標準へ倒す
 			originalUrls = [detail.urls[IMAGE_QUALITY.ORIGINAL] ?? detail.urls[IMAGE_QUALITY.REGULAR] ?? ''];
 			index = 0;
+			pendingIndex = null;
+			lastDirection = 1;
+			// 分母と矢印は /pages を待たず detail.pageCount で先に出す
+			total = Math.max(detail.pageCount, 1);
 			paint();
 
 			if (detail.pageCount <= 1) return;
@@ -273,24 +380,48 @@ export function createImagePane(deps) {
 				if (next.length === 0) throw new Error(REASONS.PAGES_EMPTY);
 				urls = next;
 				originalUrls = pickPageUrls(pages, IMAGE_QUALITY.ORIGINAL);
+				total = urls.length;
+				// /pages を待つ間に押された矢印はここで反映する
+				index = clamp(pendingIndex ?? index, 0, urls.length - 1);
+				pendingIndex = null;
 				paint();
 			} catch (error) {
 				// disposed の判定だけで中断による失敗も黙る。念のため種別でも確かめる
 				if (disposed || error?.kind === PIXIV_ERROR_KINDS.ABORTED) return;
+				// 実際に採れたのは 1 枚だけなので、先出ししていた分母を戻す (矢印が消える)
+				total = urls.length;
+				pendingIndex = null;
 				// 1 枚目は出ているので、複数枚が開けないことだけを伝える
 				showPaneError(strings.imagePane.PAGES_FAILED);
 				warn('failed to load pages', detail.id, error);
+				paint();
 			}
 		},
 
 		next() { move(1); },
 		prev() { move(-1); },
 
+		/**
+		 * 指定したページの、読み込みを起こさずに手元にある URL を返す。
+		 * 表示中のページは img が読み終えていれば、そうでなければ先読みの Image が
+		 * 読み終えていればその URL。無ければ null。(原寸表示の placeholder に使う)
+		 * @param {number} i ページ番号
+		 * @returns {string|null} 読み終えている URL。無ければ null
+		 */
+		loadedUrlAt(i) {
+			if (i === index) {
+				return image && image.complete && image.naturalWidth > 0 ? shownUrl : null;
+			}
+			const img = prefetched.get(i);
+			return img && img.complete && img.naturalWidth > 0 ? img.src : null;
+		},
+
 		dispose() {
 			aborter.abort();
 			disposed = true;
 			// 破棄したあとに古い画像の error が発火して、
 			// 新しく描いた画面にエラーを出すのを防ぐ
+			clearPrefetchReadyHandler();
 			if (image && onImageError) image.removeEventListener('error', onImageError);
 			if (image && onImageClick) image.removeEventListener('click', onImageClick);
 			if (image) assignImageSrc(image, '');
