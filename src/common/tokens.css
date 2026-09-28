@@ -45,6 +45,9 @@
 	/* 取り返しの付かない操作 (設定の初期化の確定など) の枠と文字。
 	   やり直せる失敗 (保存の失敗の通知) には使わない */
 	--danger: #e5737a;
+	/* 通知 (notice.css) やメニューの浮き影。地の色ごとに強さを変える。
+	   (ライトは白地の上で重く見えるため薄くする) */
+	--notice-shadow: rgba(0, 0, 0, 0.36);
 	/* スクロールバーの太さ */
 	--scrollbar-size: 6px;
 	/* スクロールバー。軌道は下地がうっすら分かる程度、つまみはその上で確実に読める濃さ */
@@ -84,6 +87,7 @@
 	--accent: #0096fa;
 	--on-accent: #ffffff;
 	--danger: #c0392b;
+	--notice-shadow: rgba(0, 0, 0, 0.16);
 	--scrollbar-track: rgba(0, 0, 0, 0.06);
 	--scrollbar-thumb: rgba(0, 0, 0, 0.26);
 	--scrollbar-thumb-hover: rgba(0, 0, 0, 0.4);
@@ -114,6 +118,7 @@
 		--accent: #0096fa;
 		--on-accent: #ffffff;
 		--danger: #c0392b;
+		--notice-shadow: rgba(0, 0, 0, 0.16);
 		--scrollbar-track: rgba(0, 0, 0, 0.06);
 		--scrollbar-thumb: rgba(0, 0, 0, 0.26);
 		--scrollbar-thumb-hover: rgba(0, 0, 0, 0.4);
