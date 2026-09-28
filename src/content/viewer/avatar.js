@@ -15,11 +15,16 @@ export const AVATAR_PENDING_CLASS = 'is-pending';
  * アバターの img を作る。作った時点では枠だけ。
  * @param {Document} doc 対象のドキュメント
  * @param {string} className 見た目のクラス (author-avatar / comment-avatar)
+ * @param {{lazy?: boolean}} [options] lazy なら loading="lazy" / decoding="async" を付ける
  * @returns {HTMLImageElement} img
  */
-export function createAvatar(doc, className) {
+export function createAvatar(doc, className, options = {}) {
 	const avatar = doc.createElement('img');
 	avatar.className = className;
+	if (options.lazy) {
+		avatar.setAttribute('loading', 'lazy');
+		avatar.setAttribute('decoding', 'async');
+	}
 	avatar.setAttribute('alt', '');
 	avatar.classList.add(AVATAR_PENDING_CLASS);
 	avatar.addEventListener('error', () => { avatar.classList.add(AVATAR_PENDING_CLASS); });

@@ -188,6 +188,15 @@ test('作者行はアイコン・名前・ユーザー ID・フォロー用の�
 	assert.equal(sidebar.followSlot(), row.children[1]);
 });
 
+test('作者行のアバターは遅延読み込みにしない', () => {
+	// 読み込みを遅らせるのはコメント一覧だけ。常に見えている作者行まで遅らせると初回表示が遅れる
+	const { container, sidebar } = build();
+	sidebar.render(DETAIL);
+	const avatar = find(container, '.author-avatar');
+	assert.equal(avatar.getAttribute('loading'), null);
+	assert.equal(avatar.getAttribute('decoding'), null);
+});
+
 test('作者のアイコンは /ajax/user の image を CDN の関門に通して入れる', async () => {
 	const image = 'https://i.pximg.net/user-profile/img/2020/01/01/00/00/00/1_170.jpg';
 	const { container, sidebar } = build({ fetchUser: async () => ({ image }) });

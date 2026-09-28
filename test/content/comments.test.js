@@ -225,6 +225,58 @@ async function submitText(form, text) {
 	await flush();
 }
 
+/**
+ * setAttribute の呼び出し順と src への代入を記録する img を作る document の代わり。
+ * `img` 以外の要素はそのまま fakeDoc() の挙動に任せる。
+ * @returns {{doc: object, ordersOf: (img: object) => string[]}} doc の代わりと、img ごとの順序を引く関数
+ */
+function orderTrackingDoc() {
+	const doc = loggedInDoc();
+	const createElement = doc.createElement;
+	const orders = new Map();
+	doc.createElement = (tag) => {
+		const element = createElement(tag);
+		if (tag !== 'img') return element;
+		const order = [];
+		orders.set(element, order);
+		const setAttribute = element.setAttribute;
+		element.setAttribute = (name, value) => {
+			order.push(name);
+			setAttribute(name, value);
+		};
+		let src = '';
+		Object.defineProperty(element, 'src', {
+			get() { return src; },
+			set(value) { order.push('src'); src = value; },
+		});
+		return element;
+	};
+	return { doc, ordersOf: (img) => orders.get(img) ?? [] };
+}
+
+test('コメントのアバター・絵文字・スタンプは loading=lazy と decoding=async を src より先に持つ', async () => {
+	const { doc, ordersOf } = orderTrackingDoc();
+	const textComment = { ...ROOT, id: '1', comment: 'すき(heaven)', stampId: null };
+	const stampComment = { ...ROOT, id: '2', comment: '', stampId: '304' };
+	const container = fakeElement('div');
+	const comments = createComments({
+		doc,
+		container,
+		strings: STRINGS,
+		fetchJson: async () => ({ comments: [textComment, stampComment], hasNext: false }),
+	});
+	await comments.load(DETAIL);
+
+	const avatar = find(container, '.comment-avatar');
+	assert.deepEqual(ordersOf(avatar), ['loading', 'decoding', 'alt', 'src']);
+
+	const emoji = find(container, '.comment-emoji');
+	assert.deepEqual(ordersOf(emoji), ['loading', 'decoding', 'src', 'alt']);
+
+	const stamp = find(container, '.comment-stamp');
+	assert.deepEqual(ordersOf(stamp), ['loading', 'decoding', 'src', 'alt']);
+});
+
 test('「もっと見る」はスクロールする領域の中、一覧の後ろに置く', async () => {
 	// 一番下まで読んだときだけ見えるようにする。外に置くと常に見えて不自然になる
 	const { container, comments } = build(async () => ({ comments: [ROOT], hasNext: true }));
