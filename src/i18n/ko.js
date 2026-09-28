@@ -63,6 +63,7 @@ export default {
 		LABEL: '원본 크기 보기',
 		PREV_PAGE: '이전 페이지',
 		NEXT_PAGE: '다음 페이지',
+		PREVIEW_NOTICE: '표준 화질로 임시 표시 중입니다. 원본을 불러오는 중…',
 	},
 	sidebar: {
 		OPEN_ORIGINAL: '작품 페이지 열기',

@@ -7,6 +7,7 @@
 // 配色トークン (common/tokens.css) は設定画面と共通。viewer.css より前に置き、変数を先に定義する
 import tokensCss from '../../common/tokens.css';
 import viewerCss from './viewer.css';
+import noticeCss from '../../common/notice.css';
 import {
 	HOST_ELEMENT_ID,
 	FOCUSABLE_SELECTOR,
@@ -200,7 +201,7 @@ export function createViewer(deps) {
 		shadow = host.attachShadow({ mode: 'open' });
 
 		const style = doc.createElement('style');
-		style.textContent = tokensCss + viewerCss;
+		style.textContent = tokensCss + viewerCss + noticeCss;
 		shadow.appendChild(style);
 
 		overlay = doc.createElement('div');

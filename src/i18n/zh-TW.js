@@ -61,6 +61,7 @@ export default {
 		LABEL: '原尺寸顯示',
 		PREV_PAGE: '上一頁',
 		NEXT_PAGE: '下一頁',
+		PREVIEW_NOTICE: '正在以標準畫質暫時顯示，原始尺寸載入中…',
 	},
 	sidebar: {
 		OPEN_ORIGINAL: '開啟作品頁面',
