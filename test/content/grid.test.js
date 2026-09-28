@@ -132,7 +132,10 @@ function fakeDoc() {
 			if (index >= 0) listeners.splice(index, 1);
 		},
 		listenerCount() { return listeners.length; },
-		fire(event) { for (const listener of [...listeners]) listener.fn(event); },
+		// 型ごとに発火する。pointerdown / pointercancel / dragstart も同じ document に張るため
+		dispatch(type, event) {
+			for (const listener of listeners.filter((l) => l.type === type)) listener.fn(event);
+		},
 	};
 }
 
@@ -169,7 +172,7 @@ test('attachGridListener はカードの外の作品リンクを横取りしな�
 	const opened = [];
 	attachGridListener(doc, (id) => opened.push(id), { origin: ORIGIN });
 	const event = fakeClick('/artworks/1', { inCard: false });
-	doc.fire(event);
+	doc.dispatch('click', event);
 	assert.deepEqual(opened, []);
 	assert.equal(event.defaultPrevented, false);
 });
@@ -179,7 +182,7 @@ test('attachGridListener は作品リンクのクリックを横取りする', (
 	const opened = [];
 	attachGridListener(doc, (id) => opened.push(id), { origin: ORIGIN });
 	const event = fakeClick('/artworks/149425016');
-	doc.fire(event);
+	doc.dispatch('click', event);
 	assert.deepEqual(opened, ['149425016']);
 	assert.equal(event.defaultPrevented, true);
 	assert.equal(event.propagationStopped, true);
@@ -192,7 +195,7 @@ test('attachGridListener は修飾キー付きのクリックを横取りしな�
 		const opened = [];
 		attachGridListener(doc, (id) => opened.push(id), { origin: ORIGIN });
 		const event = fakeClick('/artworks/1', { [key]: true });
-		doc.fire(event);
+		doc.dispatch('click', event);
 		assert.deepEqual(opened, [], `${key} を押しながらのクリックを横取りしてしまった`);
 		assert.equal(event.defaultPrevented, false);
 	}
@@ -203,7 +206,7 @@ test('attachGridListener は中クリックを横取りしない', () => {
 	const opened = [];
 	attachGridListener(doc, (id) => opened.push(id), { origin: ORIGIN });
 	const event = fakeClick('/artworks/1', { button: 1 });
-	doc.fire(event);
+	doc.dispatch('click', event);
 	assert.deepEqual(opened, []);
 	assert.equal(event.defaultPrevented, false);
 });
@@ -213,7 +216,7 @@ test('attachGridListener は作品リンク以外のクリックを無視する'
 	const opened = [];
 	attachGridListener(doc, (id) => opened.push(id), { origin: ORIGIN });
 	const event = fakeClick(null);
-	doc.fire(event);
+	doc.dispatch('click', event);
 	assert.deepEqual(opened, []);
 	assert.equal(event.defaultPrevented, false);
 });
@@ -223,7 +226,7 @@ test('attachGridListener はタグ絞り込みリンクを横取りしない', (
 	const opened = [];
 	attachGridListener(doc, (id) => opened.push(id), { origin: ORIGIN });
 	const event = fakeClick('/users/54734418/artworks/オリジナル');
-	doc.fire(event);
+	doc.dispatch('click', event);
 	assert.deepEqual(opened, []);
 	assert.equal(event.defaultPrevented, false);
 });
@@ -232,7 +235,7 @@ test('attachGridListener は origin を渡さなければ doc.location から取
 	const doc = fakeDoc();
 	const opened = [];
 	attachGridListener(doc, (id) => opened.push(id));
-	doc.fire(fakeClick('/artworks/42'));
+	doc.dispatch('click', fakeClick('/artworks/42'));
 	assert.deepEqual(opened, ['42']);
 });
 
@@ -243,7 +246,7 @@ test('attachGridListener の dispose でリスナーが外れる', () => {
 	assert.equal(doc.listenerCount(), 1);
 	handle.dispose();
 	assert.equal(doc.listenerCount(), 0);
-	doc.fire(fakeClick('/artworks/1'));
+	doc.dispatch('click', fakeClick('/artworks/1'));
 	assert.deepEqual(opened, []);
 });
 
@@ -260,4 +263,46 @@ test('英語表示のグリッドからも作品 ID を集める', () => {
 	const { ul } = makeGrid(cards);
 	assert.deepEqual(collectWorkIds(ul, ORIGIN), ['1', '2', '3']);
 	assert.equal(findGridList(ul.parent), ul);
+});
+
+test('pointerdown は click と同じ条件のときだけ onPress を呼ぶ', () => {
+	const doc = fakeDoc();
+	const pressed = [];
+	attachGridListener(doc, () => {}, { origin: ORIGIN, onPress: (id) => pressed.push(id) });
+	doc.dispatch('pointerdown', fakeClick('/artworks/123'));
+	doc.dispatch('pointerdown', fakeClick('/artworks/123', { button: 1 }));
+	doc.dispatch('pointerdown', fakeClick('/artworks/123', { ctrlKey: true }));
+	assert.deepEqual(pressed, ['123']);
+});
+
+test('pointerdown は preventDefault を呼ばない', () => {
+	// 選択やドラッグを壊さないため
+	const doc = fakeDoc();
+	attachGridListener(doc, () => {}, { origin: ORIGIN, onPress: () => {} });
+	const event = fakeClick('/artworks/1');
+	doc.dispatch('pointerdown', event);
+	assert.equal(event.defaultPrevented, false);
+});
+
+test('pointercancel と dragstart は onPressCancel を呼ぶ', () => {
+	const doc = fakeDoc();
+	let cancels = 0;
+	attachGridListener(doc, () => {}, { origin: ORIGIN, onPress: () => {}, onPressCancel: () => { cancels += 1; } });
+	doc.dispatch('pointercancel', {});
+	doc.dispatch('dragstart', {});
+	assert.equal(cancels, 2);
+});
+
+test('deps.onPress が無ければ pointerdown 系のリスナーは張らない', () => {
+	const doc = fakeDoc();
+	attachGridListener(doc, () => {}, { origin: ORIGIN });
+	assert.equal(doc.listenerCount(), 1);
+});
+
+test('dispose で pointerdown 系のリスナーも外れる', () => {
+	const doc = fakeDoc();
+	const handle = attachGridListener(doc, () => {}, { origin: ORIGIN, onPress: () => {}, onPressCancel: () => {} });
+	assert.equal(doc.listenerCount(), 4);
+	handle.dispose();
+	assert.equal(doc.listenerCount(), 0);
 });

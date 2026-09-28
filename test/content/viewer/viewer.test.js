@@ -247,6 +247,54 @@ test('作品を送ると前の作品の取得を中断する', async () => {
 	assert.equal(signals[1].aborted, true);
 });
 
+test('押し始めに取った詳細を、同じ作品を開いたときに使う', async () => {
+	const { viewer, fetched } = setup();
+	viewer.prefetchOnPress('1');
+	await viewer.open('1');
+	assert.deepEqual(fetched, ['/ajax/illust/1?lang=ja']);
+});
+
+test('押し始めと違う作品を開くと、押し始めの取得は止めて取り直す', async () => {
+	const signals = [];
+	const { viewer } = setup({
+		getJsonImpl: (url, jsonDeps) => {
+			signals.push(jsonDeps.signal);
+			return new Promise(() => {});
+		},
+	});
+	viewer.prefetchOnPress('1');
+	void viewer.open('2');
+	assert.equal(signals.length, 2);
+	assert.equal(signals[0].aborted, true);
+});
+
+test('cancelPressPrefetch で押し始めの取得を止める', () => {
+	const signals = [];
+	const { viewer } = setup({
+		getJsonImpl: (url, jsonDeps) => {
+			signals.push(jsonDeps.signal);
+			return new Promise(() => {});
+		},
+	});
+	viewer.prefetchOnPress('1');
+	viewer.cancelPressPrefetch();
+	assert.equal(signals.length, 1);
+	assert.equal(signals[0].aborted, true);
+});
+
+test('close は開いていなくても押し始めの先読みを止める', () => {
+	const signals = [];
+	const { viewer } = setup({
+		getJsonImpl: (url, jsonDeps) => {
+			signals.push(jsonDeps.signal);
+			return new Promise(() => {});
+		},
+	});
+	viewer.prefetchOnPress('1');
+	viewer.close();
+	assert.equal(signals[0].aborted, true);
+});
+
 test('読み込み中の文言は LOADING_STATUS_DELAY_MS 経ってから出る', async () => {
 	const timers = [];
 	const { viewer, stage } = setup({

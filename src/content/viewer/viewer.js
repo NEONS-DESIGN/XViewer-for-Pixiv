@@ -16,6 +16,7 @@ import {
 	KEYS,
 	LOADING_STATUS_DELAY_MS,
 	POPUP_THEMES,
+	PRESS_PREFETCH_TTL_MS,
 	SIDEBAR_SCROLL,
 	STATUS_KINDS,
 	INERT_SELECTOR,
@@ -31,6 +32,7 @@ import { readSession } from '../session.js';
 import { renderWork, disposeAll, movePage, consumeKey } from './panes.js';
 import { createZoomLayer } from './zoom.js';
 import { createNavigation } from './navigation.js';
+import { createPrefetchSlot } from './prefetch-slot.js';
 
 /** ホストページのスクロールを止めるために body へ付ける style。 */
 const BODY_LOCK_STYLE = 'overflow:hidden';
@@ -152,7 +154,7 @@ export function loadFailedMessage(error, strings) {
  * ビュワーを作る。
  * 生成した時点では画面に何も出さない。open() で初めて表示する。
  * @param {ViewerDeps} deps 依存
- * @returns {{open: (workId: string, nextSequence?: import('../sequence.js').Sequence) => Promise<void>, close: () => void, isOpen: () => boolean, dispose: () => void, setSettings: (s: object) => void}}
+ * @returns {{open: (workId: string, nextSequence?: import('../sequence.js').Sequence) => Promise<void>, close: () => void, isOpen: () => boolean, dispose: () => void, setSettings: (s: object) => void, prefetchOnPress: (workId: string) => void, cancelPressPrefetch: () => void}}
  */
 export function createViewer(deps) {
 	const { doc, strings } = deps;
@@ -190,6 +192,8 @@ export function createViewer(deps) {
 	let openAborter = null;
 	/** 読み込み中の文言を出すタイマー ID。0 は動いていない */
 	let loadingTimer = 0;
+	/** 押し始めに取った作品詳細。押してから離すまでの間に取得を進める */
+	const pressSlot = createPrefetchSlot({ ttlMs: PRESS_PREFETCH_TTL_MS });
 	// 作品間の移動とキー操作の割り振りは navigation.js が持つ。
 	// ここに残るのはホストの構築と描画の指揮だけ
 	const navigation = createNavigation({
@@ -402,12 +406,22 @@ export function createViewer(deps) {
 	}
 
 	/**
+	 * 作品詳細を取得する。
+	 * @param {string} workId 作品 ID
+	 * @param {AbortSignal} signal 中断の合図
+	 * @returns {Promise<object>} 取得結果 (正規化前)
+	 */
+	function startDetailFetch(workId, signal) {
+		return fetchJson(illustUrl(workId, strings.lang), { signal }, DETAIL_FETCH_INIT);
+	}
+
+	/**
 	 * 先読み済みの応答を取り出す。
 	 * @param {string} workId 作品 ID
-	 * @returns {object|null} 先読み結果。無ければ null
+	 * @returns {Promise<object>|null} 先読み結果。無ければ null
 	 */
 	function takePrefetched(workId) {
-		return null;
+		return pressSlot.take(workId); // Task 8 で neighborSlot も見る
 	}
 
 	/**
@@ -502,9 +516,10 @@ export function createViewer(deps) {
 		openAborter?.abort();
 		const aborter = new AbortController();
 		openAborter = aborter;
-		// 取得を最初に出す。ホストの組み立て・背景のロック・フォーカスの確定の間も通信を進める
-		const pending = takePrefetched(workId)
-			?? fetchJson(illustUrl(workId, strings.lang), { signal: aborter.signal }, DETAIL_FETCH_INIT);
+		// 取得を最初に出す。ホストの組み立て・背景のロック・フォーカスの確定の間も通信を進める。
+		// 先読みが当たったときの Promise は取得側の AbortController を持ったままで openAborter には繋がない。
+		// 次の要求が来ても中断はできず、応答は最後まで受信したうえで世代 (requestToken) が結果を捨てるだけになる
+		const pending = takePrefetched(workId) ?? startDetailFetch(workId, aborter.signal);
 		// 未処理の拒否を出さない。結果は下の await で受ける
 		pending.catch(() => {});
 
@@ -567,6 +582,8 @@ export function createViewer(deps) {
 	 * @returns {void}
 	 */
 	function close() {
+		// 押し始めの先読みは、開いていない間も走っていることがあるので必ず止める
+		pressSlot.drop();
 		// 開いていないのに body の style を触ると、ビュワーを開かずに
 		// ブラウザバックしただけで pixiv 本体のインラインスタイルを消してしまう
 		if (host === null) return;
@@ -642,5 +659,23 @@ export function createViewer(deps) {
 
 		// close と同じ。呼び出し側 (main.js) の撤去の作法に合わせた別名
 		dispose: close,
+
+		/**
+		 * 押し始めた時点で作品詳細の取得を進める。
+		 * 離した先が同じ作品なら openWork がこの結果をそのまま使う。
+		 * @param {string} workId 押された作品 ID
+		 * @returns {void}
+		 */
+		prefetchOnPress(workId) {
+			pressSlot.put(workId, (signal) => startDetailFetch(workId, signal));
+		},
+
+		/**
+		 * prefetchOnPress() で始めた取得を止める。
+		 * @returns {void}
+		 */
+		cancelPressPrefetch() {
+			pressSlot.drop();
+		},
 	};
 }

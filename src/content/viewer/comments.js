@@ -156,7 +156,7 @@ export function renderStamp(doc, stampId, strings) {
  * @property {HTMLElement} container 描画先
  * @property {object} strings 文言のカタログ (src/i18n)
  * @property {HTMLElement} [scrollTarget] 「上部へ」で先頭に戻す相手 (.sidebar)。無ければボタンを出さない
- * @property {(url: string) => Promise<object>} [fetchJson] 取得の差し替え。テストから通信させないために使う
+ * @property {(url: string, init?: {signal?: AbortSignal}) => Promise<object>} [fetchJson] 取得の差し替え。テストから通信させないために使う
  * @property {{postComment?: Function, postStamp?: Function, deleteComment?: Function}} [actions] 更新系の差し替え。テストから通信させないために使う
  * @property {() => void} [onPosted] 投稿できたときに 1 回呼ぶ。コメント件数の +1 に使う
  * @property {(count: number|null) => void} [onDeleted] 削除できたときに 1 回呼ぶ。引数は数え直した件数で、引けなければ null
