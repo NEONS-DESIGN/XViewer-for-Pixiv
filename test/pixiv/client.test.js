@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { getJson, postJson, postFormRaw, postFormData, postForm } from '../../src/pixiv/client.js';
+import { getJson, postJson, postFormRaw, postFormData, postForm, FRESH_FETCH_INIT } from '../../src/pixiv/client.js';
 import { PIXIV_ERROR_KINDS } from '../../src/pixiv/errors.js';
 import { fakeFetch } from '../helpers/pixiv.js';
 
@@ -13,6 +13,21 @@ test('getJson は body を取り出して返す', async () => {
 test('getJson は Cookie を送る', async () => {
 	const { impl, calls } = fakeFetch({ json: { error: false, body: {} } });
 	await getJson('/ajax/illust/1', { fetchImpl: impl });
+	assert.equal(calls[0].init.credentials, 'include');
+});
+
+test('getJson は既定では HTTP キャッシュの指定を付けない', async () => {
+	const { impl, calls } = fakeFetch({ json: { error: false, body: {} } });
+	await getJson('/ajax/illust/1', { fetchImpl: impl });
+	assert.equal(calls[0].init.cache, undefined);
+});
+
+test('getJson は FRESH_FETCH_INIT を渡すと HTTP キャッシュを確かめ直す', async () => {
+	// pixiv の API は private, max-age=10 で返すので、指定しないと
+	// ページ側でフォローした直後でも 10 秒前の応答が使い回される
+	const { impl, calls } = fakeFetch({ json: { error: false, body: {} } });
+	await getJson('/ajax/user/1?full=1', { fetchImpl: impl }, FRESH_FETCH_INIT);
+	assert.equal(calls[0].init.cache, 'no-cache');
 	assert.equal(calls[0].init.credentials, 'include');
 });
 

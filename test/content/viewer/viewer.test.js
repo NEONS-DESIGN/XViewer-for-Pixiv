@@ -4,6 +4,8 @@ import { register } from 'node:module';
 import { clearSessionCache } from '../../../src/content/session.js';
 import { KEYS } from '../../../src/common/constants.js';
 import { createStrings } from '../../../src/i18n/index.js';
+import { FRESH_FETCH_INIT } from '../../../src/pixiv/client.js';
+import { PixivError, PIXIV_ERROR_KINDS } from '../../../src/pixiv/errors.js';
 import { fakeElement, fakeDoc as fakeDocBase, find, findAll, flush } from '../../helpers/dom.js';
 import { fakeSequence } from '../../helpers/sequence.js';
 
@@ -135,6 +137,7 @@ function setup(options = {}) {
 		}),
 		// サイドバーを出すテストだけが渡す。作者情報の取得で通信させない
 		fetchUser: options.fetchUser,
+		clearUserCache: options.clearUserCache ?? (() => {}),
 	});
 	const shadow = () => doc.body.children[0]?.shadowRoot ?? null;
 	return {
@@ -195,6 +198,33 @@ test('開くと作品を取得して描き、閉じると DOM ごと捨てる', 
 	viewer.close();
 	assert.equal(viewer.isOpen(), false);
 	assert.equal(doc.body.children.length, 0);
+});
+
+test('作品詳細は HTTP キャッシュを確かめ直して取る', async () => {
+	// ページ側でいいね・ブックマークした直後に開いたとき、ブラウザに残った古い応答を使わせない
+	const inits = [];
+	const { viewer } = setup({
+		getJsonImpl: async (url, deps, init) => {
+			inits.push(init);
+			return rawDetail(url.match(/illust\/(\d+)/)[1]);
+		},
+	});
+	await viewer.open('1');
+	assert.deepEqual(inits, [FRESH_FETCH_INIT]);
+});
+
+test('新しく開いたときだけユーザー情報の覚えを捨て、作品を送る間は保つ', async () => {
+	// ページ側でフォローしてから開き直すと、覚えていた isFollowed が古いまま出てしまう。
+	// 開いている間はページのボタンを押せないので、送るたびに捨てる必要は無い
+	let cleared = 0;
+	const { viewer } = setup({ clearUserCache: () => { cleared += 1; } });
+	await viewer.open('1', fakeSequence(['1', '2']));
+	assert.equal(cleared, 1);
+	await viewer.open('2');
+	assert.equal(cleared, 1);
+	viewer.close();
+	await viewer.open('1');
+	assert.equal(cleared, 2);
 });
 
 test('開いている間は body のスクロールを止め、スクロールバーの幅だけ padding で補う', async () => {
@@ -340,6 +370,23 @@ test('取得に失敗したら文言を出す', async () => {
 	assert.equal(status.textContent, '作品を読み込めませんでした');
 	assert.equal(status.getAttribute('role'), 'alert');
 	assert.equal(findAll(stage(), '.frame').length, 0);
+});
+
+test('作品が見つからない (404) ときは、削除か非公開の可能性を伝える', async () => {
+	// 削除済みや存在しない作品の /ajax/illust/{id} は 404 を返す
+	const { viewer, stage } = setup({
+		getJsonImpl: async () => { throw new PixivError(PIXIV_ERROR_KINDS.NOT_FOUND, 'not found', 404); },
+	});
+	await viewer.open('1');
+	assert.equal(find(stage(), '.status').textContent, '作品が見つかりませんでした。削除されたか、非公開になった可能性があります');
+});
+
+test('通信そのものが失敗したときは、接続を確かめるよう伝える', async () => {
+	const { viewer, stage } = setup({
+		getJsonImpl: async () => { throw new PixivError(PIXIV_ERROR_KINDS.NETWORK, 'network'); },
+	});
+	await viewer.open('1');
+	assert.equal(find(stage(), '.status').textContent, '通信に失敗しました。接続を確かめてから開き直してください');
 });
 
 test('描画に失敗したら描きかけのペインを捨ててから文言を出す', async () => {

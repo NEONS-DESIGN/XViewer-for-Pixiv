@@ -49,6 +49,8 @@ export default {
 		CLOSE_TITLE: '关闭（Esc）',
 		LOADING: '加载中...',
 		LOAD_FAILED: '无法加载作品',
+		NOT_FOUND: '找不到该作品。可能已被删除或设为非公开',
+		NETWORK_FAILED: '通信失败。请检查网络连接后重新打开',
 	},
 	imagePane: {
 		PREV_PAGE: '上一页',

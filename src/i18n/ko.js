@@ -50,6 +50,8 @@ export default {
 		CLOSE_TITLE: '닫기 (Esc)',
 		LOADING: '불러오는 중...',
 		LOAD_FAILED: '작품을 불러오지 못했습니다',
+		NOT_FOUND: '작품을 찾을 수 없습니다. 삭제되었거나 비공개로 바뀌었을 수 있습니다',
+		NETWORK_FAILED: '통신에 실패했습니다. 연결을 확인한 뒤 다시 열어 주세요',
 	},
 	imagePane: {
 		PREV_PAGE: '이전 페이지',

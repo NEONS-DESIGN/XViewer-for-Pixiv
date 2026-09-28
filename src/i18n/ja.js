@@ -49,6 +49,8 @@ export default {
 		CLOSE_TITLE: '閉じる (Esc)',
 		LOADING: '読み込み中...',
 		LOAD_FAILED: '作品を読み込めませんでした',
+		NOT_FOUND: '作品が見つかりませんでした。削除されたか、非公開になった可能性があります',
+		NETWORK_FAILED: '通信に失敗しました。接続を確かめてから開き直してください',
 	},
 	imagePane: {
 		PREV_PAGE: '前のページ',
