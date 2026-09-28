@@ -12,9 +12,19 @@ import {
 test('normalizeLanguage は BCP 47 を言語サブタグへ切り詰める', () => {
 	assert.equal(normalizeLanguage('en'), 'en');
 	assert.equal(normalizeLanguage('en-US'), 'en');
-	assert.equal(normalizeLanguage('zh-Hant-TW'), 'zh');
+	assert.equal(normalizeLanguage('ko-KR'), 'ko');
 	assert.equal(normalizeLanguage('JA'), 'ja');
 	assert.equal(normalizeLanguage('  ja  '), 'ja');
+});
+
+test('normalizeLanguage は中国語だけ繁体字と簡体字を分ける', () => {
+	// pixiv は zh-CN / zh-TW を返す。(SITE_SPEC §0) ブラウザの UI 言語は地域や字体の付き方がまちまち
+	for (const tag of ['zh-TW', 'zh-tw', 'zh_TW', 'zh-Hant', 'zh-Hant-TW', 'zh-HK', 'zh-MO', 'zh-Hant-HK']) {
+		assert.equal(normalizeLanguage(tag), 'zh-TW', tag);
+	}
+	for (const tag of ['zh', 'zh-CN', 'zh-cn', 'zh_CN', 'zh-Hans', 'zh-Hans-CN', 'zh-SG', 'zh-Hans-HK']) {
+		assert.equal(normalizeLanguage(tag), 'zh-CN', tag);
+	}
 });
 
 test('normalizeLanguage は読めない値に null を返す', () => {
@@ -29,7 +39,9 @@ test('normalizeLanguage は読めない値に null を返す', () => {
 test('readPageLanguage は documentElement.lang を読む', () => {
 	assert.equal(readPageLanguage({ documentElement: { lang: 'en' } }), 'en');
 	assert.equal(readPageLanguage({ documentElement: { lang: 'ja' } }), 'ja');
-	assert.equal(readPageLanguage({ documentElement: { lang: 'zh-TW' } }), 'zh');
+	assert.equal(readPageLanguage({ documentElement: { lang: 'ko' } }), 'ko');
+	assert.equal(readPageLanguage({ documentElement: { lang: 'zh-CN' } }), 'zh-CN');
+	assert.equal(readPageLanguage({ documentElement: { lang: 'zh-TW' } }), 'zh-TW');
 });
 
 test('readPageLanguage は読めなければ null を返す', () => {
@@ -41,15 +53,16 @@ test('readPageLanguage は読めなければ null を返す', () => {
 });
 
 test('uiLanguage は対応している言語をそのまま返す', () => {
-	assert.equal(uiLanguage('ja'), 'ja');
-	assert.equal(uiLanguage('en'), 'en');
+	for (const language of ['ja', 'en', 'ko', 'zh-CN', 'zh-TW']) {
+		assert.equal(uiLanguage(language), language);
+	}
 });
 
 test('uiLanguage は未対応の言語を英語へ倒す', () => {
 	// pixiv を日本語以外で読んでいる人に日本語を出しても通じない
-	assert.equal(uiLanguage('ko'), UNSUPPORTED_FALLBACK);
-	assert.equal(uiLanguage('zh'), 'en');
-	assert.equal(uiLanguage('th'), 'en');
+	assert.equal(uiLanguage('th'), UNSUPPORTED_FALLBACK);
+	assert.equal(uiLanguage('ms'), 'en');
+	assert.equal(uiLanguage('fr'), 'en');
 });
 
 test('uiLanguage は判定に失敗したときだけ日本語へ倒す', () => {
@@ -58,7 +71,7 @@ test('uiLanguage は判定に失敗したときだけ日本語へ倒す', () => 
 	assert.equal(uiLanguage(undefined), 'ja');
 });
 
-test('SUPPORTED_LANGUAGES は ja と en の 2 つ', () => {
-	assert.deepEqual([...SUPPORTED_LANGUAGES], ['ja', 'en']);
+test('SUPPORTED_LANGUAGES は 5 言語', () => {
+	assert.deepEqual([...SUPPORTED_LANGUAGES], ['ja', 'en', 'ko', 'zh-CN', 'zh-TW']);
 	assert.ok(Object.isFrozen(SUPPORTED_LANGUAGES));
 });

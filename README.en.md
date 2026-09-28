@@ -13,7 +13,10 @@
 
 **[Website](https://xviewer.neonsdesign.com/en/)** ・
 [Privacy policy](https://xviewer.neonsdesign.com/en/privacy.html) ・
-[日本語](README.md)
+[日本語](README.md) ・
+[한국어](README.ko.md) ・
+[简体中文](README.zh-CN.md) ・
+[繁體中文](README.zh-TW.md)
 
 </div>
 
@@ -101,9 +104,9 @@ The extension follows the display language you have set on pixiv.
 | --- | --- |
 | Japanese | Supported |
 | English | Supported |
-| Korean | On request |
-| Chinese (Simplified) | On request |
-| Chinese (Traditional) | On request |
+| Korean | Supported |
+| Chinese (Simplified) | Supported |
+| Chinese (Traditional) | Supported |
 | Thai | On request |
 | Malay | On request |
 
@@ -214,7 +217,7 @@ If you prefer GitHub, [Issues](https://github.com/NEONS-DESIGN/XViewer-for-Pixiv
 | `npm run build` | Builds `dist/` for Chromium browsers and `dist-firefox/` for Firefox |
 | `npm run build:chrome` / `npm run build:firefox` | Builds only one of them |
 | `npm run watch` | Build in watch mode |
-| `npm test` | Runs the tests with `node --test` (1111 tests) |
+| `npm test` | Runs the tests with `node --test` (1124 tests) |
 | `npm run build:icons` | Regenerates the extension icon PNGs (the output is committed) |
 | `npm run build:symbols` | Regenerates the UI icon shape data (the output is committed) |
 | `npm run build:site-images` | Exports the website images (WebP, plus JPEG for OGP) (the output is committed. The source PNGs are not in the repository, so it will not run on a fresh clone) |

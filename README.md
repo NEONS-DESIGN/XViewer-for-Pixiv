@@ -13,7 +13,10 @@
 
 **[紹介サイト](https://xviewer.neonsdesign.com/)** ・
 [プライバシーポリシー](https://xviewer.neonsdesign.com/privacy.html) ・
-[English](README.en.md)
+[English](README.en.md) ・
+[한국어](README.ko.md) ・
+[简体中文](README.zh-CN.md) ・
+[繁體中文](README.zh-TW.md)
 
 </div>
 
@@ -94,9 +97,9 @@ Firefox (Firefox 140 以上のデスクトップ版) は [Firefox Add-ons](https
 | --- | --- |
 | 日本語 | 対応 |
 | 英語 | 対応 |
-| 韓国語 | リクエスト次第 |
-| 中国語 (簡体字) | リクエスト次第 |
-| 中国語 (繁体字) | リクエスト次第 |
+| 韓国語 | 対応 |
+| 中国語 (簡体字) | 対応 |
+| 中国語 (繁体字) | 対応 |
 | タイ語 | リクエスト次第 |
 | マレー語 | リクエスト次第 |
 
@@ -204,7 +207,7 @@ GitHub をお使いの方は [Issues](https://github.com/NEONS-DESIGN/XViewer-fo
 | `npm run build` | Chrome 系用の `dist/` と Firefox 用の `dist-firefox/` を作る |
 | `npm run build:chrome` / `npm run build:firefox` | 片方だけを作る |
 | `npm run watch` | ビルドの監視モード |
-| `npm test` | `node --test` でテストを走らせる (1111 tests) |
+| `npm test` | `node --test` でテストを走らせる (1124 tests) |
 | `npm run build:icons` | 拡張機能アイコンの PNG を生成する (生成物はコミット済み) |
 | `npm run build:symbols` | UI のアイコン図形データを再生成する (生成物はコミット済み) |
 | `npm run build:site-images` | 紹介サイトの画像 (WebP と OGP 用の JPEG) を書き出す (生成物はコミット済み。元素材の PNG はリポジトリに含まれないため、手元では動かない) |

@@ -34,7 +34,7 @@ function withArea(deps, run, fallback) {
 
 /**
  * 今見ている pixiv の表示言語を覚える。
- * @param {string} language 正規化済みの言語サブタグ
+ * @param {string} language 正規化済みの言語コード (normalizeLanguage の結果)
  * @param {{area?: object}} [deps] 保存領域の差し替え
  * @returns {Promise<boolean>} 書けたら true
  */
@@ -48,7 +48,7 @@ export async function savePageLanguage(language, deps = {}) {
 /**
  * 最後に見た pixiv の表示言語を読む。
  * @param {{area?: object}} [deps] 保存領域の差し替え
- * @returns {Promise<string|null>} 言語サブタグ。無い・壊れていれば null
+ * @returns {Promise<string|null>} 言語コード。無い・壊れていれば null
  */
 export async function loadPageLanguage(deps = {}) {
 	return withArea(deps, async (area) => {

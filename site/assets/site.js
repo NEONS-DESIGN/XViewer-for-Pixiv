@@ -1,5 +1,5 @@
 /**
- * 紹介サイトの最小限の動き。配色の切り替え、動画の停止ボタン、静止画の自動切り替え、先頭へ戻るボタンの出し入れの 4 つだけを持つ。
+ * 紹介サイトの最小限の動き。配色の切り替え、動画の停止ボタン、静止画の自動切り替え、先頭へ戻るボタンの出し入れ、言語メニューを閉じる操作の 5 つだけを持つ。
  * 言語の切り替えと先頭へ戻る動作そのものはただのリンクなので JS は関与しない。(JS が無くても読める)
  */
 (function () {
@@ -258,10 +258,32 @@
 		update();
 	}
 
+	/**
+	 * 言語メニュー (details) に、外側のクリックと Esc で閉じる動きを足す。
+	 * 開閉そのものは details の既定の動きで、JS が無くても言語は選べる。
+	 * @returns {void}
+	 */
+	function wireLangMenu() {
+		var menu = document.querySelector('.lang-menu');
+		if (!menu) return;
+		var summary = menu.querySelector('summary');
+
+		document.addEventListener('click', function (event) {
+			if (menu.open && !menu.contains(event.target)) menu.open = false;
+		});
+		document.addEventListener('keydown', function (event) {
+			if (event.key !== 'Escape' || !menu.open) return;
+			menu.open = false;
+			// 閉じた後もキーボードで続けられるよう、開いたボタンへ戻す
+			if (summary) summary.focus();
+		});
+	}
+
 	document.addEventListener('DOMContentLoaded', function () {
 		wireVideos();
 		wireSlides();
 		wireToTop();
+		wireLangMenu();
 		var button = document.querySelector('.theme-toggle');
 		var stored = readStored();
 		// head の先読みスクリプトが既に属性を付けている。ここでは文言だけ合わせる

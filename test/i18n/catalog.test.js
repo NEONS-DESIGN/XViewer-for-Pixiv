@@ -64,7 +64,8 @@ test('カタログは自分の言語を持つ', () => {
 });
 
 test('未知の言語は既定の言語のカタログになる', () => {
-	assert.equal(createStrings('ko').lang, DEFAULT_LANGUAGE);
+	assert.equal(createStrings('th').lang, DEFAULT_LANGUAGE);
+	assert.equal(createStrings('zh').lang, DEFAULT_LANGUAGE);
 	assert.equal(createStrings('').lang, DEFAULT_LANGUAGE);
 	assert.equal(createStrings(undefined).lang, DEFAULT_LANGUAGE);
 });
@@ -92,5 +93,18 @@ test('日時の書式は言語ごとの形で、時は 24 時間制の 2 桁', (
 	for (const [iso, ja, en] of cases) {
 		assert.equal(createStrings('ja').sidebar.formatDateTime(new Date(iso)), ja, `ja: ${iso}`);
 		assert.equal(createStrings('en').sidebar.formatDateTime(new Date(iso)), en, `en: ${iso}`);
+	}
+});
+
+test('韓国語と中国語の日時も年月日の順で、時は 24 時間制の 2 桁', () => {
+	const cases = [
+		['2026-09-23T13:05:00+09:00', '2026년 9월 23일 13:05', '2026年9月23日 13:05'],
+		['2026-09-23T00:05:00+09:00', '2026년 9월 23일 00:05', '2026年9月23日 00:05'],
+		['2026-01-02T03:05:00+09:00', '2026년 1월 2일 03:05', '2026年1月2日 03:05'],
+	];
+	for (const [iso, ko, zh] of cases) {
+		assert.equal(createStrings('ko').sidebar.formatDateTime(new Date(iso)), ko, `ko: ${iso}`);
+		assert.equal(createStrings('zh-CN').sidebar.formatDateTime(new Date(iso)), zh, `zh-CN: ${iso}`);
+		assert.equal(createStrings('zh-TW').sidebar.formatDateTime(new Date(iso)), zh, `zh-TW: ${iso}`);
 	}
 });

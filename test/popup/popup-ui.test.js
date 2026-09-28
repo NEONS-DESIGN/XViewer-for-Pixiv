@@ -5,6 +5,7 @@ import { createSections } from '../../src/popup/sections.js';
 import { SETTINGS_DEFAULTS, POPUP_THEMES, PREFETCH_CHOICES } from '../../src/common/constants.js';
 import { PROJECT_LICENSE, THIRD_PARTY } from '../../src/common/licenses.js';
 import { createStrings } from '../../src/i18n/index.js';
+import { SUPPORTED_LANGUAGES } from '../../src/common/language.js';
 import { fakeElement, findRole, iconName } from '../helpers/dom.js';
 import { fakePopupDoc } from '../helpers/popup.js';
 
@@ -45,7 +46,7 @@ function build(overrides = {}) {
 
 test('定義表のキーは popupTheme を除く全設定と 1 対 1 に対応する', () => {
 	// タイポしたキーで saveSetting が成功し、読み込み側は既定へ倒すので誰も気づけない
-	for (const lang of ['ja', 'en']) {
+	for (const lang of SUPPORTED_LANGUAGES) {
 		const keys = createSections(createStrings(lang)).flatMap((section) => section.fields.map((field) => field.key));
 		assert.equal(new Set(keys).size, keys.length, 'キーが重複している');
 		assert.deepEqual(new Set([...keys, 'popupTheme']), new Set(Object.keys(SETTINGS_DEFAULTS)));

@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14161c" media="(prefers-color-scheme: dark)">
+<title>隐私政策 - XViewer for Pixiv</title>
+<meta name="description" content="XViewer for Pixiv 的隐私政策。本扩展程序不会收集任何个人信息，也不会发送到作者的服务器。保存的只有用户选择的设置项，以及最后看到的 pixiv 显示语言。">
+<!-- lang:head -->
+<link rel="canonical" href="https://xviewer.neonsdesign.com/zh-cn/privacy.html">
+<link rel="alternate" hreflang="ja" href="https://xviewer.neonsdesign.com/privacy.html">
+<link rel="alternate" hreflang="en" href="https://xviewer.neonsdesign.com/en/privacy.html">
+<link rel="alternate" hreflang="ko" href="https://xviewer.neonsdesign.com/ko/privacy.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xviewer.neonsdesign.com/zh-cn/privacy.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xviewer.neonsdesign.com/zh-tw/privacy.html">
+<link rel="alternate" hreflang="x-default" href="https://xviewer.neonsdesign.com/privacy.html">
+<!-- /lang:head -->
+<link rel="icon" href="../assets/img/icon-32.png" sizes="32x32">
+<link rel="icon" href="../assets/img/icon-128.png" sizes="128x128">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="XViewer for Pixiv">
+<meta property="og:title" content="隐私政策 - XViewer for Pixiv">
+<meta property="og:description" content="本扩展程序不会收集任何个人信息，也不会发送到作者的服务器。">
+<meta property="og:url" content="https://xviewer.neonsdesign.com/zh-cn/privacy.html">
+<meta property="og:locale" content="zh_CN">
+<link rel="stylesheet" href="../assets/style.css">
+<script>
+	/* 描画前に配色をあてて、切り替え時のちらつきを防ぐ */
+	(function () {
+		/* JS が動く印。先頭へ戻るボタンを描画前から隠しておくのに使う (style.css) */
+		document.documentElement.setAttribute('data-js', '');
+		try {
+			var saved = window.localStorage.getItem('xviewer-site-theme');
+			if (saved === 'dark' || saved === 'light') document.documentElement.setAttribute('data-theme', saved);
+		} catch (error) {
+			/* 保存領域が使えなくても OS の設定で描ける */
+		}
+	})();
+</script>
+<script src="../assets/site.js" defer></script>
+</head>
+<body id="top">
+
+<a class="skip-link" href="#main">跳到正文</a>
+
+<header class="site-header">
+	<div class="wrap">
+		<a class="brand" href="./">
+			<img src="../assets/img/icon-128.png" alt="" width="28" height="28">
+			<span>XViewer for Pixiv</span>
+		</a>
+		<nav class="site-nav" aria-label="页面内导航">
+			<a href="./#features">功能</a>
+			<a href="./#settings">设置</a>
+			<a href="./#requirements">运行环境</a>
+			<a href="privacy.html" aria-current="page">隐私</a>
+		</nav>
+		<div class="header-tools">
+			<!-- lang:menu -->
+			<details class="lang-menu">
+				<summary>
+					<svg class="lang-menu-globe" viewBox="0 -960 960 960" aria-hidden="true"><path d="M323-111.5Q250-143 196-197t-85-127.5Q80-398 80-482t31-156.5Q142-711 196-765t127-84.5Q396-880 480-880t157 30.5Q710-819 764-765t85 126.5Q880-566 880-482t-31 157.5Q818-251 764-197t-127 85.5Q564-80 480-80t-157-31.5ZM480-138q35-36 58.5-82.5T577-331H384q14 60 37.5 108t58.5 85Zm-85-12q-25-38-43-82t-30-99H172q38 71 88 111.5T395-150Zm171-1q72-23 129.5-69T788-331H639q-13 54-30.5 98T566-151ZM152-391h159q-3-27-3.5-48.5T307-482q0-25 1-44.5t4-43.5H152q-7 24-9.5 43t-2.5 45q0 26 2.5 46.5T152-391Zm221 0h215q4-31 5-50.5t1-40.5q0-20-1-38.5t-5-49.5H373q-4 31-5 49.5t-1 38.5q0 21 1 40.5t5 50.5Zm275 0h160q7-24 9.5-44.5T820-482q0-26-2.5-45t-9.5-43H649q3 35 4 53.5t1 34.5q0 22-1.5 41.5T648-391Zm-10-239h150q-33-69-90.5-115T565-810q25 37 42.5 80T638-630Zm-254 0h194q-11-53-37-102.5T480-820q-32 27-54 71t-42 119Zm-212 0h151q11-54 28-96.5t43-82.5q-75 19-131 64t-91 115Z"/></svg>
+					<span class="visually-hidden">语言：</span><span>简体中文</span>
+					<svg class="lang-menu-caret" viewBox="0 -960 960 960" aria-hidden="true"><path d="M469-358q-5-2-10-7L261-563q-9-9-8.5-21.5T262-606q9-9 21.5-9t21.5 9l175 176 176-176q9-9 21-8.5t21 9.5q9 9 9 21.5t-9 21.5L501-365q-5 5-10 7t-11 2q-6 0-11-2Z"/></svg>
+				</summary>
+				<ul class="lang-menu-list">
+					<li><a href="../privacy.html" hreflang="ja" lang="ja">日本語</a></li>
+					<li><a href="../en/privacy.html" hreflang="en" lang="en">English</a></li>
+					<li><a href="../ko/privacy.html" hreflang="ko" lang="ko">한국어</a></li>
+					<li><a href="privacy.html" hreflang="zh-CN" lang="zh-CN" aria-current="true">简体中文</a></li>
+					<li><a href="../zh-tw/privacy.html" hreflang="zh-TW" lang="zh-TW">繁體中文</a></li>
+				</ul>
+			</details>
+			<!-- /lang:menu -->
+			<button type="button" class="theme-toggle" aria-label="将配色切换为日间模式"
+				data-label-light="将配色切换为日间模式" data-label-dark="将配色切换为夜间模式">
+				<svg class="icon-moon" viewBox="0 -960 960 960" aria-hidden="true"><path d="M480-120q-150 0-255-105T120-480q0-135 79.5-229T408-830q20-5 34-1t22 15q8 10 7.5 25t-8.5 35q-9 23-14 47t-5 49q0 90 63 153t153 63q25 0 48.5-4.5T754-461q22-8 38-7t26 9q10 8 13 23t-2 36q-27 121-121 200.5T480-120Z"/></svg>
+				<svg class="icon-sun" viewBox="0 -960 960 960" aria-hidden="true"><path d="M338.5-338.5Q280-397 280-480t58.5-141.5Q397-680 480-680t141.5 58.5Q680-563 680-480t-58.5 141.5Q563-280 480-280t-141.5-58.5ZM70-450q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32Q57.25-510 70-510h100q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H70Zm720 0q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h100q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H790ZM458.5-768.63Q450-777.25 450-790v-100q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v100q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63Zm0 720Q450-57.25 450-70v-100q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v100q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63ZM240-678l-57-56q-9-9-8.63-21.6.37-12.61 8.53-21.5 8.89-8.9 21.5-8.9 12.6 0 21.6 9l56 57q8 9 8 21t-8 20.5q-8 8.5-20.5 8.5t-21.5-8Zm494 495-56-57q-8-9-8-21.38 0-12.37 8.5-20.62 8.5-9 20.5-9t21 9l57 56q9 9 8.63 21.6-.37 12.61-8.53 21.5-8.89 8.9-21.5 8.9-12.6 0-21.6-9Zm-56-495q-9-9-9-21t9-21l56-57q9-9 21.6-8.63 12.61.37 21.5 8.53 8.9 8.89 8.9 21.5 0 12.6-9 21.6l-57 56q-8 8-20.36 8-12.37 0-21.64-8ZM182.9-182.9q-8.9-8.89-8.9-21.5 0-12.6 9-21.6l57-56q8.8-9 20.9-9 12.1 0 20.71 9 9.39 9 9.39 21t-9 21l-56 57q-9 9-21.6 8.63-12.61-.37-21.5-8.53Z"/></svg>
+			</button>
+		</div>
+	</div>
+</header>
+
+<main id="main" class="doc">
+	<div class="wrap">
+
+		<h1>隐私政策</h1>
+		<p class="doc-meta">最后更新日期：2026年9月27日 / 制定日期：2026年9月17日</p>
+
+		<div class="summary-box">
+			<p>本扩展程序不会收集任何个人信息。</p>
+			<p>
+				除了你正在浏览的 pixiv 之外，不会向任何地方发送数据。
+				保存的只有你选择的设置项，以及最后看到的 pixiv 显示语言。详情如下。
+			</p>
+		</div>
+
+		<h2>1. 适用范围</h2>
+		<p>
+			本政策适用于浏览器扩展程序“XViewer for Pixiv”（在 Chrome 应用商店、Edge 加载项和 Firefox 附加组件上发布的版本，以下简称“本扩展程序”）以及本网站
+			（<code>xviewer.neonsdesign.com</code>）。
+		</p>
+		<p>
+			本扩展程序是一款为 pixiv（https://www.pixiv.net/）的用户页面添加独立图片查看器的非官方工具。
+			它并非由 pixiv Inc. 制作或发布，与该公司没有任何关系。
+			关于 pixiv 本身对个人信息的处理，请参阅 pixiv Inc. 的隐私政策。
+		</p>
+
+		<h2>2. 不收集的信息</h2>
+		<p>本扩展程序不收集以下任何信息，既不获取，也不保存，更不发送。</p>
+		<ul>
+			<li><strong>可识别个人身份的信息</strong> — 姓名、地址、电子邮件地址、年龄、个人识别号码等</li>
+			<li><strong>健康信息</strong></li>
+			<li><strong>财务状况和支付信息</strong></li>
+			<li><strong>身份验证信息</strong> — 密码、凭据、安全问题、PIN 码等</li>
+			<li><strong>个人通信</strong> — 电子邮件、消息等</li>
+			<li><strong>位置信息</strong> — 地区、IP 地址、GPS 坐标等</li>
+			<li><strong>网络浏览记录</strong> — 浏览过的页面列表及其相关数据</li>
+			<li><strong>用户活动</strong> — 点击、鼠标位置、滚动、按键输入的记录等</li>
+			<li><strong>网站内容</strong> — 保存图片、文字、音频、视频等，或将其发送到外部</li>
+		</ul>
+		<p>
+			本扩展程序会为了在查看器中显示而加载 pixiv 的图片、作品说明和评论，
+			但这些内容只会为了在屏幕上显示而在浏览器的内存中处理。
+			既不会被保存，也不会被发送到包括作者在内的第三方能够获取的地方。
+		</p>
+		<p>
+			你在弹窗中写的评论和回复也是一样。
+			点击发送按钮时，内容只会原样提交给 pixiv 自身的 API，本扩展程序不会保存，
+			也不会发送给包括作者在内的第三方。所发表评论的公开范围和处理方式，
+			与在 pixiv 网站的评论栏中发表时完全相同。
+		</p>
+
+		<h2>3. 保存的信息</h2>
+		<p>
+			本扩展程序保存的信息有 2 种。一种是在弹出页面中选择的设置，
+			另一种是最后看到的 pixiv 显示语言。两者的保存位置不同，详情如下。
+		</p>
+		<p>
+			设置保存在浏览器的设置同步存储（<code>chrome.storage.sync</code>）中，
+			位于你的浏览器内；如果你启用了浏览器同步，还会保存在该浏览器的账户中
+			（Chrome 为 Google 账户，Edge 为 Microsoft 账户，Firefox 为 Mozilla 账户）。
+			包括作者在内的第三方都无法读取这些内容。
+		</p>
+		<p>保存的设置为以下 11 项。每一项都是布尔值，或者是固定选项中的一个。</p>
+		<ul>
+			<li>是否使用查看器</li>
+			<li>图片分辨率</li>
+			<li>预加载的张数</li>
+			<li>是否显示侧边栏</li>
+			<li>侧边栏的滚动方式</li>
+			<li>点击背景时是否关闭</li>
+			<li>点击时是否查看原图</li>
+			<li>网格中 Tab 键导航的方式</li>
+			<li>是否隐藏精选栏</li>
+			<li>无限滚动的行为</li>
+			<li>设置页面的配色</li>
+		</ul>
+		<p>
+			浏览过的作品 ID、用户 ID、浏览记录，以及点赞和收藏的记录，一概不会保存。
+		</p>
+		<p>
+			设置页面（弹出页面）不属于 pixiv 的页面，因此无法自行判断显示语言。
+			为此，在 pixiv 页面上运行的脚本会将其看到的显示语言保存到 <code>chrome.storage.local</code> 中，
+			再由设置页面读取。保存的值只有 <code>ja</code> 或 <code>en</code> 这样的 1 个语言代码，
+			不包含任何可识别个人身份的信息。该存储区域只存在于设备本地，也不会参与浏览器同步。
+		</p>
+
+		<h3>删除已保存的信息</h3>
+		<p>
+			点击设置页面中的“重置设置”，已保存的值将恢复为默认值。
+			从浏览器中移除本扩展程序后，存储区域也会一并删除。
+		</p>
+
+		<h2>4. 通信对象</h2>
+		<p>
+			本扩展程序没有服务器，完全不会与作者管理的服务器通信。
+			只与你已经打开的 pixiv 及其图片分发服务器通信。
+		</p>
+		<ul>
+			<li><code>https://www.pixiv.net/</code> — 获取作品信息、评论和作者信息。发送点赞、收藏、关注、发表评论和回复、删除自己的评论（均仅在你点击按钮时）</li>
+			<li><code>https://i.pximg.net/</code> — 加载作品图片和动图数据</li>
+			<li><code>https://s.pximg.net/</code> — 加载评论中贴图和表情的图片</li>
+		</ul>
+		<p>
+			以上通信在使用普通浏览器浏览 pixiv 时同样会发生。
+			本扩展程序没有加入任何访问统计、广告或崩溃报告之类的功能。
+		</p>
+
+		<h2>5. 请求的权限及其理由</h2>
+		<p>本扩展程序请求的权限只有以下 2 项。不请求访问其他网站的权限。</p>
+		<h3><code>storage</code></h3>
+		<p>
+			用于保存上述设置以及最后看到的 pixiv 显示语言。设置在工具栏的弹出页面中更改，
+			由在 pixiv 页面上运行的脚本读取，因此需要一种在两者之间共享数值的方式。
+			显示语言则正好相反，由在 pixiv 页面上运行的脚本写入，再由弹出页面读取。
+		</p>
+		<h3><code>https://www.pixiv.net/*</code></h3>
+		<p>
+			这是为了显示查看器而在 pixiv 页面上运行脚本的权限。
+			用于更改页面的显示、以你的登录状态调用 pixiv 自身的 API，
+			以及检测页面跳转。该权限仅限于这 1 个网站，
+			不请求针对其他网站或所有网站的权限。
+		</p>
+
+		<h2>6. Cookie 和身份验证信息的处理</h2>
+		<p>
+			本扩展程序不会读取你的 Cookie。
+			调用 pixiv 的 API 时，浏览器会像普通浏览页面时一样附带登录状态。
+			本扩展程序不会处理登录信息本身。
+		</p>
+		<p>
+			点赞、收藏、关注、发表评论和回复、删除自己的评论，
+			只会在你点击弹窗中的按钮时执行，不会自动发送。
+			另外，由于 pixiv 的机制，赞无法取消。删除评论后也无法恢复，因此设有两步确认。
+		</p>
+
+		<h2>7. 向第三方提供</h2>
+		<p>
+			由于没有收集任何信息，因此也没有向第三方提供的信息。
+			本扩展程序不会出售、转让或共享用户的数据。
+			此外，不会将数据用于与单一用途（为 pixiv 的用户页面添加图片查看器）无关的目的，
+			也不会用于信用评估或贷款目的。
+		</p>
+
+		<h2>8. 关于本网站</h2>
+		<p>
+			本网站是发布在 GitHub Pages（GitHub, Inc.）上的静态页面。
+			完全不使用访问统计、广告、外部字体和外部脚本。
+			本网站也不会设置 Cookie。
+		</p>
+		<p>
+			不过，托管服务商 GitHub, Inc. 可能会在提供服务的过程中记录访问日志
+			（IP 地址等）。这些日志不由作者管理。
+			详情请参阅 GitHub 的隐私声明。
+		</p>
+		<p>
+			另外，本网站刊登的静态截图是为了说明功能而使用的演示用虚拟数据，
+			并非真实的作品信息或评论。
+		</p>
+		<p>
+			而说明无限滚动的视频，则是实际浏览 pixiv 公开账户时的屏幕录像。
+			其中显示的作品信息和计数均未经加工。
+		</p>
+
+		<h2>9. 关于儿童的使用</h2>
+		<p>
+			本扩展程序不会从任何用户处收集个人信息。无论年龄大小，这一点都不会改变。
+			另外，有年龄限制的作品的显示遵循 pixiv 的设置。
+			本扩展程序不会绕过年龄限制。
+		</p>
+
+		<h2>10. 本政策的变更</h2>
+		<p>
+			变更本政策时，将更新此页面，并修改开头的最后更新日期。
+			进行重要变更时，也会在扩展程序的更新说明中告知。
+		</p>
+
+		<h2>11. 联系方式</h2>
+		<p>关于本政策及本扩展程序的咨询、问题反馈、疑问和需求，请通过以下方式联系。</p>
+		<ul>
+			<li>联系表单（问题反馈、咨询、需求）：<a href="https://forms.gle/C7AWaUHWmwnoeDV66" target="_blank" rel="noopener">打开 Google 表单</a>。表单为英文，但可以直接用中文填写。</li>
+			<li>GitHub 的 Issues：<a href="https://github.com/NEONS-DESIGN/XViewer-for-Pixiv/issues" target="_blank" rel="noopener">面向开发者的渠道</a>（需要 GitHub 账户）</li>
+		</ul>
+
+		<h3>联系表单接收的信息</h3>
+		<p>联系表单使用的是 Google 表单。接收的只有你填写的以下 3 项内容。</p>
+		<ul>
+			<li><strong>咨询类型</strong>（必填）— 提问 / 问题反馈 / 功能需求之一</li>
+			<li><strong>咨询内容</strong>（必填）</li>
+			<li><strong>电子邮件地址</strong>（选填）— 仅在希望收到回复时填写</li>
+		</ul>
+		<p>
+			该表单不要求登录 Google 账户，也不会自动记录已登录账户的电子邮件地址。
+			如果不填写电子邮件地址，作者将无法与你取得联系。
+		</p>
+		<p>
+			收到的内容仅用于回复你，以及修复本扩展程序的问题和改进功能。
+			不会提供给作者以外的任何第三方。
+		</p>
+		<p>
+			表单的提交内容保存在 Google 的服务中。打开或提交表单时 Google 对信息的处理，
+			遵循 Google 的隐私政策。
+			写在 GitHub Issues 中的内容会发布在任何人都能阅读的公开场所，请不要写入个人信息。
+		</p>
+
+	</div>
+</main>
+
+<!-- 先頭へ戻るボタン。1 画面分スクロールするまで site.js が隠す。図形は Material Symbols (Apache-2.0) -->
+<a class="to-top" href="#top" aria-label="返回页面顶部" title="返回页面顶部">
+	<svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M469-358q-5-2-10-7L261-563q-9-9-8.5-21.5T262-606q9-9 21.5-9t21.5 9l175 176 176-176q9-9 21-8.5t21 9.5q9 9 9 21.5t-9 21.5L501-365q-5 5-10 7t-11 2q-6 0-11-2Z"/></svg>
+</a>
+
+<footer class="site-footer">
+	<div class="wrap">
+		<div class="footer-grid">
+			<div>
+				<a class="brand" href="./">
+					<img src="../assets/img/icon-128.png" alt="" width="28" height="28">
+					<span>XViewer for Pixiv</span>
+				</a>
+			</div>
+			<ul class="footer-links">
+				<li><a href="./">首页</a></li>
+				<li><a href="https://github.com/NEONS-DESIGN/XViewer-for-Pixiv" target="_blank" rel="noopener">GitHub</a></li>
+				<li><a href="https://forms.gle/C7AWaUHWmwnoeDV66" target="_blank" rel="noopener">联系我们</a></li>
+				<!-- lang:footer -->
+				<li><a href="../privacy.html" hreflang="ja" lang="ja">日本語</a></li>
+				<li><a href="../en/privacy.html" hreflang="en" lang="en">English</a></li>
+				<li><a href="../ko/privacy.html" hreflang="ko" lang="ko">한국어</a></li>
+				<li><a href="../zh-tw/privacy.html" hreflang="zh-TW" lang="zh-TW">繁體中文</a></li>
+				<!-- /lang:footer -->
+			</ul>
+		</div>
+		<div class="footer-note">
+			<p>pixiv 是 pixiv Inc. 的注册商标。本网站及本扩展程序与 pixiv Inc. 没有任何关系。</p>
+			<p>图标图形使用了 Material Symbols（<a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank" rel="noopener">Apache License 2.0</a>）和 Font Awesome Free（<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>）。</p>
+		</div>
+		<p class="footer-copyright">&copy; 2026 NEONS</p>
+	</div>
+</footer>
+
+</body>
+</html>

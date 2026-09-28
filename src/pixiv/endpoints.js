@@ -14,26 +14,25 @@ const AJAX = '/ajax';
  *
  * pixiv は lang= に未知の値を渡してもエラーにせず、常に 200 で黙って英語の翻訳へ倒す。
  * だから綴りを外しても API 呼び出しは壊れない。ただし**英語になってしまう**ので、
- * 実測で翻訳が返ると確かめられた値だけをここへ足す。(2026-09-23 実測: ja / en / ko / zh は効く。
- * zh_tw もアンダースコア区切りなら効くが、ハイフン形や th / ru / es などその他の言語は英語へ倒れる)
+ * 実測で翻訳が返ると確かめられた値だけをここへ足す。(2026-09-23 実測: ja / en / ko / zh / zh_tw は効く。
+ * ハイフン形 (zh-TW / zh-cn) や th / ru / es などその他の言語は英語へ倒れる)
  *
- * **繁体字中国語は含めない。** pixiv 側は `zh_tw` でないと効かないが、documentElement.lang
- * から取った値は normalizeLanguage (common/language.js) が `zh` へ切り詰めてしまうため、
- * ここへ `zh_tw` を足しても呼び出し元から渡ってこない。結果として繁体字の利用者には
- * 簡体字の翻訳が返る。これは既知の制限で、normalizeLanguage 側を直さない限り解消しない。
+ * キーは UI の言語 (strings.lang)、値は pixiv が受け付ける綴り。中国語だけ綴りが違い、
+ * 簡体字は `zh`、繁体字は `zh_tw` (アンダースコア) でないと翻訳が返らない。
  */
-const API_LANGUAGES = Object.freeze(['ja', 'en', 'ko', 'zh']);
+const API_LANGUAGES = Object.freeze({ ja: 'ja', en: 'en', ko: 'ko', 'zh-CN': 'zh', 'zh-TW': 'zh_tw' });
 
 /** 未検証の言語のときに送る値。 */
 const DEFAULT_API_LANGUAGE = 'ja';
 
 /**
  * API へ渡す言語のクエリを組む。
- * @param {string} lang 言語サブタグ (strings.lang)
+ * @param {string} lang 言語コード (strings.lang)
  * @returns {string} 'lang=ja' の形
  */
 export function langParam(lang) {
-	return `lang=${API_LANGUAGES.includes(lang) ? lang : DEFAULT_API_LANGUAGE}`;
+	const value = Object.hasOwn(API_LANGUAGES, lang) ? API_LANGUAGES[lang] : DEFAULT_API_LANGUAGE;
+	return `lang=${value}`;
 }
 
 /** pixiv 本体のオリジン。投稿文の相対リンクを解決する基準に使う。 */
@@ -162,7 +161,7 @@ export function stampUrl(stampId) {
 /**
  * 作品詳細。
  * @param {string} illustId 作品 ID
- * @param {string} lang 言語サブタグ (strings.lang)
+ * @param {string} lang 言語コード (strings.lang)
  * @returns {string} URL
  */
 export function illustUrl(illustId, lang) {
@@ -172,7 +171,7 @@ export function illustUrl(illustId, lang) {
 /**
  * 作品の全ページ。R-18 を表示できないときは 404 が返る。(異常ではない)
  * @param {string} illustId 作品 ID
- * @param {string} lang 言語サブタグ (strings.lang)
+ * @param {string} lang 言語コード (strings.lang)
  * @returns {string} URL
  */
 export function illustPagesUrl(illustId, lang) {
@@ -182,7 +181,7 @@ export function illustPagesUrl(illustId, lang) {
 /**
  * うごイラのフレーム情報と zip の場所。illustType === 2 のみ有効。
  * @param {string} illustId 作品 ID
- * @param {string} lang 言語サブタグ (strings.lang)
+ * @param {string} lang 言語コード (strings.lang)
  * @returns {string} URL
  */
 export function ugoiraMetaUrl(illustId, lang) {
@@ -194,7 +193,7 @@ export function ugoiraMetaUrl(illustId, lang) {
  * @param {string} illustId 作品 ID
  * @param {number} offset 取得開始位置
  * @param {number} limit 取得件数
- * @param {string} lang 言語サブタグ (strings.lang)
+ * @param {string} lang 言語コード (strings.lang)
  * @returns {string} URL
  */
 export function commentRootsUrl(illustId, offset, limit, lang) {
@@ -206,7 +205,7 @@ export function commentRootsUrl(illustId, offset, limit, lang) {
  * offset/limit ではなく 1 始まりの page で送る。(SITE_SPEC §4 実測)
  * @param {string} commentId ルートコメントの ID
  * @param {number} page ページ番号。1 始まり
- * @param {string} lang 言語サブタグ (strings.lang)
+ * @param {string} lang 言語コード (strings.lang)
  * @returns {string} URL
  */
 export function commentRepliesUrl(commentId, page, lang) {
@@ -216,7 +215,7 @@ export function commentRepliesUrl(commentId, page, lang) {
 /**
  * ユーザー情報。
  * @param {string} userId ユーザー ID
- * @param {string} lang 言語サブタグ (strings.lang)
+ * @param {string} lang 言語コード (strings.lang)
  * @returns {string} URL
  */
 export function userUrl(userId, lang) {
@@ -226,7 +225,7 @@ export function userUrl(userId, lang) {
 /**
  * ユーザーの全作品 ID。値は null で、キーだけが意味を持つ。
  * @param {string} userId ユーザー ID
- * @param {string} lang 言語サブタグ (strings.lang)
+ * @param {string} lang 言語コード (strings.lang)
  * @returns {string} URL
  */
 export function userProfileAllUrl(userId, lang) {
@@ -242,7 +241,7 @@ export function userProfileAllUrl(userId, lang) {
  * @param {string[]} ids 作品 ID の配列
  * @param {boolean} isFirstPage 一覧の 1 ページ目か
  * @param {string|null} category 絞り込む種別 (WORK_CATEGORY)。null なら両方
- * @param {string} lang 言語サブタグ (strings.lang)
+ * @param {string} lang 言語コード (strings.lang)
  * @returns {string} URL
  */
 export function userProfileIllustsUrl(userId, ids, isFirstPage, category, lang) {

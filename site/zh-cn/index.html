@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14161c" media="(prefers-color-scheme: dark)">
+<title>XViewer for Pixiv - 为 pixiv 添加 X 风格图片查看器的浏览器扩展程序</title>
+<meta name="description" content="在 pixiv 的用户页面点击作品后，无需跳转页面，就会在当前页面打开弹窗。多张图片的切换、动图的播放、作品说明和评论的阅读乃至发表，都能在弹窗中完成。这是一款非官方的浏览器扩展程序，支持 Chrome / Edge / Firefox。">
+<!-- lang:head -->
+<link rel="canonical" href="https://xviewer.neonsdesign.com/zh-cn/">
+<link rel="alternate" hreflang="ja" href="https://xviewer.neonsdesign.com/">
+<link rel="alternate" hreflang="en" href="https://xviewer.neonsdesign.com/en/">
+<link rel="alternate" hreflang="ko" href="https://xviewer.neonsdesign.com/ko/">
+<link rel="alternate" hreflang="zh-CN" href="https://xviewer.neonsdesign.com/zh-cn/">
+<link rel="alternate" hreflang="zh-TW" href="https://xviewer.neonsdesign.com/zh-tw/">
+<link rel="alternate" hreflang="x-default" href="https://xviewer.neonsdesign.com/">
+<!-- /lang:head -->
+<link rel="icon" href="../assets/img/icon-32.png" sizes="32x32">
+<link rel="icon" href="../assets/img/icon-128.png" sizes="128x128">
+<link rel="apple-touch-icon" href="../assets/img/icon-128.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="XViewer for Pixiv">
+<meta property="og:title" content="XViewer for Pixiv">
+<meta property="og:description" content="一款浏览器扩展程序，为 pixiv 用户页面添加接近 X.com 媒体浏览体验的图片查看器。支持 Chrome / Edge / Firefox。">
+<meta property="og:url" content="https://xviewer.neonsdesign.com/zh-cn/">
+<meta property="og:image" content="https://xviewer.neonsdesign.com/assets/img/og-viewer-en.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1920">
+<meta property="og:image:height" content="1024">
+<meta property="og:image:alt" content="pixiv 作品在弹窗中打开，右侧侧边栏中排列着作品说明、标签、计数和评论的界面">
+<meta property="og:locale" content="zh_CN">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="../assets/style.css">
+<script>
+	/* 描画前に配色をあてて、切り替え時のちらつきを防ぐ */
+	(function () {
+		/* JS が動く印。先頭へ戻るボタンを描画前から隠しておくのに使う (style.css) */
+		document.documentElement.setAttribute('data-js', '');
+		try {
+			var saved = window.localStorage.getItem('xviewer-site-theme');
+			if (saved === 'dark' || saved === 'light') document.documentElement.setAttribute('data-theme', saved);
+		} catch (error) {
+			/* 保存領域が使えなくても OS の設定で描ける */
+		}
+	})();
+</script>
+<script src="../assets/site.js" defer></script>
+<script type="application/ld+json">
+{
+	"@context": "https://schema.org",
+	"@graph": [
+		{
+			"@type": "WebSite",
+			"url": "https://xviewer.neonsdesign.com/zh-cn/",
+			"name": "XViewer for Pixiv",
+			"inLanguage": "zh-CN",
+			"description": "介绍一款浏览器扩展程序的网站。该扩展程序为 pixiv 用户页面添加接近 X.com 媒体浏览体验的图片查看器。"
+		},
+		{
+			"@type": "SoftwareApplication",
+			"name": "XViewer for Pixiv",
+			"url": "https://xviewer.neonsdesign.com/zh-cn/",
+			"applicationCategory": "BrowserApplication",
+			"operatingSystem": "Windows, macOS, Linux, ChromeOS",
+			"softwareRequirements": "Chrome 120 及以上版本的 Chromium 内核浏览器（Chrome / Brave / Edge），或 Firefox 140 及以上版本（桌面版）",
+			"inLanguage": "zh-CN",
+			"description": "一款非官方的浏览器扩展程序。在 pixiv 的用户页面点击作品后，无需跳转页面，就会在当前页面打开弹窗。多张图片的切换、动图的播放、作品说明和评论的阅读乃至发表，都能在弹窗中完成。",
+			"isAccessibleForFree": true,
+			"license": "https://opensource.org/licenses/MIT",
+			"sameAs": "https://github.com/NEONS-DESIGN/XViewer-for-Pixiv",
+			"offers": {
+				"@type": "Offer",
+				"price": "0",
+				"priceCurrency": "CNY"
+			},
+			"screenshot": [
+				"https://xviewer.neonsdesign.com/assets/img/shot-viewer-en.webp",
+				"https://xviewer.neonsdesign.com/assets/img/shot-comments-en.webp",
+				"https://xviewer.neonsdesign.com/assets/img/shot-comment-form-en.webp",
+				"https://xviewer.neonsdesign.com/assets/img/shot-popup-en.webp"
+			],
+			"featureList": [
+				"无需跳转页面，在弹窗中打开作品",
+				"用键盘切换多张图片的作品",
+				"播放动图",
+				"在侧边栏中显示作品说明、标签、计数和评论",
+				"点赞、收藏、关注和发表评论",
+				"用户页面的无限滚动"
+			]
+		}
+	]
+}
+</script>
+</head>
+<body id="top">
+
+<a class="skip-link" href="#main">跳到正文</a>
+
+<!-- アイコンの図形。出典は Material Symbols (Apache-2.0)。ブラウザのロゴは Wikimedia Commons から取り、svgo で縮めた。どちらもフッターに表示している -->
+<svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+	<defs>
+		<symbol id="i-open" viewBox="0 -960 960 960"><path d="M180-120q-24 0-42-18t-18-42v-600q0-24 18-42t42-18h249q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H180v600h600v-249q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v249q0 24-18 42t-42 18H180Zm600-617L403-360q-9 9-21 8.5t-21-9.5q-9-9-9-21t9-21l377-377H549q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h261q12.75 0 21.38 8.62Q840-822.75 840-810v261q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63-8.5-8.62-8.5-21.37v-188Z"/></symbol>
+		<symbol id="i-next" viewBox="0 -960 960 960"><path d="M530-481 353-658q-9-9-8.5-21t9.5-21q9-9 21.5-9t21.5 9l198 198q5 5 7 10t2 11q0 6-2 11t-7 10L396-261q-9 9-21 8.5t-21-9.5q-9-9-9-21.5t9-21.5l176-176Z"/></symbol>
+		<symbol id="i-play" viewBox="0 -960 960 960"><path d="M320-258v-450q0-14 9-22t21-8q4 0 8 1t8 3l354 226q7 5 10.5 11t3.5 14q0 8-3.5 14T720-458L366-232q-4 2-8 3t-8 1q-12 0-21-8t-9-22Z"/></symbol>
+		<symbol id="i-zoom" viewBox="0 -960 960 960"><path d="M600.5-379.62q49.5-49.62 49.5-120.5T600.38-620.5Q550.76-670 479.88-670T359.5-620.38Q310-570.76 310-499.88t49.62 120.38q49.62 49.5 120.5 49.5t120.38-49.62Zm-200-41.12q-32.5-32.73-32.5-79.5 0-46.76 32.74-79.26 32.73-32.5 79.5-32.5 46.76 0 79.26 32.74 32.5 32.73 32.5 79.5 0 46.76-32.74 79.26-32.73 32.5-79.5 32.5-46.76 0-79.26-32.74ZM234.5-276Q124-352 57-470q-4-7.13-6-14.65-2-7.52-2-15.43 0-7.92 2-15.38 2-7.47 6-14.54 67-118 177.5-194T480-800q135 0 245.5 76T903-530q4 7.12 6 14.65 2 7.52 2 15.43 0 7.92-2 15.38-2 7.47-6 14.54-67 118-177.5 194T480-200q-135 0-245.5-76Z"/></symbol>
+		<symbol id="i-comment" viewBox="0 -960 960 960"><path d="M270-400h420q13 0 21.5-8.5T720-430q0-13-8.5-21.5T690-460H270q-13 0-21.5 8.5T240-430q0 13 8.5 21.5T270-400Zm0-130h420q13 0 21.5-8.5T720-560q0-13-8.5-21.5T690-590H270q-13 0-21.5 8.5T240-560q0 13 8.5 21.5T270-530Zm0-130h420q13 0 21.5-8.5T720-690q0-13-8.5-21.5T690-720H270q-13 0-21.5 8.5T240-690q0 13 8.5 21.5T270-660ZM140-240q-24 0-42-18t-18-42v-520q0-24 18-42t42-18h680q24 0 42 18t18 42v668q0 20-18.5 27.5T829-131L720-240H140Z"/></symbol>
+		<symbol id="i-like" viewBox="0 -960 960 960"><path d="M458-144q-11-4-19-12l-53-49Q262-320 171-424.5T80-643q0-90 60.5-150.5T290-854q51 0 101 24.5t89 80.5q44-56 91-80.5t99-24.5q89 0 149.5 60.5T880-643q0 114-91 218.5T574-205l-53 49q-8 8-19 12t-22 4q-11 0-22-4Z"/></symbol>
+		<symbol id="i-scroll" viewBox="0 -960 960 960"><path d="M469-358q-5-2-10-7L261-563q-9-9-8.5-21.5T262-606q9-9 21.5-9t21.5 9l175 176 176-176q9-9 21-8.5t21 9.5q9 9 9 21.5t-9 21.5L501-365q-5 5-10 7t-11 2q-6 0-11-2Z"/></symbol>
+		<symbol id="i-theme" viewBox="0 -960 960 960"><path d="M480-120q-150 0-255-105T120-480q0-135 79.5-229T408-830q20-5 34-1t22 15q8 10 7.5 25t-8.5 35q-9 23-14 47t-5 49q0 90 63 153t153 63q25 0 48.5-4.5T754-461q22-8 38-7t26 9q10 8 13 23t-2 36q-27 121-121 200.5T480-120Z"/></symbol>
+		<!-- ブラウザのロゴ (各社の商標)。Chrome: Google (パブリックドメイン) / Edge: Microsoft (MIT) / Firefox: Mozilla (MPL-2.0) -->
+		<symbol id="i-chrome" viewBox="0 0 48 48"><defs><linearGradient id="chrome-a" x1="3.22" x2="44.78" y1="15" y2="15" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#d93025"/><stop offset="1" stop-color="#ea4335"/></linearGradient><linearGradient id="chrome-b" x1="20.72" x2="41.5" y1="47.68" y2="11.68" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fcc934"/><stop offset="1" stop-color="#fbbc04"/></linearGradient><linearGradient id="chrome-c" x1="26.6" x2="5.82" y1="46.5" y2="10.51" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#1e8e3e"/><stop offset="1" stop-color="#34a853"/></linearGradient></defs><circle cx="24" cy="23.99" r="12" fill="#fff"/><path fill="none" d="M3.22 36A24 24 0 1 0 12 3.22 24 24 0 0 0 3.22 36m31.17-18A12 12 0 1 1 18 13.6 12 12 0 0 1 34.4 18"/><path fill="url(#chrome-a)" d="M24 12h20.78a24 24 0 0 0-41.56 0L13.6 30A11.99 11.99 0 0 1 24 12"/><circle cx="24" cy="24" r="9.5" fill="#1a73e8"/><path fill="url(#chrome-b)" d="M34.4 30 24 48a24 24 0 0 0 20.78-36H24v.01a11.99 11.99 0 0 1 10.4 18"/><path fill="url(#chrome-c)" d="M13.6 30 3.23 12A24 24 0 0 0 24 48l10.4-18h-.01a11.99 11.99 0 0 1-20.78 0"/></symbol>
+		<symbol id="i-edge" viewBox="0 0 256 256"><defs><radialGradient id="edge-b" cx="161.8" cy="68.9" r="95.4" gradientTransform="matrix(1 0 0 -.95 0 248.8)" gradientUnits="userSpaceOnUse"><stop offset=".7" stop-opacity="0"/><stop offset=".9" stop-opacity=".5"/><stop offset="1"/></radialGradient><radialGradient id="edge-d" cx="-340.3" cy="63" r="143.2" gradientTransform="matrix(.15 -.99 -.8 -.12 176.6 -125.4)" gradientUnits="userSpaceOnUse"><stop offset=".8" stop-opacity="0"/><stop offset=".9" stop-opacity=".5"/><stop offset="1"/></radialGradient><radialGradient id="edge-e" cx="113.4" cy="570.2" r="202.4" gradientTransform="matrix(-.04 1 2.13 .08 -1179.5 -106.7)" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#35c1f1"/><stop offset=".1" stop-color="#34c1ed"/><stop offset=".2" stop-color="#2fc2df"/><stop offset=".3" stop-color="#2bc3d2"/><stop offset=".7" stop-color="#36c752"/></radialGradient><radialGradient id="edge-f" cx="376.5" cy="568" r="97.3" gradientTransform="matrix(.28 .96 .78 -.23 -303.8 -148.5)" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#66eb6e"/><stop offset="1" stop-color="#66eb6e" stop-opacity="0"/></radialGradient><linearGradient id="edge-a" x1="63.3" x2="241.7" y1="84" y2="84" gradientTransform="matrix(1 0 0 -1 0 266)" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#0c59a4"/><stop offset="1" stop-color="#114a8b"/></linearGradient><linearGradient id="edge-c" x1="157.3" x2="46" y1="161.4" y2="40.1" gradientTransform="matrix(1 0 0 -1 0 266)" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#1b9de2"/><stop offset=".2" stop-color="#1595df"/><stop offset=".7" stop-color="#0680d7"/><stop offset="1" stop-color="#0078d4"/></linearGradient></defs><path fill="url(#edge-a)" d="M235.7 195.5a94 94 0 0 1-10.6 4.7 102 102 0 0 1-35.9 6.4c-47.3 0-88.5-32.5-88.5-74.3a31.5 31.5 0 0 1 16.4-27.3c-42.8 1.8-53.8 46.4-53.8 72.5 0 74 68.1 81.4 82.8 81.4 7.9 0 19.8-2.3 27-4.6l1.3-.4a128.3 128.3 0 0 0 66.6-52.8 4 4 0 0 0-5.3-5.6" transform="translate(-4.6 -5)"/><path fill="url(#edge-b)" d="M235.7 195.5a94 94 0 0 1-10.6 4.7 102 102 0 0 1-35.9 6.4c-47.3 0-88.5-32.5-88.5-74.3a31.5 31.5 0 0 1 16.4-27.3c-42.8 1.8-53.8 46.4-53.8 72.5 0 74 68.1 81.4 82.8 81.4 7.9 0 19.8-2.3 27-4.6l1.3-.4a128.3 128.3 0 0 0 66.6-52.8 4 4 0 0 0-5.3-5.6" opacity=".35" style="isolation:isolate" transform="translate(-4.6 -5)"/><path fill="url(#edge-c)" d="M110.3 246.3A79 79 0 0 1 87.6 225a80.7 80.7 0 0 1 29.5-120c3.2-1.5 8.5-4.1 15.6-4a32.4 32.4 0 0 1 25.7 13 32 32 0 0 1 6.3 18.7c0-.2 24.5-79.6-80-79.6-43.9 0-80 41.6-80 78.2a130 130 0 0 0 12.1 56 128 128 0 0 0 156.4 67 75.5 75.5 0 0 1-62.8-8Z" transform="translate(-4.6 -5)"/><path fill="url(#edge-d)" d="M110.3 246.3A79 79 0 0 1 87.6 225a80.7 80.7 0 0 1 29.5-120c3.2-1.5 8.5-4.1 15.6-4a32.4 32.4 0 0 1 25.7 13 32 32 0 0 1 6.3 18.7c0-.2 24.5-79.6-80-79.6-43.9 0-80 41.6-80 78.2a130 130 0 0 0 12.1 56 128 128 0 0 0 156.4 67 75.5 75.5 0 0 1-62.8-8Z" opacity=".41" style="isolation:isolate" transform="translate(-4.6 -5)"/><path fill="url(#edge-e)" d="M157 153.8c-.9 1-3.4 2.5-3.4 5.6 0 2.6 1.7 5.2 4.8 7.3 14.3 10 41.4 8.6 41.5 8.6a59.6 59.6 0 0 0 30.3-8.3 61.4 61.4 0 0 0 30.4-52.9c.3-22.4-8-37.3-11.3-43.9C228 28.8 182.3 5 132.6 5a128 128 0 0 0-128 126.2c.5-36.5 36.8-66 80-66 3.5 0 23.5.3 42 10a72.6 72.6 0 0 1 30.9 29.3c6.1 10.6 7.2 24.1 7.2 29.5s-2.7 13.3-7.8 19.9Z" transform="translate(-4.6 -5)"/><path fill="url(#edge-f)" d="M157 153.8c-.9 1-3.4 2.5-3.4 5.6 0 2.6 1.7 5.2 4.8 7.3 14.3 10 41.4 8.6 41.5 8.6a59.6 59.6 0 0 0 30.3-8.3 61.4 61.4 0 0 0 30.4-52.9c.3-22.4-8-37.3-11.3-43.9C228 28.8 182.3 5 132.6 5a128 128 0 0 0-128 126.2c.5-36.5 36.8-66 80-66 3.5 0 23.5.3 42 10a72.6 72.6 0 0 1 30.9 29.3c6.1 10.6 7.2 24.1 7.2 29.5s-2.7 13.3-7.8 19.9Z" transform="translate(-4.6 -5)"/></symbol>
+		<!-- Firefox logo: This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/ -->
+		<symbol id="i-firefox" viewBox="0 0 512 512"><defs><radialGradient id="firefox-g" cx="210%" cy="-100%" r="290%"><stop offset=".1" stop-color="#ffe226"/><stop offset=".79" stop-color="#ff7139"/></radialGradient><radialGradient id="firefox-c" cx="49%" cy="40%" r="128%" gradientTransform="matrix(.82 0 0 1 .09 0)"><stop offset=".3" stop-color="#960e18"/><stop offset=".35" stop-color="#b11927" stop-opacity=".74"/><stop offset=".43" stop-color="#db293d" stop-opacity=".34"/><stop offset=".5" stop-color="#f5334b" stop-opacity=".09"/><stop offset=".53" stop-color="#ff3750" stop-opacity="0"/></radialGradient><radialGradient id="firefox-d" cx="48%" cy="-12%" r="140%"><stop offset=".13" stop-color="#fff44f"/><stop offset=".53" stop-color="#ff980e"/></radialGradient><radialGradient id="firefox-e" cx="22.76%" cy="110.11%" r="100%"><stop offset=".35" stop-color="#3a8ee6"/><stop offset=".67" stop-color="#9059ff"/><stop offset="1" stop-color="#c139e6"/></radialGradient><radialGradient id="firefox-f" cx="52%" cy="33%" r="59%" gradientTransform="scale(.9 1)"><stop offset=".21" stop-color="#9059ff" stop-opacity="0"/><stop offset=".97" stop-color="#6e008b" stop-opacity=".6"/></radialGradient><radialGradient id="firefox-b" cx="87.4%" cy="-12.9%" r="128%" gradientTransform="matrix(.8 0 0 1 .18 .13)"><stop offset=".13" stop-color="#ffbd4f"/><stop offset=".28" stop-color="#ff980e"/><stop offset=".47" stop-color="#ff3750"/><stop offset=".78" stop-color="#eb0878"/><stop offset=".86" stop-color="#e50080"/></radialGradient><radialGradient id="firefox-h" cx="84%" cy="-41%" r="180%"><stop offset=".11" stop-color="#fff44f"/><stop offset=".46" stop-color="#ff980e"/><stop offset=".72" stop-color="#ff3647"/><stop offset=".9" stop-color="#e31587"/></radialGradient><radialGradient id="firefox-i" cx="16.1%" cy="-18.6%" r="348.8%" gradientTransform="matrix(.10453 .46743 -.99452 .04913 -.05 -.26)"><stop offset="0" stop-color="#fff44f"/><stop offset=".3" stop-color="#ff980e"/><stop offset=".57" stop-color="#ff3647"/><stop offset=".74" stop-color="#e31587"/></radialGradient><radialGradient id="firefox-j" cx="18.9%" cy="-42.5%" r="238.4%"><stop offset=".14" stop-color="#fff44f"/><stop offset=".48" stop-color="#ff980e"/><stop offset=".66" stop-color="#ff3647"/><stop offset=".9" stop-color="#e31587"/></radialGradient><radialGradient id="firefox-k" cx="159.3%" cy="-44.72%" r="313.1%"><stop offset=".09" stop-color="#fff44f"/><stop offset=".63" stop-color="#ff980e"/></radialGradient><linearGradient id="firefox-a" x1="87.25%" x2="9.4%" y1="15.5%" y2="93.1%"><stop offset=".05" stop-color="#fff44f"/><stop offset=".37" stop-color="#ff980e"/><stop offset=".53" stop-color="#ff3647"/><stop offset=".7" stop-color="#e31587"/></linearGradient><linearGradient id="firefox-l" x1="80%" x2="18%" y1="14%" y2="84%"><stop offset=".17" stop-color="#fff44f" stop-opacity=".8"/><stop offset=".6" stop-color="#fff44f" stop-opacity="0"/></linearGradient></defs><path fill="url(#firefox-a)" d="M478.71 166.35c-10.44-25.12-31.6-52.24-48.21-60.82 13.52 26.5 21.34 53.1 24.33 72.94l.05.4C427.71 111.14 381.63 83.82 344 24.35c-1.9-3-3.8-6.02-5.66-9.2a74 74 0 0 1-2.65-4.97 44 44 0 0 1-3.59-9.5.63.63 0 0 0-.55-.65 1 1 0 0 0-.45 0l-.12.07-.17.1.1-.14c-60.37 35.36-80.85 100.76-82.73 133.49a120.3 120.3 0 0 0-66.15 25.48 71 71 0 0 0-6.22-4.7 111.3 111.3 0 0 1-.68-58.73c-24.68 11.24-43.89 29.01-57.85 44.7h-.1c-9.53-12.06-8.86-51.87-8.32-60.18-.11-.52-7.1 3.63-8.02 4.25a175 175 0 0 0-23.49 20.12 211 211 0 0 0-22.44 26.92l-.01.03.01-.03a203 203 0 0 0-32.25 72.8l-.32 1.59a397 397 0 0 0-2.37 15l-.05.52a229 229 0 0 0-3.9 33.16L16 255.7C16 388.4 123.6 496 256.32 496c118.87 0 217.56-86.29 236.89-199.63.4-3.08.73-6.17 1.09-9.27 4.77-41.21-.53-84.53-15.59-120.75m-277 188.1c1.13.53 2.19 1.12 3.34 1.64l.16.1a126 126 0 0 1-3.5-1.74M454.9 178.92l-.03-.23.04.26z"/><path fill="url(#firefox-b)" d="M478.71 166.35c-10.44-25.12-31.6-52.24-48.21-60.82 13.52 26.5 21.34 53.1 24.33 72.94 0-.06.02.05.04.22l.04.26c22.68 61.47 10.32 123.98-7.48 162.18-27.54 59.1-94.21 119.67-198.57 116.71C136.1 454.65 36.76 371 18.22 261.41c-3.38-17.28 0-26.05 1.7-40.08-2.07 10.81-2.86 13.94-3.9 33.15l-.02 1.23C16 388.41 123.6 496 256.32 496c118.87 0 217.56-86.29 236.89-199.63.4-3.08.73-6.17 1.09-9.27 4.77-41.21-.53-84.53-15.59-120.75"/><path fill="url(#firefox-c)" d="M478.71 166.35c-10.44-25.12-31.6-52.24-48.21-60.82 13.52 26.5 21.34 53.1 24.33 72.94 0-.06.02.05.04.22l.04.26c22.68 61.47 10.32 123.98-7.48 162.18-27.54 59.1-94.21 119.67-198.57 116.71C136.1 454.65 36.76 371 18.22 261.41c-3.38-17.28 0-26.05 1.7-40.08-2.07 10.81-2.86 13.94-3.9 33.15l-.02 1.23C16 388.41 123.6 496 256.32 496c118.87 0 217.56-86.29 236.89-199.63.4-3.08.73-6.17 1.09-9.27 4.77-41.21-.53-84.53-15.59-120.75"/><path fill="url(#firefox-d)" d="M361.92 194.6c.53.37 1 .73 1.5 1.1a131 131 0 0 0-22.31-29.11C266.4 91.89 321.5 4.63 330.8.19l.1-.13c-60.37 35.35-80.85 100.76-82.73 133.48 2.8-.2 5.6-.43 8.44-.43 45.05 0 84.29 24.77 105.3 61.49"/><path fill="url(#firefox-e)" d="M256.77 209.51c-.4 5.98-21.51 26.6-28.9 26.6-68.34 0-79.43 41.33-79.43 41.33 3.03 34.81 27.26 63.48 56.61 78.65q2.02 1.02 4.05 1.93a133 133 0 0 0 7.06 2.89 107 107 0 0 0 31.27 6.03c119.78 5.62 142.99-143.2 56.55-186.41 22.13-3.85 45.11 5.05 57.94 14.07-21-36.72-60.25-61.49-105.3-61.49-2.85 0-5.64.24-8.44.43a120.3 120.3 0 0 0-66.14 25.49c3.66 3.1 7.8 7.24 16.51 15.83 16.3 16.06 58.13 32.7 58.22 34.65"/><path fill="url(#firefox-f)" d="M256.77 209.51c-.4 5.98-21.51 26.6-28.9 26.6-68.34 0-79.43 41.33-79.43 41.33 3.03 34.81 27.26 63.48 56.61 78.65q2.02 1.02 4.05 1.93a133 133 0 0 0 7.06 2.89 107 107 0 0 0 31.27 6.03c119.78 5.62 142.99-143.2 56.55-186.41 22.13-3.85 45.11 5.05 57.94 14.07-21-36.72-60.25-61.49-105.3-61.49-2.85 0-5.64.24-8.44.43a120.3 120.3 0 0 0-66.14 25.49c3.66 3.1 7.8 7.24 16.51 15.83 16.3 16.06 58.13 32.7 58.22 34.65"/><path fill="url(#firefox-g)" d="M170.83 151.04a244 244 0 0 1 4.98 3.3 111.3 111.3 0 0 1-.67-58.74c-24.7 11.25-43.9 29.01-57.85 44.7 1.15-.03 36.01-.66 53.54 10.74"/><path fill="url(#firefox-h)" d="M18.22 261.41C36.77 370.99 136.1 454.65 248.86 457.84c104.36 2.96 171.03-57.62 198.57-116.71 17.8-38.2 30.16-100.7 7.48-162.18v-.02l-.04-.24c-.02-.17-.04-.28-.04-.22l.05.4c8.53 55.66-19.79 109.58-64.05 146.04l-.13.31c-86.25 70.23-168.78 42.37-185.49 30.97a144 144 0 0 1-3.5-1.74c-50.28-24.03-71.05-69.84-66.6-109.13-42.45 0-56.93-35.8-56.93-35.8s38.12-27.18 88.36-3.55c46.53 21.9 90.23 3.55 90.23 3.54-.09-1.95-41.92-18.59-58.22-34.65-8.72-8.59-12.85-12.72-16.52-15.83a71 71 0 0 0-6.22-4.7 283 283 0 0 0-4.98-3.3c-17.53-11.4-52.4-10.76-53.55-10.73h-.1c-9.53-12.07-8.86-51.88-8.32-60.19-.11-.51-7.1 3.63-8.02 4.26a175 175 0 0 0-23.49 20.12 211 211 0 0 0-22.44 26.92l-.01.03.01-.03a203 203 0 0 0-32.25 72.8c-.11.52-8.65 37.84-4.44 57.2"/><path fill="url(#firefox-i)" d="M341.1 166.59a131 131 0 0 1 22.31 29.1q2.02 1.51 3.61 2.96c54.49 50.2 25.94 121.2 23.81 126.26 44.26-36.46 72.58-90.38 64.05-146.04C427.71 111.14 381.63 83.82 344 24.35c-1.9-3-3.8-6.02-5.66-9.2a74 74 0 0 1-2.65-4.97 44 44 0 0 1-3.59-9.5.63.63 0 0 0-.55-.65 1 1 0 0 0-.45 0l-.12.07-.17.1c-9.3 4.43-64.41 91.7 10.3 166.39"/><path fill="url(#firefox-j)" d="M367.02 198.65a47 47 0 0 0-3.6-2.95c-.5-.37-.97-.73-1.5-1.1-12.83-9.01-35.8-17.92-57.94-14.07 86.44 43.22 63.23 192.03-56.55 186.41a107 107 0 0 1-31.27-6.03 135 135 0 0 1-7.06-2.89 91 91 0 0 1-4.05-1.93l.16.1c16.71 11.4 99.24 39.25 185.49-30.97l.13-.31c2.13-5.06 30.68-76.06-23.8-126.26"/><path fill="url(#firefox-k)" d="M148.44 277.44s11.1-41.33 79.43-41.33c7.39 0 28.51-20.62 28.9-26.6s-43.7 18.36-90.23-3.54c-50.24-23.63-88.36 3.54-88.36 3.54s14.48 35.81 56.93 35.81c-4.45 39.29 16.32 85.1 66.6 109.13 1.13.53 2.18 1.12 3.34 1.64-29.35-15.17-53.58-43.84-56.61-78.65"/><path fill="url(#firefox-l)" d="M478.71 166.35c-10.44-25.12-31.6-52.24-48.21-60.82 13.52 26.5 21.34 53.1 24.33 72.94l.05.4C427.71 111.14 381.63 83.82 344 24.35c-1.9-3-3.8-6.02-5.66-9.2a74 74 0 0 1-2.65-4.97 44 44 0 0 1-3.59-9.5.63.63 0 0 0-.55-.65 1 1 0 0 0-.45 0l-.12.07-.17.1.1-.14c-60.37 35.36-80.85 100.76-82.73 133.49 2.8-.2 5.59-.43 8.44-.43 45.05 0 84.29 24.77 105.3 61.48-12.83-9.01-35.81-17.92-57.95-14.07 86.44 43.22 63.24 192.03-56.54 186.41a107 107 0 0 1-31.28-6.03 135 135 0 0 1-7.06-2.89 91 91 0 0 1-4.05-1.93l.17.1a144 144 0 0 1-3.5-1.74c1.12.53 2.18 1.12 3.33 1.64-29.35-15.17-53.58-43.84-56.6-78.65 0 0 11.08-41.33 79.42-41.33 7.4 0 28.51-20.62 28.9-26.6-.09-1.95-41.91-18.59-58.22-34.65-8.71-8.59-12.85-12.72-16.51-15.83a71 71 0 0 0-6.23-4.7 111.3 111.3 0 0 1-.67-58.73c-24.7 11.24-43.9 29-57.85 44.7h-.11c-9.53-12.07-8.86-51.87-8.32-60.19-.11-.51-7.1 3.63-8.02 4.26a175 175 0 0 0-23.49 20.12 211 211 0 0 0-22.43 26.92l-.01.03.01-.03a203 203 0 0 0-32.25 72.8l-.32 1.59a398 398 0 0 0-2.77 15.15c-.02.18.02-.17 0 0a280 280 0 0 0-3.55 33.53l-.02 1.23C16 388.41 123.6 496 256.32 496c118.87 0 217.56-86.29 236.89-199.63.4-3.08.73-6.17 1.09-9.27 4.77-41.21-.53-84.53-15.59-120.75m-23.84 12.34.04.26v-.02z"/></symbol>
+	</defs>
+</svg>
+
+<header class="site-header">
+	<div class="wrap">
+		<a class="brand" href="./">
+			<img src="../assets/img/icon-128.png" alt="" width="28" height="28">
+			<span>XViewer for Pixiv</span>
+		</a>
+		<nav class="site-nav" aria-label="页面内导航">
+			<a href="#features">功能</a>
+			<a href="#settings">设置</a>
+			<a href="#requirements">运行环境</a>
+			<a href="privacy.html">隐私</a>
+		</nav>
+		<div class="header-tools">
+			<!-- lang:menu -->
+			<details class="lang-menu">
+				<summary>
+					<svg class="lang-menu-globe" viewBox="0 -960 960 960" aria-hidden="true"><path d="M323-111.5Q250-143 196-197t-85-127.5Q80-398 80-482t31-156.5Q142-711 196-765t127-84.5Q396-880 480-880t157 30.5Q710-819 764-765t85 126.5Q880-566 880-482t-31 157.5Q818-251 764-197t-127 85.5Q564-80 480-80t-157-31.5ZM480-138q35-36 58.5-82.5T577-331H384q14 60 37.5 108t58.5 85Zm-85-12q-25-38-43-82t-30-99H172q38 71 88 111.5T395-150Zm171-1q72-23 129.5-69T788-331H639q-13 54-30.5 98T566-151ZM152-391h159q-3-27-3.5-48.5T307-482q0-25 1-44.5t4-43.5H152q-7 24-9.5 43t-2.5 45q0 26 2.5 46.5T152-391Zm221 0h215q4-31 5-50.5t1-40.5q0-20-1-38.5t-5-49.5H373q-4 31-5 49.5t-1 38.5q0 21 1 40.5t5 50.5Zm275 0h160q7-24 9.5-44.5T820-482q0-26-2.5-45t-9.5-43H649q3 35 4 53.5t1 34.5q0 22-1.5 41.5T648-391Zm-10-239h150q-33-69-90.5-115T565-810q25 37 42.5 80T638-630Zm-254 0h194q-11-53-37-102.5T480-820q-32 27-54 71t-42 119Zm-212 0h151q11-54 28-96.5t43-82.5q-75 19-131 64t-91 115Z"/></svg>
+					<span class="visually-hidden">语言：</span><span>简体中文</span>
+					<svg class="lang-menu-caret" viewBox="0 -960 960 960" aria-hidden="true"><path d="M469-358q-5-2-10-7L261-563q-9-9-8.5-21.5T262-606q9-9 21.5-9t21.5 9l175 176 176-176q9-9 21-8.5t21 9.5q9 9 9 21.5t-9 21.5L501-365q-5 5-10 7t-11 2q-6 0-11-2Z"/></svg>
+				</summary>
+				<ul class="lang-menu-list">
+					<li><a href="../" hreflang="ja" lang="ja">日本語</a></li>
+					<li><a href="../en/" hreflang="en" lang="en">English</a></li>
+					<li><a href="../ko/" hreflang="ko" lang="ko">한국어</a></li>
+					<li><a href="./" hreflang="zh-CN" lang="zh-CN" aria-current="true">简体中文</a></li>
+					<li><a href="../zh-tw/" hreflang="zh-TW" lang="zh-TW">繁體中文</a></li>
+				</ul>
+			</details>
+			<!-- /lang:menu -->
+			<button type="button" class="theme-toggle" aria-label="将配色切换为日间模式"
+				data-label-light="将配色切换为日间模式" data-label-dark="将配色切换为夜间模式">
+				<svg class="icon-moon" viewBox="0 -960 960 960" aria-hidden="true"><path d="M480-120q-150 0-255-105T120-480q0-135 79.5-229T408-830q20-5 34-1t22 15q8 10 7.5 25t-8.5 35q-9 23-14 47t-5 49q0 90 63 153t153 63q25 0 48.5-4.5T754-461q22-8 38-7t26 9q10 8 13 23t-2 36q-27 121-121 200.5T480-120Z"/></svg>
+				<svg class="icon-sun" viewBox="0 -960 960 960" aria-hidden="true"><path d="M338.5-338.5Q280-397 280-480t58.5-141.5Q397-680 480-680t141.5 58.5Q680-563 680-480t-58.5 141.5Q563-280 480-280t-141.5-58.5ZM70-450q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32Q57.25-510 70-510h100q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H70Zm720 0q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h100q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H790ZM458.5-768.63Q450-777.25 450-790v-100q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v100q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63Zm0 720Q450-57.25 450-70v-100q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v100q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63ZM240-678l-57-56q-9-9-8.63-21.6.37-12.61 8.53-21.5 8.89-8.9 21.5-8.9 12.6 0 21.6 9l56 57q8 9 8 21t-8 20.5q-8 8.5-20.5 8.5t-21.5-8Zm494 495-56-57q-8-9-8-21.38 0-12.37 8.5-20.62 8.5-9 20.5-9t21 9l57 56q9 9 8.63 21.6-.37 12.61-8.53 21.5-8.89 8.9-21.5 8.9-12.6 0-21.6-9Zm-56-495q-9-9-9-21t9-21l56-57q9-9 21.6-8.63 12.61.37 21.5 8.53 8.9 8.89 8.9 21.5 0 12.6-9 21.6l-57 56q-8 8-20.36 8-12.37 0-21.64-8ZM182.9-182.9q-8.9-8.89-8.9-21.5 0-12.6 9-21.6l57-56q8.8-9 20.9-9 12.1 0 20.71 9 9.39 9 9.39 21t-9 21l-56 57q-9 9-21.6 8.63-12.61-.37-21.5-8.53Z"/></svg>
+			</button>
+		</div>
+	</div>
+</header>
+
+<main id="main">
+
+	<section class="hero">
+		<div class="wrap">
+			<p class="eyebrow">支持 Chrome / Brave / Edge / Firefox</p>
+			<h1>像浏览 <span class="brand-x">X</span> 一样，浏览 <span class="brand-pixiv">pixiv</span>。</h1>
+			<p class="lede">
+				在用户页面点击作品后，无需跳转页面，就会在当前页面打开弹窗。
+				多张图片的切换、动图的播放、作品说明和评论的阅读，乃至点赞、收藏、关注和发表评论，
+				全都能在弹窗中完成。
+				关闭后，即可回到原来网格中的原有滚动位置。
+			</p>
+			<div class="cta-row">
+				<a class="btn btn-primary" href="https://chromewebstore.google.com/detail/xviewer-for-pixiv/hbnpmpiipnocflhikmpamobpodadfbpd" target="_blank" rel="noopener">
+					<svg aria-hidden="true"><use href="#i-chrome"></use></svg>
+					在 Chrome 应用商店获取
+				</a>
+				<a class="btn btn-primary" href="https://microsoftedge.microsoft.com/addons/detail/pmkplomaebdlciailfpopkocnfpcdmgl" target="_blank" rel="noopener">
+					<svg aria-hidden="true"><use href="#i-edge"></use></svg>
+					在 Edge 加载项获取
+				</a>
+				<a class="btn btn-primary" href="https://addons.mozilla.org/firefox/addon/xviewer-for-pixiv/" target="_blank" rel="noopener">
+					<svg aria-hidden="true"><use href="#i-firefox"></use></svg>
+					在 Firefox 附加组件获取
+				</a>
+				<a class="btn btn-secondary" href="https://github.com/NEONS-DESIGN/XViewer-for-Pixiv" target="_blank" rel="noopener">
+					<svg aria-hidden="true"><use href="#i-open"></use></svg>
+					在 GitHub 上查看
+				</a>
+			</div>
+			<div class="hero-shot">
+				<img src="../assets/img/shot-viewer-en.webp" width="1920" height="1024" fetchpriority="high" decoding="async"
+					alt="pixiv 作品在弹窗中打开，右侧侧边栏中排列着作品说明、标签、计数、评论输入框和评论的界面">
+			</div>
+		</div>
+	</section>
+
+	<hr class="divider">
+
+	<section class="section" id="features">
+		<div class="wrap">
+			<div class="section-head center">
+				<h2>不离开列表，直接看下一个作品</h2>
+				<p>每打开一个作品就要跳转页面，每次返回都会找不到原来的滚动位置。本扩展程序就是为了消除这种来回往返。</p>
+			</div>
+			<div class="card-grid">
+				<div class="card">
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-open"></use></svg></span>在弹窗中打开</h3>
+					<p>接管网格中的点击，不跳转页面直接显示。URL 会替换为作品页面的地址，因此也可以刷新和分享。</p>
+				</div>
+				<div class="card">
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-next"></use></svg></span>切换多张图片</h3>
+					<p>用左右方向键或屏幕边缘的箭头翻页。会预加载前后的图片，切换时无需等待。</p>
+				</div>
+				<div class="card">
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-scroll"></use></svg></span>一个接一个看作品</h3>
+					<p>用上下方向键移到网格中的上一个或下一个作品。到达末尾时会自动加载下一页的内容。在插画和漫画标签页中，只会依次浏览该类别的作品。</p>
+				</div>
+				<div class="card">
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-play"></use></svg></span>播放动图</h3>
+					<p>解压 zip 并组合帧，直接在当前位置播放。也支持暂停。</p>
+				</div>
+				<div class="card">
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-zoom"></use></svg></span>查看原图</h3>
+					<p>点击图片后，以原始尺寸铺满整个屏幕打开。打开时也能翻页，可以一边确认细节一边往下看。</p>
+				</div>
+				<div class="card">
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-comment"></use></svg></span>阅读和发表评论</h3>
+					<p>以图片形式显示贴图和表情，也支持展开回复和加载更多。发表评论、回复以及删除自己的评论，都可以在弹窗打开的状态下完成。</p>
+				</div>
+				<div class="card">
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-like"></use></svg></span>点赞和收藏</h3>
+					<p>关注，以及分享到 X / Facebook / Pawoo 和复制链接，也都可以在弹窗中操作。按住 Shift 点击收藏即可非公开收藏。在自己的作品中不显示这些按钮。</p>
+				</div>
+				<div class="card">
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-theme"></use></svg></span>夜间与日间</h3>
+					<p>查看器的配色跟随 pixiv 网站的设置，不需要另外再设置一遍。设置页面的配色可以通过右上角的图标切换。</p>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<hr class="divider">
+
+	<section class="section" id="screens">
+		<div class="wrap">
+			<div class="showcase">
+				<div class="showcase-text">
+					<h3>作品说明和评论，都在图片旁边</h3>
+					<p>
+						侧边栏中排列着作品说明、标签、投稿时间、点赞数、收藏数、浏览量，以及作者的头像和关注按钮。
+						评论中的贴图和表情会直接以图片显示，回复也能当场展开。
+					</p>
+					<ul class="feature-list">
+						<li>可以选择整个侧边栏一起滚动，还是只滚动评论</li>
+						<li>即使加载失败，也可以通过重试继续阅读</li>
+						<li>在其他标签页中点过的赞，不会重复计算</li>
+						<li>也可以隐藏侧边栏，只看图片</li>
+					</ul>
+				</div>
+				<figure>
+					<img src="../assets/img/shot-comments-en.webp" loading="lazy" decoding="async" width="1920" height="1024"
+						alt="侧边栏上方是评论输入框，下方排列着评论的界面">
+				</figure>
+			</div>
+
+			<div class="showcase reverse">
+				<div class="showcase-text">
+					<h3>无需关闭，直接回复</h3>
+					<p>
+						评论和回复都可以在弹窗打开的状态下发表。输入框会随输入的行数伸展，
+						表情和贴图可以从面板中选择。<kbd>Ctrl</kbd> + <kbd>Enter</kbd> 发送，<kbd>Enter</kbd> 换行。
+					</p>
+					<ul class="feature-list">
+						<li>自己的评论经过两步确认后可以删除</li>
+						<li>有尚未发送的内容时，按 <kbd>Esc</kbd> 不会关闭弹窗</li>
+						<li>发表的评论与在 pixiv 网站上发表的评论完全相同</li>
+					</ul>
+				</div>
+				<figure class="compact">
+					<img src="../assets/img/shot-comment-form-en.webp" loading="lazy" decoding="async" width="1019" height="984"
+						alt="侧边栏的评论输入框中输入了 3 行文字，右侧排列着表情按钮和发送按钮的界面">
+				</figure>
+			</div>
+
+			<div class="showcase">
+				<div class="showcase-text">
+					<h3>让列表不再中断</h3>
+					<p>
+						可以将插画和漫画列表的分页改为向下连续加载。
+						URL 中的页码会跟随屏幕上显示的页面，刷新后也能回到大致相同的位置。
+					</p>
+					<ul class="feature-list">
+						<li>可选择“滚动到底部时加载”或“始终提前加载下一页”</li>
+						<li>可以隐藏个人资料中的精选栏，让作品列表一眼可见</li>
+					</ul>
+				</div>
+				<figure class="has-video">
+					<video class="shot-video" src="../assets/img/infinite-scroll.mp4"
+						poster="../assets/img/infinite-scroll.webp" width="1280" height="688" preload="none"
+						autoplay loop muted playsinline
+						aria-label="在用户页面持续向下滚动时，无需点击分页即可加载下一页的作品，URL 中的页码也随之变化的样子"></video>
+					<button type="button" class="media-toggle" aria-label="暂停视频"
+						data-label-pause="暂停视频" data-label-play="播放视频">
+						<svg class="icon-pause" viewBox="0 -960 960 960" aria-hidden="true"><path d="M615-200q-24.75 0-42.37-17.63Q555-235.25 555-260v-440q0-24.75 17.63-42.38Q590.25-760 615-760h55q24.75 0 42.38 17.62Q730-724.75 730-700v440q0 24.75-17.62 42.37Q694.75-200 670-200h-55Zm-325 0q-24.75 0-42.37-17.63Q230-235.25 230-260v-440q0-24.75 17.63-42.38Q265.25-760 290-760h55q24.75 0 42.38 17.62Q405-724.75 405-700v440q0 24.75-17.62 42.37Q369.75-200 345-200h-55Z"/></svg>
+						<svg class="icon-play" viewBox="0 -960 960 960" aria-hidden="true"><path d="M320-258v-450q0-14 9-22t21-8q4 0 8 1t8 3l354 226q7 5 10.5 11t3.5 14q0 8-3.5 14T720-458L366-232q-4 2-8 3t-8 1q-12 0-21-8t-9-22Z"/></svg>
+					</button>
+				</figure>
+			</div>
+
+			<div class="showcase reverse">
+				<div class="showcase-text">
+					<h3>可以细致地设置扩展程序</h3>
+					<p>
+						从工具栏的图标打开。分为查看器、图片、用户页面、操作 4 类，从显示效果到操作习惯，都能按自己的喜好调整。
+					</p>
+					<ul class="feature-list">
+						<li>可以根据网络状况和喜好，选择图片分辨率和预加载的张数</li>
+						<li>侧边栏的显示方式、滚动方式，乃至点击背景是否关闭都可以更改</li>
+						<li>关闭查看器本身，即可恢复 pixiv 的默认行为</li>
+					</ul>
+				</div>
+				<!-- 設定ポップアップの上半分と下半分を一定時間ごとに重ねて切り替える (site.js)。JS が無ければ上半分のまま -->
+				<figure class="portrait has-slides">
+					<img src="../assets/img/shot-popup-en.webp" loading="lazy" decoding="async" width="459" height="861" data-active
+						alt="扩展程序设置弹窗的上半部分。查看器和图片分类中排列着设置项">
+					<img src="../assets/img/shot-popup-bottom-en.webp" loading="lazy" decoding="async" width="459" height="861"
+						alt="扩展程序设置弹窗的下半部分。用户页面和操作分类中排列着设置项，末尾有重置设置的按钮">
+					<button type="button" class="media-toggle" aria-label="暂停图片切换"
+						data-label-pause="暂停图片切换" data-label-play="继续图片切换">
+						<svg class="icon-pause" viewBox="0 -960 960 960" aria-hidden="true"><path d="M615-200q-24.75 0-42.37-17.63Q555-235.25 555-260v-440q0-24.75 17.63-42.38Q590.25-760 615-760h55q24.75 0 42.38 17.62Q730-724.75 730-700v440q0 24.75-17.62 42.37Q694.75-200 670-200h-55Zm-325 0q-24.75 0-42.37-17.63Q230-235.25 230-260v-440q0-24.75 17.63-42.38Q265.25-760 290-760h55q24.75 0 42.38 17.62Q405-724.75 405-700v440q0 24.75-17.62 42.37Q369.75-200 345-200h-55Z"/></svg>
+						<svg class="icon-play" viewBox="0 -960 960 960" aria-hidden="true"><path d="M320-258v-450q0-14 9-22t21-8q4 0 8 1t8 3l354 226q7 5 10.5 11t3.5 14q0 8-3.5 14T720-458L366-232q-4 2-8 3t-8 1q-12 0-21-8t-9-22Z"/></svg>
+					</button>
+				</figure>
+			</div>
+		</div>
+	</section>
+
+	<hr class="divider">
+
+	<section class="section" id="settings">
+		<div class="wrap">
+			<div class="section-head">
+				<h2>可以设置的内容</h2>
+				<p>所有设置都可以在工具栏的弹窗中更改。设置保存在浏览器的同步存储中，不会发送到外部。</p>
+			</div>
+			<div class="table-scroll">
+				<table>
+					<thead>
+						<tr>
+							<th scope="col">分类</th>
+							<th scope="col">项目</th>
+							<th scope="col">默认值</th>
+							<th scope="col">效果</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>查看器</td>
+							<td>使用查看器</td>
+							<td class="default">开</td>
+							<td>关闭后将恢复 pixiv 的默认行为</td>
+						</tr>
+						<tr>
+							<td>查看器</td>
+							<td>显示侧边栏</td>
+							<td class="default">开</td>
+							<td>在图片旁显示作品说明、标签、点赞数和评论</td>
+						</tr>
+						<tr>
+							<td>查看器</td>
+							<td>侧边栏的滚动方式</td>
+							<td class="default">整个侧边栏</td>
+							<td>将作品说明到评论连成一体滚动，还是固定作品说明、只滚动评论</td>
+						</tr>
+						<tr>
+							<td>图片</td>
+							<td>图片分辨率</td>
+							<td class="default">标准</td>
+							<td>选择原图会更清晰，但加载较慢</td>
+						</tr>
+						<tr>
+							<td>图片</td>
+							<td>预加载</td>
+							<td class="default">前后各 1 张</td>
+							<td>可以选择提前加载的图片张数</td>
+						</tr>
+						<tr>
+							<td>图片</td>
+							<td>点击查看原图</td>
+							<td class="default">关</td>
+							<td>点击图片后，以原始尺寸铺满整个屏幕打开</td>
+						</tr>
+						<tr>
+							<td>用户页面</td>
+							<td>隐藏精选栏</td>
+							<td class="default">关</td>
+							<td>隐藏个人资料主页中显示的精选栏</td>
+						</tr>
+						<tr>
+							<td>用户页面</td>
+							<td>无限滚动</td>
+							<td class="default">不使用</td>
+							<td>可选择“滚动到底部时加载”或“始终提前加载下一页”</td>
+						</tr>
+						<tr>
+							<td>操作</td>
+							<td>点击背景关闭</td>
+							<td class="default">开</td>
+							<td>点击图片外侧时是否关闭</td>
+						</tr>
+						<tr>
+							<td>操作</td>
+							<td>网格中的 Tab 键导航</td>
+							<td class="default">不跳过</td>
+							<td>在网格中按 Tab 时，是否将收藏和标题从焦点顺序中移除</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+
+			<h3 style="margin-block:56px 20px;font-size:19px">键盘操作</h3>
+			<div class="keys">
+				<div class="key-row"><kbd>←</kbd><kbd>→</kbd><span>在同一作品中翻页（查看原图时也一样）</span></div>
+				<div class="key-row"><kbd>↑</kbd><kbd>↓</kbd><span>移到上一个或下一个作品</span></div>
+				<div class="key-row"><kbd>Ctrl</kbd><kbd>Enter</kbd><span>发送评论（Mac 为 <kbd>Cmd</kbd>）</span></div>
+				<div class="key-row"><kbd>Esc</kbd><span>从最前面的内容开始依次关闭</span></div>
+				<div class="key-row"><kbd>Tab</kbd><span>在弹窗内移动焦点</span></div>
+			</div>
+			<p class="key-note">
+				<kbd>Esc</kbd> 会按表情面板、查看原图和分享菜单、弹窗的顺序关闭。有尚未发送的评论时不会关闭弹窗。<br>
+				输入评论时，<kbd>Enter</kbd> 为换行，<kbd>&larr;</kbd> <kbd>&rarr;</kbd> <kbd>&uarr;</kbd> <kbd>&darr;</kbd> 用于移动光标。（不会切换作品）
+			</p>
+		</div>
+	</section>
+
+	<hr class="divider">
+
+	<section class="section" id="requirements">
+		<div class="wrap">
+			<div class="section-head">
+				<h2>运行环境</h2>
+				<p>可在支持 Manifest V3 的 Chromium 内核浏览器和 Firefox 中运行。</p>
+			</div>
+			<div class="card-grid">
+				<div class="card">
+					<h3>支持的浏览器</h3>
+					<p>Chrome、Brave、Edge 等 Chromium 内核浏览器。需要 <strong>Chrome 120 及以上版本</strong>。Edge 也可以从 Edge 加载项安装。Firefox（<strong>Firefox 140 及以上</strong>的桌面版）可以从 Firefox 附加组件安装。不支持 Safari。</p>
+				</div>
+				<div class="card">
+					<h3>适用页面</h3>
+					<p><code>https://www.pixiv.net/</code> 的用户页面。在其他网站上不会运行。</p>
+				</div>
+				<div class="card">
+					<h3>许可证</h3>
+					<p>源代码公开在 GitHub 上。免责声明和随附的第三方资源的说明，位于设置页面的“许可证”标签页中。</p>
+				</div>
+				<div class="card wide">
+					<h3>支持的语言</h3>
+					<p>扩展程序的显示语言会跟随 pixiv 的显示语言切换。下表列出了 pixiv 可选的 7 种显示语言。当 pixiv 以“视需求而定”的语言显示时，扩展程序将以英语显示。</p>
+					<div class="table-scroll in-card">
+						<table class="lang-table">
+							<thead>
+								<tr>
+									<th scope="col">语言</th>
+									<th scope="col">支持情况</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr>
+									<td>日语</td>
+									<td><span class="lang-status yes">支持</span></td>
+								</tr>
+								<tr>
+									<td>英语</td>
+									<td><span class="lang-status yes">支持</span></td>
+								</tr>
+								<tr>
+									<td>韩语</td>
+									<td><span class="lang-status yes">支持</span></td>
+								</tr>
+								<tr>
+									<td>中文（简体）</td>
+									<td><span class="lang-status yes">支持</span></td>
+								</tr>
+								<tr>
+									<td>中文（繁体）</td>
+									<td><span class="lang-status yes">支持</span></td>
+								</tr>
+								<tr>
+									<td>泰语</td>
+									<td><span class="lang-status ask">视需求而定</span></td>
+								</tr>
+								<tr>
+									<td>马来语</td>
+									<td><span class="lang-status ask">视需求而定</span></td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+				</div>
+				<div class="card wide">
+					<h3>问题反馈与需求</h3>
+					<p>问题反馈、使用咨询和功能需求，请通过<a href="https://forms.gle/C7AWaUHWmwnoeDV66" target="_blank" rel="noopener">联系表单</a>发送。表单为英文，但可以直接用中文填写。使用 GitHub 的用户也可以通过 <a href="https://github.com/NEONS-DESIGN/XViewer-for-Pixiv/issues" target="_blank" rel="noopener">Issues</a> 反馈。</p>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<hr class="divider">
+
+	<section class="section" id="privacy">
+		<div class="wrap">
+			<div class="section-head center">
+				<h2>数据不会离开 pixiv</h2>
+				<p>本扩展程序没有作者的服务器，只与你正在浏览的 pixiv 及其图片 CDN 通信。</p>
+			</div>
+			<div class="card-grid">
+				<div class="card">
+					<h3>不收集的内容</h3>
+					<p>浏览记录、作品 ID、用户 ID、Cookie、认证信息、个人信息。以上内容一概不获取、不保存、不发送。你写的评论也只会直接提交给 pixiv，不会留在扩展程序中。</p>
+				</div>
+				<div class="card">
+					<h3>保存的内容</h3>
+					<p>你选择的 11 项设置，以及最后看到的 pixiv 显示语言。两者都只保留在浏览器中，不会发送到外部服务器。</p>
+				</div>
+				<div class="card">
+					<h3>请求的权限</h3>
+					<p>只有 <code>storage</code> 和 <code>https://www.pixiv.net/*</code> 这 2 项。不请求访问其他网站的权限。</p>
+				</div>
+			</div>
+			<p style="text-align:center;margin-block:40px 0">
+				<a class="btn btn-secondary" href="privacy.html">阅读隐私政策</a>
+			</p>
+		</div>
+	</section>
+
+	<section class="section" style="padding-top:0">
+		<div class="wrap">
+			<div class="notice">
+				<p><strong>这是非官方的扩展程序。</strong></p>
+				<p>
+					它是利用 pixiv 平台开发的，并非由 pixiv Inc. 制作或发布的应用程序。
+					与该公司没有任何关系，也未获得其合作、支持或推荐。
+				</p>
+				<ul>
+					<li>使用风险自负。对于因使用本扩展程序而造成的损失，作者及 pixiv Inc. 概不负责</li>
+					<li>R-18 作品的显示遵循 pixiv 的设置。本扩展程序不会绕过年龄限制</li>
+					<li>赞无法取消。这是 pixiv 的机制，即使误点也无法撤回</li>
+					<li>发表和删除评论与在 pixiv 网站上操作相同。每次点击都会直接发送到 pixiv。删除后无法恢复，因此设有两步确认</li>
+					<li>没有收集作品的功能。既没有下载，也没有批量操作的自动化，只获取当前打开的作品及其前后的几张图片</li>
+					<li>可能会因 pixiv 的改版而无法运行</li>
+				</ul>
+			</div>
+		</div>
+	</section>
+
+</main>
+
+<!-- 先頭へ戻るボタン。1 画面分スクロールするまで site.js が隠す。図形は Material Symbols (Apache-2.0) -->
+<a class="to-top" href="#top" aria-label="返回页面顶部" title="返回页面顶部">
+	<svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M469-358q-5-2-10-7L261-563q-9-9-8.5-21.5T262-606q9-9 21.5-9t21.5 9l175 176 176-176q9-9 21-8.5t21 9.5q9 9 9 21.5t-9 21.5L501-365q-5 5-10 7t-11 2q-6 0-11-2Z"/></svg>
+</a>
+
+<footer class="site-footer">
+	<div class="wrap">
+		<div class="footer-grid">
+			<div>
+				<a class="brand" href="./">
+					<img src="../assets/img/icon-128.png" alt="" width="28" height="28">
+					<span>XViewer for Pixiv</span>
+				</a>
+			</div>
+			<ul class="footer-links">
+				<li><a href="https://github.com/NEONS-DESIGN/XViewer-for-Pixiv" target="_blank" rel="noopener">GitHub</a></li>
+				<li><a href="privacy.html">隐私政策</a></li>
+				<li><a href="https://forms.gle/C7AWaUHWmwnoeDV66" target="_blank" rel="noopener">联系我们</a></li>
+				<!-- lang:footer -->
+				<li><a href="../" hreflang="ja" lang="ja">日本語</a></li>
+				<li><a href="../en/" hreflang="en" lang="en">English</a></li>
+				<li><a href="../ko/" hreflang="ko" lang="ko">한국어</a></li>
+				<li><a href="../zh-tw/" hreflang="zh-TW" lang="zh-TW">繁體中文</a></li>
+				<!-- /lang:footer -->
+			</ul>
+		</div>
+		<div class="footer-note">
+			<p>pixiv 是 pixiv Inc. 的注册商标。本网站及本扩展程序与 pixiv Inc. 没有任何关系。</p>
+			<p>本网站刊登的静态截图是为了说明功能而使用的演示用虚拟数据，并非真实的作品信息或评论。无限滚动的视频是实际的屏幕录像，作品信息和计数均未经加工。</p>
+			<p>图标图形使用了 Material Symbols（<a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank" rel="noopener">Apache License 2.0</a>）和 Font Awesome Free（<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>）。</p>
+			<p>浏览器标志分别属于 Google Chrome（Google）、Microsoft Edge（Microsoft，<a href="https://opensource.org/license/mit" target="_blank" rel="noopener">MIT License</a>）和 Firefox（Mozilla，<a href="https://mozilla.org/MPL/2.0/" target="_blank" rel="noopener">MPL 2.0</a>），均为各公司的商标。仅用于引导至各个商店。</p>
+		</div>
+		<p class="footer-copyright">&copy; 2026 NEONS</p>
+	</div>
+</footer>
+
+</body>
+</html>

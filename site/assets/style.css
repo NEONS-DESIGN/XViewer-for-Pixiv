@@ -31,7 +31,25 @@
 
 	--font: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans",
 		"BIZ UDPGothic", Meiryo, "Yu Gothic", "Noto Sans JP", system-ui, sans-serif;
+	--font-ko: "Helvetica Neue", Arial, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+	--font-zh-cn: "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+	--font-zh-tw: "Helvetica Neue", Arial, "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", system-ui, sans-serif;
 	--font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Courier New", monospace;
+}
+
+/* 韓国語と中国語は、その言語の字を揃って持つフォントを先に探す。
+   日本語のフォントのままだと、持っていない字 (简 など) だけが別のフォントで出て太さや形が揃わない。
+   ページ全体 (html の lang) と、言語メニューの各リンク (a の lang) の両方に効く */
+:lang(ko) {
+	--font: var(--font-ko);
+}
+
+:lang(zh-CN) {
+	--font: var(--font-zh-cn);
+}
+
+:lang(zh-TW) {
+	--font: var(--font-zh-tw);
 }
 
 /* OS がライトで、かつ利用者が明示的にダークを選んでいないときだけライトへ倒す */
@@ -252,32 +270,111 @@ code {
 	flex: none;
 }
 
-.lang-switch {
-	display: inline-flex;
-	border: 1px solid var(--border);
-	border-radius: 999px;
-	overflow: hidden;
-	background: var(--surface);
+/* 言語の切り替え。details の開閉だけで動くので JS が無くても使える。
+   外側のクリックと Esc で閉じる動きは site.js が足す */
+.lang-menu {
+	position: relative;
 }
 
-.lang-switch a {
-	padding: 5px 12px;
+.lang-menu > summary {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 36px;
+	padding: 0 10px 0 12px;
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	background: var(--surface);
+	color: var(--fg);
 	font-size: 13px;
 	font-weight: 700;
+	white-space: nowrap;
+	cursor: pointer;
+	list-style: none;
+	user-select: none;
+}
+
+/* Safari は list-style では三角を消せない */
+.lang-menu > summary::-webkit-details-marker {
+	display: none;
+}
+
+.lang-menu > summary:hover,
+.lang-menu[open] > summary {
+	background: var(--hover);
+}
+
+.lang-menu svg {
+	width: 18px;
+	height: 18px;
+	fill: currentColor;
+	flex: none;
+}
+
+.lang-menu-caret {
 	color: var(--muted);
+	transition: transform 0.15s ease;
+}
+
+.lang-menu[open] .lang-menu-caret {
+	transform: rotate(180deg);
+}
+
+.lang-menu-list {
+	position: absolute;
+	inset-inline-end: 0;
+	top: calc(100% + 6px);
+	z-index: 60;
+	min-width: 168px;
+	margin: 0;
+	padding: 6px;
+	list-style: none;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-sm);
+	box-shadow: var(--shadow);
+}
+
+.lang-menu-list a {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 8px 10px;
+	border-radius: 6px;
+	color: var(--fg);
+	/* リンクの lang で切り替わった --font を拾い直す (本文の body で決まった値を継いだままにしない) */
+	font-family: var(--font);
+	font-size: 14px;
+	line-height: 1.5;
 	text-decoration: none;
-	line-height: 1.6;
 	white-space: nowrap;
 }
 
-.lang-switch a[aria-current="true"] {
-	background: var(--accent);
-	color: var(--on-accent);
+.lang-menu-list a:hover {
+	background: var(--hover);
 }
 
-.lang-switch a:not([aria-current="true"]):hover {
-	background: var(--hover);
-	color: var(--fg);
+.lang-menu-list a[aria-current="true"] {
+	color: var(--accent);
+	font-weight: 700;
+}
+
+/* 今の言語に付けるチェック。図形は Material Symbols の check */
+.lang-menu-list a[aria-current="true"]::after {
+	content: "";
+	width: 18px;
+	height: 18px;
+	flex: none;
+	background: currentColor;
+	-webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'%3E%3Cpath d='m378-332 363-363q9-9 21.5-9t21.5 9q9 9 9 21.5t-9 21.5L399-267q-9 9-21 9t-21-9L175-449q-9-9-8.5-21.5T176-492q9-9 21.5-9t21.5 9l159 160Z'/%3E%3C/svg%3E") center / contain no-repeat;
+	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'%3E%3Cpath d='m378-332 363-363q9-9 21.5-9t21.5 9q9 9 9 21.5t-9 21.5L399-267q-9 9-21 9t-21-9L175-449q-9-9-8.5-21.5T176-492q9-9 21.5-9t21.5 9l159 160Z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.lang-menu-caret {
+		transition: none;
+	}
 }
 
 .theme-toggle {

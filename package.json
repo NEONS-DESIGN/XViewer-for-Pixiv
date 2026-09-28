@@ -1,6 +1,6 @@
 {
 	"name": "xviewer_for_pixiv",
-	"version": "1.1.1",
+	"version": "1.2.0",
 	"private": true,
 	"type": "module",
 	"description": "pixiv のユーザーページに独自の画像ビュワーを追加するブラウザ拡張機能 (Chrome 系 / Firefox)",
@@ -12,6 +12,7 @@
 		"build:symbols": "node scripts/build-symbols.mjs",
 		"build:icons": "node scripts/build-icons.mjs",
 		"build:site-images": "node scripts/build-site-images.mjs",
+		"build:site-langs": "node scripts/site-langs.mjs",
 		"build:screenshots": "node scripts/build-screenshots.mjs",
 		"pack:crx": "node scripts/pack-crx.mjs",
 		"test": "node --test \"test/**/*.test.js\""
