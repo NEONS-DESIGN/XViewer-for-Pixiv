@@ -2,9 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { register } from 'node:module';
 import { clearSessionCache } from '../../../src/content/session.js';
-import { KEYS } from '../../../src/common/constants.js';
+import { KEYS, LOADING_STATUS_DELAY_MS } from '../../../src/common/constants.js';
 import { createStrings } from '../../../src/i18n/index.js';
-import { FRESH_FETCH_INIT } from '../../../src/pixiv/client.js';
 import { PixivError, PIXIV_ERROR_KINDS } from '../../../src/pixiv/errors.js';
 import { fakeElement, fakeDoc as fakeDocBase, find, findAll, flush } from '../../helpers/dom.js';
 import { fakeSequence } from '../../helpers/sequence.js';
@@ -115,7 +114,7 @@ function fakeDoc() {
 
 /**
  * ビュワーと依存の記録を用意する。
- * @param {object} [options] getJsonImpl と settings の差し替え
+ * @param {object} [options] getJsonImpl と settings、setTimeout / clearTimeout の差し替え
  * @returns {{viewer: object, doc: object, fetched: string[], closed: () => number, shadow: () => object, stage: () => object}} 一式
  */
 function setup(options = {}) {
@@ -138,6 +137,8 @@ function setup(options = {}) {
 		// サイドバーを出すテストだけが渡す。作者情報の取得で通信させない
 		fetchUser: options.fetchUser,
 		clearUserCache: options.clearUserCache ?? (() => {}),
+		setTimeout: options.setTimeout,
+		clearTimeout: options.clearTimeout,
 	});
 	const shadow = () => doc.body.children[0]?.shadowRoot ?? null;
 	return {
@@ -200,7 +201,7 @@ test('開くと作品を取得して描き、閉じると DOM ごと捨てる', 
 	assert.equal(doc.body.children.length, 0);
 });
 
-test('作品詳細は HTTP キャッシュを確かめ直して取る', async () => {
+test('作品詳細は HTTP キャッシュを確かめ直し、優先度を上げて取る', async () => {
 	// ページ側でいいね・ブックマークした直後に開いたとき、ブラウザに残った古い応答を使わせない
 	const inits = [];
 	const { viewer } = setup({
@@ -210,7 +211,54 @@ test('作品詳細は HTTP キャッシュを確かめ直して取る', async ()
 		},
 	});
 	await viewer.open('1');
-	assert.deepEqual(inits, [FRESH_FETCH_INIT]);
+	assert.deepEqual(inits, [{ cache: 'no-cache', priority: 'high' }]);
+});
+
+test('openWork は DOM を組む前に作品詳細の取得を始め、priority high を付ける', async () => {
+	const calls = [];
+	const { viewer, doc } = setup({
+		getJsonImpl: (url, jsonDeps, init) => {
+			calls.push({ url, deps: jsonDeps, init, hostExists: doc.body.children.length > 0 });
+			return new Promise(() => {});
+		},
+	});
+	void viewer.open('1');
+	assert.equal(calls.length, 1);
+	assert.equal(calls[0].init.priority, 'high');
+	assert.equal(calls[0].init.cache, 'no-cache');
+	assert.ok(calls[0].deps.signal);
+	// 取得の発行はホストを作るより前
+	assert.equal(calls[0].hostExists, false);
+});
+
+test('作品を送ると前の作品の取得を中断する', async () => {
+	const signals = [];
+	const { viewer } = setup({
+		getJsonImpl: (url, jsonDeps) => {
+			signals.push(jsonDeps.signal);
+			return new Promise(() => {});
+		},
+	});
+	void viewer.open('1');
+	void viewer.open('2');
+	assert.equal(signals[0].aborted, true);
+	assert.equal(signals[1].aborted, false);
+	viewer.close();
+	assert.equal(signals[1].aborted, true);
+});
+
+test('読み込み中の文言は LOADING_STATUS_DELAY_MS 経ってから出る', async () => {
+	const timers = [];
+	const { viewer, stage } = setup({
+		getJsonImpl: () => new Promise(() => {}),
+		setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; },
+		clearTimeout: () => {},
+	});
+	void viewer.open('1');
+	assert.equal(findAll(stage(), '.status').length, 0);
+	assert.equal(timers.at(-1).ms, LOADING_STATUS_DELAY_MS);
+	timers.at(-1).fn();
+	assert.equal(findAll(stage(), '.status').length, 1);
 });
 
 test('新しく開いたときだけユーザー情報の覚えを捨て、作品を送る間は保つ', async () => {

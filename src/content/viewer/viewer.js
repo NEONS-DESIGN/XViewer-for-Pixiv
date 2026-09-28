@@ -14,6 +14,7 @@ import {
 	HIDDEN_SELECTOR,
 	INERT_ATTRIBUTE,
 	KEYS,
+	LOADING_STATUS_DELAY_MS,
 	POPUP_THEMES,
 	SIDEBAR_SCROLL,
 	STATUS_KINDS,
@@ -52,6 +53,12 @@ const TEXT_ENTRY_PASSTHROUGH_KEYS = Object.freeze([KEYS.FOCUS_NEXT, KEYS.CLOSE])
 const RERENDER_SETTING_KEYS = Object.freeze(['imageQuality', 'prefetch', 'showSidebar', 'clickZoom']);
 
 /**
+ * 作品詳細を取得するときの fetch の init。
+ * 開いた直後の取得は他の通信より先に進めたいので、優先度を上げる。
+ */
+const DETAIL_FETCH_INIT = Object.freeze({ ...FRESH_FETCH_INIT, priority: 'high' });
+
+/**
  * ステージの中で押しても閉じない要素。
  *
  * ステージの余白を押すと閉じるが、主役のペイン (.frame / .ugoira / .blocked) は
@@ -85,6 +92,8 @@ const KEEP_OPEN_SELECTOR = [
  * @property {(url: string, deps?: object, init?: RequestInit) => Promise<object>} [getJsonImpl] 作品詳細の取得。テストから通信させないために使う
  * @property {(userId: string, lang: string) => Promise<object>} [fetchUser] 作者情報の取得。テストから通信させないために使う
  * @property {() => void} [clearUserCache] 覚えた作者情報を捨てる。既定は pixiv/user.js の clearUserCache
+ * @property {(fn: Function, ms: number) => number} [setTimeout] 遅延実行の差し替え。既定は window.setTimeout
+ * @property {(id: number) => void} [clearTimeout] 上の取り消し。既定は window.clearTimeout
  */
 
 /**
@@ -149,6 +158,8 @@ export function createViewer(deps) {
 	const { doc, strings } = deps;
 	const fetchJson = deps.getJsonImpl ?? getJson;
 	const forgetUsers = deps.clearUserCache ?? clearUserCache;
+	const later = deps.setTimeout ?? ((fn, ms) => setTimeout(fn, ms));
+	const cancelLater = deps.clearTimeout ?? ((id) => clearTimeout(id));
 	let settings = deps.settings;
 
 	/** @type {HTMLElement|null} */
@@ -175,6 +186,10 @@ export function createViewer(deps) {
 	let savedBodyStyle = '';
 	/** @type {EventTarget|null} ステージの中で押し始めた要素。click の相手と合わせて余白かどうかを見る */
 	let pressTarget = null;
+	/** @type {AbortController|null} 作品詳細の取得を中断するためのもの。次の openWork と close() で abort する */
+	let openAborter = null;
+	/** 読み込み中の文言を出すタイマー ID。0 は動いていない */
+	let loadingTimer = 0;
 	// 作品間の移動とキー操作の割り振りは navigation.js が持つ。
 	// ここに残るのはホストの構築と描画の指揮だけ
 	const navigation = createNavigation({
@@ -251,7 +266,7 @@ export function createViewer(deps) {
 
 		// 原寸表示は overlay の直下に敷く。ステージの中に入れるとサイドバーが上に残る。
 		// 閉じたらフォーカスはダイアログ本体へ戻す (レイヤの中の部品ごと消えるため)
-		zoomLayer = createZoomLayer({ doc, container: overlay, restoreFocus: () => overlay?.focus(), strings });
+		zoomLayer = createZoomLayer({ doc, container: overlay, restoreFocus: () => overlay?.focus({ preventScroll: true }), strings });
 
 		doc.body.appendChild(host);
 	}
@@ -387,6 +402,38 @@ export function createViewer(deps) {
 	}
 
 	/**
+	 * 先読み済みの応答を取り出す。
+	 * @param {string} workId 作品 ID
+	 * @returns {object|null} 先読み結果。無ければ null
+	 */
+	function takePrefetched(workId) {
+		return null;
+	}
+
+	/**
+	 * 読み込み中の文言を LOADING_STATUS_DELAY_MS 経ってから出す。
+	 * 応答がすぐ届いたときに文言をちらつかせないための遅延。
+	 * @returns {void}
+	 */
+	function scheduleLoadingStatus() {
+		cancelLoadingStatus();
+		loadingTimer = later(() => {
+			loadingTimer = 0;
+			showStatus(strings.viewer.LOADING, STATUS_KINDS.INFO);
+		}, LOADING_STATUS_DELAY_MS);
+	}
+
+	/**
+	 * scheduleLoadingStatus() で仕込んだタイマーを止める。
+	 * @returns {void}
+	 */
+	function cancelLoadingStatus() {
+		if (!loadingTimer) return;
+		cancelLater(loadingTimer);
+		loadingTimer = 0;
+	}
+
+	/**
 	 * キーボード操作。
 	 *
 	 * キーは手前に出ているものから順に使わせる。
@@ -422,6 +469,7 @@ export function createViewer(deps) {
 	 * @returns {Promise<void>}
 	 */
 	async function renderDetail(detail, token) {
+		cancelLoadingStatus();
 		try {
 			clearStatus();
 			overlay.setAttribute('aria-label', `${detail.title} - ${strings.viewer.DIALOG_LABEL}`);
@@ -450,6 +498,16 @@ export function createViewer(deps) {
 	async function openWork(workId) {
 		const token = ++requestToken;
 		navigation.setCurrentWorkId(workId);
+		// 前の作品の取得は止める。世代で捨てるだけだと応答を最後まで受信してしまう
+		openAborter?.abort();
+		const aborter = new AbortController();
+		openAborter = aborter;
+		// 取得を最初に出す。ホストの組み立て・背景のロック・フォーカスの確定の間も通信を進める
+		const pending = takePrefetched(workId)
+			?? fetchJson(illustUrl(workId, strings.lang), { signal: aborter.signal }, DETAIL_FETCH_INIT);
+		// 未処理の拒否を出さない。結果は下の await で受ける
+		pending.catch(() => {});
+
 		// 既に開いている状態で body を再ロックすると、ロック済みの style を
 		// 「元の値」として保存してしまい、閉じたあとスクロールが戻らなくなる。
 		// 作品間を移動するときは open() が close() を挟まずに呼ばれる
@@ -478,23 +536,28 @@ export function createViewer(deps) {
 		// 中に無くなっていたらダイアログ本体へ戻す。(読み上げが文脈を失わないように)
 		// 閉じるボタンなど中の部品へ当てないこと。次にキーを押した瞬間に :focus-visible が立ち、
 		// 十字キーでフォーカスが動いたように見える
-		if (!shadow.activeElement) overlay?.focus();
+		if (!shadow.activeElement) overlay?.focus({ preventScroll: true });
 		sidebar.hidden = !settings.showSidebar;
-		showStatus(strings.viewer.LOADING, STATUS_KINDS.INFO);
+		clearStatus();
+		// 応答がすぐ届く場合に文言をちらつかせないよう、遅らせて出す
+		scheduleLoadingStatus();
 
 		let detail;
 		try {
-			const raw = await fetchJson(illustUrl(workId, strings.lang), {}, FRESH_FETCH_INIT);
+			const raw = await pending;
 			// 待っている間に新しい要求が来ていたら捨てる。
 			// 同じ作品を開き直したときも古い応答を捨てられるよう、ID ではなく世代で見る
 			if (token !== requestToken) return;
 			detail = normalizeDetail(raw);
 		} catch (error) {
-			if (token !== requestToken) return;
+			// 中断による失敗は次の要求が引き継ぐので、画面にも warn にも出さない
+			if (token !== requestToken || error?.kind === PIXIV_ERROR_KINDS.ABORTED) return;
+			cancelLoadingStatus();
 			showStatus(loadFailedMessage(error, strings), STATUS_KINDS.ERROR);
 			warn('failed to open', workId, error);
 			return;
 		}
+		cancelLoadingStatus();
 		lastDetail = detail;
 		await renderDetail(detail, token);
 	}
@@ -507,6 +570,9 @@ export function createViewer(deps) {
 		// 開いていないのに body の style を触ると、ビュワーを開かずに
 		// ブラウザバックしただけで pixiv 本体のインラインスタイルを消してしまう
 		if (host === null) return;
+		openAborter?.abort();
+		openAborter = null;
+		cancelLoadingStatus();
 		navigation.reset();
 		// 取得の途中で閉じたときに、応答が返ってから描き直さないようにする
 		requestToken += 1;

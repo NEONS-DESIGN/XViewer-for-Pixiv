@@ -172,8 +172,10 @@ export function createComments(deps) {
 	// コメント主のリンクは pixiv 本体のページを指すので、今の表示言語の接頭辞 (/en) を付ける
 	const localePrefix = deps.localePrefix ?? currentLocalePrefix(doc);
 	const scrollTarget = deps.scrollTarget ?? null;
-	const fetchJson = deps.fetchJson ?? ((url) => getJson(url));
+	const fetchJson = deps.fetchJson ?? ((url, init = {}) => getJson(url, init));
 	const api = { postComment, postStamp, deleteComment, ...deps.actions };
+	/** roots / replies の取得を中断するためのもの。load() の冒頭で前の分を中断して作り直す */
+	let aborter = new AbortController();
 	/** 読み込み済みの件数。「もっと見る」で増やす */
 	let offset = 0;
 	/** 今表示している作品 */
@@ -587,7 +589,7 @@ export function createComments(deps) {
 			toggle.disabled = true;
 			if (replyMore) replyMore.disabled = true;
 			try {
-				const responseBody = await fetchJson(commentRepliesUrl(comment.id, page, strings.lang));
+				const responseBody = await fetchJson(commentRepliesUrl(comment.id, page, strings.lang), { signal: aborter.signal });
 				// 待っている間に別の作品へ移っていたら捨てる
 				if (workId !== requestedWorkId) return;
 				// 畳まれていたら並べない
@@ -621,6 +623,8 @@ export function createComments(deps) {
 				}
 			} catch (error) {
 				if (workId !== requestedWorkId) return;
+				// 中断による失敗 (別の作品へ移った・load() を呼び直した) は伝えない
+				if (error?.kind === PIXIV_ERROR_KINDS.ABORTED) return;
 				if (page === FIRST_REPLY_PAGE) {
 					// 1 件も出せていない。閉じた状態に戻し、押し直せばもう一度試せるようにする
 					setOpen(false);
@@ -869,7 +873,7 @@ export function createComments(deps) {
 		const focused = button !== null && isFocused(doc, button);
 		if (button) button.disabled = true;
 		try {
-			const body = await fetchJson(commentRootsUrl(requestedWorkId, offset, COMMENT_PAGE_SIZE, strings.lang));
+			const body = await fetchJson(commentRootsUrl(requestedWorkId, offset, COMMENT_PAGE_SIZE, strings.lang), { signal: aborter.signal });
 			// 待っている間に破棄されたか、別の作品へ移ったか、描き直されていたら捨てる
 			if (workId !== requestedWorkId || !list || list !== requestedList) return;
 			const comments = (body?.comments ?? []).map((raw) => normalizeComment(raw, strings));
@@ -889,6 +893,8 @@ export function createComments(deps) {
 			// 破棄後・別の作品へ移った後・描き直した後の失敗は伝えない。
 			// これを入れないと、正常な切り替えが読み込み失敗として表示される
 			if (workId !== requestedWorkId || list !== requestedList) return;
+			// 中断による失敗も同じく伝えない (load() を呼び直したときに前の取得が中断される)
+			if (error?.kind === PIXIV_ERROR_KINDS.ABORTED) return;
 			// 一時的な失敗で以降が読めなくならないよう、ボタンは再試行として残す。
 			// 表示は 1 つだけ。失敗のたびに積み上げない
 			failure?.remove();
@@ -920,6 +926,9 @@ export function createComments(deps) {
 		 * @returns {Promise<void>}
 		 */
 		async load(detail) {
+			// 同じインスタンスで load() を呼び直す経路がある。前の取得は必ず止めてから作り直す
+			aborter.abort();
+			aborter = new AbortController();
 			workId = detail.id;
 			offset = 0;
 			container.textContent = '';
@@ -991,6 +1000,7 @@ export function createComments(deps) {
 		 * @returns {void}
 		 */
 		dispose() {
+			aborter.abort();
 			layout.dispose();
 			headerEl = null;
 			headingEl = null;
