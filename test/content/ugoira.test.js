@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pickZipUrl, buildFrames, advanceFrame, createUgoiraPlayer } from '../../src/content/viewer/ugoira.js';
+import { pickZipUrl, advanceFrame, createUgoiraPlayer } from '../../src/content/viewer/ugoira.js';
 import { fakeElement, fakeDoc, find, findAll, flush } from '../helpers/dom.js';
+import { buildStoredZip, bytes, localSpan } from '../helpers/zip.js';
+import { UGOIRA_START_FRAMES } from '../../src/common/constants.js';
 import { createStrings } from '../../src/i18n/index.js';
 
 /** 文言のカタログ (日本語)。 */
@@ -22,28 +24,6 @@ test('解像度の設定に応じて zip を選ぶ', () => {
 
 test('originalSrc が無ければ src へ落とす', () => {
 	assert.equal(pickZipUrl({ src: 'a' }, 'original'), 'a');
-});
-
-test('buildFrames は meta の順番で中身と待ち時間を組む', () => {
-	const entries = [
-		{ name: '000001.jpg', bytes: new Uint8Array([2]) },
-		{ name: '000000.jpg', bytes: new Uint8Array([1]) },
-	];
-	const frames = buildFrames(entries, META.frames);
-	assert.equal(frames.length, 2);
-	assert.deepEqual([...frames[0].bytes], [1]);
-	assert.equal(frames[0].delay, 100);
-	assert.deepEqual([...frames[1].bytes], [2]);
-});
-
-test('buildFrames は zip に無いファイルを飛ばす', () => {
-	const frames = buildFrames([{ name: '000000.jpg', bytes: new Uint8Array([1]) }], META.frames);
-	assert.equal(frames.length, 1);
-});
-
-test('buildFrames は空でも落ちない', () => {
-	assert.deepEqual(buildFrames([], META.frames), []);
-	assert.deepEqual(buildFrames([], []), []);
 });
 
 /** 30ms x 3 コマの待ち時間。 */
@@ -86,35 +66,20 @@ test('advanceFrame は待ち時間に届かなければ何もしない', () => {
 	assert.equal(next.startedAt, 1000);
 });
 
-/**
- * テスト用に STORE 方式の zip を組み立てる。
- * @param {Array<{name: string, data: number[]}>} files エントリ
- * @returns {ArrayBuffer} zip
- */
-function buildZip(files) {
-	const chunks = [];
-	for (const file of files) {
-		const nameBytes = new TextEncoder().encode(file.name);
-		const header = new Uint8Array(30);
-		const view = new DataView(header.buffer);
-		view.setUint32(0, 0x04034b50, true);
-		view.setUint16(4, 20, true);
-		view.setUint16(8, 0, true);
-		view.setUint32(18, file.data.length, true);
-		view.setUint32(22, file.data.length, true);
-		view.setUint16(26, nameBytes.length, true);
-		view.setUint16(28, 0, true);
-		chunks.push(header, nameBytes, new Uint8Array(file.data));
-	}
-	const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-	const out = new Uint8Array(total);
-	let offset = 0;
-	for (const chunk of chunks) {
-		out.set(chunk, offset);
-		offset += chunk.length;
-	}
-	return out.buffer;
-}
+test('advanceFrame は揃っていない間、揃った最後のコマで止まり先頭へ戻らない', () => {
+	// 2 コマ目までしか届いていない。待ち時間を過ぎても 0 コマ目へ戻さず、待っていることを返す
+	const next = advanceFrame({ now: 1100, startedAt: 1000, index: 0, timings: TIMINGS.slice(0, 2), complete: false });
+	assert.equal(next.index, 1);
+	assert.equal(next.advanced, 1);
+	assert.equal(next.stalled, true);
+});
+
+test('advanceFrame は揃っていなくても次のコマがあれば普段どおり進める', () => {
+	const next = advanceFrame({ now: 1035, startedAt: 1000, index: 0, timings: TIMINGS.slice(0, 2), complete: false });
+	assert.equal(next.index, 1);
+	assert.equal(next.startedAt, 1030);
+	assert.equal(next.stalled, false);
+});
 
 /** 再生器へ渡す作品詳細の代わり。 */
 const DETAIL = Object.freeze({
@@ -134,11 +99,50 @@ const META3 = Object.freeze({
 });
 
 /** 3 コマ分の zip。 */
-const ZIP3 = buildZip([
-	{ name: '000000.jpg', data: [1] },
-	{ name: '000001.jpg', data: [2] },
-	{ name: '000002.jpg', data: [3] },
-]);
+const ZIP3 = buildStoredZip([
+	{ name: '000000.jpg', bytes: bytes(1, 1) },
+	{ name: '000001.jpg', bytes: bytes(1, 2) },
+	{ name: '000002.jpg', bytes: bytes(1, 3) },
+]).buffer;
+
+/** 5 コマの zip のエントリ。受信の途中で再生が始まるかを見る。 */
+const ENTRIES5 = Array.from({ length: 5 }, (_, at) => ({ name: `00000${at}.jpg`, bytes: bytes(4, at * 10) }));
+
+/** 5 コマの meta。 */
+const META5 = Object.freeze({
+	...META,
+	frames: ENTRIES5.map((entry) => ({ file: entry.name, delay: 30 })),
+});
+
+/** 5 コマ分の zip。 */
+const ZIP5 = buildStoredZip(ENTRIES5);
+
+/**
+ * 少しずつ流せる zip の応答を作る。
+ * dispose で signal が abort されると、本物の fetch と同じく読み取りが AbortError で落ちる。
+ * @param {Uint8Array} zip zip 全体
+ * @returns {{respond: (init: object) => object, send: (from: number, to: number) => void, close: () => void, fail: (error: Error) => void, state: {cancelled: boolean}}} 応答と操作
+ */
+function streamedZip(zip) {
+	let controller;
+	const state = { cancelled: false };
+	const body = new ReadableStream({
+		start(streamController) { controller = streamController; },
+		cancel() { state.cancelled = true; },
+	});
+	return {
+		respond(init) {
+			init.signal.addEventListener('abort', () => {
+				try { controller.error(new DOMException('aborted', 'AbortError')); } catch { /* 閉じた後 */ }
+			}, { once: true });
+			return { ok: true, status: 200, body, arrayBuffer: async () => { throw new Error('body を読むこと'); } };
+		},
+		send(from, to) { controller.enqueue(new Uint8Array(zip.buffer, from, to - from)); },
+		close() { controller.close(); },
+		fail(error) { controller.error(error); },
+		state,
+	};
+}
 
 /**
  * ugoira_meta の応答の代わり。client.js は text() で読んでから JSON.parse する
@@ -155,21 +159,29 @@ function metaResponse(body) {
  * @param {number[]} [options.sizes] 作った順に各 Image へ与える naturalWidth。0 は壊れたコマ
  * @param {Function} [options.fetchImpl] 通信の代わり。省くと meta と zip を返す
  * @param {boolean} [options.holdImages] true なら Image の load を releaseImages() まで止める
+ * @param {boolean} [options.holdTimers] true なら setTimeout の関数をすぐには呼ばない。(timers から呼ぶ) 省くとすぐ呼ぶ
  * @param {object} [options.strings] 文言のカタログ。省くと日本語
  * @param {Promise<object>|null} [options.preloadedMeta] 温めておいた ugoira_meta の body
- * @returns {object} container / player / 作った Image / rAF のコールバック / 取り消した rAF の ID / 描いたコマ / zip fetch の init / releaseImages
+ * @returns {object} container / player / 作った Image / rAF のコールバック / 取り消した rAF の ID / 描いたコマ / zip fetch の init / releaseImages / setTimeout の記録 / getContext の引数
  */
-function build({ sizes = [10, 10, 10], fetchImpl, holdImages = false, strings = STRINGS, preloadedMeta = null } = {}) {
+function build({ sizes = [10, 10, 10], fetchImpl, holdImages = false, holdTimers = false, strings = STRINGS, preloadedMeta = null } = {}) {
 	const doc = fakeDoc();
 	const drawn = [];
+	const contextArgs = [];
 	const create = doc.createElement;
 	doc.createElement = (tag) => {
 		const element = create(tag);
 		if (tag === 'canvas') {
-			element.getContext = () => ({ drawImage(image) { drawn.push(image); } });
+			element.getContext = (...args) => {
+				contextArgs.push(args);
+				return { drawImage(image) { drawn.push(image); } };
+			};
 		}
 		return element;
 	};
+	/** @type {Array<{callback: Function, delay: number}>} setTimeout に渡されたもの。ID は積んだ順の 1 始まり */
+	const timers = [];
+	const clearedTimers = [];
 	const container = fakeElement('div');
 	const images = [];
 	const rafCallbacks = [];
@@ -211,8 +223,14 @@ function build({ sizes = [10, 10, 10], fetchImpl, holdImages = false, strings = 
 		},
 		requestAnimationFrame: (callback) => { rafCallbacks.push(callback); return rafCallbacks.length; },
 		cancelAnimationFrame: (id) => { cancelled.push(id); },
+		setTimeout: (callback, delay) => {
+			timers.push({ callback, delay });
+			if (!holdTimers) callback();
+			return timers.length;
+		},
+		clearTimeout: (id) => { clearedTimers.push(id); },
 	});
-	return { container, player, images, rafCallbacks, cancelled, drawn, zipInits, releaseImages };
+	return { container, player, images, rafCallbacks, cancelled, drawn, zipInits, releaseImages, timers, clearedTimers, contextArgs };
 }
 
 test('render は静止画を先に出し、読めたら canvas に切り替えて再生を始める', async () => {
@@ -408,5 +426,238 @@ test('温めた meta が失敗していたら、いつもどおり取り直す',
 	assert.equal(asked.filter((url) => url.includes('ugoira_meta')).length, 1);
 	assert.equal(findAll(container, '.pane-error').length, 0, '温めの失敗だけでは失敗を出さない');
 	assert.equal(find(container, '.ugoira-canvas').hidden, false);
+	player.dispose();
+});
+
+/**
+ * meta と、少しずつ流す zip を返す通信の代わり。
+ * @param {object} stream streamedZip の戻り値
+ * @param {object} [meta] ugoira_meta の body
+ * @returns {Function} fetch の代わり
+ */
+function streamingFetch(stream, meta = META5) {
+	return async (url, init) => {
+		if (url.includes('ugoira_meta')) return metaResponse(meta);
+		return stream.respond(init);
+	};
+}
+
+/** 5 コマとも読める大きさ。 */
+const SIZES5 = [10, 10, 10, 10, 10];
+
+test('先頭 UGOIRA_START_FRAMES コマが読めた時点で再生を始める', async () => {
+	const stream = streamedZip(ZIP5);
+	const { container, player, images, drawn, rafCallbacks } = build({ fetchImpl: streamingFetch(stream), sizes: SIZES5 });
+	let finished = false;
+	const rendering = player.render(DETAIL).then(() => { finished = true; });
+	const canvas = find(container, '.ugoira-canvas');
+	// 1 コマ足りないうちは静止画のまま
+	stream.send(0, localSpan(ENTRIES5, UGOIRA_START_FRAMES - 1));
+	await flush();
+	assert.equal(canvas.hidden, true);
+	stream.send(localSpan(ENTRIES5, UGOIRA_START_FRAMES - 1), localSpan(ENTRIES5, UGOIRA_START_FRAMES));
+	await flush();
+	assert.equal(canvas.hidden, false);
+	assert.equal(find(container, '.ugoira-poster').hidden, true);
+	assert.equal(find(container, '.ugoira-toggle').hidden, false);
+	assert.deepEqual(drawn, [images[0]]);
+	assert.equal(rafCallbacks.length, 1);
+	assert.equal(finished, false, 'zip の残りはまだ受信中');
+	stream.send(localSpan(ENTRIES5, UGOIRA_START_FRAMES), ZIP5.length);
+	stream.close();
+	await rendering;
+	assert.equal(images.length, 5);
+	assert.equal(findAll(container, '.pane-error').length, 0);
+	player.dispose();
+});
+
+test('次のコマが未着ならそのコマで待ち、届いたら進む', async () => {
+	const stream = streamedZip(ZIP5);
+	const { player, images, drawn, rafCallbacks, timers } = build({ fetchImpl: streamingFetch(stream), sizes: SIZES5 });
+	const rendering = player.render(DETAIL);
+	stream.send(0, localSpan(ENTRIES5, 3));
+	await flush();
+	rafCallbacks[0](1000);
+	rafCallbacks[1](1030);
+	rafCallbacks[2](1060);
+	assert.deepEqual(drawn, [images[0], images[1], images[2]]);
+	// 3 コマ目の待ち時間が過ぎても 4 コマ目は未着。先頭へ戻らず、次の予約もしない
+	rafCallbacks[3](1090);
+	assert.deepEqual(drawn, [images[0], images[1], images[2]]);
+	assert.equal(rafCallbacks.length, 4);
+	// 4 コマ目が届いたら 1 コマだけ進む。待っていた時間は繰り越さない
+	stream.send(localSpan(ENTRIES5, 3), localSpan(ENTRIES5, 4));
+	await flush();
+	assert.equal(rafCallbacks.length, 5);
+	rafCallbacks[4](5000);
+	assert.deepEqual(drawn.slice(3), [images[3]]);
+	// 4 コマ目は届いた時刻から 30ms 見せる (余白 4ms を引いて眠る)
+	assert.equal(timers.at(-1).delay, 26);
+	stream.send(localSpan(ENTRIES5, 4), ZIP5.length);
+	stream.close();
+	await rendering;
+	player.dispose();
+});
+
+test('response.body が無ければ全体を受け取ってから再生する', async () => {
+	let reads = 0;
+	const fetchImpl = async (url) => {
+		if (url.includes('ugoira_meta')) return metaResponse(META3);
+		return { ok: true, status: 200, arrayBuffer: async () => { reads += 1; return ZIP3; } };
+	};
+	const { container, player, images } = build({ fetchImpl });
+	await player.render(DETAIL);
+	assert.equal(reads, 1);
+	assert.equal(images.length, 3);
+	assert.equal(find(container, '.ugoira-canvas').hidden, false);
+	player.dispose();
+});
+
+test('data descriptor の zip は受信をやめ、同じ signal で取り直して全体から読む', async () => {
+	// 2 つ目のエントリに bit 3。受信しながらは切り出せない
+	const entries = ENTRIES5.slice(0, 3).map((entry, at) => ({ ...entry, flags: at === 1 ? 0x08 : 0 }));
+	const zip = buildStoredZip(entries);
+	const stream = streamedZip(zip);
+	const zipInits = [];
+	const fetchImpl = async (url, init) => {
+		if (url.includes('ugoira_meta')) return metaResponse(META3);
+		zipInits.push(init);
+		if (zipInits.length === 1) return stream.respond(init);
+		return { ok: true, status: 200, arrayBuffer: async () => zip.buffer };
+	};
+	const { container, player, images } = build({ fetchImpl });
+	const rendering = player.render(DETAIL);
+	stream.send(0, zip.length);
+	await rendering;
+	assert.equal(stream.state.cancelled, true, '途中まで読んだ body は取り消す');
+	assert.equal(zipInits.length, 2);
+	assert.equal(zipInits[1].signal, zipInits[0].signal);
+	// 受信中に読めた 1 つ目は二重に作らない
+	assert.equal(images.length, 3);
+	assert.equal(find(container, '.ugoira-canvas').hidden, false);
+	player.dispose();
+});
+
+test('JPEG なら alpha:false で getContext する', async () => {
+	const { player, contextArgs } = build();
+	await player.render(DETAIL);
+	assert.deepEqual(contextArgs, [['2d', { alpha: false }]]);
+	player.dispose();
+});
+
+test('JPEG 以外は透過を残して getContext する', async () => {
+	const fetchImpl = async (url) => {
+		if (url.includes('ugoira_meta')) return metaResponse({ ...META3, mime_type: 'image/png' });
+		return { ok: true, status: 200, arrayBuffer: async () => ZIP3 };
+	};
+	const { player, contextArgs } = build({ fetchImpl });
+	await player.render(DETAIL);
+	assert.deepEqual(contextArgs, [['2d', undefined]]);
+	player.dispose();
+});
+
+test('再生はタイマで次のコマの期限まで眠り、rAF を 1 回だけ使う', async () => {
+	const { player, images, drawn, rafCallbacks, timers } = build({ holdTimers: true });
+	await player.render(DETAIL);
+	assert.equal(rafCallbacks.length, 1);
+	rafCallbacks[0](1000);
+	// 30ms のコマなので、余白 4ms を引いた 26ms 眠る。眠っている間は rAF を回さない
+	assert.deepEqual(timers.map((timer) => timer.delay), [26]);
+	assert.equal(rafCallbacks.length, 1);
+	timers[0].callback();
+	assert.equal(rafCallbacks.length, 2);
+	rafCallbacks[1](1030);
+	assert.deepEqual(drawn, [images[0], images[1]]);
+	// rAF が期限より早く来たら、残りの分だけ眠り直す
+	timers[1].callback();
+	rafCallbacks[2](1050);
+	assert.deepEqual(drawn, [images[0], images[1]]);
+	assert.equal(timers[2].delay, 6);
+	player.dispose();
+});
+
+test('止めるとタイマも取り消す', async () => {
+	const { container, player, rafCallbacks, clearedTimers } = build({ holdTimers: true });
+	await player.render(DETAIL);
+	rafCallbacks[0](1000);
+	await find(container, '.ugoira-toggle').click();
+	assert.deepEqual(clearedTimers, [1]);
+	player.dispose();
+});
+
+test('受信中に dispose されたら転送を止め、Blob URL を全部 revoke して黙る', async (t) => {
+	const revoke = t.mock.method(URL, 'revokeObjectURL');
+	const stream = streamedZip(ZIP5);
+	const { container, player, rafCallbacks, cancelled } = build({ fetchImpl: streamingFetch(stream), sizes: SIZES5 });
+	const rendering = player.render(DETAIL);
+	stream.send(0, localSpan(ENTRIES5, 3));
+	await flush();
+	assert.equal(rafCallbacks.length, 1);
+	player.dispose();
+	await rendering;
+	assert.equal(revoke.mock.callCount(), 3);
+	assert.deepEqual(cancelled, [1]);
+	assert.equal(container.children.length, 0);
+	assert.equal(findAll(container, '.pane-error').length, 0);
+});
+
+test('再生が始まった後に受信が失敗したら、届いた分で繰り返す', async () => {
+	const stream = streamedZip(ZIP5);
+	const { container, player, images, drawn, rafCallbacks } = build({ fetchImpl: streamingFetch(stream), sizes: SIZES5 });
+	const rendering = player.render(DETAIL);
+	stream.send(0, localSpan(ENTRIES5, 3));
+	await flush();
+	stream.fail(new TypeError('network error'));
+	await rendering;
+	assert.equal(findAll(container, '.pane-error').length, 0);
+	rafCallbacks[0](1000);
+	rafCallbacks[1](1030);
+	rafCallbacks[2](1060);
+	rafCallbacks[3](1090);
+	assert.deepEqual(drawn, [images[0], images[1], images[2], images[0]]);
+	player.dispose();
+});
+
+test('再生が始まる前に受信が失敗したら、静止画のまま理由を出す', async () => {
+	const stream = streamedZip(ZIP5);
+	const { container, player, drawn } = build({ fetchImpl: streamingFetch(stream), sizes: SIZES5 });
+	const rendering = player.render(DETAIL);
+	stream.send(0, localSpan(ENTRIES5, 1));
+	await flush();
+	stream.fail(new TypeError('network error'));
+	await rendering;
+	await flush();
+	assert.equal(find(container, '.pane-error').textContent, 'うごイラを再生できませんでした');
+	assert.equal(find(container, '.ugoira-poster').hidden, false);
+	assert.equal(find(container, '.ugoira-canvas').hidden, true);
+	assert.equal(drawn.length, 0);
+	player.dispose();
+});
+
+test('受信中に一時停止したら、コマが届いても止まったまま', async () => {
+	const stream = streamedZip(ZIP5);
+	const { container, player, rafCallbacks } = build({ fetchImpl: streamingFetch(stream), sizes: SIZES5 });
+	const rendering = player.render(DETAIL);
+	stream.send(0, localSpan(ENTRIES5, 3));
+	await flush();
+	const toggle = find(container, '.ugoira-toggle');
+	await toggle.click();
+	stream.send(localSpan(ENTRIES5, 3), ZIP5.length);
+	stream.close();
+	await rendering;
+	assert.equal(toggle.getAttribute('aria-label'), '再生');
+	assert.equal(rafCallbacks.length, 1, '届いても rAF を予約しない');
+	player.dispose();
+});
+
+test('meta にコマが無ければ静止画のまま理由を出す', async () => {
+	const fetchImpl = async (url) => {
+		if (url.includes('ugoira_meta')) return metaResponse({ ...META3, frames: [] });
+		return { ok: true, status: 200, arrayBuffer: async () => ZIP3 };
+	};
+	const { container, player, rafCallbacks } = build({ fetchImpl });
+	await player.render(DETAIL);
+	assert.equal(find(container, '.pane-error').textContent, 'うごイラを再生できませんでした');
+	assert.equal(rafCallbacks.length, 0);
 	player.dispose();
 });
