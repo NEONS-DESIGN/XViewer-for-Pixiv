@@ -9,6 +9,7 @@
  * language.js の SUPPORTED_LANGUAGES へ 1 つ足す。他は触らなくてよい。
  */
 import { SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE } from '../common/language.js';
+import { buildStrings } from './freeze.js';
 import ja from './ja.js';
 import en from './en.js';
 import ko from './ko.js';
@@ -22,22 +23,6 @@ const CATALOGS = Object.freeze({ ja, en, ko, 'zh-CN': zhCN, 'zh-TW': zhTW });
 const cache = new Map();
 
 /**
- * 深く凍結する。カタログはどこからも書き換えられてはいけない。
- * 辿るのはオブジェクトと配列だけで、書式の関数は凍結しない。(関数にプロパティを生やす用途は無い)
- * createStrings が渡すのは浅いコピーなので、入れ子は各言語のカタログ (ja.js など) の default export のものが
- * そのまま凍結される。(カタログ本体を書き換えられなくするのが狙いなので意図どおり)
- * @param {object} value 凍結するもの
- * @returns {object} 同じもの (凍結済み)
- */
-function deepFreeze(value) {
-	for (const key of Object.getOwnPropertyNames(value)) {
-		const child = value[key];
-		if (child && typeof child === 'object' && !Object.isFrozen(child)) deepFreeze(child);
-	}
-	return Object.freeze(value);
-}
-
-/**
  * 指定した言語のカタログを返す。
  * @param {string} lang 言語コード (SUPPORTED_LANGUAGES のどれか)
  * @returns {object} 文言のカタログ。自分の言語を lang として持つ。未知の言語なら既定の言語
@@ -46,7 +31,7 @@ export function createStrings(lang) {
 	const resolved = SUPPORTED_LANGUAGES.includes(lang) ? lang : DEFAULT_LANGUAGE;
 	const cached = cache.get(resolved);
 	if (cached) return cached;
-	const strings = deepFreeze({ lang: resolved, ...CATALOGS[resolved] });
+	const strings = buildStrings(resolved, CATALOGS[resolved]);
 	cache.set(resolved, strings);
 	return strings;
 }

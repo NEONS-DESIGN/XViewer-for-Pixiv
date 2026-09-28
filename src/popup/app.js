@@ -7,7 +7,7 @@ import { loadSettings as loadSettingsImpl, saveSetting as saveSettingImpl, reset
 import { logError } from '../common/log.js';
 import { loadPageLanguage as loadPageLanguageImpl } from '../common/language-store.js';
 import { normalizeLanguage, uiLanguage } from '../common/language.js';
-import { createStrings } from '../i18n/index.js';
+import { loadStrings as loadStringsImpl } from '../i18n/load.js';
 import { renderPopup as renderPopupImpl } from './popup-ui.js';
 
 /**
@@ -65,6 +65,7 @@ function roleSelector(role) {
  * @param {typeof logError} [deps.report] 描画に失敗したときの記録
  * @param {() => Promise<string|null>} [deps.loadPageLanguage] pixiv の表示言語の読み出し (resolvePopupLanguage へ渡す)
  * @param {() => string} [deps.getUILanguage] ブラウザの UI 言語の読み出し (resolvePopupLanguage へ渡す)
+ * @param {typeof loadStringsImpl} [deps.loadStrings] 文言カタログの読み出し
  * @returns {Promise<void>} 最初の描画の完了
  */
 export async function main({
@@ -76,6 +77,7 @@ export async function main({
 	report = logError,
 	loadPageLanguage,
 	getUILanguage,
+	loadStrings = loadStringsImpl,
 }) {
 	const root = doc.getElementById(ROOT_ID);
 	if (!root) return;
@@ -85,7 +87,7 @@ export async function main({
 		loadSettings(),
 		resolvePopupLanguage({ loadPageLanguage, getUILanguage }),
 	]);
-	const strings = createStrings(lang);
+	const strings = await loadStrings(lang);
 	// popup.html は lang="ja" で書いてある。実際に描く言語へ合わせる
 	doc.documentElement.lang = strings.lang;
 
