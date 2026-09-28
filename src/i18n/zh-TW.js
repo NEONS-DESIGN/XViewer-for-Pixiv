@@ -48,6 +48,8 @@ export default {
 		CLOSE_TITLE: '關閉（Esc）',
 		LOADING: '載入中...',
 		LOAD_FAILED: '無法載入作品',
+		NOT_FOUND: '找不到此作品。可能已被刪除或設為不公開',
+		NETWORK_FAILED: '通訊失敗。請確認網路連線後重新開啟',
 	},
 	imagePane: {
 		PREV_PAGE: '上一頁',

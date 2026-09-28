@@ -20,7 +20,9 @@ import {
 } from '../../common/constants.js';
 import { createIcon } from '../../common/icons.js';
 import { warn } from '../../common/log.js';
-import { getJson } from '../../pixiv/client.js';
+import { getJson, FRESH_FETCH_INIT } from '../../pixiv/client.js';
+import { clearUserCache } from '../../pixiv/user.js';
+import { PIXIV_ERROR_KINDS } from '../../pixiv/errors.js';
 import { illustUrl } from '../../pixiv/endpoints.js';
 import { normalizeDetail } from '../../pixiv/normalize.js';
 import { readSession } from '../session.js';
@@ -79,8 +81,9 @@ const KEEP_OPEN_SELECTOR = [
  * @property {(workId: string) => void} onNavigate 上下キーで作品が切り替わったときに呼ばれる (URL の差し替えは呼び出し側)
  * @property {() => boolean} canExtendSequence グリッドの端で全作品の並びへ広げてよいか (タグ絞り込み中は false)
  * @property {(current: import('../sequence.js').Sequence) => Promise<import('../sequence.js').Sequence>} extendSequence 端で全作品の並びへ広げる
- * @property {(url: string) => Promise<object>} [getJsonImpl] 作品詳細の取得。テストから通信させないために使う
+ * @property {(url: string, deps?: object, init?: RequestInit) => Promise<object>} [getJsonImpl] 作品詳細の取得。テストから通信させないために使う
  * @property {(userId: string, lang: string) => Promise<object>} [fetchUser] 作者情報の取得。テストから通信させないために使う
+ * @property {() => void} [clearUserCache] 覚えた作者情報を捨てる。既定は pixiv/user.js の clearUserCache
  */
 
 /**
@@ -123,6 +126,19 @@ export function isTextEntry(event) {
 }
 
 /**
+ * 作品詳細を取れなかった理由を、利用者向けの文言にする。
+ * 見分けるのは「作品が無い (削除・非公開)」と「通信の失敗」だけで、他は共通の文言にする。
+ * @param {unknown} error 取得で投げられた例外
+ * @param {object} strings 文言のカタログ (src/i18n)
+ * @returns {string} 出す文言
+ */
+export function loadFailedMessage(error, strings) {
+	if (error?.kind === PIXIV_ERROR_KINDS.NOT_FOUND) return strings.viewer.NOT_FOUND;
+	if (error?.kind === PIXIV_ERROR_KINDS.NETWORK) return strings.viewer.NETWORK_FAILED;
+	return strings.viewer.LOAD_FAILED;
+}
+
+/**
  * ビュワーを作る。
  * 生成した時点では画面に何も出さない。open() で初めて表示する。
  * @param {ViewerDeps} deps 依存
@@ -131,6 +147,7 @@ export function isTextEntry(event) {
 export function createViewer(deps) {
 	const { doc, strings } = deps;
 	const fetchJson = deps.getJsonImpl ?? getJson;
+	const forgetUsers = deps.clearUserCache ?? clearUserCache;
 	let settings = deps.settings;
 
 	/** @type {HTMLElement|null} */
@@ -445,6 +462,9 @@ export function createViewer(deps) {
 			lockBody();
 			doc.addEventListener('keydown', onKeyDown, true);
 			lockBackground();
+			// 閉じている間にページ側でフォローを切り替えられていても、開いたときは最新を出す。
+			// 開いている間はページのボタンに触れないので、作品を送るたびには捨てない
+			forgetUsers();
 		}
 
 		// 古いペインは取得を待つ前に必ず捨てる。
@@ -463,14 +483,14 @@ export function createViewer(deps) {
 
 		let detail;
 		try {
-			const raw = await fetchJson(illustUrl(workId, strings.lang));
+			const raw = await fetchJson(illustUrl(workId, strings.lang), {}, FRESH_FETCH_INIT);
 			// 待っている間に新しい要求が来ていたら捨てる。
 			// 同じ作品を開き直したときも古い応答を捨てられるよう、ID ではなく世代で見る
 			if (token !== requestToken) return;
 			detail = normalizeDetail(raw);
 		} catch (error) {
 			if (token !== requestToken) return;
-			showStatus(strings.viewer.LOAD_FAILED, STATUS_KINDS.ERROR);
+			showStatus(loadFailedMessage(error, strings), STATUS_KINDS.ERROR);
 			warn('failed to open', workId, error);
 			return;
 		}

@@ -1,6 +1,7 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { fetchUserProfile, patchUserProfile, clearUserCache } from '../../src/pixiv/user.js';
+import { FRESH_FETCH_INIT } from '../../src/pixiv/client.js';
 
 beforeEach(() => { clearUserCache(); });
 
@@ -19,6 +20,14 @@ test('既定では /ajax/user/{id}?full=1 を取りに行く', async () => {
 	const { getJsonImpl, urls } = fakeGetJson();
 	await fetchUserProfile('54734418', 'ja', { getJsonImpl });
 	assert.deepEqual(urls, ['/ajax/user/54734418?full=1&lang=ja']);
+});
+
+test('フォロー状態を読む取得なので HTTP キャッシュを確かめ直させる', async () => {
+	// ページ側でフォローした直後に開いたとき、ブラウザに残った古い応答を使わせない
+	const inits = [];
+	const getJsonImpl = async (url, deps, init) => { inits.push(init); return {}; };
+	await fetchUserProfile('1', 'ja', { getJsonImpl });
+	assert.deepEqual(inits, [FRESH_FETCH_INIT]);
 });
 
 test('同じユーザーは一度しか取りに行かない', async () => {

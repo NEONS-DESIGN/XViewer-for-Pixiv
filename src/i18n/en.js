@@ -34,6 +34,8 @@ export default {
 		CLOSE_TITLE: 'Close (Esc)',
 		LOADING: 'Loading...',
 		LOAD_FAILED: 'Could not load this artwork',
+		NOT_FOUND: 'This artwork could not be found. It may have been deleted or made private',
+		NETWORK_FAILED: 'Could not connect. Check your connection and open it again',
 	},
 	imagePane: {
 		PREV_PAGE: 'Previous page',

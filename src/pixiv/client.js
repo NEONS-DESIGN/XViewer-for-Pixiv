@@ -21,6 +21,13 @@ const FORM_HEADERS = Object.freeze({
 	[HEADER_CONTENT_TYPE]: CONTENT_TYPE_FORM,
 });
 
+/**
+ * HTTP キャッシュを使わず、サーバーへ確かめ直して取るときの fetch の init。
+ * pixiv の API は private, max-age=10 で返すので、フォローやいいねの状態を読む取得に付ける。
+ * 付けないと、ページ側で操作した直後でも 10 秒前の応答が返ることがある。
+ */
+export const FRESH_FETCH_INIT = Object.freeze({ cache: 'no-cache' });
+
 /** fetch が中断されたときに投げる例外の name (DOMException)。 */
 const ABORT_ERROR_NAME = 'AbortError';
 
@@ -119,10 +126,11 @@ async function request(url, init, deps, parse = unwrap) {
  * GET して body を返す。
  * @param {string} url URL
  * @param {ClientDeps} [deps] 依存
+ * @param {RequestInit} [init] fetch の init に足すもの。(FRESH_FETCH_INIT など)
  * @returns {Promise<unknown>} body
  */
-export function getJson(url, deps = {}) {
-	return request(url, {}, deps);
+export function getJson(url, deps = {}, init = {}) {
+	return request(url, init, deps);
 }
 
 /**

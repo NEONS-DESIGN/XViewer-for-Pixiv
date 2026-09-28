@@ -6,7 +6,7 @@
  * フォロー状態の出どころもここ 1 つにする。切替後は patchUserProfile で書き換え、
  * 呼び出し側が別のキャッシュを持たなくて済むようにする。
  */
-import { getJson } from './client.js';
+import { getJson, FRESH_FETCH_INIT } from './client.js';
 import { userUrl } from './endpoints.js';
 import { createPromiseCache } from './promise-cache.js';
 
@@ -20,7 +20,7 @@ const USER_PROFILE_CACHE_LIMIT = 100;
 
 /**
  * @typedef {object} UserDeps
- * @property {(url: string) => Promise<object>} [getJsonImpl] 取得の差し替え。client.js の getJson と同じ形
+ * @property {(url: string, deps?: object, init?: RequestInit) => Promise<object>} [getJsonImpl] 取得の差し替え。client.js の getJson と同じ形
  */
 
 /**
@@ -33,6 +33,7 @@ const cache = createPromiseCache(USER_PROFILE_CACHE_LIMIT);
 
 /**
  * ユーザー情報を取る。同じ ID は覚えて使い回す。
+ * isFollowed を読むので、取りに行くときは HTTP キャッシュを確かめ直す。
  * @param {string} userId ユーザー ID
  * @param {string} lang 言語コード (strings.lang)
  * @param {UserDeps} [deps] テスト用の依存
@@ -40,7 +41,7 @@ const cache = createPromiseCache(USER_PROFILE_CACHE_LIMIT);
  */
 export function fetchUserProfile(userId, lang, deps = {}) {
 	const getJsonImpl = deps.getJsonImpl ?? getJson;
-	return cache.get(userId) ?? cache.remember(userId, () => getJsonImpl(userUrl(userId, lang)));
+	return cache.get(userId) ?? cache.remember(userId, () => getJsonImpl(userUrl(userId, lang), {}, FRESH_FETCH_INIT));
 }
 
 /**
@@ -58,7 +59,9 @@ export function patchUserProfile(userId, patch) {
 }
 
 /**
- * 覚えた内容を捨てる。テスト用。
+ * 覚えた内容を捨てる。
+ * ビュワーを新しく開くときに呼ぶ。閉じている間にページ側でフォローを切り替えられても、
+ * 覚えた isFollowed はそれを知らないため。
  * @returns {void}
  */
 export function clearUserCache() {
