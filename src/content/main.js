@@ -575,8 +575,8 @@ function startNavigationWatch() {
 	window.addEventListener(NAV_EVENTS.NAVIGATE, onNavigate);
 	window.addEventListener('popstate', onPopState);
 
-	// 保険の経路。無限スクロールで数千回走るので、ここは pathname の比較だけに留める。
-	// (グリッドの出現の検出には使わない)
+	// 保険の経路。無限スクロールで数千回走るので、pathname の比較と
+	// 無限スクロールの張り先の確認だけに留める。
 	// タイマが動いている間は何もしないので、再描画が続いても確認は間隔ごとに 1 回で済む
 	const observer = new MutationObserver(() => {
 		if (checkTimer) return;
@@ -599,7 +599,7 @@ function startNavigationWatch() {
 	observer.observe(document.body, { childList: true, subtree: true });
 
 	// この購読は stop() では外さない。外すと対象外のページへ出たあと戻ってこられない。
-	// 解除するのは設定が enabled: false になったときだけ
+	// 解除するのは needsNavigationWatch() が false になったときだけ
 	navigationWatch = {
 		dispose() {
 			window.removeEventListener(NAV_EVENTS.NAVIGATE, onNavigate);
