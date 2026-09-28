@@ -64,6 +64,9 @@ const RERENDER_SETTING_KEYS = Object.freeze(['imageQuality', 'prefetch', 'showSi
  */
 const DETAIL_FETCH_INIT = Object.freeze({ ...FRESH_FETCH_INIT, priority: 'high' });
 
+/** 隣の作品の詳細を先読みするときの fetch の init。今見ている作品の読み込みより後に回す。 */
+const NEIGHBOR_DETAIL_FETCH_INIT = Object.freeze({ ...FRESH_FETCH_INIT, priority: 'low' });
+
 /** 隣の作品の 1 枚目を読んでおく Image の fetchPriority。今見ている作品の読み込みより後に回す。 */
 const NEIGHBOR_IMAGE_PRIORITY = 'low';
 
@@ -426,10 +429,11 @@ export function createViewer(deps) {
 	 * 作品詳細を取得する。
 	 * @param {string} workId 作品 ID
 	 * @param {AbortSignal} signal 中断の合図
+	 * @param {RequestInit} [init] fetch の init。既定は開いた直後向けの DETAIL_FETCH_INIT
 	 * @returns {Promise<object>} 取得結果 (正規化前)
 	 */
-	function startDetailFetch(workId, signal) {
-		return fetchJson(illustUrl(workId, strings.lang), { signal }, DETAIL_FETCH_INIT);
+	function startDetailFetch(workId, signal, init = DETAIL_FETCH_INIT) {
+		return fetchJson(illustUrl(workId, strings.lang), { signal }, init);
 	}
 
 	/**
@@ -521,7 +525,7 @@ export function createViewer(deps) {
 		if (!settings.prefetchNeighbor) return;
 		const id = navigation.peek();
 		if (!id || id === neighborSlot.peekId()) return;
-		neighborSlot.put(id, (signal) => startDetailFetch(id, signal));
+		neighborSlot.put(id, (signal) => startDetailFetch(id, signal, NEIGHBOR_DETAIL_FETCH_INIT));
 		const promise = neighborSlot.peekPromise();
 		promise.then((raw) => {
 			// 待っている間に開かれた・捨てられた・差し替えられた分は温めない
@@ -616,7 +620,7 @@ export function createViewer(deps) {
 			warn('failed to render', detail.id, error);
 			return;
 		}
-		// 隣を温めるのは描き終えてから。今見ている作品の読み込みと帯域を取り合わない
+		// 主役を組み終えてから、低い優先度で隣を温める
 		if (token === requestToken) warmNeighbor();
 	}
 

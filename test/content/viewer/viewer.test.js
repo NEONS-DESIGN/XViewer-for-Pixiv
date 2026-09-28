@@ -805,6 +805,22 @@ test('prefetchNeighbor が true なら描き終えた後に隣の詳細を 1 本
 	assert.match(find(shadow(), '.overlay').getAttribute('aria-label'), /作品 2/);
 });
 
+test('隣の詳細は優先度を下げて取り、開いた作品の詳細は優先度を上げたまま', async () => {
+	const inits = {};
+	const { viewer } = setup({
+		settings: settings({ prefetchNeighbor: true }),
+		createImage: imageRecorder().createImage,
+		getJsonImpl: async (url, jsonDeps, init) => {
+			inits[idOf(url)] = init;
+			return rawDetail(idOf(url));
+		},
+	});
+	await viewer.open('1', fakeSequence(['1', '2']));
+	await flush();
+	assert.deepEqual(inits['1'], { cache: 'no-cache', priority: 'high' });
+	assert.deepEqual(inits['2'], { cache: 'no-cache', priority: 'low' });
+});
+
 test('隣の温めは開くときと同じ言語で取る', async () => {
 	const { viewer, fetched } = setup({
 		settings: settings({ prefetchNeighbor: true }),
