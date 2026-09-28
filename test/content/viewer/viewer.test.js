@@ -114,7 +114,7 @@ function fakeDoc() {
 
 /**
  * ビュワーと依存の記録を用意する。
- * @param {object} [options] getJsonImpl と settings、setTimeout / clearTimeout の差し替え
+ * @param {object} [options] getJsonImpl と settings、setTimeout / clearTimeout / createImage の差し替え
  * @returns {{viewer: object, doc: object, fetched: string[], closed: () => number, shadow: () => object, stage: () => object}} 一式
  */
 function setup(options = {}) {
@@ -139,6 +139,7 @@ function setup(options = {}) {
 		clearUserCache: options.clearUserCache ?? (() => {}),
 		setTimeout: options.setTimeout,
 		clearTimeout: options.clearTimeout,
+		createImage: options.createImage,
 	});
 	const shadow = () => doc.body.children[0]?.shadowRoot ?? null;
 	return {
@@ -719,4 +720,313 @@ test('巡回先が無くても Tab を素通しさせない', async () => {
 	let prevented = 0;
 	await doc.dispatch('keydown', { key: KEYS.FOCUS_NEXT, shiftKey: false, preventDefault() { prevented += 1; } });
 	assert.equal(prevented, 1);
+});
+
+/**
+ * 隣の画像の温めに使う Image の代わりを作り、作ったものを記録する。
+ * @returns {{createImage: () => object, images: object[]}} 工場と記録
+ */
+function imageRecorder() {
+	const images = [];
+	return {
+		images,
+		createImage: () => {
+			const image = { src: '', fetchPriority: 'auto' };
+			images.push(image);
+			return image;
+		},
+	};
+}
+
+/**
+ * 取得の URL から作品 ID を読む。
+ * @param {string} url 取得の URL
+ * @returns {string} 作品 ID
+ */
+function idOf(url) {
+	return url.match(/illust\/(\d+)/)[1];
+}
+
+/**
+ * 下キー (次の作品) の keydown の代わり。
+ * @returns {object} event の代わり
+ */
+function nextWorkKey() {
+	return { key: KEYS.NEXT_WORK, preventDefault() {}, stopPropagation() {} };
+}
+
+/**
+ * 上キー (前の作品) の keydown の代わり。
+ * @returns {object} event の代わり
+ */
+function prevWorkKey() {
+	return { key: KEYS.PREV_WORK, preventDefault() {}, stopPropagation() {} };
+}
+
+/**
+ * 指定した作品の詳細だけ応答を返さない getJsonImpl を作り、渡された signal を記録する。
+ * @param {string} holdId 応答を返さない作品 ID
+ * @returns {{getJsonImpl: Function, signals: Object<string, AbortSignal>}} 取得の代わりと記録
+ */
+function holdingFetch(holdId) {
+	const signals = {};
+	return {
+		signals,
+		getJsonImpl: (url, jsonDeps) => {
+			const id = idOf(url);
+			signals[id] = jsonDeps.signal;
+			return id === holdId ? new Promise(() => {}) : Promise.resolve(rawDetail(id));
+		},
+	};
+}
+
+test('prefetchNeighbor が false なら隣を温めない', async () => {
+	const { createImage, images } = imageRecorder();
+	const { viewer, fetched } = setup({ createImage });
+	await viewer.open('1', fakeSequence(['1', '2']));
+	await flush();
+	assert.deepEqual(fetched, ['/ajax/illust/1?lang=ja']);
+	assert.equal(images.length, 0);
+});
+
+test('prefetchNeighbor が true なら描き終えた後に隣の詳細を 1 本取り、送ったときに使う', async () => {
+	const { createImage, images } = imageRecorder();
+	const { viewer, doc, fetched, shadow } = setup({ settings: settings({ prefetchNeighbor: true }), createImage });
+	await viewer.open('1', fakeSequence(['1', '2']));
+	await flush();
+	assert.deepEqual(fetched, ['/ajax/illust/1?lang=ja', '/ajax/illust/2?lang=ja']);
+	// 1 枚目を優先度を下げて読んでおく
+	assert.equal(images.length, 1);
+	assert.equal(images[0].src, REGULAR_URL);
+	assert.equal(images[0].fetchPriority, 'low');
+	await doc.dispatch('keydown', nextWorkKey());
+	await flush();
+	assert.equal(fetched.filter((url) => url.includes('/illust/2')).length, 1);
+	assert.match(find(shadow(), '.overlay').getAttribute('aria-label'), /作品 2/);
+});
+
+test('隣の温めは開くときと同じ言語で取る', async () => {
+	const { viewer, fetched } = setup({
+		settings: settings({ prefetchNeighbor: true }),
+		strings: createStrings('en'),
+		createImage: imageRecorder().createImage,
+	});
+	await viewer.open('1', fakeSequence(['1', '2']));
+	await flush();
+	assert.deepEqual(fetched, ['/ajax/illust/1?lang=en', '/ajax/illust/2?lang=en']);
+});
+
+test('一度使った隣の先読みは捨て、戻って来たら取り直す', async () => {
+	const { viewer, doc, fetched } = setup({ settings: settings({ prefetchNeighbor: true }), createImage: imageRecorder().createImage });
+	await viewer.open('1', fakeSequence(['1', '2']));
+	await flush();
+	await doc.dispatch('keydown', nextWorkKey());
+	await flush();
+	await doc.dispatch('keydown', prevWorkKey());
+	await flush();
+	await doc.dispatch('keydown', nextWorkKey());
+	await flush();
+	assert.equal(fetched.filter((url) => url.includes('/illust/2')).length, 2);
+});
+
+test('上へ送ったあとは前の向きを温める', async () => {
+	const { viewer, doc, fetched } = setup({ settings: settings({ prefetchNeighbor: true }), createImage: imageRecorder().createImage });
+	await viewer.open('3', fakeSequence(['1', '2', '3', '4']));
+	await flush();
+	await doc.dispatch('keydown', prevWorkKey());
+	await flush();
+	// 3 を開いて 4 を温め、上へ送って 2 を開いたら、次は 1 を温める
+	assert.deepEqual(fetched.map(idOf), ['3', '4', '2', '1']);
+});
+
+test('見られない作品は詳細だけで、画像は読まない', async () => {
+	const { createImage, images } = imageRecorder();
+	const fetched = [];
+	const { viewer } = setup({
+		settings: settings({ prefetchNeighbor: true }),
+		createImage,
+		// fakeDoc に __NEXT_DATA__ が無いので未ログイン扱い。R-18 は見られない
+		getJsonImpl: async (url) => {
+			fetched.push(url);
+			const id = idOf(url);
+			return rawDetail(id, id === '2' ? { xRestrict: 1 } : {});
+		},
+	});
+	await viewer.open('1', fakeSequence(['1', '2']));
+	await flush();
+	assert.equal(fetched.filter((url) => url.includes('/illust/2')).length, 1);
+	assert.equal(images.length, 0);
+});
+
+test('隣がうごイラなら meta まで温め、開いたときに meta を取り直さない', async (t) => {
+	// 再生器は zip を取りに行くので、zip は 403 で返して止める。失敗の warn は黙らせる
+	t.mock.method(console, 'warn', () => {});
+	// 閉じるときに再生器が rAF を取り消す。Node には無いので足し、終わったら外す
+	globalThis.cancelAnimationFrame = () => {};
+	t.after(() => { delete globalThis.cancelAnimationFrame; });
+	const pageFetched = [];
+	t.mock.method(globalThis, 'fetch', async (url) => {
+		pageFetched.push(String(url));
+		return { ok: false, status: 403 };
+	});
+	const { createImage, images } = imageRecorder();
+	const fetched = [];
+	const { viewer, doc } = setup({
+		settings: settings({ prefetchNeighbor: true }),
+		createImage,
+		getJsonImpl: async (url) => {
+			fetched.push(url);
+			if (url.includes('ugoira_meta')) {
+				return { src: 'https://i.pximg.net/img-zip-ugoira/img/x_ugoira600x600.zip', frames: [] };
+			}
+			const id = idOf(url);
+			return rawDetail(id, id === '2' ? { illustType: 2 } : {});
+		},
+	});
+	await viewer.open('1', fakeSequence(['1', '2']));
+	await flush();
+	assert.deepEqual(fetched, ['/ajax/illust/1?lang=ja', '/ajax/illust/2?lang=ja', '/ajax/illust/2/ugoira_meta?lang=ja']);
+	// zip も画像も温めない
+	assert.equal(images.length, 0);
+	assert.deepEqual(pageFetched, []);
+	await doc.dispatch('keydown', nextWorkKey());
+	await flush();
+	assert.equal(fetched.filter((url) => url.includes('ugoira_meta')).length, 1);
+	assert.equal(pageFetched.filter((url) => url.includes('ugoira_meta')).length, 0);
+	assert.equal(pageFetched.length, 1, '再生器は zip だけを取りに行く');
+	viewer.close();
+});
+
+test('閉じたら隣の先読みを止める', async () => {
+	const { getJsonImpl, signals } = holdingFetch('2');
+	const { viewer } = setup({ settings: settings({ prefetchNeighbor: true }), createImage: imageRecorder().createImage, getJsonImpl });
+	await viewer.open('1', fakeSequence(['1', '2']));
+	await flush();
+	assert.equal(signals['2'].aborted, false);
+	viewer.close();
+	assert.equal(signals['2'].aborted, true);
+});
+
+test('閉じたら温めている画像と meta も止める', async () => {
+	const { createImage, images } = imageRecorder();
+	let metaSignal = null;
+	const { viewer } = setup({
+		settings: settings({ prefetchNeighbor: true }),
+		createImage,
+		getJsonImpl: (url, jsonDeps) => {
+			if (url.includes('ugoira_meta')) {
+				metaSignal = jsonDeps.signal;
+				return new Promise(() => {});
+			}
+			const id = idOf(url);
+			return Promise.resolve(rawDetail(id, id === '3' ? { illustType: 2 } : {}));
+		},
+	});
+	// 1 を開くと 2 (一枚絵) の画像を温める
+	await viewer.open('1', fakeSequence(['1', '2', '3']));
+	await flush();
+	assert.equal(images[0].src, REGULAR_URL);
+	viewer.close();
+	assert.equal(images[0].src, '');
+	// 2 を開くと 3 (うごイラ) の meta を温める
+	await viewer.open('2', fakeSequence(['1', '2', '3']));
+	await flush();
+	assert.ok(metaSignal);
+	assert.equal(metaSignal.aborted, false);
+	viewer.close();
+	assert.equal(metaSignal.aborted, true);
+	// Image は作り直さず 1 つを使い回す
+	assert.equal(images.length, 1);
+});
+
+test('先読みを使って開いた作品の取得も、閉じたときに止める', async () => {
+	const { getJsonImpl, signals } = holdingFetch('2');
+	const { viewer, doc } = setup({ settings: settings({ prefetchNeighbor: true }), createImage: imageRecorder().createImage, getJsonImpl });
+	await viewer.open('1', fakeSequence(['1', '2', '3']));
+	await flush();
+	await doc.dispatch('keydown', nextWorkKey());
+	// 2 は温めた取得をそのまま待っている
+	assert.equal(signals['2'].aborted, false);
+	viewer.close();
+	assert.equal(signals['2'].aborted, true);
+});
+
+test('先読みを使って開いた作品の取得も、次に送ったときに止める', async () => {
+	const { getJsonImpl, signals } = holdingFetch('2');
+	const { viewer } = setup({ settings: settings({ prefetchNeighbor: true }), createImage: imageRecorder().createImage, getJsonImpl });
+	await viewer.open('1', fakeSequence(['1', '2', '3']));
+	await flush();
+	void viewer.open('2');
+	assert.equal(signals['2'].aborted, false);
+	void viewer.open('3');
+	assert.equal(signals['2'].aborted, true);
+	viewer.close();
+});
+
+test('隣の詳細が届く前に別の作品へ移ったら、その画像は読まない', async () => {
+	const { createImage, images } = imageRecorder();
+	let release = null;
+	const { viewer, doc } = setup({
+		settings: settings({ prefetchNeighbor: true }),
+		createImage,
+		getJsonImpl: (url) => {
+			const id = idOf(url);
+			if (id === '2') return new Promise((resolve) => { release = () => resolve(rawDetail('2')); });
+			return Promise.resolve(rawDetail(id));
+		},
+	});
+	await viewer.open('1', fakeSequence(['0', '1', '2']));
+	await flush();
+	await doc.dispatch('keydown', prevWorkKey());
+	await flush();
+	release();
+	await flush();
+	assert.equal(images.length, 0);
+});
+
+test('隣の先読みが失敗していたら、開くときに取り直す', async () => {
+	const fetched = [];
+	let failNext = true;
+	const { viewer, doc, stage } = setup({
+		settings: settings({ prefetchNeighbor: true }),
+		createImage: imageRecorder().createImage,
+		getJsonImpl: async (url) => {
+			fetched.push(url);
+			const id = idOf(url);
+			if (id === '2' && failNext) {
+				failNext = false;
+				throw new PixivError(PIXIV_ERROR_KINDS.NETWORK, 'offline');
+			}
+			return rawDetail(id);
+		},
+	});
+	await viewer.open('1', fakeSequence(['1', '2']));
+	await flush();
+	await doc.dispatch('keydown', nextWorkKey());
+	await flush();
+	assert.equal(fetched.filter((url) => url.includes('/illust/2')).length, 2);
+	assert.equal(findAll(stage(), '.status').length, 0);
+	assert.equal(findAll(stage(), '.frame').length, 1);
+});
+
+test('prefetchNeighbor を切ったら温めている途中の取得を止める', async () => {
+	const { getJsonImpl, signals } = holdingFetch('2');
+	const { viewer } = setup({ settings: settings({ prefetchNeighbor: true }), createImage: imageRecorder().createImage, getJsonImpl });
+	await viewer.open('1', fakeSequence(['1', '2']));
+	await flush();
+	viewer.setSettings(settings({ prefetchNeighbor: false }));
+	assert.equal(signals['2'].aborted, true);
+});
+
+test('新しい並びで開き直したら隣の先読みを捨てる', async () => {
+	const { getJsonImpl, signals } = holdingFetch('2');
+	const { viewer } = setup({ settings: settings({ prefetchNeighbor: true }), createImage: imageRecorder().createImage, getJsonImpl });
+	await viewer.open('1', fakeSequence(['1', '2']));
+	await flush();
+	const warmSignal = signals['2'];
+	void viewer.open('2', fakeSequence(['9', '2']));
+	assert.equal(warmSignal.aborted, true);
+	// 温めた分は使わず取り直す
+	assert.notEqual(signals['2'], warmSignal);
+	viewer.close();
 });

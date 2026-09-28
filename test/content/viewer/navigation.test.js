@@ -315,3 +315,39 @@ test('reset で並びと今の作品を捨てる', async () => {
 	await nav.moveWork(1);
 	assert.deepEqual(deps.opened, []);
 });
+
+test('peek は最後に動いた向きの隣を返す。初めは次の向き', async () => {
+	const nav = openedNavigation(fakeDeps(), ['1', '2', '3'], '2');
+	assert.equal(nav.lastDirection(), 1);
+	assert.equal(nav.peek(), '3');
+	await nav.moveWork(-1);
+	// openWork の偽物は setCurrentWorkId を呼ばないので、viewer の代わりに記録する
+	nav.setCurrentWorkId('1');
+	assert.equal(nav.lastDirection(), -1);
+	// 1 より前は無い
+	assert.equal(nav.peek(), null);
+});
+
+test('peek は端で並びを広げない', () => {
+	let extendCalls = 0;
+	const deps = fakeDeps({
+		canExtendSequence: () => true,
+		extendSequence: async (current) => { extendCalls += 1; return current; },
+	});
+	const nav = openedNavigation(deps, ['1', '2'], '2');
+	assert.equal(nav.peek(), null);
+	assert.equal(extendCalls, 0);
+});
+
+test('reset と setSequence で向きは次へ戻る', async () => {
+	const nav = openedNavigation(fakeDeps(), ['1', '2', '3'], '2');
+	await nav.moveWork(-1);
+	assert.equal(nav.lastDirection(), -1);
+	nav.setSequence(fakeSequence(['1', '2', '3']));
+	assert.equal(nav.lastDirection(), 1);
+	nav.setCurrentWorkId('2');
+	await nav.moveWork(-1);
+	nav.reset();
+	assert.equal(nav.lastDirection(), 1);
+	assert.equal(nav.peek(), null);
+});

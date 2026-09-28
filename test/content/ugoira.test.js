@@ -156,9 +156,10 @@ function metaResponse(body) {
  * @param {Function} [options.fetchImpl] 通信の代わり。省くと meta と zip を返す
  * @param {boolean} [options.holdImages] true なら Image の load を releaseImages() まで止める
  * @param {object} [options.strings] 文言のカタログ。省くと日本語
+ * @param {Promise<object>|null} [options.preloadedMeta] 温めておいた ugoira_meta の body
  * @returns {object} container / player / 作った Image / rAF のコールバック / 取り消した rAF の ID / 描いたコマ / zip fetch の init / releaseImages
  */
-function build({ sizes = [10, 10, 10], fetchImpl, holdImages = false, strings = STRINGS } = {}) {
+function build({ sizes = [10, 10, 10], fetchImpl, holdImages = false, strings = STRINGS, preloadedMeta = null } = {}) {
 	const doc = fakeDoc();
 	const drawn = [];
 	const create = doc.createElement;
@@ -191,6 +192,7 @@ function build({ sizes = [10, 10, 10], fetchImpl, holdImages = false, strings = 
 		settings: { imageQuality: 'regular' },
 		strings,
 		fetchImpl: fetchImpl ?? defaultFetch,
+		preloadedMeta,
 		createImage: () => {
 			const image = fakeElement('img');
 			const size = sizes[images.length] ?? 10;
@@ -377,5 +379,34 @@ test('再生ボタンの読み上げ名が英語になる', async () => {
 	assert.equal(toggle.getAttribute('aria-label'), 'Pause');
 	await toggle.click();
 	assert.equal(toggle.getAttribute('aria-label'), 'Play');
+	player.dispose();
+});
+
+test('温めた meta を渡されたら ugoira_meta を取りに行かない', async () => {
+	const asked = [];
+	const fetchImpl = async (url) => {
+		asked.push(url);
+		return { ok: true, status: 200, arrayBuffer: async () => ZIP3 };
+	};
+	const { container, player } = build({ fetchImpl, preloadedMeta: Promise.resolve(META3) });
+	await player.render(DETAIL);
+	assert.equal(asked.filter((url) => url.includes('ugoira_meta')).length, 0);
+	assert.equal(asked.length, 1, 'zip だけを取る');
+	assert.equal(find(container, '.ugoira-canvas').hidden, false);
+	player.dispose();
+});
+
+test('温めた meta が失敗していたら、いつもどおり取り直す', async () => {
+	const asked = [];
+	const fetchImpl = async (url) => {
+		asked.push(url);
+		if (url.includes('ugoira_meta')) return metaResponse(META3);
+		return { ok: true, status: 200, arrayBuffer: async () => ZIP3 };
+	};
+	const { container, player } = build({ fetchImpl, preloadedMeta: Promise.reject(new Error('warm failed')) });
+	await player.render(DETAIL);
+	assert.equal(asked.filter((url) => url.includes('ugoira_meta')).length, 1);
+	assert.equal(findAll(container, '.pane-error').length, 0, '温めの失敗だけでは失敗を出さない');
+	assert.equal(find(container, '.ugoira-canvas').hidden, false);
 	player.dispose();
 });
