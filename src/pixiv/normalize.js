@@ -59,6 +59,8 @@ function tagNames(tags) {
  * @property {string} title
  * @property {number} illustType ILLUST_TYPES のいずれか
  * @property {number} pageCount
+ * @property {number} width 1 枚目 (単ページ作品ではその 1 枚) の実寸の幅
+ * @property {number} height 1 枚目 (単ページ作品ではその 1 枚) の実寸の高さ
  * @property {number} xRestrict 0=全年齢 1=R-18 2=R-18G
  * @property {number} aiType 1=非AI 2=AI生成。未使用。
  * @property {string|null} thumbUrl
@@ -128,6 +130,8 @@ export function normalizeDetail(raw) {
 		title: raw.illustTitle,
 		illustType: raw.illustType,
 		pageCount: raw.pageCount,
+		width: raw.width,
+		height: raw.height,
 		xRestrict: raw.xRestrict,
 		aiType: raw.aiType,
 		thumbUrl: urls.thumb ?? null,

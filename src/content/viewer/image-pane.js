@@ -46,6 +46,21 @@ export function pickPageUrls(pages, quality) {
 }
 
 /**
+ * ページ配列から実寸を並べる。
+ * 原寸表示の仮表示を、原寸と同じ大きさへ引き伸ばすために使う。
+ * @param {Array<{width?: unknown, height?: unknown}>|null} pages /pages の body
+ * @returns {Array<{width: number, height: number}|null>} ページ順の実寸。数値でなければ null
+ */
+export function pickPageSizes(pages) {
+	if (!Array.isArray(pages)) return [];
+	return pages.map((page) => {
+		const width = page?.width;
+		const height = page?.height;
+		return Number.isFinite(width) && Number.isFinite(height) ? { width, height } : null;
+	});
+}
+
+/**
  * 先読みするページ番号を決める。
  * 今見ているページの前後を対象にし、端と自分自身は含めない。
  * 最後に動いた向きの側を先に並べる。(進んでいる方向を優先して取りに行く)
@@ -131,6 +146,11 @@ export function createImagePane(deps) {
 	 * 届いたら index へ反映する。待っていなければ null
 	 */
 	let pendingIndex = null;
+	/**
+	 * @type {Array<{width: number, height: number}|null>} 原寸表示の仮表示に渡すページごとの実寸。
+	 * /pages が届く前は detail.width / detail.height (1 枚だけ) を使う
+	 */
+	let pageSizes = [];
 	/**
 	 * 分母と矢印に使う総ページ数。/pages が届く前は detail.pageCount を使い、
 	 * 届いたら実際の urls.length に置き換える。(枚数を先に出すため)
@@ -291,18 +311,43 @@ export function createImagePane(deps) {
 	}
 
 	/**
+	 * 指定したページの、読み込みを起こさずに手元にある URL を返す。
+	 * 表示中のページは img が読み終えていれば、そうでなければ先読みの Image が
+	 * 読み終えていればその URL。無ければ null。(原寸表示の仮表示に使う)
+	 * @param {number} i ページ番号
+	 * @returns {string|null} 読み終えている URL。無ければ null
+	 */
+	function loadedUrlAt(i) {
+		if (i === index) {
+			return image && image.complete && image.naturalWidth > 0 ? shownUrl : null;
+		}
+		const img = prefetched.get(i);
+		return img && img.complete && img.naturalWidth > 0 ? img.src : null;
+	}
+
+	/**
 	 * 原寸表示を開く。
 	 * 開いた先でページを送られたら、こちらの表示も合わせる。
 	 * (閉じたときに違うページが出ていると、見ていた場所を見失う)
+	 * 解像度の設定が原寸でなければ、手元にある標準画質を仮表示用として渡す。
+	 * 通信は増やさない (読み込み済みのものしか渡さない) ので、設定に関わらず渡してよい
 	 * @param {string} alt 画像の代替文言 (作品名)
 	 * @returns {void}
 	 */
 	function openZoom(alt) {
+		// /pages 待ちの行き先は、原寸表示を開いた時点の index を基準にする。
+		// 残したまま /pages が届くと、原寸表示で見ている場所と違うページへ飛ぶ
+		pendingIndex = null;
+		const showPlaceholder = deps.settings.imageQuality !== IMAGE_QUALITY.ORIGINAL;
 		deps.zoom?.open({
 			urls: originalUrls,
 			index,
 			alt,
+			placeholderAt: showPlaceholder ? loadedUrlAt : undefined,
+			sizes: showPlaceholder ? pageSizes : undefined,
 			onIndexChange: (next) => {
+				// 先読みの向きを、原寸表示の中で送った向きにも合わせる
+				lastDirection = next >= index ? 1 : -1;
 				index = next;
 				paint();
 			},
@@ -365,6 +410,9 @@ export function createImagePane(deps) {
 			urls = [detail.urls[deps.settings.imageQuality] ?? detail.urls[IMAGE_QUALITY.REGULAR] ?? ''];
 			// 原寸が無い作品 (未ログインでは urls.original が落ちる) は標準へ倒す
 			originalUrls = [detail.urls[IMAGE_QUALITY.ORIGINAL] ?? detail.urls[IMAGE_QUALITY.REGULAR] ?? ''];
+			// /pages が届く前 (単ページ作品ではずっと) は詳細に入っている実寸を使う
+			pageSizes = [Number.isFinite(detail.width) && Number.isFinite(detail.height)
+				? { width: detail.width, height: detail.height } : null];
 			index = 0;
 			pendingIndex = null;
 			lastDirection = 1;
@@ -383,6 +431,7 @@ export function createImagePane(deps) {
 				if (next.length === 0) throw new Error(REASONS.PAGES_EMPTY);
 				urls = next;
 				originalUrls = pickPageUrls(pages, IMAGE_QUALITY.ORIGINAL);
+				pageSizes = pickPageSizes(pages);
 				total = urls.length;
 				// /pages を待つ間に押された矢印はここで反映する
 				index = clamp(pendingIndex ?? index, 0, urls.length - 1);
@@ -404,20 +453,7 @@ export function createImagePane(deps) {
 		next() { move(1); },
 		prev() { move(-1); },
 
-		/**
-		 * 指定したページの、読み込みを起こさずに手元にある URL を返す。
-		 * 表示中のページは img が読み終えていれば、そうでなければ先読みの Image が
-		 * 読み終えていればその URL。無ければ null。(原寸表示の placeholder に使う)
-		 * @param {number} i ページ番号
-		 * @returns {string|null} 読み終えている URL。無ければ null
-		 */
-		loadedUrlAt(i) {
-			if (i === index) {
-				return image && image.complete && image.naturalWidth > 0 ? shownUrl : null;
-			}
-			const img = prefetched.get(i);
-			return img && img.complete && img.naturalWidth > 0 ? img.src : null;
-		},
+		loadedUrlAt,
 
 		dispose() {
 			aborter.abort();
@@ -440,6 +476,7 @@ export function createImagePane(deps) {
 			onImageError = null;
 			onImageClick = null;
 			originalUrls = [];
+			pageSizes = [];
 			counter = null;
 			prevButton = null;
 			nextButton = null;

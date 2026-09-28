@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pickPageUrls, prefetchTargets, releaseTargets, createImagePane } from '../../src/content/viewer/image-pane.js';
+import { pickPageUrls, pickPageSizes, prefetchTargets, releaseTargets, createImagePane } from '../../src/content/viewer/image-pane.js';
 import { fakeElement, fakeDoc, find, findAll } from '../helpers/dom.js';
 import { fakeFetch, fakeApiFetch } from '../helpers/pixiv.js';
 import { createStrings } from '../../src/i18n/index.js';
-import { PREFETCH_RELEASE_MARGIN } from '../../src/common/constants.js';
+import { PREFETCH_RELEASE_MARGIN, IMAGE_QUALITY } from '../../src/common/constants.js';
 
 /** 実際の CDN と同じ形の URL を作る。安全側の関門を通す必要があるため。 */
 const cdn = (name) => `https://i.pximg.net/img-master/img/2026/09/10/00/00/00/${name}.jpg`;
@@ -38,6 +38,21 @@ test('pickPageUrls は CDN 以外の URL を空文字に落とす', () => {
 test('pickPageUrls は空や不正な入力で空配列を返す', () => {
 	assert.deepEqual(pickPageUrls([], 'regular'), []);
 	assert.deepEqual(pickPageUrls(null, 'regular'), []);
+});
+
+test('pickPageSizes は width/height を並べる', () => {
+	const pages = [{ width: 2177, height: 3031 }, { width: 1200, height: 1800 }];
+	assert.deepEqual(pickPageSizes(pages), [{ width: 2177, height: 3031 }, { width: 1200, height: 1800 }]);
+});
+
+test('pickPageSizes は width/height が数値でなければ null にする', () => {
+	const pages = [{ width: 'x', height: 3031 }, {}, { width: 100, height: 200 }];
+	assert.deepEqual(pickPageSizes(pages), [null, null, { width: 100, height: 200 }]);
+});
+
+test('pickPageSizes は空や不正な入力で空配列を返す', () => {
+	assert.deepEqual(pickPageSizes([]), []);
+	assert.deepEqual(pickPageSizes(null), []);
 });
 
 test('prefetchTargets は前後の枚数分を返す', () => {
@@ -74,14 +89,16 @@ const DETAIL = Object.freeze({
 	id: '149425016',
 	title: 'タイトル',
 	pageCount: 3,
+	width: 2177,
+	height: 3031,
 	urls: { regular: cdn('r0'), original: cdn('o0') },
 });
 
 /** /pages の応答の代わり。 */
 const PAGES = [
-	{ urls: { regular: cdn('r0'), original: cdn('o0') } },
-	{ urls: { regular: cdn('r1'), original: cdn('o1') } },
-	{ urls: { regular: cdn('r2'), original: cdn('o2') } },
+	{ urls: { regular: cdn('r0'), original: cdn('o0') }, width: 2177, height: 3031 },
+	{ urls: { regular: cdn('r1'), original: cdn('o1') }, width: 1200, height: 1800 },
+	{ urls: { regular: cdn('r2'), original: cdn('o2') }, width: 900, height: 1400 },
 ];
 
 /**
@@ -99,17 +116,18 @@ function fakeZoom() {
  * @param {Function} [options.fetchImpl] 通信の代わり
  * @param {number} [options.prefetch] 先読みの枚数
  * @param {boolean} [options.clickZoom] クリックで原寸表示するか
+ * @param {string} [options.imageQuality] 表示解像度の設定
  * @param {object} [options.zoom] 原寸レイヤの代わり
  * @param {object} [options.strings] 文言のカタログ
  * @returns {{container: object, pane: object, created: object[], zoom: object}} 描画先・ペイン・作った先読み Image・原寸レイヤ
  */
-function build({ fetchImpl, prefetch = 0, clickZoom = false, zoom = fakeZoom(), strings = createStrings('ja') } = {}) {
+function build({ fetchImpl, prefetch = 0, clickZoom = false, imageQuality = IMAGE_QUALITY.REGULAR, zoom = fakeZoom(), strings = createStrings('ja') } = {}) {
 	const container = fakeElement('div');
 	const created = [];
 	const pane = createImagePane({
 		doc: fakeDoc(),
 		container,
-		settings: { imageQuality: 'regular', prefetch, clickZoom },
+		settings: { imageQuality, prefetch, clickZoom },
 		zoom,
 		fetchImpl,
 		strings,
@@ -466,6 +484,90 @@ test('原寸表示でページを送るとペインも追従する', async () =>
 	// 閉じたときに同じページが出ていないと、見ていた場所を見失う
 	assert.equal(find(container, 'img').src, cdn('r2'));
 	assert.equal(find(container, '.counter').textContent, '3/3');
+});
+
+test('/pages 前は詳細の width/height を仮表示の実寸として渡す', async () => {
+	let respond;
+	const fetchImpl = () => new Promise((resolve) => { respond = resolve; });
+	const { container, pane, zoom } = build({ fetchImpl, clickZoom: true });
+	const rendering = pane.render(DETAIL);
+	await find(container, 'img').dispatch('click', {});
+	assert.deepEqual(zoom.opened[0].sizes, [{ width: 2177, height: 3031 }]);
+	assert.equal(typeof zoom.opened[0].placeholderAt, 'function');
+	respond({ ok: true, status: 200, text: async () => JSON.stringify({ error: false, body: PAGES }) });
+	await rendering;
+});
+
+test('/pages が届いたら実寸は各ページの width/height になる', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { container, pane, zoom } = build({ fetchImpl: impl, clickZoom: true });
+	await pane.render(DETAIL);
+	await find(container, 'img').dispatch('click', {});
+	assert.deepEqual(zoom.opened[0].sizes, [
+		{ width: 2177, height: 3031 },
+		{ width: 1200, height: 1800 },
+		{ width: 900, height: 1400 },
+	]);
+});
+
+test('原寸表示の仮表示は読み込み済みの URL だけを返す (通信を起こさない)', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { container, pane, zoom } = build({ fetchImpl: impl, clickZoom: true });
+	await pane.render(DETAIL);
+	const image = find(container, 'img');
+	image.complete = true;
+	image.naturalWidth = 1;
+	await image.dispatch('load');
+	await find(container, 'img').dispatch('click', {});
+	assert.equal(zoom.opened[0].placeholderAt(0), cdn('r0'));
+	assert.equal(zoom.opened[0].placeholderAt(1), null);
+});
+
+test('解像度の設定が原寸なら仮表示用の情報を渡さない', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { container, pane, zoom } = build({ fetchImpl: impl, clickZoom: true, imageQuality: IMAGE_QUALITY.ORIGINAL });
+	await pane.render(DETAIL);
+	await find(container, 'img').dispatch('click', {});
+	assert.equal(zoom.opened[0].placeholderAt, undefined);
+	assert.equal(zoom.opened[0].sizes, undefined);
+});
+
+test('原寸内でページを戻すと、以後の先読みは戻った向きを優先する', async () => {
+	const total = 5;
+	const detail = { ...DETAIL, pageCount: total };
+	const pagesData = Array.from({ length: total }, (_, i) => ({ urls: { regular: cdn(`r${i}`), original: cdn(`o${i}`) } }));
+	const { impl } = fakeApiFetch(pagesData);
+	const { container, pane, zoom, created } = build({ fetchImpl: impl, clickZoom: true, prefetch: 1 });
+	await pane.render(detail);
+	// 0 -> 3 まで前進しておく。lastDirection はここで 1
+	pane.next();
+	pane.next();
+	pane.next();
+	await find(container, 'img').dispatch('click', {});
+	created.length = 0;
+	// 原寸内で 3 -> 1 へ戻る
+	zoom.opened[0].onIndexChange(1);
+	const image = find(container, 'img');
+	image.complete = true;
+	image.naturalWidth = 1;
+	await image.dispatch('load');
+	// 戻った向きなので「前」(0) を先に読みに行く。直っていなければ「次」(2) が先になる
+	assert.deepEqual(created.map((img) => img.src), [cdn('r0'), cdn('r2')]);
+});
+
+test('/pages 待ちの間に原寸表示を開くと、待っていた行き先を捨てる', async () => {
+	let respond;
+	const fetchImpl = () => new Promise((resolve) => { respond = resolve; });
+	const { container, pane, zoom } = build({ fetchImpl, clickZoom: true });
+	const rendering = pane.render(DETAIL);
+	// /pages 待ちなので、この矢印は pendingIndex にだけ覚える
+	pane.next();
+	await find(container, 'img').dispatch('click', {});
+	respond({ ok: true, status: 200, text: async () => JSON.stringify({ error: false, body: PAGES }) });
+	await rendering;
+	// 原寸表示を開いたことで pendingIndex を捨てているので、1 枚目のまま
+	assert.equal(find(container, 'img').src, cdn('r0'));
+	assert.equal(find(container, '.counter').textContent, '1/3');
 });
 
 test('英語のカタログで英語の文言が出る', async () => {

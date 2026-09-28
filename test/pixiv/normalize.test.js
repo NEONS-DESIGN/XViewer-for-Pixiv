@@ -24,6 +24,8 @@ test('normalizeDetail は詳細をまとめ、いいね済みとブックマー�
 		illustComment: '本文',
 		illustType: 0,
 		pageCount: 1,
+		width: 2177,
+		height: 3031,
 		xRestrict: 0,
 		aiType: 1,
 		userId: '54734418',
@@ -56,6 +58,8 @@ test('normalizeDetail は詳細をまとめ、いいね済みとブックマー�
 	assert.equal(detail.urls.original, 'https://i.pximg.net/img-original/o.png');
 	assert.equal(detail.thumbUrl, 'https://i.pximg.net/c/250x250/img-master/t.jpg');
 	assert.equal(detail.commentOff, false);
+	assert.equal(detail.width, 2177);
+	assert.equal(detail.height, 3031);
 });
 
 test('normalizeDetail はブックマークしていない作品の bookmarkId を null にする', () => {
