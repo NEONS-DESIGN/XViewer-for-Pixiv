@@ -14,6 +14,7 @@ import { addBookmark, deleteBookmark } from '../pixiv/actions.js';
 import { PIXIV_ERROR_KINDS } from '../pixiv/errors.js';
 import { warn } from '../common/log.js';
 import { createStyleHandle } from '../common/style-injector.js';
+import { runWhenIdle } from '../common/idle.js';
 import {
 	INFINITE_SCROLL,
 	XV_CARD_ATTR,
@@ -48,6 +49,9 @@ const FAILURE_TEXT_KEY = Object.freeze({
 
 /** 再試行ボタンを出す状態。失敗の文言を持つ状態と同じ集合 */
 const RETRYABLE_STATES = new Set(Object.keys(FAILURE_TEXT_KEY));
+
+/** prefetch モードで組み立て直後 / setMode() 直後に先読みを始めるまで待てる空き時間の上限 (ms)。 */
+const PREFETCH_IDLE_TIMEOUT_MS = 1000;
 
 /**
  * sentinel が引く strings.infinite のキーの一覧。
@@ -241,6 +245,8 @@ export function attachInfiniteScroll(doc, options) {
 	});
 	// 更新系は差し替えられるようにしておく (テストから本物の pixiv を叩かないため)
 	const actions = { addBookmark, deleteBookmark, ...deps.actions };
+	// 空き時間に走らせる口。テストから requestIdleCallback を挟まず即座に検証できるよう差し替えられる
+	const runIdle = deps.runWhenIdle ?? runWhenIdle;
 
 	const templates = captureTemplates(ul, { computedStyle: deps.computedStyle });
 	// 雛形が採れないページでは何もしない。呼び出し側はページャを隠さない
@@ -299,6 +305,13 @@ export function attachInfiniteScroll(doc, options) {
 	const cardStyle = createStyleHandle(doc, CARD_STYLE_ID, CARD_SHOW_CSS, 'card show');
 	/** @type {WeakSet<object>} 送信中のカード。二度押しで 2 回送らないための印 */
 	const sending = new WeakSet();
+	/**
+	 * 継ぎ足しの取得を束ねる中断の合図。dispose() で中断する。
+	 * setMode() の dropPrefetch() では中断しない。(応答が HTTP キャッシュへ残り、次の advance() で使えるため)
+	 */
+	const aborter = new AbortController();
+	/** @type {Set<string>} 自分が継ぎ足した作品 ID。重複判定は ul 全体を数え直さずここを見る */
+	const ownIds = new Set();
 
 	/**
 	 * 監視をやめる。二度呼んでも 1 回しか切らない。
@@ -441,23 +454,30 @@ export function attachInfiniteScroll(doc, options) {
 	}
 
 	/**
-	 * ul に既に並んでいる作品の ID を集める。
+	 * ul に本体 (pixiv) が並べている作品の ID を集める。
 	 * 継ぎ足しの重複判定に使う。基準ページの記憶がずれたとき (pixiv がグリッドを描き直した等) に
 	 * 同じ作品が二重に並ぶのを止めるための保険。
+	 * 自分が継ぎ足したカードは ownIds が覚えているので、ここでは見ない。
+	 * (継ぎ足すたびに増え続ける自分のカードを毎回数え直すと、ページを追うごとに遅くなる)
 	 * @returns {Set<string>} 作品 ID
 	 */
 	function existingWorkIds() {
 		const ids = new Set();
-		for (const link of ul.querySelectorAll(ARTWORK_LINK_SELECTOR)) {
-			// 作品リンクの href はパスだけ (/artworks/{id})。origin を挟まずそのまま読める
-			const id = parseArtworkPath(link.getAttribute('href') ?? '');
-			if (id) ids.add(id);
+		for (const card of ul.children) {
+			if (card.hasAttribute?.(XV_CARD_ATTR)) continue;
+			for (const link of card.querySelectorAll?.(ARTWORK_LINK_SELECTOR) ?? []) {
+				// 作品リンクの href はパスだけ (/artworks/{id})。origin を挟まずそのまま読める
+				const id = parseArtworkPath(link.getAttribute('href') ?? '');
+				if (id) ids.add(id);
+			}
 		}
 		return ids;
 	}
 
 	/**
 	 * 作品を並べる。既に並んでいる作品は飛ばし、組めなかった作品も飛ばす。
+	 * 組んだカードは DocumentFragment へ集め、ul への挿入を 1 回にまとめる。
+	 * (1 枚ずつ appendChild すると、pixiv 側の描き直しがそのたびに走る)
 	 * そのページで最初に並べたカードは `?p=` を決める印として覚える。
 	 * 1 枚も並ばなかったページは印を持たない。(画面に出ていないので `?p=` にも現れない)
 	 * @param {object[]} works 作品サマリ
@@ -467,21 +487,23 @@ export function attachInfiniteScroll(doc, options) {
 	 */
 	function render(works, page) {
 		const existing = existingWorkIds();
+		const fragment = doc.createDocumentFragment();
 		let added = 0;
 		let skipped = 0;
 		for (const work of works) {
 			const id = String(work?.id ?? '');
-			if (id && existing.has(id)) {
+			if (id && (existing.has(id) || ownIds.has(id))) {
 				skipped += 1;
 				continue;
 			}
 			const card = buildCard(templates, work, { loggedIn });
 			if (!card) continue;
-			ul.appendChild(card);
+			fragment.appendChild(card);
 			if (added === 0) pageMarks.push({ page, el: card });
-			if (id) existing.add(id);
+			if (id) ownIds.add(id);
 			added += 1;
 		}
+		if (added > 0) ul.appendChild(fragment);
 		return { added, skipped };
 	}
 
@@ -494,7 +516,7 @@ export function attachInfiniteScroll(doc, options) {
 	 */
 	async function loadQuietly(page) {
 		try {
-			const works = await source.loadPage(page);
+			const works = await source.loadPage(page, { signal: aborter.signal });
 			return Array.isArray(works) ? works : null;
 		} catch (error) {
 			// 先読みは失敗しても実害が無い。下まで来たときに読み直す
@@ -520,6 +542,21 @@ export function attachInfiniteScroll(doc, options) {
 			return works;
 		});
 		prefetchTask = task;
+	}
+
+	/**
+	 * 空き時間に 1 ページだけ先読みする。
+	 *
+	 * prefetch モードでだけ動き、組み立ての直後と setMode() で prefetch になった直後に呼ぶ。
+	 * (onReach は「通信は最小」がモードの約束なので、組み立て直後の先読みはしない)
+	 * 空き時間に回るまでの間に状況が変わっていることがあるので、実行する直前にも条件を見直す。
+	 * @returns {void}
+	 */
+	function schedulePrefetch() {
+		if (mode !== INFINITE_SCROLL.PREFETCH || done || disposed || loading || prefetched || prefetchTask) return;
+		runIdle(() => {
+			if (!disposed && !loading && !prefetchTask && !prefetched && mode === INFINITE_SCROLL.PREFETCH) startPrefetch(lastPage + 1);
+		}, { timeoutMs: PREFETCH_IDLE_TIMEOUT_MS, view });
 	}
 
 	/**
@@ -631,7 +668,7 @@ export function attachInfiniteScroll(doc, options) {
 					finish();
 					return;
 				}
-				const works = held ?? await source.loadPage(next);
+				const works = held ?? await source.loadPage(next, { signal: aborter.signal });
 				held = null;
 				if (disposed) return;
 				// 空の応答は総ページ数が実際より多かったときの保険
@@ -663,6 +700,9 @@ export function attachInfiniteScroll(doc, options) {
 			// 先読みは描き終えてから始め、待たない (待つと次の advance() が弾かれる)
 			if (mode === INFINITE_SCROLL.PREFETCH) startPrefetch(lastPage + 1);
 		} catch (error) {
+			// dispose() 後に届いた失敗。中断 (ABORTED) のこともあれば、応答の読み込み中に
+			// 中断されて別の種類のエラーになることもあるので、error.kind では判定しない
+			if (disposed) return;
 			// 自動で繰り返さない。同じ失敗を繰り返すほうが害になる。
 			// IntersectionObserver は交差が変わったときにしか鳴らず、カードが増えないと
 			// sentinel も動かないので、下端に留まったままの人のために再試行ボタンを出す
@@ -823,6 +863,7 @@ export function attachInfiniteScroll(doc, options) {
 	const firstCard = ul.querySelector('li');
 	if (firstCard) pageMarks.push({ page: lastPage, el: firstCard });
 	bindScroll();
+	schedulePrefetch();
 
 	return {
 		/**
@@ -850,6 +891,7 @@ export function attachInfiniteScroll(doc, options) {
 				// 監視し直せなければ継ぎ足しは止まる。ページャは残っているので閲覧は続けられる
 				warn('infinite scroll re-observe failed', error);
 			}
+			schedulePrefetch();
 		},
 		/**
 		 * 今画面に出ているページ番号。
@@ -874,21 +916,26 @@ export function attachInfiniteScroll(doc, options) {
 		dispose() {
 			if (disposed) return;
 			disposed = true;
+			// 走っている取得を中断する。応答が HTTP キャッシュに残っていれば無駄にはならない
+			aborter.abort();
 			dropPrefetch();
 			stopObserving();
 			unbindScroll();
 			unbindHeart();
 			// 撤去したカードの印は残さない。外れたノードの rect は当てにならない
 			pageMarks.length = 0;
+			ownIds.clear();
 			// 隠したページャを戻す。継ぎ足しをやめた以上、ページ送りの手段が要る。
 			// sentinel の見た目も外して、置いたものを全て元へ戻す
 			pagerStyle.hide();
 			cardStyle.hide();
 			sentinelStyle.hide();
 			// 撤去は別々に包む。片方が投げても、もう片方はページに残さない。
-			// 継ぎ足したカードが残るのは「拡張をオフにしたのに元へ戻らない」状態なので先に消す
+			// 継ぎ足したカードが残るのは「拡張をオフにしたのに元へ戻らない」状態なので先に消す。
+			// 後ろから外す (末尾からの削除は子の並びを詰め直す量が少ない)
 			try {
-				for (const card of [...ul.querySelectorAll(`[${XV_CARD_ATTR}]`)]) card.remove();
+				const cards = ul.querySelectorAll(`[${XV_CARD_ATTR}]`);
+				for (let i = cards.length - 1; i >= 0; i -= 1) cards[i].remove();
 			} catch (error) {
 				warn('infinite scroll card removal failed', error);
 			}

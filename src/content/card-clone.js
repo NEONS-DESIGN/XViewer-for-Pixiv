@@ -223,10 +223,11 @@ export function buildCard(templates, work, deps) {
 
 		const img = card.querySelector('img');
 		if (img) {
-			setImageSrcAttribute(img, src);
-			img.setAttribute('alt', String(work.alt ?? work.title ?? ''));
-			// 48 枚を一度に足すので、読み込みはブラウザの遅延読み込みに任せる
+			// 48 枚を一度に足すので、読み込みはブラウザの遅延読み込みに任せる。
+			// src を入れる前に付けないと、対応しないブラウザで一括読み込みが走ってしまう
 			img.setAttribute('loading', 'lazy');
+			img.setAttribute('alt', String(work.alt ?? work.title ?? ''));
+			setImageSrcAttribute(img, src);
 		}
 
 		const titleLink = links.find((link) => !link.querySelector('img'));

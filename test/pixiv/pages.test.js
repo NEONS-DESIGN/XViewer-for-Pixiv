@@ -1,6 +1,6 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { createPageSource, clearPageSourceCache, sortIdsDesc } from '../../src/pixiv/pages.js';
+import { createPageSource, clearPageSourceCache, sortIdsDesc, loadAllWorkIds } from '../../src/pixiv/pages.js';
 import { WORK_CATEGORY } from '../../src/common/constants.js';
 
 // 各テストが同じ userId '1' を使うため、キャッシュを挟むと前のテストの ID が漏れる。
@@ -113,6 +113,33 @@ test('ページ番号が 1 未満なら空配列を返す', async () => {
 	const source = createPageSource('1', null, 'ja', { getJsonImpl: impl });
 	assert.deepEqual(await source.loadPage(0), []);
 	assert.deepEqual(await source.loadPage(-1), []);
+});
+
+test('loadAllWorkIds は並べ替えた結果を覚え、2 回目は同じ配列を返す', async () => {
+	// 呼び出しのたびに並べ替え直すと、大きな作者ほど無駄な計算が積み重なる
+	const { impl } = fakeGet(['300', '100', '200']);
+	const a = await loadAllWorkIds('1', WORK_CATEGORY.ILLUST, 'ja', { getJsonImpl: impl });
+	const b = await loadAllWorkIds('1', WORK_CATEGORY.ILLUST, 'ja', { getJsonImpl: impl });
+	assert.equal(a, b, '毎回新しい配列を組み立てている');
+	assert.deepEqual(a, ['300', '200', '100']);
+	assert.ok(Object.isFrozen(a), '呼び出し側が書き換えられる配列を返している');
+});
+
+test('loadPage は signal を profile/illusts の取得へ渡す', async () => {
+	const ids = ['300', '200'];
+	const { impl } = fakeGet(ids);
+	const calls = [];
+	const wrapped = async (url, deps) => {
+		calls.push({ url, deps });
+		return impl(url);
+	};
+	const source = createPageSource('1', null, 'ja', { getJsonImpl: wrapped });
+	const controller = new AbortController();
+	await source.loadPage(1, { signal: controller.signal });
+	const illustsCall = calls.find((call) => call.url.includes('/profile/illusts'));
+	assert.equal(illustsCall.deps.signal, controller.signal, 'profile/illusts に signal を渡していない');
+	const allCall = calls.find((call) => call.url.includes('/profile/all'));
+	assert.equal(allCall.deps, undefined, 'profile/all の取得は共有されるので signal を渡してはいけない');
 });
 
 test('応答に無い ID (非公開になった作品など) は落とす', async () => {

@@ -347,6 +347,15 @@ test('findOverlayLabels はバッジも画像もラベルとして拾わない',
 	assert.deepEqual(findOverlayLabels(makeCard({ id: '2', pages: 2 })), []);
 });
 
+test('buildCard は loading=lazy を src より先に付ける', () => {
+	// 対応しないブラウザで一括読み込みが走らないよう、遅延読み込みの指定を先に入れる
+	const templates = capture([makeCard({ id: '1' })]);
+	const card = buildCard(templates, work(), { loggedIn: true });
+	const names = card.querySelector('img').attributeCalls.map(([name]) => name);
+	assert.ok(names.includes('loading') && names.includes('src'), 'loading か src が付いていない');
+	assert.ok(names.indexOf('loading') < names.indexOf('src'), 'loading が src より後に付いている');
+});
+
 test('英語表示では href に /en を付ける', () => {
 	// 雛形は pixiv 本体のカード (/en/artworks/...)。継ぎ足したカードだけ日本語ページへ飛ばさない
 	const templates = capture([makeCard({ id: '1', userId: '9', localePrefix: '/en' })]);
