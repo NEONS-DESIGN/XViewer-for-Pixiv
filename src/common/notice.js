@@ -16,7 +16,8 @@ export const NOTICE_KINDS = Object.freeze({ INFO: 'info', PROGRESS: 'progress', 
 const KIND_ICONS = Object.freeze({ [NOTICE_KINDS.INFO]: 'info', [NOTICE_KINDS.ERROR]: 'error' });
 
 /**
- * 通知の置き場を作る。作った時点では何も出さない。
+ * 通知の置き場を作る。空の置き場 (live region) だけを先に入れ物へ足し、dispose まで残す。
+ * 中身は show で足す。空の置き場は幅も押せる領域も持たない。
  * @param {Document} doc 対象のドキュメント
  * @param {HTMLElement} container 通知を重ねる入れ物 (position を持つ要素)
  * @param {{setTimeout?: Function, clearTimeout?: Function}} [deps] テスト用の依存
@@ -25,27 +26,18 @@ const KIND_ICONS = Object.freeze({ [NOTICE_KINDS.INFO]: 'info', [NOTICE_KINDS.ER
 export function createNoticeArea(doc, container, deps = {}) {
 	const later = deps.setTimeout ?? ((fn, ms) => setTimeout(fn, ms));
 	const cancel = deps.clearTimeout ?? ((id) => clearTimeout(id));
+	/** 支援技術が中身の変化を拾えるよう、中身より先に置いておく live region。dispose 後は null */
 	/** @type {HTMLElement|null} */
-	let area = null;
+	let area = doc.createElement('div');
+	area.className = 'notice-area';
+	area.setAttribute('role', 'status');
+	area.setAttribute('aria-live', 'polite');
+	container.appendChild(area);
 	/** @type {Map<string, {el: HTMLElement, text: HTMLElement, timer: number}>} */
 	const items = new Map();
 
 	/**
-	 * 入れ物を用意する。
-	 * @returns {HTMLElement} 入れ物
-	 */
-	function ensureArea() {
-		if (area) return area;
-		area = doc.createElement('div');
-		area.className = 'notice-area';
-		area.setAttribute('role', 'status');
-		area.setAttribute('aria-live', 'polite');
-		container.appendChild(area);
-		return area;
-	}
-
-	/**
-	 * 1 件消す。空になったら入れ物も外す。
+	 * 1 件消す。置き場は残す。
 	 * @param {string} id 通知の ID
 	 * @returns {void}
 	 */
@@ -55,19 +47,16 @@ export function createNoticeArea(doc, container, deps = {}) {
 		if (item.timer) cancel(item.timer);
 		item.el.remove();
 		items.delete(id);
-		if (items.size === 0) {
-			area?.remove();
-			area = null;
-		}
 	}
 
 	/**
-	 * 出す。同じ ID なら差し替える。
+	 * 出す。同じ ID なら差し替える。dispose の後は何も出さない。
 	 * @param {NoticeOptions} options 中身
 	 * @returns {NoticeHandle} 後から文言を替える・消すための口
 	 */
 	function show({ id, message, kind = NOTICE_KINDS.INFO, timeoutMs }) {
 		dismiss(id);
+		if (!area) return { update() {}, dismiss() {} };
 		const el = doc.createElement('div');
 		el.className = 'notice';
 		el.dataset.kind = kind;
@@ -84,7 +73,7 @@ export function createNoticeArea(doc, container, deps = {}) {
 		text.className = 'notice-text';
 		text.textContent = message;
 		el.appendChild(text);
-		ensureArea().appendChild(el);
+		area.appendChild(el);
 		const timer = Number.isFinite(timeoutMs) && timeoutMs > 0 ? later(() => dismiss(id), timeoutMs) : 0;
 		const entry = { el, text, timer };
 		items.set(id, entry);
@@ -99,12 +88,22 @@ export function createNoticeArea(doc, container, deps = {}) {
 	}
 
 	/**
-	 * 全部消す。
+	 * 全部消す。置き場は残す。
 	 * @returns {void}
 	 */
 	function clear() {
 		for (const id of [...items.keys()]) dismiss(id);
 	}
 
-	return { show, dismiss, clear, dispose: clear };
+	/**
+	 * 全部消し、置き場も外す。以後の show は何も出さない。
+	 * @returns {void}
+	 */
+	function dispose() {
+		clear();
+		area?.remove();
+		area = null;
+	}
+
+	return { show, dismiss, clear, dispose };
 }

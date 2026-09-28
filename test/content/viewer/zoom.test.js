@@ -287,12 +287,58 @@ test('読み込み済みの標準画質があれば仮に出し、通知を出�
 	assert.equal(notice.dataset.kind, 'progress');
 });
 
-test('通知の入れ物には inert を付けない', () => {
+test('通知の入れ物はダイアログ (.zoom) の中に置き、inert を付けない', () => {
+	// aria-modal の外に置くと読み上げに届かないため
 	const { createImage } = fakeUpgradeImages();
 	const { container, zoom } = build({ createImage });
 	zoom.open(pages({ placeholderAt: (index) => REGULAR[index], sizes: [{ width: 2000, height: 3000 }] }));
-	const area = find(container, '.notice-area');
-	assert.equal(area.getAttribute(INERT_ATTRIBUTE), null);
+	const layer = find(container, '.zoom');
+	assert.equal(findAll(container, '.notice-area').length, 1);
+	assert.equal(findAll(layer, '.notice-area').length, 1);
+	assert.equal(find(layer, '.notice-area').getAttribute(INERT_ATTRIBUTE), null);
+	assert.equal(findAll(layer, '.notice').length, 1);
+});
+
+test('通知の入れ物は開いた時点で空のまま置き、閉じたら外す', () => {
+	const { container, zoom } = build();
+	zoom.open(pages());
+	const layer = find(container, '.zoom');
+	assert.equal(findAll(layer, '.notice-area').length, 1);
+	assert.equal(findAll(layer, '.notice').length, 0);
+	zoom.close();
+	assert.equal(findAll(container, '.notice-area').length, 0);
+	zoom.open(pages());
+	assert.equal(findAll(container, '.notice-area').length, 1);
+	zoom.dispose();
+	assert.equal(findAll(container, '.notice-area').length, 0);
+});
+
+test('原寸が既に読み込み済みなら仮表示も通知も出さずにその場で差し替える', () => {
+	const created = [];
+	const createImage = () => {
+		const img = fakeElement('img');
+		let current = '';
+		// 読み込み済みの URL を入れた直後の Image と同じく、complete と naturalWidth がすぐ立つ
+		Object.defineProperty(img, 'src', {
+			get: () => current,
+			set: (value) => { current = value; },
+			configurable: true,
+		});
+		Object.defineProperty(img, 'complete', { get: () => current !== '', configurable: true });
+		Object.defineProperty(img, 'naturalWidth', { get: () => (current ? 2000 : 0), configurable: true });
+		created.push(img);
+		return img;
+	};
+	const { container, zoom } = build({ createImage });
+	zoom.open(pages({ placeholderAt: (index) => REGULAR[index], sizes: [{ width: 2000, height: 3000 }] }));
+	const img = find(container, '.zoom-image');
+	assert.equal(img.src, URLS[0]);
+	assert.equal(img.getAttribute('width'), null);
+	assert.equal(img.getAttribute('height'), null);
+	assert.equal(findAll(container, '.notice').length, 0);
+	assert.equal(created.length, 1);
+	assert.equal((created[0].listeners.load ?? []).length, 0);
+	assert.equal((created[0].listeners.error ?? []).length, 0);
 });
 
 test('原寸を読み終えたら差し替え、通知を消す', async () => {

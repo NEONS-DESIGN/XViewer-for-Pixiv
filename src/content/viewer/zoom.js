@@ -66,12 +66,15 @@ function hasModifier(event) {
 export function createZoomLayer(deps) {
 	const { doc, container, strings } = deps;
 	const createImage = deps.createImage ?? (() => new Image());
-	// container (overlay) 直下に置く。layer (スクロールする .zoom) の中に置くと、
-	// ページ送りで一緒に流れて上部に留まらなくなる
-	const notices = createNoticeArea(doc, container);
 
 	/** @type {HTMLElement|null} レイヤ本体 (スクロールする器)。閉じているときは null */
 	let layer = null;
+	/**
+	 * 通知の置き場。aria-modal の内側で読み上げに届くよう layer の中に置く。
+	 * 開くたびに作り、閉じたら外す。閉じているときは null
+	 * @type {ReturnType<typeof createNoticeArea>|null}
+	 */
+	let notices = null;
 	/** @type {HTMLElement|null} 画像の入れ物 (.zoom-canvas)。読めないページの文言の置き場 */
 	let canvas = null;
 	/** @type {HTMLImageElement|null} */
@@ -106,8 +109,6 @@ export function createZoomLayer(deps) {
 		inertTargets = [];
 		for (const element of Array.from(container.children)) {
 			if (element === layer) continue;
-			// 通知の入れ物は overlay 直下に置かれる。inert にすると読み上げに届かなくなる
-			if (element.classList?.contains('notice-area')) continue;
 			if (element.getAttribute(INERT_ATTRIBUTE) !== null) continue;
 			element.setAttribute(INERT_ATTRIBUTE, '');
 			inertTargets.push(element);
@@ -197,7 +198,7 @@ export function createZoomLayer(deps) {
 			upgrade = null;
 			upgradeHandlers = null;
 		}
-		notices.dismiss(PREVIEW_NOTICE_ID);
+		notices?.dismiss(PREVIEW_NOTICE_ID);
 	}
 
 	/**
@@ -207,7 +208,7 @@ export function createZoomLayer(deps) {
 	function finishUpgrade() {
 		upgrade = null;
 		upgradeHandlers = null;
-		notices.dismiss(PREVIEW_NOTICE_ID);
+		notices?.dismiss(PREVIEW_NOTICE_ID);
 	}
 
 	/**
@@ -216,7 +217,8 @@ export function createZoomLayer(deps) {
 	 * 画像ペインの読み込み失敗と同じ文言を画像の入れ物に出す。(1 枚目が空なら open() が開かない)
 	 *
 	 * 手元に読み込み済みの標準画質があれば (placeholderAt)、先にそれを原寸の大きさで出し、
-	 * 裏で原寸を読み込んで届いたら差し替える。通信を増やさないため、手元に無ければ仮表示はしない
+	 * 裏で原寸を読み込んで届いたら差し替える。通信を増やさないため、手元に無ければ仮表示はしない。
+	 * 原寸も既に読み込み済み (URL を入れた直後に complete) なら、仮表示も通知も出さずにその場で出す
 	 * @returns {void}
 	 */
 	function paint() {
@@ -225,11 +227,13 @@ export function createZoomLayer(deps) {
 		cancelUpgrade();
 		canvas.querySelector('.pane-error')?.remove();
 		const placeholder = url ? placeholderAt?.(index) ?? null : null;
-		if (placeholder && placeholder !== url) {
+		const probe = placeholder && placeholder !== url ? createImage() : null;
+		if (probe) assignImageSrc(probe, url);
+		if (probe && !(probe.complete && probe.naturalWidth > 0)) {
 			applySize(sizes?.[index] ?? null);
 			assignImageSrc(image, placeholder);
-			notices.show({ id: PREVIEW_NOTICE_ID, message: strings.zoom.PREVIEW_NOTICE, kind: NOTICE_KINDS.PROGRESS });
-			upgrade = createImage();
+			notices?.show({ id: PREVIEW_NOTICE_ID, message: strings.zoom.PREVIEW_NOTICE, kind: NOTICE_KINDS.PROGRESS });
+			upgrade = probe;
 			const target = index;
 			const onLoad = () => {
 				if (layer && index === target) {
@@ -245,7 +249,6 @@ export function createZoomLayer(deps) {
 			upgradeHandlers = { onLoad, onError };
 			upgrade.addEventListener('load', onLoad, { once: true });
 			upgrade.addEventListener('error', onError, { once: true });
-			assignImageSrc(upgrade, url);
 		} else {
 			clearSize();
 			assignImageSrc(image, url);
@@ -287,7 +290,8 @@ export function createZoomLayer(deps) {
 		if (!layer) return;
 		unlockBehind();
 		cancelUpgrade();
-		notices.clear();
+		notices?.dispose();
+		notices = null;
 		// 破棄したあとに読み込みが続かないようにしてから外す
 		assignImageSrc(image, '');
 		layer.remove();
@@ -346,6 +350,8 @@ export function createZoomLayer(deps) {
 			counter.className = 'zoom-counter';
 
 			layer.append(canvas, zones.prev, zones.next, counter);
+			// 中身より先に空の置き場を置く。支援技術は既にある live region の変化を読み上げる
+			notices = createNoticeArea(doc, layer);
 			// 画像の上でも余白でも、クリック領域以外を押したら閉じる (pixiv 本体と同じ)
 			layer.addEventListener('click', () => close());
 			container.appendChild(layer);
