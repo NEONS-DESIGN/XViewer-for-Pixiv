@@ -292,6 +292,10 @@ export default {
 						description: `預先載入到往後第 ${count} 張為止。連續瀏覽時更流暢。`,
 					}),
 			},
+			prefetchNeighbor: {
+				label: '預先載入前後作品',
+				description: '顯示完成後，會預先載入 1 件透過 ↑ ↓ 可能前往的作品。切換更快，但即使未切換就關閉，也會增加流量消耗。',
+			},
 			clickZoom: {
 				label: '點擊以原尺寸顯示',
 				description: '點擊圖片後，會以原尺寸填滿整個畫面開啟（與 pixiv 的作品頁面相同）。點擊左右兩端或按 ← → 翻頁，再點擊一次或按 Esc 返回。無論上方的解析度設定為何，都會載入原尺寸圖片。',

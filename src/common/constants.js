@@ -326,6 +326,7 @@ export const SETTINGS_DEFAULTS = Object.freeze({
 	enabled: true,
 	imageQuality: IMAGE_QUALITY.REGULAR,
 	prefetch: DEFAULT_PREFETCH,
+	prefetchNeighbor: false,
 	showSidebar: true,
 	sidebarScroll: SIDEBAR_SCROLL.WHOLE,
 	closeOnBackdrop: true,
@@ -393,3 +394,24 @@ export const DISPLAY_TIME_ZONE = 'Asia/Tokyo';
  * 時差を持たない日時 (コメントの commentDate 'YYYY-MM-DD HH:mm') を Date に読むときに使う。
  */
 export const DISPLAY_TIME_ZONE_OFFSET = '+09:00';
+
+/** 押した直後の先読み結果を使い回してよい期限 (ミリ秒)。 */
+export const PRESS_PREFETCH_TTL_MS = 3000;
+
+/** 前後の作品の先読み結果を使い回してよい期限 (ミリ秒)。 */
+export const NEIGHBOR_PREFETCH_TTL_MS = 30000;
+
+/** 読み込み中の表示を出すまでの遅延 (ミリ秒)。短時間で終わる読み込みでは出さない。 */
+export const LOADING_STATUS_DELAY_MS = 250;
+
+/** 先読み結果を手放す枚数の余白。現在位置からこの枚数を超えて離れたら破棄する。 */
+export const PREFETCH_RELEASE_MARGIN = 10;
+
+/** うごイラの再生開始とみなすまでに待つフレーム数。 */
+export const UGOIRA_START_FRAMES = 3;
+
+/** セッション情報の取得を待つ上限 (ミリ秒)。超えたら諦めて既定へ倒す。 */
+export const SESSION_WARMUP_TIMEOUT_MS = 2000;
+
+/** ブラウザがアイドル検知に対応しないときの代替の遅延 (ミリ秒)。 */
+export const IDLE_FALLBACK_DELAY_MS = 0;

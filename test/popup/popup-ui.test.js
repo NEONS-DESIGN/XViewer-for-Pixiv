@@ -91,6 +91,15 @@ test('ピックアップ非表示は既定でオフ、切り替えると onChang
 	assert.deepEqual(changes, [{ hidePickup: true }]);
 });
 
+test('前後の作品も先読みは既定でオフ、切り替えると onChange に届く', () => {
+	const { root, changes } = build();
+	const input = findRole(root, 'prefetchNeighbor');
+	assert.equal(input.checked, false);
+	input.checked = true;
+	input.dispatch('change');
+	assert.deepEqual(changes, [{ prefetchNeighbor: true }]);
+});
+
 test('チェックボックスを変えると そのキーで onChange に届く', () => {
 	const { root, changes } = build({ settings: { enabled: true } });
 	const input = findRole(root, 'enabled');

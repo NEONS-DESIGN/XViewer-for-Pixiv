@@ -293,6 +293,10 @@ export default {
 						description: `提前加载前后各 ${count} 张。连续浏览时更流畅。`,
 					}),
 			},
+			prefetchNeighbor: {
+				label: '预加载前后作品',
+				description: '显示完成后，会预先加载 1 件 ↑ ↓ 可能移动到的作品。切换更快，但即使未切换就关闭，也会增加流量消耗。',
+			},
 			clickZoom: {
 				label: '点击查看原图',
 				description: '点击图片后，以原始尺寸铺满整个屏幕打开（与 pixiv 的作品页面相同）。点击左右边缘或按 ← → 翻页，再次点击或按 Esc 返回。无论上方的分辨率设置如何，都会加载原图。',
