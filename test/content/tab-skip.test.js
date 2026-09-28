@@ -372,3 +372,16 @@ test('dispose で予約を取り消し、以後の通知では動かない', () 
 	handle.dispose();
 	assert.deepEqual(cancelled, [1]);
 });
+
+test('none では body を見張らず、title に変えたら見張り始め、none に戻したら外す', () => {
+	const observed = [];
+	let disconnected = 0;
+	const createObserver = () => ({ observe: (target) => observed.push(target), disconnect: () => { disconnected += 1; } });
+	const doc = fakeDoc([makeCard('1')]);
+	const handle = attachTabSkip(doc, GRID_TAB_SKIP.NONE, { createObserver, schedule: () => 0, cancel: () => {} });
+	assert.equal(observed.length, 0);
+	handle.setMode(GRID_TAB_SKIP.TITLE);
+	assert.equal(observed.length, 1);
+	handle.setMode(GRID_TAB_SKIP.NONE);
+	assert.ok(disconnected >= 1);
+});
