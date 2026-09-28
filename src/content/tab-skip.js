@@ -17,6 +17,9 @@ import {
 } from '../common/constants.js';
 import { warn } from '../common/log.js';
 
+/** MutationObserver に渡す設定 (固定) */
+const OBSERVE_OPTIONS = Object.freeze({ childList: true, subtree: true });
+
 /**
  * 何かをフォーカス順から外す設定か。
  * `none` と、設定が壊れて知らない値になったときの両方で false。当てる側と予約する側で判定を揃える
@@ -186,6 +189,24 @@ export function attachTabSkip(doc, mode, deps = {}) {
 		apply(roots);
 	};
 
+	/**
+	 * 現在のモードに合わせて、observer の監視を開始または停止する。
+	 * スキップモードなら doc.body を observe し、そうでなければ disconnect する。
+	 * 非スキップモードへ切り替わるときは、予約も取り消す。
+	 * @returns {void}
+	 */
+	const syncObserving = () => {
+		if (isSkippingMode(current) && doc.body) {
+			observer.observe(doc.body, OBSERVE_OPTIONS);
+		} else {
+			observer.disconnect();
+			if (timer) cancel(timer);
+			timer = 0;
+			pending = false;
+			pendingRoots.clear();
+		}
+	};
+
 	// 何も外さない設定 (none と、planSkipTargets が何もしない不明な値) では予約すら入れない。
 	// 無限スクロールの再描画ごとに空振りのタイマを積まないため
 	const observer = createObserver((records) => {
@@ -199,7 +220,7 @@ export function attachTabSkip(doc, mode, deps = {}) {
 		// schedule が同期で発火する実装では flush が先に済んでいる。その ID は取り消す先が無いので持たない
 		if (pending) timer = id;
 	});
-	if (doc.body) observer.observe(doc.body, { childList: true, subtree: true });
+	syncObserving();
 	apply([doc]);
 
 	return {
@@ -208,6 +229,7 @@ export function attachTabSkip(doc, mode, deps = {}) {
 			// 元へ戻してから当て直す。ブックマークだけ戻すような差分は追わない
 			restore();
 			current = next;
+			syncObserving();
 			apply([doc]);
 		},
 		dispose() {
