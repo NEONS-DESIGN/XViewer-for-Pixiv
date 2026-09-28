@@ -28,6 +28,7 @@ import { createIcon } from '../../common/icons.js';
 import { formatCount } from '../../common/format.js';
 import { warn } from '../../common/log.js';
 import { readSession, clearSessionCache } from '../session.js';
+import { isFocused } from './focus.js';
 import { fetchUserProfile, patchUserProfile } from '../../pixiv/user.js';
 import { isOwnWork } from '../../pixiv/normalize.js';
 import { PIXIV_ERROR_KINDS } from '../../pixiv/errors.js';
@@ -269,6 +270,8 @@ export function createActionsBar(deps) {
 		let following = false;
 
 		const button = createButton('personAdd', followLabel(false, strings), async () => {
+			// disabled にするとブラウザがフォーカスを外すので、持っていたかを先に見る
+			const hadFocus = isFocused(doc, button);
 			button.disabled = true;
 			const token = readSession(doc).csrfToken;
 			try {
@@ -285,6 +288,8 @@ export function createActionsBar(deps) {
 				announceFailure(strings.actionsBar.messages.FOLLOW_FAILED, error, 'follow failed');
 			} finally {
 				button.disabled = false;
+				// disabled のままの要素には focus() が効かないので、戻すのは有効に戻したあと
+				if (hadFocus && !disposed) button.focus();
 			}
 		});
 		button.className = 'action action-follow';
@@ -347,6 +352,7 @@ export function createActionsBar(deps) {
 
 			const likeButton = upgradeCount('count-like', 'like', async () => {
 				if (liked) return;
+				const hadFocus = isFocused(doc, likeButton);
 				likeButton.disabled = true;
 				try {
 					// 戻り値は「送信前に既にいいね済みだったか」。(別タブで先に押していた等)
@@ -358,9 +364,12 @@ export function createActionsBar(deps) {
 					likeButton.classList.add('is-on');
 					describeCount(likeButton, likeLabel(true, strings), likeCount);
 					announce(alreadyLiked === true ? strings.actionsBar.messages.ALREADY_LIKED : strings.actionsBar.messages.LIKED);
+					// いいねのボタンは押せないまま残り、フォーカスを置けない。隣のブックマークへ移す
+					if (hadFocus && bookmarkButton && !bookmarkButton.disabled) bookmarkButton.focus();
 				} catch (error) {
 					if (disposed) return;
 					likeButton.disabled = false;
+					if (hadFocus) likeButton.focus();
 					announceFailure(strings.actionsBar.messages.LIKE_FAILED, error, 'like failed');
 				}
 			});
@@ -372,6 +381,7 @@ export function createActionsBar(deps) {
 			}
 
 			const bookmarkButton = upgradeCount('count-bookmark', 'favorite', async (event) => {
+				const hadFocus = isFocused(doc, bookmarkButton);
 				bookmarkButton.disabled = true;
 				const wasBookmarked = Boolean(bookmarkId);
 				// 反映が遅れるので画面を先に変える
@@ -402,6 +412,7 @@ export function createActionsBar(deps) {
 					announceFailure(strings.actionsBar.messages.BOOKMARK_FAILED, error, 'bookmark failed');
 				} finally {
 					bookmarkButton.disabled = false;
+					if (hadFocus && !disposed) bookmarkButton.focus();
 				}
 			});
 			describeBookmark(bookmarkButton, bookmarkId, bookmarkCount);

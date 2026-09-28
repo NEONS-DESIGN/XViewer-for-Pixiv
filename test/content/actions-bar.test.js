@@ -353,6 +353,62 @@ test('フォロー状態を取れなくてもボタンは押せる状態に戻�
 	bar.dispose();
 });
 
+test('フォローを押したら、通信の後にボタンへフォーカスを戻す', async () => {
+	// 押している間は disabled にするので、ブラウザがフォーカスを外す。
+	// 戻さないとキーボードの利用者は作者行の位置を見失う
+	const { followContainer, bar } = setup({
+		actions: { followUser: async () => {}, unfollowUser: async () => { throw new Error('500'); } },
+	});
+	bar.render(DETAIL);
+	await settle();
+	const button = followContainer.children[0];
+	button.focus();
+	await button.dispatch('click');
+	assert.equal(button.focused, true);
+	// 失敗しても押し直せるよう戻す
+	await button.dispatch('click');
+	assert.equal(button.focused, true);
+	bar.dispose();
+});
+
+test('ブックマークを押したら、通信の後にボタンへフォーカスを戻す', async () => {
+	const { bar, bookmark } = setup({ actions: { addBookmark: async () => '1' } });
+	bar.render(DETAIL);
+	bookmark().focus();
+	await bookmark().dispatch('click', { shiftKey: false });
+	assert.equal(bookmark().focused, true);
+	bar.dispose();
+});
+
+test('フォーカスを持たずに押したときはフォーカスを動かさない', async () => {
+	// マウスで押した場合。持っていなかった所へフォーカスを出すと、枠が急に現れる
+	const { bar, bookmark } = setup({ actions: { addBookmark: async () => '1' } });
+	bar.render(DETAIL);
+	await bookmark().dispatch('click', { shiftKey: false });
+	assert.equal(bookmark().focused, false);
+	bar.dispose();
+});
+
+test('いいねに失敗したら、いいねのボタンへフォーカスを戻す', async () => {
+	const { bar, like } = setup({ actions: { likeIllust: async () => { throw new Error('400'); } } });
+	bar.render(DETAIL);
+	like().focus();
+	await like().dispatch('click');
+	assert.equal(like().focused, true);
+	bar.dispose();
+});
+
+test('いいねできたら、押せなくなったボタンの代わりにブックマークへフォーカスを移す', async () => {
+	// いいねは取り消せないので押せないまま残る。disabled の要素にはフォーカスを置けない
+	const { bar, like, bookmark } = setup({ actions: { likeIllust: async () => {} } });
+	bar.render(DETAIL);
+	like().focus();
+	await like().dispatch('click');
+	assert.equal(like().disabled, true);
+	assert.equal(bookmark().focused, true);
+	bar.dispose();
+});
+
 test('既にいいね済みだったと返ってきたら件数を増やさない', async () => {
 	// 別タブや pixiv 本体で先に押していた場合。pixiv 側の件数は増えないので手元も増やさない
 	const { bar, like } = setup({ actions: { likeIllust: async () => true } });
