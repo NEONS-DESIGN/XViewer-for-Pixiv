@@ -11,6 +11,10 @@
 import { KEYS, INERT_ATTRIBUTE } from '../../common/constants.js';
 import { createIcon } from '../../common/icons.js';
 import { assignImageSrc } from '../../common/image-source.js';
+import { createNoticeArea, NOTICE_KINDS } from '../../common/notice.js';
+
+/** 標準画質の仮表示中に出す通知の ID。1 つしか出さないので固定値で足りる。 */
+const PREVIEW_NOTICE_ID = 'zoom-preview';
 
 /**
  * 左右のクリック領域の見た目。
@@ -38,6 +42,10 @@ function hasModifier(event) {
  * @property {number} index 最初に出すページ番号 (0 始まり)
  * @property {string} alt 画像の代替文言 (作品名)
  * @property {(index: number) => void} [onIndexChange] ページが変わったときに呼ばれる
+ * @property {(index: number) => string | null} [placeholderAt] 手元にある標準画質の URL。
+ *   通信を起こさず読み込み済みのものだけを返す。無ければ仮表示をしない
+ * @property {Array<{width: number, height: number} | null>} [sizes] ページごとの実寸。
+ *   仮表示を原寸と同じ大きさへ引き伸ばすために使う
  */
 
 /**
@@ -46,6 +54,7 @@ function hasModifier(event) {
  * @property {HTMLElement} container レイヤを置く先 (ビュワーの overlay)
  * @property {() => void} [restoreFocus] 閉じたときにフォーカスを戻す役
  * @property {object} strings 文言のカタログ (src/i18n)
+ * @property {() => HTMLImageElement} [createImage] 原寸の読み込み役 (Image) の差し替え。テスト用
  */
 
 /**
@@ -56,6 +65,10 @@ function hasModifier(event) {
  */
 export function createZoomLayer(deps) {
 	const { doc, container, strings } = deps;
+	const createImage = deps.createImage ?? (() => new Image());
+	// container (overlay) 直下に置く。layer (スクロールする .zoom) の中に置くと、
+	// ページ送りで一緒に流れて上部に留まらなくなる
+	const notices = createNoticeArea(doc, container);
 
 	/** @type {HTMLElement|null} レイヤ本体 (スクロールする器)。閉じているときは null */
 	let layer = null;
@@ -73,6 +86,14 @@ export function createZoomLayer(deps) {
 	let index = 0;
 	/** @type {((index: number) => void)|null} ページが変わったことの通知先 (画像ペイン) */
 	let onIndexChange = null;
+	/** @type {((index: number) => string | null)|null} 手元にある標準画質の URL。無ければ仮表示をしない */
+	let placeholderAt = null;
+	/** @type {Array<{width: number, height: number} | null>|null} ページごとの実寸 */
+	let sizes = null;
+	/** @type {HTMLImageElement|null} 原寸を読み込み中の Image。仮表示をしていない間は null */
+	let upgrade = null;
+	/** @type {{onLoad: () => void, onError: () => void}|null} upgrade に付けたリスナ。取り消すときに外す */
+	let upgradeHandlers = null;
 	/** @type {Element[]} 自分が inert を付けた要素。元から付いていた分は触らない */
 	let inertTargets = [];
 
@@ -85,6 +106,8 @@ export function createZoomLayer(deps) {
 		inertTargets = [];
 		for (const element of Array.from(container.children)) {
 			if (element === layer) continue;
+			// 通知の入れ物は overlay 直下に置かれる。inert にすると読み上げに届かなくなる
+			if (element.classList?.contains('notice-area')) continue;
 			if (element.getAttribute(INERT_ATTRIBUTE) !== null) continue;
 			element.setAttribute(INERT_ATTRIBUTE, '');
 			inertTargets.push(element);
@@ -125,23 +148,109 @@ export function createZoomLayer(deps) {
 	}
 
 	/**
+	 * 読み込み失敗の文言を画像の入れ物に出す。
+	 * URL が空のページ (safeCdnUrl で弾かれた) と、原寸の読み込みに失敗したときの両方で使う。
+	 * @returns {void}
+	 */
+	function showZoomError() {
+		if (!layer) return;
+		canvas.querySelector('.pane-error')?.remove();
+		const line = doc.createElement('p');
+		line.className = 'pane-error';
+		line.setAttribute('role', 'alert');
+		line.textContent = strings.imagePane.IMAGE_FAILED;
+		canvas.appendChild(line);
+	}
+
+	/**
+	 * 仮表示を原寸と同じ大きさへ引き伸ばす。
+	 * @param {{width: number, height: number} | null | undefined} size ページの実寸
+	 * @returns {void}
+	 */
+	function applySize(size) {
+		if (!size) return;
+		image.setAttribute('width', String(size.width));
+		image.setAttribute('height', String(size.height));
+	}
+
+	/**
+	 * applySize() で入れた寸法を外す。原寸を等倍のまま出すため
+	 * @returns {void}
+	 */
+	function clearSize() {
+		image.removeAttribute('width');
+		image.removeAttribute('height');
+	}
+
+	/**
+	 * 原寸の読み込みを取り消す。ページを送った・閉じたときに、前のページの分を捨てるために呼ぶ。
+	 * 読み込み中でなくても通知だけは消す (呼び出し側で分岐しなくて済むように)
+	 * @returns {void}
+	 */
+	function cancelUpgrade() {
+		if (upgrade) {
+			assignImageSrc(upgrade, '');
+			if (upgradeHandlers) {
+				upgrade.removeEventListener('load', upgradeHandlers.onLoad);
+				upgrade.removeEventListener('error', upgradeHandlers.onError);
+			}
+			upgrade = null;
+			upgradeHandlers = null;
+		}
+		notices.dismiss(PREVIEW_NOTICE_ID);
+	}
+
+	/**
+	 * 原寸の読み込みが終わった (成功でも失敗でも) ときの後片付け。
+	 * @returns {void}
+	 */
+	function finishUpgrade() {
+		upgrade = null;
+		upgradeHandlers = null;
+		notices.dismiss(PREVIEW_NOTICE_ID);
+	}
+
+	/**
 	 * 今のページを描く。
 	 * URL が空のページ (safeCdnUrl で弾かれた) は真っ黒な画面になるだけなので、
 	 * 画像ペインの読み込み失敗と同じ文言を画像の入れ物に出す。(1 枚目が空なら open() が開かない)
+	 *
+	 * 手元に読み込み済みの標準画質があれば (placeholderAt)、先にそれを原寸の大きさで出し、
+	 * 裏で原寸を読み込んで届いたら差し替える。通信を増やさないため、手元に無ければ仮表示はしない
 	 * @returns {void}
 	 */
 	function paint() {
 		if (!layer) return;
 		const url = urls[index] ?? '';
-		assignImageSrc(image, url);
+		cancelUpgrade();
 		canvas.querySelector('.pane-error')?.remove();
-		if (!url) {
-			const line = doc.createElement('p');
-			line.className = 'pane-error';
-			line.setAttribute('role', 'alert');
-			line.textContent = strings.imagePane.IMAGE_FAILED;
-			canvas.appendChild(line);
+		const placeholder = url ? placeholderAt?.(index) ?? null : null;
+		if (placeholder && placeholder !== url) {
+			applySize(sizes?.[index] ?? null);
+			assignImageSrc(image, placeholder);
+			notices.show({ id: PREVIEW_NOTICE_ID, message: strings.zoom.PREVIEW_NOTICE, kind: NOTICE_KINDS.PROGRESS });
+			upgrade = createImage();
+			const target = index;
+			const onLoad = () => {
+				if (layer && index === target) {
+					assignImageSrc(image, url);
+					clearSize();
+				}
+				finishUpgrade();
+			};
+			const onError = () => {
+				finishUpgrade();
+				if (layer && index === target) showZoomError();
+			};
+			upgradeHandlers = { onLoad, onError };
+			upgrade.addEventListener('load', onLoad, { once: true });
+			upgrade.addEventListener('error', onError, { once: true });
+			assignImageSrc(upgrade, url);
+		} else {
+			clearSize();
+			assignImageSrc(image, url);
 		}
+		if (!url) showZoomError();
 		if (counter) {
 			counter.textContent = `${index + 1}/${urls.length}`;
 			counter.hidden = urls.length <= 1;
@@ -177,6 +286,8 @@ export function createZoomLayer(deps) {
 	function close() {
 		if (!layer) return;
 		unlockBehind();
+		cancelUpgrade();
+		notices.clear();
 		// 破棄したあとに読み込みが続かないようにしてから外す
 		assignImageSrc(image, '');
 		layer.remove();
@@ -188,6 +299,8 @@ export function createZoomLayer(deps) {
 		urls = [];
 		index = 0;
 		onIndexChange = null;
+		placeholderAt = null;
+		sizes = null;
 		deps.restoreFocus?.();
 	}
 
@@ -208,6 +321,8 @@ export function createZoomLayer(deps) {
 			urls = list;
 			index = start;
 			onIndexChange = typeof pages.onIndexChange === 'function' ? pages.onIndexChange : null;
+			placeholderAt = typeof pages.placeholderAt === 'function' ? pages.placeholderAt : null;
+			sizes = Array.isArray(pages.sizes) ? pages.sizes : null;
 
 			layer = doc.createElement('div');
 			layer.className = 'zoom';

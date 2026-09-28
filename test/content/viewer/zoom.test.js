@@ -2,14 +2,18 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createZoomLayer } from '../../../src/content/viewer/zoom.js';
 import { KEYS, INERT_ATTRIBUTE } from '../../../src/common/constants.js';
-import { fakeElement, fakeDoc, find } from '../../helpers/dom.js';
+import { fakeElement, fakeDoc, find, findAll } from '../../helpers/dom.js';
 import { createStrings } from '../../../src/i18n/index.js';
 
 /** 実際の CDN と同じ形の URL。safeCdnUrl の関門は通した後の値を渡す前提。 */
 const cdn = (name) => `https://i.pximg.net/img-original/img/2026/09/10/00/00/00/${name}.jpg`;
+/** 標準画質の URL。原寸表示の仮表示に使う。 */
+const cdnRegular = (name) => `https://i.pximg.net/img-master/img/2026/09/10/00/00/00/${name}.jpg`;
 
 /** 3 ページぶんの原寸 URL。 */
 const URLS = [cdn('o0'), cdn('o1'), cdn('o2')];
+/** 3 ページぶんの標準画質 URL。 */
+const REGULAR = [cdnRegular('r0'), cdnRegular('r1'), cdnRegular('r2')];
 
 /**
  * 原寸レイヤを組み立てる。
@@ -17,14 +21,15 @@ const URLS = [cdn('o0'), cdn('o1'), cdn('o2')];
  * @param {object} [options] 差し替え
  * @param {() => void} [options.restoreFocus] 閉じたときに呼ばれる
  * @param {object} [options.strings] 文言のカタログ
+ * @param {() => object} [options.createImage] 原寸の読み込み役 (Image) の差し替え
  * @returns {{container: object, stage: object, zoom: object}} 描画先・既存の子・レイヤ
  */
-function build({ restoreFocus, strings = createStrings('ja') } = {}) {
+function build({ restoreFocus, strings = createStrings('ja'), createImage } = {}) {
 	const container = fakeElement('div');
 	const stage = fakeElement('div');
 	stage.className = 'stage';
 	container.appendChild(stage);
-	const zoom = createZoomLayer({ doc: fakeDoc(), container, restoreFocus, strings });
+	const zoom = createZoomLayer({ doc: fakeDoc(), container, restoreFocus, strings, createImage });
 	return { container, stage, zoom };
 }
 
@@ -248,4 +253,124 @@ test('英語のカタログで英語の文言が出る', () => {
 	assert.match(find(container, '.zoom').getAttribute('aria-label'), /Actual size/);
 	assert.equal(find(container, '.zoom-zone-prev').getAttribute('aria-label'), 'Previous page');
 	assert.equal(find(container, '.zoom-zone-next').getAttribute('aria-label'), 'Next page');
+});
+
+/**
+ * 原寸の読み込み役 (createImage の代わり) を作る。呼ばれるたびに配列へ積む。
+ * @returns {{created: object[], createImage: () => object}} 作られた Image の代わりと差し替え関数
+ */
+function fakeUpgradeImages() {
+	const created = [];
+	return {
+		created,
+		createImage: () => {
+			const img = fakeElement('img');
+			created.push(img);
+			return img;
+		},
+	};
+}
+
+test('読み込み済みの標準画質があれば仮に出し、通知を出す', () => {
+	const { createImage } = fakeUpgradeImages();
+	const { container, zoom } = build({ createImage });
+	zoom.open(pages({
+		placeholderAt: (index) => REGULAR[index],
+		sizes: [{ width: 2000, height: 3000 }, { width: 1200, height: 1800 }, null],
+	}));
+	const img = find(container, '.zoom-image');
+	assert.equal(img.src, REGULAR[0]);
+	assert.equal(img.getAttribute('width'), '2000');
+	assert.equal(img.getAttribute('height'), '3000');
+	assert.equal(findAll(container, '.notice').length, 1);
+	const notice = find(container, '.notice');
+	assert.equal(notice.dataset.kind, 'progress');
+});
+
+test('通知の入れ物には inert を付けない', () => {
+	const { createImage } = fakeUpgradeImages();
+	const { container, zoom } = build({ createImage });
+	zoom.open(pages({ placeholderAt: (index) => REGULAR[index], sizes: [{ width: 2000, height: 3000 }] }));
+	const area = find(container, '.notice-area');
+	assert.equal(area.getAttribute(INERT_ATTRIBUTE), null);
+});
+
+test('原寸を読み終えたら差し替え、通知を消す', async () => {
+	const { created, createImage } = fakeUpgradeImages();
+	const { container, zoom } = build({ createImage });
+	zoom.open(pages({ placeholderAt: (index) => REGULAR[index], sizes: [{ width: 2000, height: 3000 }] }));
+	assert.equal(created.length, 1);
+	assert.equal(created[0].src, URLS[0]);
+	await created[0].dispatch('load');
+	const img = find(container, '.zoom-image');
+	assert.equal(img.src, URLS[0]);
+	assert.equal(img.getAttribute('width'), null);
+	assert.equal(img.getAttribute('height'), null);
+	assert.equal(findAll(container, '.notice').length, 0);
+});
+
+test('原寸の読み込みに失敗したら通知を消し、今の失敗表示を出す', async () => {
+	const { created, createImage } = fakeUpgradeImages();
+	const { container, zoom } = build({ createImage });
+	zoom.open(pages({ placeholderAt: (index) => REGULAR[index], sizes: [{ width: 2000, height: 3000 }] }));
+	await created[0].dispatch('error');
+	assert.equal(findAll(container, '.notice').length, 0);
+	const error = find(container, '.pane-error');
+	assert.equal(error.textContent, '画像を読み込めませんでした');
+	assert.equal(error.getAttribute('role'), 'alert');
+});
+
+test('読み込み済みでなければ仮表示せず、通知も出さない (標準画質の通信を起こさない)', () => {
+	const { created, createImage } = fakeUpgradeImages();
+	const { container, zoom } = build({ createImage });
+	zoom.open(pages({ placeholderAt: () => null, sizes: [{ width: 2000, height: 3000 }] }));
+	assert.equal(find(container, '.zoom-image').src, URLS[0]);
+	assert.equal(created.length, 0);
+	assert.equal(findAll(container, '.notice').length, 0);
+});
+
+test('placeholderAt が無ければ今までどおり原寸だけを出す', () => {
+	const { created, createImage } = fakeUpgradeImages();
+	const { container, zoom } = build({ createImage });
+	zoom.open(pages());
+	assert.equal(find(container, '.zoom-image').src, URLS[0]);
+	assert.equal(created.length, 0);
+	assert.equal(findAll(container, '.notice').length, 0);
+});
+
+test('ページを送ったら前のページの通知と原寸の読み込みを捨てる', async () => {
+	const { created, createImage } = fakeUpgradeImages();
+	const { container, zoom } = build({ createImage });
+	zoom.open(pages({
+		placeholderAt: (index) => REGULAR[index],
+		sizes: [{ width: 2000, height: 3000 }, { width: 1200, height: 1800 }, null],
+	}));
+	assert.equal(created.length, 1);
+	assert.equal(findAll(container, '.notice').length, 1);
+	zoom.consumeKey({ key: KEYS.NEXT_PAGE });
+	// 前のページの原寸読み込みは取り消される (通信を止め、リスナも外す)
+	assert.equal(created[0].src, '');
+	assert.equal((created[0].listeners.load ?? []).length, 0);
+	assert.equal((created[0].listeners.error ?? []).length, 0);
+	// 新しいページの仮表示と通知は改めて出る
+	assert.equal(created.length, 2);
+	assert.equal(find(container, '.zoom-image').src, REGULAR[1]);
+	assert.equal(findAll(container, '.notice').length, 1);
+});
+
+test('閉じたら通知を消す', () => {
+	const { created, createImage } = fakeUpgradeImages();
+	const { container, zoom } = build({ createImage });
+	zoom.open(pages({ placeholderAt: (index) => REGULAR[index], sizes: [{ width: 2000, height: 3000 }] }));
+	assert.equal(findAll(container, '.notice').length, 1);
+	zoom.close();
+	assert.equal(findAll(container, '.notice').length, 0);
+});
+
+test('dispose でも通知を消す', () => {
+	const { createImage } = fakeUpgradeImages();
+	const { container, zoom } = build({ createImage });
+	zoom.open(pages({ placeholderAt: (index) => REGULAR[index], sizes: [{ width: 2000, height: 3000 }] }));
+	zoom.dispose();
+	assert.equal(findAll(container, '.notice').length, 0);
 });
