@@ -31,6 +31,8 @@ import { warn } from '../../common/log.js';
  * @property {(next: Sequence) => void} setSequence 並びを差し替える
  * @property {(workId: string) => void} setCurrentWorkId 今開いている作品を記録する
  * @property {() => string|null} currentWorkId 今開いている作品
+ * @property {() => string|null} peek 最後に動いた向きの隣の作品。並びの端なら null (並びは広げない)
+ * @property {() => 1|-1} lastDirection 最後に動いた向き。動く前と並びを差し替えた後は 1
  * @property {() => void} reset 閉じたときに状態を捨てる
  */
 
@@ -59,6 +61,8 @@ export function createNavigation(deps) {
 	let extending = false;
 	/** 今の並びを全作品へ広げ済みか。真の端で押すたびに取り直さないためのガード */
 	let extended = false;
+	/** @type {1|-1} 最後に動いた向き。隣の先読みはこの向きを見る */
+	let lastMove = 1;
 
 	/**
 	 * 今の並びで隣の作品を探す。
@@ -101,6 +105,15 @@ export function createNavigation(deps) {
 	}
 
 	/**
+	 * 動いた向きを覚える。
+	 * @param {number} step 正なら次、それ以外は前
+	 * @returns {void}
+	 */
+	function rememberDirection(step) {
+		lastMove = step > 0 ? 1 : -1;
+	}
+
+	/**
 	 * 前後の作品へ移動する。
 	 * 端に達したら全作品の並びへ広げてもう一度試す。
 	 * @param {number} direction 1 なら次、-1 なら前
@@ -108,6 +121,7 @@ export function createNavigation(deps) {
 	 */
 	async function moveWork(direction) {
 		if (!sequence || !currentWorkId) return;
+		rememberDirection(direction);
 		let target = neighbor(direction);
 
 		// 端に来た。全作品の並びへ広げられるなら広げてもう一度。
@@ -172,6 +186,7 @@ export function createNavigation(deps) {
 		setSequence(next) {
 			sequence = next;
 			extended = false;
+			lastMove = 1;
 		},
 
 		/**
@@ -192,6 +207,22 @@ export function createNavigation(deps) {
 		},
 
 		/**
+		 * 最後に動いた向きの隣の作品を返す。端でも並びは広げない。
+		 * @returns {string|null} 作品 ID。無ければ null
+		 */
+		peek() {
+			return neighbor(lastMove);
+		},
+
+		/**
+		 * 最後に動いた向きを返す。
+		 * @returns {1|-1} 1 なら次、-1 なら前
+		 */
+		lastDirection() {
+			return lastMove;
+		},
+
+		/**
 		 * 閉じたときに状態を捨てる。
 		 * @returns {void}
 		 */
@@ -199,6 +230,7 @@ export function createNavigation(deps) {
 			sequence = null;
 			currentWorkId = null;
 			extended = false;
+			lastMove = 1;
 		},
 	};
 }

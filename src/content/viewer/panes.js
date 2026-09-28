@@ -77,6 +77,7 @@ export function planPanes(detail, session, settings) {
  * @property {typeof createImagePane} [createImagePane] 画像ペインの差し替え口。テストが組み立ての順番を記録するために使う
  * @property {typeof createUgoiraPlayer} [createUgoiraPlayer] うごイラペインの差し替え口。テストが組み立ての順番を記録するために使う
  * @property {typeof createSidebar} [createSidebar] サイドバーの差し替え口。テストが組み立ての順番を記録するために使う
+ * @property {(workId: string) => Promise<object>|null} [takeUgoiraMeta] 先に取っておいた ugoira_meta を受け取る。一度渡したら空になる。無ければ null
  */
 
 /**
@@ -120,7 +121,8 @@ export async function renderWork(detail, session, settings, targets) {
 	// サイドバーより先に走らせ、画面に絵が出るまでの体感を縮める
 	let mainDone;
 	if (plan.main === MAIN_PANE.UGOIRA) {
-		ugoiraPane = makeUgoiraPlayer({ doc, container: stage, settings, strings });
+		const preloadedMeta = targets.takeUgoiraMeta?.(detail.id) ?? null;
+		ugoiraPane = makeUgoiraPlayer({ doc, container: stage, settings, strings, preloadedMeta });
 		mainDone = ugoiraPane.render(detail);
 	} else {
 		// 原寸表示を開けるのは静止画だけ。うごイラ (canvas) と見られない作品には渡さない

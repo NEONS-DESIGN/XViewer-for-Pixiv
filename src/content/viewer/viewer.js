@@ -13,8 +13,10 @@ import {
 	FOCUSABLE_SELECTOR,
 	HIDDEN_SELECTOR,
 	INERT_ATTRIBUTE,
+	IMAGE_QUALITY,
 	KEYS,
 	LOADING_STATUS_DELAY_MS,
+	NEIGHBOR_PREFETCH_TTL_MS,
 	POPUP_THEMES,
 	PRESS_PREFETCH_TTL_MS,
 	SIDEBAR_SCROLL,
@@ -22,14 +24,16 @@ import {
 	INERT_SELECTOR,
 } from '../../common/constants.js';
 import { createIcon } from '../../common/icons.js';
+import { assignImageSrc } from '../../common/image-source.js';
 import { warn } from '../../common/log.js';
 import { getJson, FRESH_FETCH_INIT } from '../../pixiv/client.js';
 import { clearUserCache } from '../../pixiv/user.js';
 import { PIXIV_ERROR_KINDS } from '../../pixiv/errors.js';
-import { illustUrl } from '../../pixiv/endpoints.js';
-import { normalizeDetail } from '../../pixiv/normalize.js';
+import { illustUrl, safeCdnUrl, ugoiraMetaUrl } from '../../pixiv/endpoints.js';
+import { normalizeDetail, ILLUST_TYPES } from '../../pixiv/normalize.js';
 import { readSession } from '../session.js';
 import { renderWork, disposeAll, movePage, consumeKey } from './panes.js';
+import { blockReason } from './blocked.js';
 import { createZoomLayer } from './zoom.js';
 import { createNavigation } from './navigation.js';
 import { createPrefetchSlot } from './prefetch-slot.js';
@@ -59,6 +63,9 @@ const RERENDER_SETTING_KEYS = Object.freeze(['imageQuality', 'prefetch', 'showSi
  * 開いた直後の取得は他の通信より先に進めたいので、優先度を上げる。
  */
 const DETAIL_FETCH_INIT = Object.freeze({ ...FRESH_FETCH_INIT, priority: 'high' });
+
+/** 隣の作品の 1 枚目を読んでおく Image の fetchPriority。今見ている作品の読み込みより後に回す。 */
+const NEIGHBOR_IMAGE_PRIORITY = 'low';
 
 /**
  * ステージの中で押しても閉じない要素。
@@ -96,6 +103,7 @@ const KEEP_OPEN_SELECTOR = [
  * @property {() => void} [clearUserCache] 覚えた作者情報を捨てる。既定は pixiv/user.js の clearUserCache
  * @property {(fn: Function, ms: number) => number} [setTimeout] 遅延実行の差し替え。既定は window.setTimeout
  * @property {(id: number) => void} [clearTimeout] 上の取り消し。既定は window.clearTimeout
+ * @property {() => HTMLImageElement} [createImage] 隣の作品の画像を読んでおく Image の工場。Node には Image が無い
  */
 
 /**
@@ -162,6 +170,7 @@ export function createViewer(deps) {
 	const forgetUsers = deps.clearUserCache ?? clearUserCache;
 	const later = deps.setTimeout ?? ((fn, ms) => setTimeout(fn, ms));
 	const cancelLater = deps.clearTimeout ?? ((id) => clearTimeout(id));
+	const createImage = deps.createImage ?? (() => new Image());
 	let settings = deps.settings;
 
 	/** @type {HTMLElement|null} */
@@ -194,6 +203,14 @@ export function createViewer(deps) {
 	let loadingTimer = 0;
 	/** 押し始めに取った作品詳細。押してから離すまでの間に取得を進める */
 	const pressSlot = createPrefetchSlot({ ttlMs: PRESS_PREFETCH_TTL_MS });
+	/** 前後の作品の先読み。描き終えた後に、最後に動いた向きの隣の詳細を 1 件だけ持つ */
+	const neighborSlot = createPrefetchSlot({ ttlMs: NEIGHBOR_PREFETCH_TTL_MS });
+	/** @type {{id: string, promise: Promise<object>, controller: AbortController}|null} 隣のうごイラの ugoira_meta。開いたときに一度だけ渡す */
+	let neighborMeta = null;
+	/** @type {HTMLImageElement|null} 隣の作品の 1 枚目を読んでおく Image。1 つだけ作って使い回す */
+	let neighborImage = null;
+	/** @type {string|null} 画像か meta を温めている作品 ID。別の作品を開いたら止める */
+	let warmedId = null;
 	// 作品間の移動とキー操作の割り振りは navigation.js が持つ。
 	// ここに残るのはホストの構築と描画の指揮だけ
 	const navigation = createNavigation({
@@ -416,12 +433,107 @@ export function createViewer(deps) {
 	}
 
 	/**
-	 * 先読み済みの応答を取り出す。
+	 * 先読み済みの取得を取り出す。押し始めの枠を先に見る。
+	 * 両方の枠を必ず空にする。(外れた枠の取得は止まり、当たった分は一度しか使わない)
 	 * @param {string} workId 作品 ID
-	 * @returns {Promise<object>|null} 先読み結果。無ければ null
+	 * @returns {{promise: Promise<object>, controller: AbortController}|null} 先読みの取得と、それを止める AbortController。無ければ null
 	 */
 	function takePrefetched(workId) {
-		return pressSlot.take(workId); // Task 8 で neighborSlot も見る
+		const pressed = pressSlot.takeEntry(workId);
+		const warmed = neighborSlot.takeEntry(workId);
+		if (!pressed) return warmed;
+		warmed?.controller.abort();
+		return pressed;
+	}
+
+	/**
+	 * 隣のうごイラの ugoira_meta の取得を止めて捨てる。
+	 * @returns {void}
+	 */
+	function stopNeighborMeta() {
+		neighborMeta?.controller.abort();
+		neighborMeta = null;
+	}
+
+	/**
+	 * 隣の作品の先読み (詳細・画像・meta) をすべて止める。
+	 * @returns {void}
+	 */
+	function stopNeighborWarm() {
+		neighborSlot.drop();
+		stopNeighborMeta();
+		if (neighborImage) assignImageSrc(neighborImage, '');
+		warmedId = null;
+	}
+
+	/**
+	 * 隣の作品の 1 枚目を読んでおく。Image は作り直さず、src を差し替える。
+	 * @param {string} workId 作品 ID
+	 * @param {string|undefined} url 1 枚目の URL
+	 * @returns {void}
+	 */
+	function warmImage(workId, url) {
+		const safe = safeCdnUrl(url);
+		if (!safe) return;
+		stopNeighborMeta();
+		if (!neighborImage) {
+			neighborImage = createImage();
+			neighborImage.fetchPriority = NEIGHBOR_IMAGE_PRIORITY;
+		}
+		assignImageSrc(neighborImage, safe);
+		warmedId = workId;
+	}
+
+	/**
+	 * 隣のうごイラの ugoira_meta を取っておく。zip は読まない。
+	 * @param {string} workId 作品 ID
+	 * @returns {void}
+	 */
+	function warmUgoiraMeta(workId) {
+		stopNeighborMeta();
+		const controller = new AbortController();
+		const promise = fetchJson(ugoiraMetaUrl(workId, strings.lang), { signal: controller.signal });
+		// 使われずに捨てられたときに未処理の拒否を出さない
+		promise.catch(() => {});
+		neighborMeta = { id: workId, promise, controller };
+		warmedId = workId;
+	}
+
+	/**
+	 * 取っておいた ugoira_meta を渡して空にする。
+	 * @param {string} workId 作品 ID
+	 * @returns {Promise<object>|null} ugoira_meta の取得。別の作品のものか無ければ null
+	 */
+	function takeUgoiraMeta(workId) {
+		if (!neighborMeta || neighborMeta.id !== String(workId)) return null;
+		const { promise } = neighborMeta;
+		neighborMeta = null;
+		return promise;
+	}
+
+	/**
+	 * 隣の作品を温める。設定が有効で、隣があるときだけ。
+	 * 詳細を取り、見られる作品なら 1 枚目 (うごイラは meta) まで読む。
+	 * 見られない作品は詳細だけで、画像は読まない。
+	 * @returns {void}
+	 */
+	function warmNeighbor() {
+		if (!settings.prefetchNeighbor) return;
+		const id = navigation.peek();
+		if (!id || id === neighborSlot.peekId()) return;
+		neighborSlot.put(id, (signal) => startDetailFetch(id, signal));
+		const promise = neighborSlot.peekPromise();
+		promise.then((raw) => {
+			// 待っている間に開かれた・捨てられた・差し替えられた分は温めない
+			if (neighborSlot.peekPromise() !== promise) return;
+			const detail = normalizeDetail(raw);
+			if (blockReason(detail, readSession(doc))) return;
+			if (detail.illustType === ILLUST_TYPES.UGOIRA) warmUgoiraMeta(id);
+			else warmImage(id, detail.urls[settings.imageQuality] ?? detail.urls[IMAGE_QUALITY.REGULAR]);
+		}).catch(() => {
+			// 失敗した応答を開くときに使わせない。開いたときに取り直させる
+			if (neighborSlot.peekPromise() === promise) neighborSlot.drop();
+		});
 	}
 
 	/**
@@ -494,6 +606,7 @@ export function createViewer(deps) {
 				zoom: zoomLayer,
 				fetchUser: deps.fetchUser,
 				strings,
+				takeUgoiraMeta,
 			});
 		} catch (error) {
 			if (token !== requestToken) return;
@@ -501,7 +614,10 @@ export function createViewer(deps) {
 			disposeAll();
 			showStatus(strings.viewer.LOAD_FAILED, STATUS_KINDS.ERROR);
 			warn('failed to render', detail.id, error);
+			return;
 		}
+		// 隣を温めるのは描き終えてから。今見ている作品の読み込みと帯域を取り合わない
+		if (token === requestToken) warmNeighbor();
 	}
 
 	/**
@@ -514,12 +630,14 @@ export function createViewer(deps) {
 		navigation.setCurrentWorkId(workId);
 		// 前の作品の取得は止める。世代で捨てるだけだと応答を最後まで受信してしまう
 		openAborter?.abort();
-		const aborter = new AbortController();
+		const hit = takePrefetched(workId);
+		// 温めていた画像と meta が別の作品のものなら止める。これから開く作品の分は、そのまま読み込みに使わせる
+		if (warmedId !== String(workId)) stopNeighborWarm();
+		// 先読みが当たったときは、その取得の AbortController を引き継ぐ。次の openWork と close() で止まる
+		const aborter = hit?.controller ?? new AbortController();
 		openAborter = aborter;
-		// 取得を最初に出す。ホストの組み立て・背景のロック・フォーカスの確定の間も通信を進める。
-		// 先読みが当たったときの Promise は取得側の AbortController を持ったままで openAborter には繋がない。
-		// 次の要求が来ても中断はできず、応答は最後まで受信したうえで世代 (requestToken) が結果を捨てるだけになる
-		const pending = takePrefetched(workId) ?? startDetailFetch(workId, aborter.signal);
+		// 取得を最初に出す。ホストの組み立て・背景のロック・フォーカスの確定の間も通信を進める
+		const pending = hit?.promise ?? startDetailFetch(workId, aborter.signal);
 		// 未処理の拒否を出さない。結果は下の await で受ける
 		pending.catch(() => {});
 
@@ -584,6 +702,7 @@ export function createViewer(deps) {
 	function close() {
 		// 押し始めの先読みは、開いていない間も走っていることがあるので必ず止める
 		pressSlot.drop();
+		stopNeighborWarm();
 		// 開いていないのに body の style を触ると、ビュワーを開かずに
 		// ブラウザバックしただけで pixiv 本体のインラインスタイルを消してしまう
 		if (host === null) return;
@@ -620,7 +739,11 @@ export function createViewer(deps) {
 		 * @returns {Promise<void>}
 		 */
 		async open(workId, nextSequence) {
-			if (nextSequence) navigation.setSequence(nextSequence);
+			if (nextSequence) {
+				navigation.setSequence(nextSequence);
+				// 前の並びで決めた隣は、新しい並びの隣とは限らない
+				stopNeighborWarm();
+			}
 			await openWork(workId);
 		},
 
@@ -642,6 +765,7 @@ export function createViewer(deps) {
 		setSettings(next) {
 			const previous = settings;
 			settings = next;
+			if (!next.prefetchNeighbor) stopNeighborWarm();
 			const workId = navigation.currentWorkId();
 			if (!host || !workId) return;
 			// 送り方は CSS だけで切り替わる。描き直すと読んでいた位置が飛ぶので属性だけ差し替える

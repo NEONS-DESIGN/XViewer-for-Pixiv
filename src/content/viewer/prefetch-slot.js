@@ -10,7 +10,7 @@
  * @param {{ttlMs: number, now?: () => number}} options 寿命 (ミリ秒) と時計
  * @returns {{
  *   put: (id: string, start: (signal: AbortSignal) => Promise<unknown>) => void,
- *   take: (id: string) => Promise<unknown>|null,
+ *   takeEntry: (id: string) => {promise: Promise<unknown>, controller: AbortController}|null,
  *   peekId: () => string|null,
  *   peekPromise: () => Promise<unknown>|null,
  *   drop: () => void,
@@ -39,15 +39,21 @@ export function createPrefetchSlot({ ttlMs, now = () => performance.now() }) {
 			promise.catch(() => {});
 			entry = { id, promise, controller, at: now() };
 		},
-		take(id) {
+		/**
+		 * 一致して期限内なら中身を渡して空にする。外れたら走っている取得を止めて空にする。
+		 * 受け取った側は controller で取得を止められる。
+		 * @param {string} id 開こうとしている ID
+		 * @returns {{promise: Promise<unknown>, controller: AbortController}|null} 当たれば中身
+		 */
+		takeEntry(id) {
 			const hit = entry?.id === id && now() - entry.at < ttlMs;
 			if (!hit) {
 				drop();
 				return null;
 			}
-			const { promise } = entry;
+			const { promise, controller } = entry;
 			entry = null;
-			return promise;
+			return { promise, controller };
 		},
 		peekId: () => entry?.id ?? null,
 		peekPromise: () => entry?.promise ?? null,

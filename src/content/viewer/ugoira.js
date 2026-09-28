@@ -108,6 +108,7 @@ export function advanceFrame({ now, startedAt, index, timings }) {
  * @property {object} settings 設定
  * @property {object} strings 文言のカタログ (src/i18n)
  * @property {typeof fetch} [fetchImpl] 通信 (meta と zip) の差し替え。テストから pixiv を叩かないために使う
+ * @property {Promise<object>|null} [preloadedMeta] 先に取っておいた ugoira_meta の body。拒否されていたら取り直す
  * @property {() => HTMLImageElement} [createImage] フレーム用 Image の差し替え。Node には Image が無い
  * @property {(callback: FrameRequestCallback) => number} [requestAnimationFrame] コマ送りの差し替え
  * @property {(id: number) => void} [cancelAnimationFrame] コマ送りの停止の差し替え
@@ -149,6 +150,24 @@ export function createUgoiraPlayer(deps) {
 	let root = null;
 	/** meta と zip の取得を途中で止めるためのもの。dispose で abort する */
 	const aborter = new AbortController();
+
+	/**
+	 * ugoira_meta を得る。先に取っておいたものがあればそれを使い、
+	 * 無いか失敗していたらここで取り直す。(先取りの失敗だけでは再生を諦めない)
+	 * @param {string} workId 作品 ID
+	 * @returns {Promise<object>} ugoira_meta の body
+	 */
+	async function loadMeta(workId) {
+		if (deps.preloadedMeta) {
+			try {
+				return await deps.preloadedMeta;
+			} catch {
+				// 取り直しに進む
+			}
+		}
+		// meta の要求も dispose で止める。(zip と同じ signal)
+		return getJson(ugoiraMetaUrl(workId, strings.lang), { fetchImpl, signal: aborter.signal });
+	}
 
 	/**
 	 * 1 コマ描いて次へ進める。
@@ -290,8 +309,7 @@ export function createUgoiraPlayer(deps) {
 			container.appendChild(wrapper);
 
 			try {
-				// meta の要求も dispose で止める。(zip と同じ signal)
-				const meta = await getJson(ugoiraMetaUrl(detail.id, strings.lang), { fetchImpl, signal: aborter.signal });
+				const meta = await loadMeta(detail.id);
 				if (disposed) return;
 
 				// API が返した値をそのまま外部オリジンへ投げない

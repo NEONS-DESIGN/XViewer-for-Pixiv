@@ -201,3 +201,44 @@ test('ブロック表示は今どおりサイドバーを先に作ってから�
 	// ブロック表示では画像ペインの工場を一切呼ばない
 	assert.deepEqual(order, ['sidebar']);
 });
+
+test('うごイラには温めた meta を takeUgoiraMeta から渡す', async () => {
+	const warmed = Promise.resolve({ frames: [] });
+	const asked = [];
+	let received;
+	await renderWork(detail({ illustType: ILLUST_TYPES.UGOIRA }), LOGGED_IN, settings(false), {
+		...targets(),
+		takeUgoiraMeta: (id) => { asked.push(id); return warmed; },
+		createUgoiraPlayer: (deps) => {
+			received = deps.preloadedMeta;
+			return { render: () => Promise.resolve(), dispose() {} };
+		},
+	});
+	disposeAll();
+	assert.deepEqual(asked, ['149425016']);
+	assert.equal(received, warmed);
+});
+
+test('温めた meta が無ければ preloadedMeta は null', async () => {
+	let received;
+	await renderWork(detail({ illustType: ILLUST_TYPES.UGOIRA }), LOGGED_IN, settings(false), {
+		...targets(),
+		createUgoiraPlayer: (deps) => {
+			received = deps.preloadedMeta;
+			return { render: () => Promise.resolve(), dispose() {} };
+		},
+	});
+	disposeAll();
+	assert.equal(received, null);
+});
+
+test('一枚絵では温めた meta を取り出さない', async () => {
+	let asked = 0;
+	await renderWork(detail(), LOGGED_IN, settings(false), {
+		...targets(),
+		takeUgoiraMeta: () => { asked += 1; return null; },
+		createImagePane: () => ({ render: () => Promise.resolve(), dispose() {} }),
+	});
+	disposeAll();
+	assert.equal(asked, 0);
+});
