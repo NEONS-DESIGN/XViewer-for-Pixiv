@@ -138,8 +138,11 @@ export function createCommentsLayout(deps) {
 	 */
 	function watchSize(el) {
 		const Observer = doc.defaultView?.ResizeObserver;
-		// テスト用の DOM には無い。見張れなくても初回の実測だけは効く
-		if (!Observer) return;
+		if (!Observer) {
+			// 見張れない環境では ResizeObserver の初回通知が来ない。その場で測って初回分を補う
+			applyFloor();
+			return;
+		}
 		sizeWatcher ??= new Observer(() => { applyFloor(); });
 		sizeWatcher.observe(el);
 	}

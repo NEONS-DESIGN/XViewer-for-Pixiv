@@ -119,6 +119,8 @@ export function renderCommentText(doc, text) {
 		if (fragment.kind !== 'emoji') return doc.createTextNode(fragment.text);
 		const image = doc.createElement('img');
 		image.className = 'comment-emoji';
+		image.setAttribute('loading', 'lazy');
+		image.setAttribute('decoding', 'async');
 		setImageSrcAttribute(image, emojiUrl(fragment.id));
 		// 読み上げと、画像が出ないときの控えを兼ねて元の文字を持たせる
 		image.setAttribute('alt', fragment.text);
@@ -144,6 +146,8 @@ export function renderStamp(doc, stampId, strings) {
 	}
 	const image = doc.createElement('img');
 	image.className = 'comment-stamp';
+	image.setAttribute('loading', 'lazy');
+	image.setAttribute('decoding', 'async');
 	setImageSrcAttribute(image, url);
 	image.setAttribute('alt', strings.comments.STAMP_ALT);
 	image.addEventListener('error', () => { image.replaceWith(doc.createTextNode(strings.comments.STAMP_PLACEHOLDER)); });
@@ -441,8 +445,9 @@ export function createComments(deps) {
 		// 退会したユーザーと ID が取れなかったコメントには飛び先が無い。押せないままにする
 		const userPage = comment.userId && !comment.isDeleted ? userPath(comment.userId, localePrefix) : null;
 
-		// 作者行と同じ部品。CDN 以外の URL や読み込み失敗は枠だけ残して黙って続ける
-		const avatar = createAvatar(doc, 'comment-avatar');
+		// 作者行と同じ部品。CDN 以外の URL や読み込み失敗は枠だけ残して黙って続ける。
+		// 一覧に何十件も並ぶので、画面に入るまで読み込みを遅らせる
+		const avatar = createAvatar(doc, 'comment-avatar', { lazy: true });
 		showAvatar(avatar, comment.avatarUrl);
 
 		// アイコンもリンクにする。(押せる範囲が広いほうが誤操作が減る)
@@ -888,7 +893,7 @@ export function createComments(deps) {
 				moreButton.hidden = body?.hasNext !== true;
 				moreButton.disabled = false;
 			}
-			layout.applyFloor();
+			// 足した分は list が ResizeObserver で見張っているので、ここでは測り直さない
 		} catch (error) {
 			// 破棄後・別の作品へ移った後・描き直した後の失敗は伝えない。
 			// これを入れないと、正常な切り替えが読み込み失敗として表示される
@@ -904,13 +909,13 @@ export function createComments(deps) {
 			failure.setAttribute('role', 'alert');
 			failure.textContent = strings.comments.LOAD_FAILED;
 			container.appendChild(failure);
+			// watchSize() の初回通知が測り直しを担う
 			layout.watchSize(failure);
 			if (moreButton) {
 				moreButton.textContent = strings.comments.RETRY;
 				moreButton.hidden = false;
 				moreButton.disabled = false;
 			}
-			layout.applyFloor();
 			warn('failed to load comments', requestedWorkId, error);
 		} finally {
 			// 隠れたボタン (続きが無い) にはフォーカスを置けない。その場合は諦める
@@ -954,23 +959,25 @@ export function createComments(deps) {
 			// 返信の導線を出すかの判断にも使うので、モジュールの状態として覚えておく
 			canPost = detail.commentOff !== true && session.isLoggedIn === true && Boolean(session.csrfToken);
 			container.appendChild(createHeader(detail.commentOff === true));
-			// 判定は文書に入れてから。createHeader() の中では位置を測れない
-			layout.syncScrollState();
+			// 判定は文書に入れてから。createHeader() の中では位置を測れない。
+			// 直後だとまだ描画が済んでおらず位置がぶれることがあるので、描画の後に回す
+			const view = doc.defaultView;
+			if (view?.requestAnimationFrame) view.requestAnimationFrame(() => { layout.syncScrollState(); });
+			else layout.syncScrollState();
 
 			if (detail.commentOff) {
 				const off = doc.createElement('p');
 				off.className = 'status';
 				off.textContent = strings.comments.COMMENT_OFF;
 				container.appendChild(off);
+				// watchSize() の初回通知が測り直しを担う
 				layout.watchSize(off);
-				layout.applyFloor();
 				return;
 			}
 			if (detail.commentCount === 0) {
 				// 引いても空なので読みに行かない。一覧もまだ作らず、
 				// 投稿されたときだけ prependComment() が作ってこの文言を消す
 				showEmpty();
-				layout.applyFloor();
 				return;
 			}
 
