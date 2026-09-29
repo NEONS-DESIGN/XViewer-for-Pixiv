@@ -47,6 +47,8 @@ export default {
 		DIALOG_LABEL: '作品ビュワー',
 		CLOSE: '閉じる',
 		CLOSE_TITLE: '閉じる (Esc)',
+		WORK_PAGE: '作品ページへ',
+		WORK_PAGE_TITLE: '作品ページを新しいタブで開く',
 		LOADING: '読み込み中...',
 		LOAD_FAILED: '作品を読み込めませんでした',
 		NOT_FOUND: '作品が見つかりませんでした。削除されたか、非公開になった可能性があります',
@@ -248,7 +250,7 @@ export default {
 			},
 			showSidebar: {
 				label: 'サイドバーを表示する',
-				description: '投稿文・タグ・いいね数・コメントを画像の横に出します。',
+				description: '投稿文・タグ・いいね数・コメントを画像の横に出します。オフにすると、作品ページへのリンクを閉じるボタンの横に出します。',
 			},
 			sidebarScroll: {
 				label: 'サイドバーのスクロール',

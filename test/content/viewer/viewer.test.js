@@ -5,7 +5,7 @@ import { clearSessionCache } from '../../../src/content/session.js';
 import { KEYS, LOADING_STATUS_DELAY_MS } from '../../../src/common/constants.js';
 import { createStrings } from '../../../src/i18n/index.js';
 import { PixivError, PIXIV_ERROR_KINDS } from '../../../src/pixiv/errors.js';
-import { fakeElement, fakeDoc as fakeDocBase, find, findAll, flush } from '../../helpers/dom.js';
+import { fakeElement, fakeDoc as fakeDocBase, find, findAll, flush, iconName } from '../../helpers/dom.js';
 import { fakeSequence } from '../../helpers/sequence.js';
 
 // viewer.js は viewer.css と common/tokens.css を import する。(esbuild が文字列にする)
@@ -1045,4 +1045,62 @@ test('新しい並びで開き直したら隣の先読みを捨てる', async ()
 	// 温めた分は使わず取り直す
 	assert.notEqual(signals['2'], warmSignal);
 	viewer.close();
+});
+
+test('サイドバーを出さない設定では閉じるボタンの右に作品ページへのリンクを出す', async () => {
+	const { viewer, stage } = setup();
+	await viewer.open('1');
+	const link = find(stage(), '.work-link');
+	assert.equal(link.hidden, false);
+	assert.equal(link.href, '/artworks/1');
+	assert.equal(link.getAttribute('target'), '_blank');
+	assert.equal(link.getAttribute('rel'), 'noopener noreferrer');
+	assert.equal(link.textContent, '作品ページへ');
+	assert.equal(link.title, '作品ページを新しいタブで開く');
+	assert.equal(iconName(link.children[1]), 'openInNew');
+	// 閉じるボタンの直後に並ぶ
+	const children = stage().children;
+	assert.equal(children[children.indexOf(link) - 1].className, 'close');
+});
+
+test('サイドバーを出す設定では作品ページへのリンクを隠す', async () => {
+	const { viewer, stage } = setup({ settings: settings({ showSidebar: true }), fetchUser: async () => ({}) });
+	await viewer.open('1');
+	assert.equal(find(stage(), '.work-link').hidden, true);
+});
+
+test('作品を送ると作品ページへのリンクも送った先を指す', async () => {
+	const { viewer, doc, stage } = setup();
+	await viewer.open('1', fakeSequence(['1', '2']));
+	await doc.dispatch('keydown', { key: KEYS.NEXT_WORK, preventDefault() {}, stopPropagation() {} });
+	await flush();
+	assert.equal(find(stage(), '.work-link').href, '/artworks/2');
+});
+
+test('作品ページへのリンクには表示言語の接頭辞を付ける', async () => {
+	const { viewer, doc, stage } = setup();
+	doc.location = { pathname: '/en/users/54734418' };
+	await viewer.open('1');
+	assert.equal(find(stage(), '.work-link').href, '/en/artworks/1');
+});
+
+test('作品の取得に失敗しても作品ページへのリンクは出す', async () => {
+	const { viewer, stage } = setup({
+		getJsonImpl: async () => { throw new PixivError(PIXIV_ERROR_KINDS.NETWORK, 'offline'); },
+	});
+	await viewer.open('1');
+	const link = find(stage(), '.work-link');
+	assert.equal(link.hidden, false);
+	assert.equal(link.href, '/artworks/1');
+});
+
+test('サイドバーの設定を切り替えると作品ページへのリンクの見え方も追従する', async () => {
+	const { viewer, stage } = setup({ fetchUser: async () => ({}) });
+	await viewer.open('1');
+	viewer.setSettings(settings({ showSidebar: true }));
+	await flush();
+	assert.equal(find(stage(), '.work-link').hidden, true);
+	viewer.setSettings(settings({ showSidebar: false }));
+	await flush();
+	assert.equal(find(stage(), '.work-link').hidden, false);
 });

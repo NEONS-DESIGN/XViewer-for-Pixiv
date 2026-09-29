@@ -25,11 +25,12 @@ import {
 } from '../../common/constants.js';
 import { createIcon } from '../../common/icons.js';
 import { assignImageSrc } from '../../common/image-source.js';
+import { currentLocalePrefix } from '../../common/locale.js';
 import { warn } from '../../common/log.js';
 import { getJson, FRESH_FETCH_INIT } from '../../pixiv/client.js';
 import { clearUserCache } from '../../pixiv/user.js';
 import { PIXIV_ERROR_KINDS } from '../../pixiv/errors.js';
-import { illustUrl, safeCdnUrl, ugoiraMetaUrl } from '../../pixiv/endpoints.js';
+import { artworkPath, illustUrl, safeCdnUrl, ugoiraMetaUrl } from '../../pixiv/endpoints.js';
 import { normalizeDetail, ILLUST_TYPES } from '../../pixiv/normalize.js';
 import { readSession } from '../session.js';
 import { renderWork, disposeAll, movePage, consumeKey } from './panes.js';
@@ -186,6 +187,8 @@ export function createViewer(deps) {
 	let stage = null;
 	/** @type {HTMLElement|null} */
 	let sidebar = null;
+	/** @type {HTMLAnchorElement|null} 作品ページへのリンク。サイドバーを出さない設定のときだけ見せる */
+	let workLink = null;
 	/** @type {ReturnType<typeof createZoomLayer>|null} 原寸表示のレイヤ。ホストと一緒に作る */
 	let zoomLayer = null;
 	/** 開く要求の世代。await をまたいで古い応答を捨てるために使う */
@@ -267,10 +270,23 @@ export function createViewer(deps) {
 		closeButton.appendChild(createIcon(doc, 'close'));
 		closeButton.addEventListener('click', () => deps.onRequestClose());
 
+		// サイドバーを出さないと、サイドバーにある作品ページへのリンクも出ない。代わりに閉じるボタンの右へ置く。
+		// href と表示するかどうかは作品を開くたびに applyWorkLink() が決める
+		workLink = doc.createElement('a');
+		workLink.className = 'work-link';
+		workLink.setAttribute('target', '_blank');
+		workLink.setAttribute('rel', 'noopener noreferrer');
+		workLink.title = strings.viewer.WORK_PAGE_TITLE;
+		workLink.hidden = true;
+		const workLinkLabel = doc.createElement('span');
+		workLinkLabel.textContent = strings.viewer.WORK_PAGE;
+		workLink.append(workLinkLabel, createIcon(doc, 'openInNew'));
+
 		sidebar = doc.createElement('div');
 		sidebar.className = 'sidebar';
 
 		stage.appendChild(closeButton);
+		stage.appendChild(workLink);
 		overlay.appendChild(stage);
 		overlay.appendChild(sidebar);
 		shadow.appendChild(overlay);
@@ -319,6 +335,19 @@ export function createViewer(deps) {
 		host.dataset.sidebarScroll = settings.sidebarScroll === SIDEBAR_SCROLL.WHOLE
 			? SIDEBAR_SCROLL.WHOLE
 			: SIDEBAR_SCROLL.COMMENTS;
+	}
+
+	/**
+	 * 作品ページへのリンクを今の作品と設定に合わせる。
+	 * サイドバーを出す設定ならサイドバー側に同じリンクがあるので隠す。
+	 * サイドバーを組む判定と揃えて、`=== true` のときだけ隠す。
+	 * @param {string} workId 作品 ID
+	 * @returns {void}
+	 */
+	function applyWorkLink(workId) {
+		if (!workLink) return;
+		workLink.href = artworkPath(workId, currentLocalePrefix(doc));
+		workLink.hidden = settings.showSidebar === true;
 	}
 
 	/**
@@ -675,6 +704,8 @@ export function createViewer(deps) {
 		// 十字キーでフォーカスが動いたように見える
 		if (!shadow.activeElement) overlay?.focus({ preventScroll: true });
 		sidebar.hidden = !settings.showSidebar;
+		// 取得を待たずに差し替える。読み込みに失敗しても作品ページへは行ける
+		applyWorkLink(workId);
 		clearStatus();
 		// 応答がすぐ届く場合に文言をちらつかせないよう、遅らせて出す
 		scheduleLoadingStatus();
@@ -730,6 +761,7 @@ export function createViewer(deps) {
 		overlay = null;
 		stage = null;
 		sidebar = null;
+		workLink = null;
 		// 元いたサムネイルへ戻す。差し替えで消えていることがあるので繋がりを確かめる
 		if (previousFocus && doc.contains(previousFocus)) previousFocus.focus?.();
 		previousFocus = null;
@@ -774,6 +806,7 @@ export function createViewer(deps) {
 			if (!host || !workId) return;
 			// 送り方は CSS だけで切り替わる。描き直すと読んでいた位置が飛ぶので属性だけ差し替える
 			applySidebarScroll();
+			applyWorkLink(workId);
 			if (!RERENDER_SETTING_KEYS.some((key) => previous[key] !== next[key])) return;
 			if (!lastDetail || String(lastDetail.id) !== String(workId)) {
 				void openWork(workId);

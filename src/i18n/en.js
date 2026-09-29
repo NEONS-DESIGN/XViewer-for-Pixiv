@@ -32,6 +32,8 @@ export default {
 		DIALOG_LABEL: 'Artwork viewer',
 		CLOSE: 'Close',
 		CLOSE_TITLE: 'Close (Esc)',
+		WORK_PAGE: 'Artwork page',
+		WORK_PAGE_TITLE: 'Open the artwork page in a new tab',
 		LOADING: 'Loading...',
 		LOAD_FAILED: 'Could not load this artwork',
 		NOT_FOUND: 'This artwork could not be found. It may have been deleted or made private',
@@ -218,7 +220,7 @@ export default {
 			},
 			showSidebar: {
 				label: 'Show the sidebar',
-				description: 'Shows the caption, tags, like count, and comments beside the image.',
+				description: 'Shows the caption, tags, like count, and comments beside the image. When off, a link to the artwork page appears next to the close button.',
 			},
 			sidebarScroll: {
 				label: 'Sidebar scrolling',

@@ -236,6 +236,42 @@
 	height: 24px;
 }
 
+/* 作品ページへのリンク。閉じるボタンの右に、同じ高さ・同じ地の角丸で並べる。
+   閉じるボタンは button の既定で border-box なので外寸は 40px。a は content-box が既定なので
+   border-box にして外寸を揃える。left は閉じるボタンの left + 外寸 + 間隔。
+   サイドバーを出さない設定のときだけ見える */
+.work-link {
+	--work-link-gap: 8px;
+	position: absolute;
+	top: 12px;
+	left: calc(12px + 40px + var(--work-link-gap));
+	z-index: 1;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	box-sizing: border-box;
+	height: 40px;
+	padding: 0 14px;
+	border: 1px solid var(--control-border);
+	border-radius: 999px;
+	background: var(--control-bg);
+	color: var(--fg);
+	font-size: 14px;
+	line-height: 1;
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.work-link:hover {
+	background: var(--control-hover);
+}
+
+.work-link svg {
+	flex: 0 0 auto;
+	width: 18px;
+	height: 18px;
+}
+
 .status {
 	color: var(--muted);
 	text-align: center;
