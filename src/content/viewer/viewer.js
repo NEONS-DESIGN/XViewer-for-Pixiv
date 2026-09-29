@@ -33,10 +33,11 @@ import { PIXIV_ERROR_KINDS } from '../../pixiv/errors.js';
 import { artworkPath, illustUrl, safeCdnUrl, ugoiraMetaUrl } from '../../pixiv/endpoints.js';
 import { normalizeDetail, ILLUST_TYPES } from '../../pixiv/normalize.js';
 import { readSession } from '../session.js';
-import { renderWork, disposeAll, movePage, consumeKey } from './panes.js';
+import { renderWork, disposeAll, movePage, canMovePage, consumeKey } from './panes.js';
 import { blockReason } from './blocked.js';
 import { createZoomLayer } from './zoom.js';
 import { createNavigation } from './navigation.js';
+import { createNavZones } from './nav-zones.js';
 import { createPrefetchSlot } from './prefetch-slot.js';
 
 /** ホストページのスクロールを止めるために body へ付ける style。 */
@@ -219,6 +220,8 @@ export function createViewer(deps) {
 	let sidebarOpen = false;
 	/** @type {ReturnType<typeof createZoomLayer>|null} 原寸表示のレイヤ。ホストと一緒に作る */
 	let zoomLayer = null;
+	/** @type {ReturnType<typeof createNavZones>|null} 画面端のクリック領域。ホストと一緒に作る */
+	let navZones = null;
 	/** 開く要求の世代。await をまたいで古い応答を捨てるために使う */
 	let requestToken = 0;
 	/** @type {object|null} 最後に描いた作品詳細。設定が変わったときに通信なしで描き直すために持つ */
@@ -345,6 +348,16 @@ export function createViewer(deps) {
 			if (!settings.closeOnBackdrop) return;
 			if (pressed || eventKeepsOpen(event, stage)) return;
 			deps.onRequestClose();
+		});
+
+		// 画面端のクリック領域。捕捉フェーズで受けるので、上の余白で閉じる処理より先に動く
+		navZones = createNavZones({
+			stage,
+			getMode: () => settings.navZones,
+			canMovePage,
+			canMoveWork: (direction) => navigation.canMove(direction),
+			movePage,
+			moveWork: (direction) => navigation.moveWork(direction),
 		});
 
 		// 原寸表示は overlay の直下に敷く。ステージの中に入れるとサイドバーが上に残る。
@@ -712,8 +725,11 @@ export function createViewer(deps) {
 			warn('failed to render', detail.id, error);
 			return;
 		}
+		if (token !== requestToken) return;
+		// 枚数が決まったので、ポインタの下の領域のカーソルを合わせ直す
+		navZones?.refresh();
 		// 主役を組み終えてから、低い優先度で隣を温める
-		if (token === requestToken) warmNeighbor();
+		warmNeighbor();
 	}
 
 	/**
@@ -818,6 +834,8 @@ export function createViewer(deps) {
 		unlockBackground();
 		zoomLayer?.dispose();
 		zoomLayer = null;
+		navZones?.reset();
+		navZones = null;
 		disposeAll();
 		host.remove();
 		host = null;
@@ -874,6 +892,7 @@ export function createViewer(deps) {
 			applySidebarScroll();
 			applyWorkLink(workId);
 			applySidebarToggle();
+			navZones?.refresh();
 			if (!RERENDER_SETTING_KEYS.some((key) => previous[key] !== next[key])) return;
 			if (!lastDetail || String(lastDetail.id) !== String(workId)) {
 				void openWork(workId);

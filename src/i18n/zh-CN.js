@@ -330,6 +330,26 @@ export default {
 				label: '点击背景关闭',
 				description: '点击图片外侧即可关闭。如果容易误关，请关闭此项。',
 			},
+			navZones: {
+				label: '点击画面边缘翻页',
+				description: '点击画面边缘即可翻页或切换作品。移到边缘时光标会变成箭头。',
+				off: {
+					label: '不使用',
+					description: '只用箭头按钮和键盘翻页。',
+				},
+				horizontal: {
+					label: '左右翻页',
+					description: '点击左右边缘（宽 25%）即可切换到上一页或下一页。在图片上也有效。',
+				},
+				vertical: {
+					label: '上下切换作品',
+					description: '点击上下边缘（高 25%）即可切换到上一个或下一个作品。翻页请用箭头按钮。',
+				},
+				both: {
+					label: '左右翻页・上下切换作品',
+					description: '左右翻页，上下切换作品。四角以左右优先。',
+				},
+			},
 			gridTabSkip: {
 				label: '网格中的 Tab 键导航',
 				description: '按 Tab 移到下一个作品时的跳过方式。',

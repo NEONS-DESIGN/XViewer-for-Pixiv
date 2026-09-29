@@ -207,11 +207,11 @@
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-next"></use></svg></span>切换多张图片</h3>
-					<p>用左右方向键或屏幕边缘的箭头翻页。会预加载前后的图片，切换时无需等待。</p>
+					<p>用左右方向键或屏幕边缘的箭头翻页。开启设置后，点击画面左右边缘也能翻页。会预加载前后的图片，切换时无需等待。</p>
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-scroll"></use></svg></span>一个接一个看作品</h3>
-					<p>用上下方向键移到网格中的上一个或下一个作品。到达末尾时会自动加载下一页的内容。在插画和漫画标签页中，只会依次浏览该类别的作品。</p>
+					<p>用上下方向键移到网格中的上一个或下一个作品。开启设置后，点击画面上下边缘也能切换。到达末尾时会自动加载下一页的内容。在插画和漫画标签页中，只会依次浏览该类别的作品。</p>
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-play"></use></svg></span>播放动图</h3>
@@ -313,7 +313,7 @@
 					</p>
 					<ul class="feature-list">
 						<li>可以根据网络状况和喜好，选择图片分辨率和预加载的张数</li>
-						<li>侧边栏的显示方式、滚动方式，乃至点击背景是否关闭都可以更改</li>
+						<li>侧边栏的显示方式、滚动方式，乃至点击背景是否关闭、点击画面边缘是否翻页都可以更改</li>
 						<li>关闭查看器本身，即可恢复 pixiv 的默认行为</li>
 					</ul>
 				</div>
@@ -411,6 +411,12 @@
 							<td>点击背景关闭</td>
 							<td class="default">开</td>
 							<td>点击图片外侧时是否关闭</td>
+						</tr>
+						<tr>
+							<td>操作</td>
+							<td>点击画面边缘翻页</td>
+							<td class="default">不使用</td>
+							<td>点击画面左右边缘翻页，点击上下边缘切换作品。可选择只用左右、只用上下或两者兼用</td>
 						</tr>
 						<tr>
 							<td>操作</td>
@@ -525,7 +531,7 @@
 				</div>
 				<div class="card">
 					<h3>保存的内容</h3>
-					<p>你选择的 12 项设置，以及最后看到的 pixiv 显示语言。两者都只保留在浏览器中，不会发送到外部服务器。</p>
+					<p>你选择的 13 项设置，以及最后看到的 pixiv 显示语言。两者都只保留在浏览器中，不会发送到外部服务器。</p>
 				</div>
 				<div class="card">
 					<h3>请求的权限</h3>

@@ -3,7 +3,7 @@
  * 保存ボタンは作らず変更のたびに書くので、書き込みは 1 項目ずつ。
  * 保存値が壊れていても既定へ倒して必ず描けるようにする。
  */
-import { SETTINGS_DEFAULTS, IMAGE_QUALITY, PREFETCH_CHOICES, GRID_TAB_SKIP, POPUP_THEMES, SIDEBAR_SCROLL, INFINITE_SCROLL } from './constants.js';
+import { SETTINGS_DEFAULTS, IMAGE_QUALITY, PREFETCH_CHOICES, GRID_TAB_SKIP, POPUP_THEMES, SIDEBAR_SCROLL, INFINITE_SCROLL, NAV_ZONES } from './constants.js';
 import { warn } from './log.js';
 import { withArea as withStorageArea } from './storage-area.js';
 
@@ -68,6 +68,7 @@ export function normalizeSettings(raw) {
 		showSidebar: asBoolean(source.showSidebar, d.showSidebar),
 		sidebarScroll: oneOf(source.sidebarScroll, Object.values(SIDEBAR_SCROLL), d.sidebarScroll),
 		closeOnBackdrop: asBoolean(source.closeOnBackdrop, d.closeOnBackdrop),
+		navZones: oneOf(source.navZones, Object.values(NAV_ZONES), d.navZones),
 		clickZoom: asBoolean(source.clickZoom, d.clickZoom),
 		gridTabSkip: oneOf(source.gridTabSkip, Object.values(GRID_TAB_SKIP), d.gridTabSkip),
 		hidePickup: asBoolean(source.hidePickup, d.hidePickup),

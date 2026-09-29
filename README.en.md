@@ -52,8 +52,8 @@ on the grid, at the scroll position you left.
 | | |
 | --- | --- |
 | **Opens in place** | The viewer takes over the grid click and renders without navigating. The URL still changes to `/artworks/{id}`, so reloading and sharing both work |
-| **Multi-image works** | `←` `→` and the on-screen arrows page through the work. Neighbouring images are prefetched, so switching is immediate |
-| **Work to work** | `↑` `↓` move to the previous or next work in the grid. Reach the end and the next page is loaded for you. On the illustration and manga tabs, only works of that kind are visited |
+| **Multi-image works** | `←` `→` and the on-screen arrows page through the work. With the setting on, clicking the left or right edge of the screen does too. Neighbouring images are prefetched, so switching is immediate |
+| **Work to work** | `↑` `↓` move to the previous or next work in the grid. With the setting on, clicking the top or bottom edge of the screen does too. Reach the end and the next page is loaded for you. On the illustration and manga tabs, only works of that kind are visited |
 | **Ugoira** | The zip is decoded into frames and played in the viewer, with pause and resume |
 | **Full size** | Click the image to open it at its original resolution, filling the screen. (The same way pixiv's own artwork page looks) Page through with the screen edges or `←` `→` (off by default) |
 
@@ -179,6 +179,7 @@ bundled third-party assets.
 | User page | Hide the pickup section | Off | Hides the "pickup" block on a profile home |
 | User page | Infinite scroll | Off | Load when you reach the bottom, or always keep one page ahead |
 | Interaction | Close on backdrop click | On | Whether clicking outside the image closes the viewer |
+| Interaction | Click the edges to navigate | Off | The left and right edges of the screen turn pages, the top and bottom edges switch works. Choose left/right only, top/bottom only, or both. The cursor turns into an arrow over them |
 | Interaction | Grid tab order | Keep all stops | Whether Tab skips the bookmark button and the title on grid cards |
 
 The settings popup can be switched between dark and light from the icon in its top right. It follows

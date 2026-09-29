@@ -91,6 +91,13 @@
 	--sidebar-drawer-max: 60%;
 	/* 操作部品の高さ */
 	--control-height: 30px;
+	/* ページ・作品を送るクリック領域のカーソル。(原寸表示と画面端のクリック領域で共有)
+	   pixiv の .cur は拡張から使えないので同じ形を SVG で持つ。
+	   白い画像の上でも消えないよう、黒い縁取りの上に白い矢印を重ねる */
+	--cursor-prev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M18 4 L8 14 L18 24' fill='none' stroke='%23000' stroke-opacity='.5' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M18 4 L8 14 L18 24' fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 14 14;
+	--cursor-next: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M10 4 L20 14 L10 24' fill='none' stroke='%23000' stroke-opacity='.5' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M10 4 L20 14 L10 24' fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 14 14;
+	--cursor-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M4 18 L14 8 L24 18' fill='none' stroke='%23000' stroke-opacity='.5' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M4 18 L14 8 L24 18' fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 14 14;
+	--cursor-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M4 10 L14 20 L24 10' fill='none' stroke='%23000' stroke-opacity='.5' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M4 10 L14 20 L24 10' fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 14 14;
 	/* コメントの入力欄の地。pixiv 本体の入力欄と同じ濃さ */
 	--field-bg: rgba(255, 255, 255, 0.12);
 	--field-bg-hover: rgba(255, 255, 255, 0.16);
@@ -407,9 +414,41 @@
 	font-size: 12px;
 }
 
-/* 画像を押すと原寸表示に入れることを、カーソルで示す (設定がオンのときだけ付く class) */
-.stage img.zoomable {
+/* 画像を押すと原寸表示に入れることを、カーソルで示す (設定がオンのときだけ付く class)。
+   画面端のクリック領域の上では原寸表示に入らないので出さない */
+.stage:not([data-nav-zone]) img.zoomable {
 	cursor: zoom-in;
+}
+
+/*
+ * 画面端のクリック領域 (nav-zones.js)。今いる領域を data-nav-zone で受け、カーソルを矢印に変える。
+ * 中の画像や canvas の上でも同じカーソルにするので子孫にも当てる。
+ * ボタンとリンクの上では属性が外れるので、そちらのカーソルは変わらない
+ */
+.stage[data-nav-zone='prev-page'],
+.stage[data-nav-zone='prev-page'] * {
+	cursor: var(--cursor-prev), pointer;
+}
+
+.stage[data-nav-zone='next-page'],
+.stage[data-nav-zone='next-page'] * {
+	cursor: var(--cursor-next), pointer;
+}
+
+.stage[data-nav-zone='prev-work'],
+.stage[data-nav-zone='prev-work'] * {
+	cursor: var(--cursor-up), pointer;
+}
+
+.stage[data-nav-zone='next-work'],
+.stage[data-nav-zone='next-work'] * {
+	cursor: var(--cursor-down), pointer;
+}
+
+/* 端に着いて今は送れない領域。押せそうに見せない */
+.stage[data-nav-zone='idle'],
+.stage[data-nav-zone='idle'] * {
+	cursor: default;
 }
 
 /*
@@ -420,10 +459,6 @@
 	/* 左右のクリック領域の幅。pixiv 本体は上下 (前 20% / 次 40%) だが、この拡張では左右に置く。
 	   前後で同じ幅にして、どちらの端も同じ押し心地にする */
 	--zoom-zone-width: 25%;
-	/* クリック領域のカーソル。pixiv の .cur は拡張から使えないので同じ形を SVG で持つ。
-	   白い画像の上でも消えないよう、黒い縁取りの上に白い矢印を重ねる */
-	--zoom-cursor-prev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M18 4 L8 14 L18 24' fill='none' stroke='%23000' stroke-opacity='.5' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M18 4 L8 14 L18 24' fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 14 14;
-	--zoom-cursor-next: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M10 4 L20 14 L10 24' fill='none' stroke='%23000' stroke-opacity='.5' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M10 4 L20 14 L10 24' fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 14 14;
 
 	position: absolute;
 	inset: 0;
@@ -468,12 +503,12 @@
 
 .zoom-zone-prev {
 	left: 0;
-	cursor: var(--zoom-cursor-prev), pointer;
+	cursor: var(--cursor-prev), pointer;
 }
 
 .zoom-zone-next {
 	right: 0;
-	cursor: var(--zoom-cursor-next), pointer;
+	cursor: var(--cursor-next), pointer;
 }
 
 /* 端では押せない。カーソルも矢印に変えない (押せそうに見せない) */

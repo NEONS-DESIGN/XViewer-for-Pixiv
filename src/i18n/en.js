@@ -300,6 +300,26 @@ export default {
 				label: 'Click the background to close',
 				description: 'Clicking outside the image closes the viewer. Turn this off if you close it by accident.',
 			},
+			navZones: {
+				label: 'Click the edges to navigate',
+				description: 'Click near the edges of the viewer to turn pages or switch works. The cursor turns into an arrow there.',
+				off: {
+					label: 'Off',
+					description: 'Use only the arrow buttons and keys.',
+				},
+				horizontal: {
+					label: 'Left/right: pages',
+					description: 'Click the left or right edge (25% wide) to go to the previous or next page. Works on top of the image too.',
+				},
+				vertical: {
+					label: 'Top/bottom: works',
+					description: 'Click the top or bottom edge (25% high) to go to the previous or next work. Turn pages with the arrow buttons.',
+				},
+				both: {
+					label: 'Left/right: pages, top/bottom: works',
+					description: 'Left and right turn pages, top and bottom switch works. The corners belong to left and right.',
+				},
+			},
 			gridTabSkip: {
 				label: 'Tab movement in the grid',
 				description: 'What Tab skips when moving to the next artwork.',

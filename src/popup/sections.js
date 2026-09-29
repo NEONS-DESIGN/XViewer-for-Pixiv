@@ -9,6 +9,7 @@ import {
 	GRID_TAB_SKIP,
 	SIDEBAR_SCROLL,
 	INFINITE_SCROLL,
+	NAV_ZONES,
 } from '../common/constants.js';
 
 /** 画面の題名。拡張の名前をそのまま出す。言語に依らない。 */
@@ -184,6 +185,34 @@ export function createSections(strings) {
 					key: 'closeOnBackdrop',
 					label: f.closeOnBackdrop.label,
 					description: f.closeOnBackdrop.description,
+				}),
+				Object.freeze({
+					kind: 'choice',
+					key: 'navZones',
+					label: f.navZones.label,
+					description: f.navZones.description,
+					options: Object.freeze([
+						Object.freeze({
+							value: NAV_ZONES.OFF,
+							label: f.navZones.off.label,
+							description: f.navZones.off.description,
+						}),
+						Object.freeze({
+							value: NAV_ZONES.HORIZONTAL,
+							label: f.navZones.horizontal.label,
+							description: f.navZones.horizontal.description,
+						}),
+						Object.freeze({
+							value: NAV_ZONES.VERTICAL,
+							label: f.navZones.vertical.label,
+							description: f.navZones.vertical.description,
+						}),
+						Object.freeze({
+							value: NAV_ZONES.BOTH,
+							label: f.navZones.both.label,
+							description: f.navZones.both.description,
+						}),
+					]),
 				}),
 				Object.freeze({
 					kind: 'choice',

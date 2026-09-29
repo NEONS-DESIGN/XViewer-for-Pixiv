@@ -607,3 +607,38 @@ test('英語のカタログで英語の文言が出る', async () => {
 	assert.equal(find(container, '.pane-error').textContent, 'Could not load this image');
 	await rendering;
 });
+
+test('canMove は今のページから送れる向きだけ true を返す', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { pane } = build({ fetchImpl: impl });
+	assert.equal(pane.canMove(1), false, '描く前は送れない');
+	await pane.render(DETAIL);
+	assert.equal(pane.canMove(-1), false);
+	assert.equal(pane.canMove(1), true);
+	pane.next();
+	pane.next();
+	assert.equal(pane.canMove(1), false);
+	assert.equal(pane.canMove(-1), true);
+	pane.dispose();
+	assert.equal(pane.canMove(-1), false, '捨てた後は送れない');
+});
+
+test('canMove は /pages 待ちに覚えた行き先を起点にする', async () => {
+	let respond;
+	const fetchImpl = () => new Promise((resolve) => { respond = resolve; });
+	const { pane } = build({ fetchImpl });
+	const rendering = pane.render(DETAIL);
+	pane.next();
+	pane.next();
+	assert.equal(pane.canMove(1), false);
+	respond({ ok: true, status: 200, text: async () => JSON.stringify({ error: false, body: PAGES }) });
+	await rendering;
+});
+
+test('canMove は 1 枚だけの作品ではどちらにも送れない', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { pane } = build({ fetchImpl: impl });
+	await pane.render({ ...DETAIL, pageCount: 1 });
+	assert.equal(pane.canMove(1), false);
+	assert.equal(pane.canMove(-1), false);
+});
