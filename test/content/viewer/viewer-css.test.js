@@ -68,3 +68,9 @@ test('原寸表示の通知はスクロールに流されず、画面に貼り�
 		}
 	}
 });
+
+test('コメントの投稿者アイコンのリンクはアイコンの大きさに留める', () => {
+	// .comment-item は flex で、既定の align-items: stretch のままだとリンクが本文の高さまで伸び、
+	// アイコンの下の余白を押しても投稿者ページへ飛んでしまう
+	assert.ok(block(viewer, '.comment-avatar-link').includes('align-self: flex-start'), 'リンクが行の高さまで伸びる');
+});

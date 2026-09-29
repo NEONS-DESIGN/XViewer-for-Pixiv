@@ -1049,10 +1049,13 @@
 }
 
 /* アイコンを包む投稿者ページへのリンク。
-   flex の指定はここが持つ (img はリンクが無いときも同じ大きさで並ぶ) */
+   flex の指定はここが持つ (img はリンクが無いときも同じ大きさで並ぶ)。
+   align-self で上に寄せ、当たり判定をアイコンの大きさに留める。
+   (既定の stretch のままだと本文の高さまで伸び、アイコンの下を押しても投稿者ページへ飛ぶ) */
 .comment-avatar-link {
 	display: flex;
 	flex: 0 0 auto;
+	align-self: flex-start;
 }
 
 .comment-avatar {
