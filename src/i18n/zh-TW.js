@@ -329,6 +329,26 @@ export default {
 				label: '點擊背景關閉',
 				description: '點擊圖片外側即可關閉。容易誤觸而關閉的話，請關掉此選項。',
 			},
+			navZones: {
+				label: '點擊畫面邊緣翻頁',
+				description: '點擊畫面邊緣即可翻頁或切換作品。移到邊緣時游標會變成箭頭。',
+				off: {
+					label: '不使用',
+					description: '只用箭頭按鈕和鍵盤翻頁。',
+				},
+				horizontal: {
+					label: '左右翻頁',
+					description: '點擊左右邊緣（寬 25%）即可切換到上一頁或下一頁。在圖片上也有效。',
+				},
+				vertical: {
+					label: '上下切換作品',
+					description: '點擊上下邊緣（高 25%）即可切換到上一個或下一個作品。翻頁請用箭頭按鈕。',
+				},
+				both: {
+					label: '左右翻頁・上下切換作品',
+					description: '左右翻頁，上下切換作品。四角以左右優先。',
+				},
+			},
 			gridTabSkip: {
 				label: '網格中的 Tab 移動',
 				description: '按 Tab 移到下一個作品時的跳過方式。',

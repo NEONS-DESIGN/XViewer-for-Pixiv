@@ -207,6 +207,17 @@ export function createNavigation(deps) {
 		},
 
 		/**
+		 * その向きへ作品を送れるか。端でも全作品の並びへ広げられるなら送れるとみなす。
+		 * @param {number} direction 1 なら次、-1 なら前
+		 * @returns {boolean} 送れれば true
+		 */
+		canMove(direction) {
+			if (!sequence || !currentWorkId) return false;
+			if (neighbor(direction)) return true;
+			return !extended && !extending && deps.canExtendSequence() === true;
+		},
+
+		/**
 		 * 最後に動いた向きの隣の作品を返す。端でも並びは広げない。
 		 * @returns {string|null} 作品 ID。無ければ null
 		 */

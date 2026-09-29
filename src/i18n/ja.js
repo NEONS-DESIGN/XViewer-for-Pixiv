@@ -330,6 +330,26 @@ export default {
 				label: '背景クリックで閉じる',
 				description: '画像の外側を押すと閉じます。誤って閉じるならオフに。',
 			},
+			navZones: {
+				label: '画面端のクリックで送る',
+				description: '画面の端を押してページや作品を送ります。端ではカーソルが矢印に変わります。',
+				off: {
+					label: '使わない',
+					description: '矢印ボタンとキー操作だけで送ります。',
+				},
+				horizontal: {
+					label: '左右でページ送り',
+					description: '左右の端 (幅 25%) を押すと前後のページへ送ります。画像の上でも効きます。',
+				},
+				vertical: {
+					label: '上下で作品送り',
+					description: '上下の端 (高さ 25%) を押すと前後の作品へ移ります。ページは矢印ボタンで送ります。',
+				},
+				both: {
+					label: '左右でページ・上下で作品',
+					description: '左右でページ、上下で作品を送ります。四隅は左右が優先です。',
+				},
+			},
 			gridTabSkip: {
 				label: 'グリッドの Tab 移動',
 				description: 'Tab で次の作品へ移るときの飛ばし方です。',

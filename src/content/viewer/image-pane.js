@@ -124,7 +124,7 @@ function clamp(value, min, max) {
  * 画像ペインを作る。
  * @param {ImagePaneDeps} deps 依存
  * @returns {{render: (detail: object) => Promise<void>, next: () => void, prev: () => void,
- *   loadedUrlAt: (index: number) => string | null, dispose: () => void}}
+ *   canMove: (offset: number) => boolean, loadedUrlAt: (index: number) => string | null, dispose: () => void}}
  */
 export function createImagePane(deps) {
 	const { doc, container, strings } = deps;
@@ -454,6 +454,17 @@ export function createImagePane(deps) {
 
 		next() { move(1); },
 		prev() { move(-1); },
+
+		/**
+		 * その向きへページを送れるか。/pages 待ちに覚えた行き先があればそこを起点にする。
+		 * @param {number} offset 相対位置
+		 * @returns {boolean} 送れれば true
+		 */
+		canMove(offset) {
+			if (disposed || !frame) return false;
+			const next = (pendingIndex ?? index) + offset;
+			return next >= 0 && next < total;
+		},
 
 		loadedUrlAt,
 

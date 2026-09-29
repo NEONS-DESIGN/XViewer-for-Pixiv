@@ -351,3 +351,23 @@ test('reset と setSequence で向きは次へ戻る', async () => {
 	assert.equal(nav.lastDirection(), 1);
 	assert.equal(nav.peek(), null);
 });
+
+test('canMove は隣がある向きだけ true を返す', () => {
+	const nav = openedNavigation(fakeDeps(), ['1', '2', '3'], '3');
+	assert.equal(nav.canMove(-1), true);
+	assert.equal(nav.canMove(1), false);
+});
+
+test('canMove は端でも並びを広げられるなら true を返す。広げ済みなら false', async () => {
+	const deps = fakeDeps({ canExtendSequence: () => true });
+	const nav = openedNavigation(deps, ['1', '2'], '2');
+	assert.equal(nav.canMove(1), true);
+	await nav.moveWork(1);
+	assert.equal(nav.canMove(1), false);
+});
+
+test('canMove は並びが無い (閉じている) ときは false を返す', () => {
+	const nav = createNavigation(fakeDeps({ canExtendSequence: () => true }));
+	assert.equal(nav.canMove(1), false);
+	assert.equal(nav.canMove(-1), false);
+});

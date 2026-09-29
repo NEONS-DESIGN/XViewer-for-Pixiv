@@ -290,6 +290,35 @@ export const SIDEBAR_SCROLL = Object.freeze({
 });
 
 /**
+ * ビュワーの画面端のクリック領域。押すとページ・作品を送る。
+ * 既定はオフ。押しただけで閉じるつもりの場所が送りに変わるのを既定にしない。
+ */
+export const NAV_ZONES = Object.freeze({
+	/** 使わない (矢印ボタンとキーだけ) */
+	OFF: 'off',
+	/** 左右の端でページを送る */
+	HORIZONTAL: 'horizontal',
+	/** 上下の端で作品を送る */
+	VERTICAL: 'vertical',
+	/** 左右でページ、上下で作品を送る。四隅は左右を優先する */
+	BOTH: 'both',
+});
+
+/** クリック領域の幅 (左右) と高さ (上下)。ステージの大きさに対する割合 */
+export const NAV_ZONE_RATIO = 0.25;
+
+/**
+ * クリック領域の種類。ステージの data-nav-zone に入れてカーソルを変える。
+ * 値は CSS の属性選択子と揃える。
+ */
+export const NAV_ZONE_KINDS = Object.freeze({
+	PREV_PAGE: 'prev-page',
+	NEXT_PAGE: 'next-page',
+	PREV_WORK: 'prev-work',
+	NEXT_WORK: 'next-work',
+});
+
+/**
  * popup の配色。
  * SYSTEM は OS の設定 (prefers-color-scheme) に従う。
  * 明示の選択 (DARK / LIGHT) は常に OS より優先する。
@@ -330,6 +359,7 @@ export const SETTINGS_DEFAULTS = Object.freeze({
 	showSidebar: true,
 	sidebarScroll: SIDEBAR_SCROLL.WHOLE,
 	closeOnBackdrop: true,
+	navZones: NAV_ZONES.OFF,
 	clickZoom: false,
 	gridTabSkip: GRID_TAB_SKIP.NONE,
 	hidePickup: false,

@@ -4,7 +4,7 @@ import { normalizeSettings, loadSettings, saveSetting, resetSettings, watchSetti
 import { LOG_PREFIX } from '../../src/common/log.js';
 import { fakeArea } from '../helpers/storage.js';
 import { flush } from '../helpers/dom.js';
-import { SETTINGS_DEFAULTS, GRID_TAB_SKIP, POPUP_THEMES, SIDEBAR_SCROLL, INFINITE_SCROLL, PREFETCH_CHOICES, IMAGE_QUALITY } from '../../src/common/constants.js';
+import { SETTINGS_DEFAULTS, GRID_TAB_SKIP, POPUP_THEMES, SIDEBAR_SCROLL, INFINITE_SCROLL, PREFETCH_CHOICES, IMAGE_QUALITY, NAV_ZONES } from '../../src/common/constants.js';
 
 test('normalizeSettings は空の入力を既定へ倒す', () => {
 	assert.deepEqual(normalizeSettings({}), SETTINGS_DEFAULTS);
@@ -19,7 +19,16 @@ test('既定値は「初めて入れた人がそのまま使える」側に寄�
 	assert.equal(SETTINGS_DEFAULTS.gridTabSkip, GRID_TAB_SKIP.NONE, 'Tab 順は pixiv 標準のまま');
 	assert.equal(SETTINGS_DEFAULTS.clickZoom, false, 'クリックで原寸表示は既定でオフ');
 	assert.equal(SETTINGS_DEFAULTS.infiniteScroll, INFINITE_SCROLL.OFF, '無限スクロールは既定でオフ (知らないうちにページの動きを変えない)');
+	assert.equal(SETTINGS_DEFAULTS.navZones, NAV_ZONES.OFF, '画面端のクリック領域は既定でオフ (余白で閉じる動きを変えない)');
 	assert.ok(PREFETCH_CHOICES.includes(SETTINGS_DEFAULTS.prefetch), '既定が選択肢に無い');
+});
+
+test('normalizeSettings は画面端のクリック領域を選択肢の値だけ通す', () => {
+	for (const mode of Object.values(NAV_ZONES)) {
+		assert.equal(normalizeSettings({ navZones: mode }).navZones, mode);
+	}
+	assert.equal(normalizeSettings({ navZones: 'diagonal' }).navZones, NAV_ZONES.OFF);
+	assert.equal(normalizeSettings({ navZones: true }).navZones, NAV_ZONES.OFF);
 });
 
 test('normalizeSettings は正しい値をそのまま通す', () => {
@@ -31,6 +40,7 @@ test('normalizeSettings は正しい値をそのまま通す', () => {
 		showSidebar: false,
 		sidebarScroll: SIDEBAR_SCROLL.WHOLE,
 		closeOnBackdrop: false,
+		navZones: NAV_ZONES.BOTH,
 		clickZoom: true,
 		gridTabSkip: GRID_TAB_SKIP.TITLE,
 		hidePickup: true,

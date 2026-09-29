@@ -332,6 +332,26 @@ export default {
 				label: '배경 클릭으로 닫기',
 				description: '이미지 바깥을 누르면 닫힙니다. 실수로 닫힌다면 꺼 두세요.',
 			},
+			navZones: {
+				label: '화면 가장자리 클릭으로 넘기기',
+				description: '화면 가장자리를 눌러 페이지나 작품을 넘깁니다. 가장자리에서는 커서가 화살표로 바뀝니다.',
+				off: {
+					label: '사용 안 함',
+					description: '화살표 버튼과 키로만 넘깁니다.',
+				},
+				horizontal: {
+					label: '좌우로 페이지 넘기기',
+					description: '좌우 가장자리 (너비 25%)를 누르면 이전·다음 페이지로 넘깁니다. 이미지 위에서도 작동합니다.',
+				},
+				vertical: {
+					label: '상하로 작품 넘기기',
+					description: '상하 가장자리 (높이 25%)를 누르면 이전·다음 작품으로 이동합니다. 페이지는 화살표 버튼으로 넘깁니다.',
+				},
+				both: {
+					label: '좌우는 페이지, 상하는 작품',
+					description: '좌우로 페이지를, 상하로 작품을 넘깁니다. 네 모서리는 좌우가 우선입니다.',
+				},
+			},
 			gridTabSkip: {
 				label: '그리드의 Tab 이동',
 				description: 'Tab으로 다음 작품으로 이동할 때 건너뛰는 방식입니다.',

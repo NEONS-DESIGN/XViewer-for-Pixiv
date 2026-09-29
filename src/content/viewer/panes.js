@@ -221,3 +221,12 @@ export function movePage(direction) {
 	if (direction > 0) imagePane?.next();
 	else imagePane?.prev();
 }
+
+/**
+ * その向きへ画像のページを送れるか。うごイラとブロック表示では常に false。
+ * @param {number} direction 1 なら次、-1 なら前
+ * @returns {boolean} 送れれば true
+ */
+export function canMovePage(direction) {
+	return imagePane?.canMove(direction) === true;
+}
