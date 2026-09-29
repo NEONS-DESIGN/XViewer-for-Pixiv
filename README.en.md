@@ -170,7 +170,7 @@ bundled third-party assets.
 | Group | Setting | Default | Effect |
 | --- | --- | --- | --- |
 | Viewer | Use the viewer | On | Turn it off and pixiv behaves exactly as it did before |
-| Viewer | Show the sidebar | On | Puts the caption, tags, like count and comments beside the image. When off, a link to the artwork page appears next to the close button |
+| Viewer | Show the sidebar | On | Puts the caption, tags, like count and comments beside the image. When off, a link to the artwork page appears next to the close button. On narrow screens, open it with the button at the top right |
 | Viewer | Sidebar scrolling | Scroll the whole sidebar | Scroll caption and comments as one, or pin the caption and scroll only the comments |
 | Image | Resolution | Regular (1200px on the long edge) | Original is sharper but slower to load |
 | Image | Prefetch | 1 each way | How many neighbouring pages to load ahead of time (none / 1 each way / 3 each way) |

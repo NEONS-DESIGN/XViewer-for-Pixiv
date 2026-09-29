@@ -42,6 +42,9 @@ import { createPrefetchSlot } from './prefetch-slot.js';
 /** ホストページのスクロールを止めるために body へ付ける style。 */
 const BODY_LOCK_STYLE = 'overflow:hidden';
 
+/** サイドバーの id。引き出すボタンの aria-controls から指す。Shadow DOM の中なのでページの id とは衝突しない */
+const SIDEBAR_ELEMENT_ID = 'xviewer-sidebar';
+
 /** キーをそのまま入力に使う要素。ここにフォーカスがある間はビュワーの割り当てを効かせない。 */
 const TEXT_ENTRY_TAGS = Object.freeze(['TEXTAREA', 'INPUT']);
 
@@ -189,6 +192,10 @@ export function createViewer(deps) {
 	let sidebar = null;
 	/** @type {HTMLAnchorElement|null} 作品ページへのリンク。サイドバーを出さない設定のときだけ見せる */
 	let workLink = null;
+	/** @type {HTMLButtonElement|null} 狭い画面で畳んだサイドバーを引き出すボタン。幅による出し分けは CSS が持つ */
+	let sidebarToggle = null;
+	/** 狭い画面でサイドバーを引き出しているか。作品を送っても保ち、閉じたら畳む */
+	let sidebarOpen = false;
 	/** @type {ReturnType<typeof createZoomLayer>|null} 原寸表示のレイヤ。ホストと一緒に作る */
 	let zoomLayer = null;
 	/** 開く要求の世代。await をまたいで古い応答を捨てるために使う */
@@ -282,11 +289,25 @@ export function createViewer(deps) {
 		workLinkLabel.textContent = strings.viewer.WORK_PAGE;
 		workLink.append(workLinkLabel, createIcon(doc, 'openInNew'));
 
+		// 狭い画面ではサイドバーを CSS で畳む。このボタンで引き出して、画像を押しのけて並べる。
+		// 広い画面では CSS で消えるので、押しても見た目は変わらない
+		sidebarToggle = doc.createElement('button');
+		sidebarToggle.className = 'sidebar-toggle';
+		sidebarToggle.type = 'button';
+		sidebarToggle.hidden = true;
+		sidebarToggle.addEventListener('click', () => {
+			sidebarOpen = !sidebarOpen;
+			applySidebarToggle();
+		});
+
 		sidebar = doc.createElement('div');
 		sidebar.className = 'sidebar';
+		sidebar.id = SIDEBAR_ELEMENT_ID;
+		sidebarToggle.setAttribute('aria-controls', SIDEBAR_ELEMENT_ID);
 
 		stage.appendChild(closeButton);
 		stage.appendChild(workLink);
+		stage.appendChild(sidebarToggle);
 		overlay.appendChild(stage);
 		overlay.appendChild(sidebar);
 		shadow.appendChild(overlay);
@@ -348,6 +369,26 @@ export function createViewer(deps) {
 		if (!workLink) return;
 		workLink.href = artworkPath(workId, currentLocalePrefix(doc));
 		workLink.hidden = settings.showSidebar === true;
+	}
+
+	/**
+	 * サイドバーを引き出すボタンと、引き出しているかどうかの属性を今の状態に合わせる。
+	 * サイドバーを出さない設定ではボタンを隠し、引き出す状態も画面へ出さない。(状態そのものは保つ)
+	 * ボタンの名前とアイコンは「押すと何になるか」を示す。
+	 * @returns {void}
+	 */
+	function applySidebarToggle() {
+		if (!sidebarToggle || !overlay) return;
+		const available = settings.showSidebar === true;
+		sidebarToggle.hidden = !available;
+		const open = available && sidebarOpen;
+		const label = open ? strings.viewer.SIDEBAR_CLOSE : strings.viewer.SIDEBAR_OPEN;
+		sidebarToggle.setAttribute('aria-label', label);
+		sidebarToggle.title = label;
+		sidebarToggle.setAttribute('aria-expanded', String(open));
+		sidebarToggle.replaceChildren(createIcon(doc, open ? 'sidebarClose' : 'sidebarOpen'));
+		if (open) overlay.dataset.sidebarOpen = '';
+		else delete overlay.dataset.sidebarOpen;
 	}
 
 	/**
@@ -706,6 +747,7 @@ export function createViewer(deps) {
 		sidebar.hidden = !settings.showSidebar;
 		// 取得を待たずに差し替える。読み込みに失敗しても作品ページへは行ける
 		applyWorkLink(workId);
+		applySidebarToggle();
 		clearStatus();
 		// 応答がすぐ届く場合に文言をちらつかせないよう、遅らせて出す
 		scheduleLoadingStatus();
@@ -762,6 +804,8 @@ export function createViewer(deps) {
 		stage = null;
 		sidebar = null;
 		workLink = null;
+		sidebarToggle = null;
+		sidebarOpen = false;
 		// 元いたサムネイルへ戻す。差し替えで消えていることがあるので繋がりを確かめる
 		if (previousFocus && doc.contains(previousFocus)) previousFocus.focus?.();
 		previousFocus = null;
@@ -807,6 +851,7 @@ export function createViewer(deps) {
 			// 送り方は CSS だけで切り替わる。描き直すと読んでいた位置が飛ぶので属性だけ差し替える
 			applySidebarScroll();
 			applyWorkLink(workId);
+			applySidebarToggle();
 			if (!RERENDER_SETTING_KEYS.some((key) => previous[key] !== next[key])) return;
 			if (!lastDetail || String(lastDetail.id) !== String(workId)) {
 				void openWork(workId);

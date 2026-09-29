@@ -49,6 +49,8 @@ export default {
 		CLOSE_TITLE: '关闭（Esc）',
 		WORK_PAGE: '前往作品页面',
 		WORK_PAGE_TITLE: '在新标签页中打开作品页面',
+		SIDEBAR_OPEN: '打开侧边栏',
+		SIDEBAR_CLOSE: '关闭侧边栏',
 		LOADING: '加载中...',
 		LOAD_FAILED: '无法加载作品',
 		NOT_FOUND: '找不到该作品。可能已被删除或设为非公开',

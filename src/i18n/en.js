@@ -34,6 +34,8 @@ export default {
 		CLOSE_TITLE: 'Close (Esc)',
 		WORK_PAGE: 'Artwork page',
 		WORK_PAGE_TITLE: 'Open the artwork page in a new tab',
+		SIDEBAR_OPEN: 'Open the sidebar',
+		SIDEBAR_CLOSE: 'Close the sidebar',
 		LOADING: 'Loading...',
 		LOAD_FAILED: 'Could not load this artwork',
 		NOT_FOUND: 'This artwork could not be found. It may have been deleted or made private',

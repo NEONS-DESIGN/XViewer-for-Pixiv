@@ -1104,3 +1104,87 @@ test('サイドバーの設定を切り替えると作品ページへのリン�
 	await flush();
 	assert.equal(find(stage(), '.work-link').hidden, false);
 });
+
+/**
+ * サイドバーを出す設定のビュワーを用意する。作者情報の取得で通信させない。
+ * @returns {ReturnType<typeof setup>} 一式
+ */
+function setupWithSidebar() {
+	return setup({ settings: settings({ showSidebar: true }), fetchUser: async () => ({}) });
+}
+
+/**
+ * ダイアログ本体 (.overlay) が引き出した印を持っているか。
+ * @param {object} shadowRoot Shadow DOM の代わり
+ * @returns {boolean} 引き出していれば true
+ */
+function drawerOpen(shadowRoot) {
+	return 'sidebarOpen' in find(shadowRoot, '.overlay').dataset;
+}
+
+test('サイドバーを出す設定では引き出すボタンを置き、畳んだ状態から始める', async () => {
+	const { viewer, stage, shadow } = setupWithSidebar();
+	await viewer.open('1');
+	const toggle = find(stage(), '.sidebar-toggle');
+	assert.equal(toggle.hidden, false);
+	assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+	assert.equal(toggle.getAttribute('aria-label'), 'サイドバーを開く');
+	assert.equal(toggle.title, 'サイドバーを開く');
+	assert.equal(toggle.getAttribute('aria-controls'), find(shadow(), '.sidebar').id);
+	assert.equal(iconName(toggle.children[0]), 'sidebarOpen');
+	assert.equal(drawerOpen(shadow()), false);
+});
+
+test('引き出すボタンを押すたびにサイドバーを開け閉めする', async () => {
+	const { viewer, stage, shadow } = setupWithSidebar();
+	await viewer.open('1');
+	const toggle = find(stage(), '.sidebar-toggle');
+	toggle.click();
+	assert.equal(drawerOpen(shadow()), true);
+	assert.equal(toggle.getAttribute('aria-expanded'), 'true');
+	assert.equal(toggle.getAttribute('aria-label'), 'サイドバーを閉じる');
+	assert.equal(iconName(toggle.children[0]), 'sidebarClose');
+	toggle.click();
+	assert.equal(drawerOpen(shadow()), false);
+	assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+});
+
+test('引き出したサイドバーは作品を送っても開いたまま', async () => {
+	const { viewer, doc, stage, shadow } = setupWithSidebar();
+	await viewer.open('1', fakeSequence(['1', '2']));
+	find(stage(), '.sidebar-toggle').click();
+	await doc.dispatch('keydown', { key: KEYS.NEXT_WORK, preventDefault() {}, stopPropagation() {} });
+	await flush();
+	assert.equal(drawerOpen(shadow()), true);
+	assert.equal(find(stage(), '.sidebar-toggle').getAttribute('aria-expanded'), 'true');
+});
+
+test('ビュワーを閉じて開き直すと、サイドバーは畳んだ状態に戻る', async () => {
+	const { viewer, stage, shadow } = setupWithSidebar();
+	await viewer.open('1');
+	find(stage(), '.sidebar-toggle').click();
+	viewer.close();
+	await viewer.open('1');
+	assert.equal(drawerOpen(shadow()), false);
+	assert.equal(find(stage(), '.sidebar-toggle').getAttribute('aria-expanded'), 'false');
+});
+
+test('サイドバーを出さない設定では引き出すボタンを隠す', async () => {
+	const { viewer, stage, shadow } = setup();
+	await viewer.open('1');
+	assert.equal(find(stage(), '.sidebar-toggle').hidden, true);
+	assert.equal(drawerOpen(shadow()), false);
+});
+
+test('引き出したままサイドバーの設定を切ると引き出した印も外し、戻すと開いた状態に戻る', async () => {
+	const { viewer, stage, shadow } = setupWithSidebar();
+	await viewer.open('1');
+	find(stage(), '.sidebar-toggle').click();
+	viewer.setSettings(settings({ showSidebar: false }));
+	await flush();
+	assert.equal(find(stage(), '.sidebar-toggle').hidden, true);
+	assert.equal(drawerOpen(shadow()), false);
+	viewer.setSettings(settings({ showSidebar: true }));
+	await flush();
+	assert.equal(drawerOpen(shadow()), true);
+});

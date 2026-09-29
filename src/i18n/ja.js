@@ -49,6 +49,8 @@ export default {
 		CLOSE_TITLE: '閉じる (Esc)',
 		WORK_PAGE: '作品ページへ',
 		WORK_PAGE_TITLE: '作品ページを新しいタブで開く',
+		SIDEBAR_OPEN: 'サイドバーを開く',
+		SIDEBAR_CLOSE: 'サイドバーを閉じる',
 		LOADING: '読み込み中...',
 		LOAD_FAILED: '作品を読み込めませんでした',
 		NOT_FOUND: '作品が見つかりませんでした。削除されたか、非公開になった可能性があります',
