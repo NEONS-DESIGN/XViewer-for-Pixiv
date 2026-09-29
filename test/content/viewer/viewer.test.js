@@ -406,6 +406,43 @@ test('ページカウンタや文言の上で押しても閉じない', async ()
 	assert.equal(closed(), 0);
 });
 
+/**
+ * 押された要素から根までの道筋を持つ click / pointerdown を組み立てる。
+ * 道筋は本物と同じく発火した時点のもので、途中で要素が外されても変わらない。
+ * @param {object} target 押された要素
+ * @param {object[]} ancestors target から根までの祖先 (近い順)
+ * @returns {object} イベントの代わり
+ */
+function pathEvent(target, ancestors) {
+	return { target, composedPath: () => [target, ...ancestors] };
+}
+
+test('押したボタンの中のアイコンが差し替えで外れていても閉じない', async () => {
+	// 引き出すボタンとうごイラの再生ボタンは、押すとアイコンを差し替える。
+	// click がステージへ届いた時点で押されたアイコン (svg) は文書から外れていて、
+	// closest() ではボタンを辿れない。発火した時点の道筋で見ないと余白扱いで閉じる
+	const { viewer, stage, closed } = setup({ settings: settings({ showSidebar: true }), fetchUser: async () => ({}) });
+	await viewer.open('1');
+	const button = find(stage(), '.sidebar-toggle');
+	const detachedIcon = enrich(fakeElement('svg'));
+	const event = pathEvent(detachedIcon, [button, stage()]);
+	await stage().dispatch('pointerdown', event);
+	await stage().dispatch('click', event);
+	assert.equal(closed(), 0);
+});
+
+test('道筋で見るときも、ステージより外側の祖先では判定しない', async () => {
+	// ステージの余白の祖先 (overlay やホスト) が閉じない要素に当たっても、余白は余白として閉じる
+	const { viewer, stage, closed } = setup();
+	await viewer.open('1');
+	const backdrop = backdropElement(stage());
+	const outer = enrich(fakeElement('a'));
+	const event = pathEvent(backdrop, [stage(), outer]);
+	await stage().dispatch('pointerdown', event);
+	await stage().dispatch('click', event);
+	assert.equal(closed(), 1);
+});
+
 test('closeOnBackdrop が偽なら余白を押しても閉じない', async () => {
 	const { viewer, stage, closed } = setup({ settings: settings({ closeOnBackdrop: false }) });
 	await viewer.open('1');
