@@ -50,6 +50,8 @@ export default {
 		CLOSE_TITLE: '닫기 (Esc)',
 		WORK_PAGE: '작품 페이지로',
 		WORK_PAGE_TITLE: '작품 페이지를 새 탭에서 열기',
+		SIDEBAR_OPEN: '사이드바 열기',
+		SIDEBAR_CLOSE: '사이드바 닫기',
 		LOADING: '불러오는 중...',
 		LOAD_FAILED: '작품을 불러오지 못했습니다',
 		NOT_FOUND: '작품을 찾을 수 없습니다. 삭제되었거나 비공개로 바뀌었을 수 있습니다',

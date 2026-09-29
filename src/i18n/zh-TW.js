@@ -48,6 +48,8 @@ export default {
 		CLOSE_TITLE: '關閉（Esc）',
 		WORK_PAGE: '前往作品頁面',
 		WORK_PAGE_TITLE: '在新分頁中開啟作品頁面',
+		SIDEBAR_OPEN: '開啟側邊欄',
+		SIDEBAR_CLOSE: '關閉側邊欄',
 		LOADING: '載入中...',
 		LOAD_FAILED: '無法載入作品',
 		NOT_FOUND: '找不到此作品。可能已被刪除或設為不公開',

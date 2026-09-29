@@ -87,6 +87,8 @@
 	--menu-shadow: 0 8px 24px rgba(0, 0, 0, 0.36);
 	/* サイドバーの幅。X.com のメディアモーダルに近い比率 */
 	--sidebar-width: 384px;
+	/* 狭い画面で引き出したサイドバーの幅の上限。画像側に最低 4 割を残す */
+	--sidebar-drawer-max: 60%;
 	/* 操作部品の高さ */
 	--control-height: 30px;
 	/* コメントの入力欄の地。pixiv 本体の入力欄と同じ濃さ */
@@ -286,10 +288,60 @@
 	color: var(--danger);
 }
 
-/* 画面が狭いときはサイドバーを畳む。読む場所が無くなるより画像を優先する */
+/* 狭い画面で畳んだサイドバーを引き出すボタン。広い画面では出さない */
+.sidebar-toggle {
+	display: none;
+}
+
+/* 画面が狭いときはサイドバーを畳む。読む場所が無くなるより画像を優先する。
+   右上のボタンで引き出すと、広い画面と同じく横に並べて画像を押しのける。
+   幅は --sidebar-width と --sidebar-drawer-max の狭いほう */
 @media (max-width: 900px) {
 	.sidebar {
 		display: none;
+	}
+
+	.overlay[data-sidebar-open] .sidebar {
+		display: flex;
+		flex-basis: min(var(--sidebar-width), var(--sidebar-drawer-max));
+	}
+
+	/* 形は閉じるボタンと同じ 40px の円。z-index も同じ理由 (ペインの下に潜らせない) */
+	.sidebar-toggle {
+		position: absolute;
+		top: 12px;
+		right: 12px;
+		z-index: 1;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 40px;
+		height: 40px;
+		padding: 0;
+		border: 1px solid var(--control-border);
+		border-radius: 50%;
+		background: var(--control-bg);
+		color: var(--fg);
+		cursor: pointer;
+	}
+
+	.sidebar-toggle:hover {
+		background: var(--control-hover);
+	}
+
+	.sidebar-toggle svg {
+		width: 24px;
+		height: 24px;
+	}
+
+	/* ページの枚数はボタンの左へずらし、縦はボタンの中心にそろえる。
+	   .counter の位置は .frame (ステージの padding 24px の内側) が基準なので、
+	   right はボタンの右端 12px + 幅 40px + 間隔 8px から、top はボタンの中心 (12px + 40px / 2) から、
+	   それぞれステージの padding を引いた値にする */
+	.sidebar-toggle:not([hidden]) ~ .frame .counter {
+		top: calc(12px + 40px / 2 - 24px);
+		right: calc(12px + 40px + 8px - 24px);
+		transform: translateY(-50%);
 	}
 }
 

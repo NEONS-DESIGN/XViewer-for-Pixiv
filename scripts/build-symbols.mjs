@@ -30,6 +30,8 @@ const ICON_SOURCES = {
 	lightMode: 'light_mode-fill',
 	darkMode: 'dark_mode-fill',
 	mood: 'mood-fill',
+	sidebarOpen: 'right_panel_open-fill',
+	sidebarClose: 'right_panel_close-fill',
 };
 
 /**
