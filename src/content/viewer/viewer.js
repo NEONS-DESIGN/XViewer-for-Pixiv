@@ -136,6 +136,27 @@ function keepsOpen(target) {
 }
 
 /**
+ * イベントが「押しても閉じない要素」の上で起きたか。
+ *
+ * 押された要素から boundary の手前までを、発火した時点の道筋 (composedPath) で見る。
+ * ボタンの click 処理が中のアイコンを差し替えると、ステージへ届いた時点の event.target は
+ * 文書から外れていて closest() ではボタンを辿れないため。
+ * 道筋を持たない相手 (合成したイベント等) は event.target の closest() で見る。
+ * @param {Event} event click / pointerdown
+ * @param {EventTarget} boundary ここより外側 (ステージ自身と祖先) は見ない
+ * @returns {boolean} 閉じない要素の上なら true
+ */
+function eventKeepsOpen(event, boundary) {
+	const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+	if (path.length === 0) return keepsOpen(event.target);
+	for (const node of path) {
+		if (node === boundary) return false;
+		if (typeof node.matches === 'function' && node.matches(KEEP_OPEN_SELECTOR)) return true;
+	}
+	return false;
+}
+
+/**
  * キーが入力欄の中で押されたか。
  *
  * ビュワーは document の捕捉フェーズで全キーを取るので、この判定が無いと
@@ -208,8 +229,8 @@ export function createViewer(deps) {
 	let inertTargets = [];
 	/** 閉じたときに戻す body の style */
 	let savedBodyStyle = '';
-	/** @type {EventTarget|null} ステージの中で押し始めた要素。click の相手と合わせて余白かどうかを見る */
-	let pressTarget = null;
+	/** ステージの中で押し始めた場所が「押しても閉じない要素」の上だったか。click の相手と合わせて余白かどうかを見る */
+	let pressKeptOpen = false;
 	/** @type {AbortController|null} 作品詳細の取得を中断するためのもの。次の openWork と close() で abort する */
 	let openAborter = null;
 	/** 読み込み中の文言を出すタイマー ID。0 は動いていない */
@@ -315,13 +336,14 @@ export function createViewer(deps) {
 		// 背景 (画像とサイドバーの間の余白) を押すと閉じる。画像そのものでは閉じない。
 		// click は押し始めと離した先が違うと両者の共通祖先で発火するので、
 		// 画像の上で押して余白で離した (つまもうとした・誤ドラッグ) だけでは閉じないよう、
-		// 押し始めの要素も覚えておいて両方が余白のときだけ閉じる
-		stage.addEventListener('pointerdown', (event) => { pressTarget = event.target; });
+		// 押し始めの判定も覚えておいて両方が余白のときだけ閉じる。
+		// 押し始めは押した時点で判定する。click までの間に押した要素が差し替えで外れることがある
+		stage.addEventListener('pointerdown', (event) => { pressKeptOpen = eventKeepsOpen(event, stage); });
 		stage.addEventListener('click', (event) => {
-			const pressed = pressTarget;
-			pressTarget = null;
+			const pressed = pressKeptOpen;
+			pressKeptOpen = false;
 			if (!settings.closeOnBackdrop) return;
-			if (keepsOpen(event.target) || keepsOpen(pressed)) return;
+			if (pressed || eventKeepsOpen(event, stage)) return;
 			deps.onRequestClose();
 		});
 
@@ -790,7 +812,7 @@ export function createViewer(deps) {
 		// 取得の途中で閉じたときに、応答が返ってから描き直さないようにする
 		requestToken += 1;
 		lastDetail = null;
-		pressTarget = null;
+		pressKeptOpen = false;
 		doc.removeEventListener('keydown', onKeyDown, true);
 		unlockBody();
 		unlockBackground();
