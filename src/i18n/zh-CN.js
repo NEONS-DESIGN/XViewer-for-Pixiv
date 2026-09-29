@@ -47,6 +47,8 @@ export default {
 		DIALOG_LABEL: '作品查看器',
 		CLOSE: '关闭',
 		CLOSE_TITLE: '关闭（Esc）',
+		WORK_PAGE: '前往作品页面',
+		WORK_PAGE_TITLE: '在新标签页中打开作品页面',
 		LOADING: '加载中...',
 		LOAD_FAILED: '无法加载作品',
 		NOT_FOUND: '找不到该作品。可能已被删除或设为非公开',
@@ -248,7 +250,7 @@ export default {
 			},
 			showSidebar: {
 				label: '显示侧边栏',
-				description: '在图片旁显示作品说明、标签、点赞数和评论。',
+				description: '在图片旁显示作品说明、标签、点赞数和评论。关闭后，会在关闭按钮旁显示作品页面的链接。',
 			},
 			sidebarScroll: {
 				label: '侧边栏的滚动方式',

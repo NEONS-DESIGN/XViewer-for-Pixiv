@@ -46,6 +46,8 @@ export default {
 		DIALOG_LABEL: '作品檢視器',
 		CLOSE: '關閉',
 		CLOSE_TITLE: '關閉（Esc）',
+		WORK_PAGE: '前往作品頁面',
+		WORK_PAGE_TITLE: '在新分頁中開啟作品頁面',
 		LOADING: '載入中...',
 		LOAD_FAILED: '無法載入作品',
 		NOT_FOUND: '找不到此作品。可能已被刪除或設為不公開',
@@ -247,7 +249,7 @@ export default {
 			},
 			showSidebar: {
 				label: '顯示側邊欄',
-				description: '在圖片旁顯示作品說明、標籤、讚數及評論。',
+				description: '在圖片旁顯示作品說明、標籤、讚數及評論。關閉後，會在關閉按鈕旁顯示作品頁面的連結。',
 			},
 			sidebarScroll: {
 				label: '側邊欄的捲動方式',

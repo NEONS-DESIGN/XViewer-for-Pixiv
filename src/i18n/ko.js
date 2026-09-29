@@ -48,6 +48,8 @@ export default {
 		DIALOG_LABEL: '작품 뷰어',
 		CLOSE: '닫기',
 		CLOSE_TITLE: '닫기 (Esc)',
+		WORK_PAGE: '작품 페이지로',
+		WORK_PAGE_TITLE: '작품 페이지를 새 탭에서 열기',
 		LOADING: '불러오는 중...',
 		LOAD_FAILED: '작품을 불러오지 못했습니다',
 		NOT_FOUND: '작품을 찾을 수 없습니다. 삭제되었거나 비공개로 바뀌었을 수 있습니다',
@@ -250,7 +252,7 @@ export default {
 			},
 			showSidebar: {
 				label: '사이드바 표시',
-				description: '작품 설명·태그·좋아요 수·댓글을 이미지 옆에 표시합니다.',
+				description: '작품 설명·태그·좋아요 수·댓글을 이미지 옆에 표시합니다. 끄면 닫기 버튼 옆에 작품 페이지 링크를 표시합니다.',
 			},
 			sidebarScroll: {
 				label: '사이드바 스크롤',
