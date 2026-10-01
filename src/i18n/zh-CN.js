@@ -245,6 +245,22 @@ export default {
 		 * @returns {string} 印を付けた見出し
 		 */
 		withDefault: (label) => `${label}（默认）`,
+		/** 親の項目がオフなので操作できない項目を押したときの警告 */
+		dependency: {
+			/**
+			 * 親のスイッチをオンにするよう促す。
+			 * @param {string} label 親の項目の見出し
+			 * @returns {string} 警告
+			 */
+			turnOn: (label) => `请开启“${label}”。`,
+			/**
+			 * 親の選択肢で「オフ」以外を選ぶよう促す。
+			 * @param {string} label 親の項目の見出し
+			 * @param {string} off 親の選択肢のうちオフに当たるものの見出し
+			 * @returns {string} 警告
+			 */
+			chooseOther: (label, off) => `请在“${label}”中选择“${off}”以外的选项。`,
+		},
 		SAVE_FAILED: '无法保存。请检查浏览器的设置同步。',
 		RESET_FAILED: '无法重置。请检查浏览器的设置同步。',
 		tabs: {
@@ -366,7 +382,7 @@ export default {
 				 */
 				option: (value) => `${value}%`,
 			},
-			backdropOpacity: {
+			backdropMode: {
 				label: '背景浓度',
 				description: '铺在图片后面的黑色幕布的浓度。调低后可以透过它看到后面的页面。',
 				theme: {
@@ -374,29 +390,59 @@ export default {
 					description: '深色时为 92%，浅色时为 88%。',
 				},
 				/**
-				 * 選択肢の見出し。値から作る。
-				 * @param {number} value 選択肢の値
-				 * @returns {string} 見出し
+				 * 「カスタム」の選択肢。値は選択肢の下に出るレンジで選ぶ。
+				 * @param {number} min 選べる最小の値 (%)
+				 * @param {number} max 選べる最大の値 (%)
+				 * @returns {{label: string, description: string}} 選択肢の文言
+				 */
+				custom: (min, max) => ({ label: '自定义', description: `从 ${min}～${max}% 中选择浓度。` }),
+			},
+			backdropOpacity: {
+				label: '浓度',
+				/**
+				 * 値の読み方。レンジの今の値・目盛り・既定の選択肢の見出しに使う。
+				 * @param {number} value 値 (%)
+				 * @returns {string} 読み
 				 */
 				option: (value) => `${value}%`,
 			},
-			navZoneSize: {
+			navZoneMode: {
 				label: '屏幕边缘点击区域大小',
 				description: '点击屏幕边缘翻页时所用边缘的宽度（左右）和高度（上下），为相对于图片显示区域的比例。',
 				/**
-				 * 選択肢の見出し。値から作る。
-				 * @param {number} value 選択肢の値
-				 * @returns {string} 見出し
+				 * 「カスタム」の選択肢。値は選択肢の下に出るレンジで選ぶ。
+				 * @param {number} min 選べる最小の値 (%)
+				 * @param {number} max 選べる最大の値 (%)
+				 * @returns {{label: string, description: string}} 選択肢の文言
+				 */
+				custom: (min, max) => ({ label: '自定义', description: `从 ${min}～${max}% 中选择大小。` }),
+			},
+			navZoneSize: {
+				label: '大小',
+				/**
+				 * 値の読み方。レンジの今の値・目盛り・既定の選択肢の見出しに使う。
+				 * @param {number} value 値 (%)
+				 * @returns {string} 読み
 				 */
 				option: (value) => `${value}%`,
 			},
-			zoomZoneSize: {
+			zoomZoneMode: {
 				label: '原图显示的点击区域宽度',
 				description: '在原图显示画面中，点击左右边缘翻页的范围宽度。',
 				/**
-				 * 選択肢の見出し。値から作る。
-				 * @param {number} value 選択肢の値
-				 * @returns {string} 見出し
+				 * 「カスタム」の選択肢。値は選択肢の下に出るレンジで選ぶ。
+				 * @param {number} min 選べる最小の値 (%)
+				 * @param {number} max 選べる最大の値 (%)
+				 * @returns {{label: string, description: string}} 選択肢の文言
+				 */
+				custom: (min, max) => ({ label: '自定义', description: `从 ${min}～${max}% 中选择宽度。` }),
+			},
+			zoomZoneSize: {
+				label: '宽度',
+				/**
+				 * 値の読み方。レンジの今の値・目盛り・既定の選択肢の見出しに使う。
+				 * @param {number} value 値 (%)
+				 * @returns {string} 読み
 				 */
 				option: (value) => `${value}%`,
 			},

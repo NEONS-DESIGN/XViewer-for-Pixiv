@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderPopup, resolveTheme } from '../../src/popup/popup-ui.js';
-import { createSections, createAdvancedSections } from '../../src/popup/sections.js';
+import { createSections, createAdvancedSections, rangeTicks } from '../../src/popup/sections.js';
 import { SETTINGS_DEFAULTS, POPUP_THEMES, PREFETCH_CHOICES, PREFETCH_CUSTOM, PREFETCH_CUSTOM_RANGE } from '../../src/common/constants.js';
 import { PROJECT_LICENSE, THIRD_PARTY } from '../../src/common/licenses.js';
 import { createStrings } from '../../src/i18n/index.js';
@@ -51,7 +51,9 @@ test('定義表のキーは popupTheme を除く全設定と 1 対 1 に対応�
 		const strings = createStrings(lang);
 		const keys = [...createSections(strings), ...createAdvancedSections(strings)]
 			.flatMap((section) => section.fields)
-			.flatMap((field) => (field.reveal ? [field.key, field.reveal.field.key] : [field.key]));
+			.flatMap(function walk(field) {
+				return [field.key, ...(field.reveal ? [field.reveal.field.key] : []), ...(field.children ?? []).flatMap(walk)];
+			});
 		assert.equal(new Set(keys).size, keys.length, 'キーが重複している');
 		assert.deepEqual(new Set([...keys, 'popupTheme']), new Set(Object.keys(SETTINGS_DEFAULTS)));
 	}
@@ -465,17 +467,48 @@ test('詳細設定タブの見出しは ビュワー / 操作 / コメント の
 
 test('数値の段階の選択肢は既定の値にだけ印が付く', () => {
 	const fields = createAdvancedSections(createStrings('ja')).flatMap((section) => section.fields);
-	for (const field of fields) {
+	for (const field of fields.filter((one) => !one.reveal)) {
 		const marked = field.options.filter((option) => option.label.endsWith('(既定)'));
 		assert.equal(marked.length, 1, `${field.key} の既定の印が 1 つではない`);
 		assert.equal(marked[0].value, String(SETTINGS_DEFAULTS[field.key]), field.key);
 	}
 });
 
-test('幕の濃さの「テーマに合わせる」は説明付きで先頭に出る', () => {
-	const field = createAdvancedSections(createStrings('ja')).flatMap((section) => section.fields).find((one) => one.key === 'backdropOpacity');
-	assert.equal(field.options[0].label, 'テーマに合わせる (既定)');
-	assert.ok(field.options[0].description.length > 0);
+test('背景の濃さとクリック領域は「既定 / カスタム」から選び、カスタムのときだけレンジを出す', () => {
+	const fields = createAdvancedSections(createStrings('ja')).flatMap((section) => section.fields);
+	const backdrop = fields.find((one) => one.key === 'backdropMode');
+	assert.deepEqual(backdrop.options.map((option) => option.label), ['テーマに合わせる (既定)', 'カスタム']);
+	assert.ok(backdrop.options[0].description.length > 0);
+	assert.deepEqual([backdrop.reveal.field.min, backdrop.reveal.field.max, backdrop.reveal.field.step], [0, 100, 10]);
+	for (const key of ['navZoneMode', 'zoomZoneMode']) {
+		const field = fields.find((one) => one.key === key);
+		assert.deepEqual(field.options.map((option) => option.label), ['25% (既定)', 'カスタム'], key);
+		assert.deepEqual([field.reveal.field.min, field.reveal.field.max, field.reveal.field.step], [5, 35, 5], key);
+		assert.deepEqual([...field.reveal.field.scale], [5, 10, 15, 20, 25, 30, 35], key);
+	}
+	const { root } = build({ settings: { backdropMode: 'theme' } });
+	const field = findRole(root, 'backdropOpacity-field');
+	assert.equal(field.hidden, true);
+	const select = findRole(root, 'backdropMode');
+	select.value = 'custom';
+	select.dispatch('change');
+	assert.equal(field.hidden, false);
+});
+
+test('先読みのレンジの目盛りは 1 / 5 / 10 / 15 / 20、背景の濃さは 20% ごと', () => {
+	const { root } = build({ settings: { prefetch: PREFETCH_CUSTOM, backdropMode: 'custom' } });
+	const ticks = (key) => findRole(root, `${key}-field`).children.find((child) => child.className === 'range-scale').children;
+	assert.deepEqual(ticks('prefetchCustom').map((tick) => tick.textContent), ['1', '5', '10', '15', '20']);
+	assert.deepEqual(ticks('backdropOpacity').map((tick) => tick.textContent), ['0%', '20%', '40%', '60%', '80%', '100%']);
+	// 位置は範囲に対する割合 (つまみの幅の差し引きは CSS)
+	assert.equal(ticks('prefetchCustom')[1].style.getPropertyValue('--tick'), String(4 / 19));
+	assert.equal(ticks('prefetchCustom').at(-1).style.getPropertyValue('--tick'), '1');
+});
+
+test('rangeTicks は両端を含め、間に step の倍数を並べる', () => {
+	assert.deepEqual([...rangeTicks(1, 20, 5)], [1, 5, 10, 15, 20]);
+	assert.deepEqual([...rangeTicks(0, 100, 20)], [0, 20, 40, 60, 80, 100]);
+	assert.deepEqual([...rangeTicks(5, 35, 5)], [5, 10, 15, 20, 25, 30, 35]);
 });
 
 test('詳細設定の選択の変更は数値で onChange に届く', () => {
@@ -651,4 +684,105 @@ test('英語のカタログで設定画面が英語になる', () => {
 	assert.match(root.textContent, /Licenses/);
 	assert.match(root.textContent, /Settings/);
 	assert.match(root.textContent, /Disclaimer/);
+});
+
+/* --- 親子と非活性 ---------------------------------------------------- */
+
+/**
+ * 項目の入れ物 (data-role の要素の親を上った .field) を探す。
+ * @param {object} element 項目の中の要素
+ * @returns {object} .field の要素
+ */
+function fieldOf(element) {
+	let node = element;
+	while (node && !String(node.className).split(' ').includes('field')) node = node.parent;
+	return node;
+}
+
+test('ビュワーを使う画面の 3 つは「ビュワーを使う」の子として字下げした箱の中に並ぶ', () => {
+	const { root } = build();
+	const parent = fieldOf(findRole(root, 'enabled'));
+	const box = parent.children.find((child) => child.className === 'field-children');
+	assert.ok(box, '子の箱が無い');
+	for (const key of ['viewerOnUser', 'viewerOnHome', 'viewerOnSearch']) {
+		assert.equal(fieldOf(findRole(root, key)).parent, box, key);
+	}
+	// サイドバーのスクロールも「サイドバーを表示する」の子
+	const sidebar = fieldOf(findRole(root, 'showSidebar'));
+	assert.equal(fieldOf(findRole(root, 'sidebarScroll')).parent.parent, sidebar);
+});
+
+test('「ビュワーを使う」がオフなら子は非活性になり、押すと親をオンにするよう警告し、保存しない', () => {
+	const { root, changes } = build({ settings: { enabled: false } });
+	const home = findRole(root, 'viewerOnHome');
+	assert.equal(home.getAttribute('aria-disabled'), 'true');
+	assert.ok(fieldOf(home).className.includes('is-locked'));
+	const warning = findRole(root, 'viewerOnHome-lock');
+	assert.equal(warning.hidden, true);
+	let prevented = false;
+	home.dispatch('click', { preventDefault() { prevented = true; } });
+	assert.equal(prevented, true, 'スイッチを切り替えさせない');
+	assert.equal(warning.hidden, false);
+	assert.equal(warning.textContent, '「ビュワーを使う」をオンにしてください。');
+	assert.equal(warning.getAttribute('role'), 'status');
+	assert.ok(home.getAttribute('aria-describedby').includes('viewerOnHome-lock'));
+	// 止めきれずに change が来ても保存しない
+	home.dispatch('change');
+	assert.deepEqual(changes, []);
+});
+
+test('親をオンにするとその場で子が活性に戻り、警告も消える', () => {
+	const { root, changes } = build({ settings: { enabled: false } });
+	const user = findRole(root, 'viewerOnUser');
+	user.dispatch('click', { preventDefault() {} });
+	const enabled = findRole(root, 'enabled');
+	enabled.checked = true;
+	enabled.dispatch('change');
+	assert.equal(user.getAttribute('aria-disabled'), null);
+	assert.equal(findRole(root, 'viewerOnUser-lock').hidden, true);
+	user.checked = false;
+	user.dispatch('change');
+	assert.deepEqual(changes, [{ enabled: true }, { viewerOnUser: false }]);
+});
+
+test('「サイドバーを表示する」がオフならサイドバーのスクロールと、詳細設定のサイドバー・コメントの項目が非活性', () => {
+	const { root, changes } = build({ settings: { showSidebar: false } });
+	for (const key of ['sidebarScroll', 'sidebarWidth', 'sidebarDrawerMax', 'commentPageSize']) {
+		assert.equal(findRole(root, key).getAttribute('aria-disabled'), 'true', key);
+	}
+	const select = findRole(root, 'sidebarWidth');
+	let prevented = false;
+	select.dispatch('mousedown', { preventDefault() { prevented = true; } });
+	assert.equal(prevented, true, '選択肢を開かせない');
+	assert.equal(findRole(root, 'sidebarWidth-lock').textContent, '「サイドバーを表示する」をオンにしてください。');
+	// 値が変わってしまっても戻して保存しない
+	select.value = '512';
+	select.dispatch('change');
+	assert.equal(select.value, String(SETTINGS_DEFAULTS.sidebarWidth));
+	assert.deepEqual(changes, []);
+});
+
+test('画面端のクリック領域は「使わない」のとき、原寸表示のクリック領域は「クリックで原寸表示」がオフのとき非活性 (レンジも)', () => {
+	const { root } = build({ settings: { navZones: 'off', navZoneMode: 'custom', clickZoom: false, zoomZoneMode: 'custom' } });
+	for (const key of ['navZoneMode', 'navZoneSize', 'zoomZoneMode', 'zoomZoneSize']) {
+		assert.equal(findRole(root, key).getAttribute('aria-disabled'), 'true', key);
+	}
+	findRole(root, 'navZoneSize').dispatch('pointerdown', { preventDefault() {} });
+	assert.equal(findRole(root, 'navZoneSize-lock').textContent, '「画面端のクリックで送る」で「使わない」以外を選んでください。');
+	findRole(root, 'zoomZoneMode').dispatch('keydown', { key: 'ArrowDown', preventDefault() {} });
+	assert.equal(findRole(root, 'zoomZoneMode-lock').textContent, '「クリックで原寸表示」をオンにしてください。');
+	// 親を選び直すと活性に戻る
+	const navZones = findRole(root, 'navZones');
+	navZones.value = 'horizontal';
+	navZones.dispatch('change');
+	assert.equal(findRole(root, 'navZoneMode').getAttribute('aria-disabled'), null);
+	assert.equal(findRole(root, 'navZoneSize').getAttribute('aria-disabled'), null);
+});
+
+test('非活性でも Tab キーは止めない (フォーカスで移れる)', () => {
+	const { root } = build({ settings: { showSidebar: false } });
+	let prevented = false;
+	findRole(root, 'sidebarScroll').dispatch('keydown', { key: 'Tab', preventDefault() { prevented = true; } });
+	assert.equal(prevented, false);
+	assert.equal(findRole(root, 'sidebarScroll-lock').hidden, true);
 });

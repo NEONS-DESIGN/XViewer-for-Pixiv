@@ -245,6 +245,22 @@ export default {
 		 * @returns {string} 印を付けた見出し
 		 */
 		withDefault: (label) => `${label} (既定)`,
+		/** 親の項目がオフなので操作できない項目を押したときの警告 */
+		dependency: {
+			/**
+			 * 親のスイッチをオンにするよう促す。
+			 * @param {string} label 親の項目の見出し
+			 * @returns {string} 警告
+			 */
+			turnOn: (label) => `「${label}」をオンにしてください。`,
+			/**
+			 * 親の選択肢で「オフ」以外を選ぶよう促す。
+			 * @param {string} label 親の項目の見出し
+			 * @param {string} off 親の選択肢のうちオフに当たるものの見出し
+			 * @returns {string} 警告
+			 */
+			chooseOther: (label, off) => `「${label}」で「${off}」以外を選んでください。`,
+		},
 		SAVE_FAILED: '保存できませんでした。ブラウザの設定同期を確認してください。',
 		RESET_FAILED: '初期化できませんでした。ブラウザの設定同期を確認してください。',
 		tabs: {
@@ -366,7 +382,7 @@ export default {
 				 */
 				option: (value) => `${value}%`,
 			},
-			backdropOpacity: {
+			backdropMode: {
 				label: '背景の濃さ',
 				description: '画像の後ろに敷く黒い幕の濃さです。下げると後ろのページが透けて見えます。',
 				theme: {
@@ -374,29 +390,59 @@ export default {
 					description: 'ダークでは 92%、ライトでは 88% にします。',
 				},
 				/**
-				 * 選択肢の見出し。値から作る。
-				 * @param {number} value 選択肢の値
-				 * @returns {string} 見出し
+				 * 「カスタム」の選択肢。値は選択肢の下に出るレンジで選ぶ。
+				 * @param {number} min 選べる最小の値 (%)
+				 * @param {number} max 選べる最大の値 (%)
+				 * @returns {{label: string, description: string}} 選択肢の文言
+				 */
+				custom: (min, max) => ({ label: 'カスタム', description: `濃さを ${min}〜${max}% から選びます。` }),
+			},
+			backdropOpacity: {
+				label: '濃さ',
+				/**
+				 * 値の読み方。レンジの今の値・目盛り・既定の選択肢の見出しに使う。
+				 * @param {number} value 値 (%)
+				 * @returns {string} 読み
 				 */
 				option: (value) => `${value}%`,
 			},
-			navZoneSize: {
+			navZoneMode: {
 				label: '画面端のクリック領域の大きさ',
 				description: '画面端のクリックで送るときの、端の幅 (左右) と高さ (上下) です。画像を出す部分に対する割合です。',
 				/**
-				 * 選択肢の見出し。値から作る。
-				 * @param {number} value 選択肢の値
-				 * @returns {string} 見出し
+				 * 「カスタム」の選択肢。値は選択肢の下に出るレンジで選ぶ。
+				 * @param {number} min 選べる最小の値 (%)
+				 * @param {number} max 選べる最大の値 (%)
+				 * @returns {{label: string, description: string}} 選択肢の文言
+				 */
+				custom: (min, max) => ({ label: 'カスタム', description: `大きさを ${min}〜${max}% から選びます。` }),
+			},
+			navZoneSize: {
+				label: '大きさ',
+				/**
+				 * 値の読み方。レンジの今の値・目盛り・既定の選択肢の見出しに使う。
+				 * @param {number} value 値 (%)
+				 * @returns {string} 読み
 				 */
 				option: (value) => `${value}%`,
 			},
-			zoomZoneSize: {
+			zoomZoneMode: {
 				label: '原寸表示のクリック領域の幅',
 				description: '原寸表示の画面で、左右の端を押してページを送る範囲の幅です。',
 				/**
-				 * 選択肢の見出し。値から作る。
-				 * @param {number} value 選択肢の値
-				 * @returns {string} 見出し
+				 * 「カスタム」の選択肢。値は選択肢の下に出るレンジで選ぶ。
+				 * @param {number} min 選べる最小の値 (%)
+				 * @param {number} max 選べる最大の値 (%)
+				 * @returns {{label: string, description: string}} 選択肢の文言
+				 */
+				custom: (min, max) => ({ label: 'カスタム', description: `幅を ${min}〜${max}% から選びます。` }),
+			},
+			zoomZoneSize: {
+				label: '幅',
+				/**
+				 * 値の読み方。レンジの今の値・目盛り・既定の選択肢の見出しに使う。
+				 * @param {number} value 値 (%)
+				 * @returns {string} 読み
 				 */
 				option: (value) => `${value}%`,
 			},

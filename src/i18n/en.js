@@ -215,6 +215,22 @@ export default {
 		 * @returns {string} 印を付けた見出し
 		 */
 		withDefault: (label) => `${label} (default)`,
+		/** 親の項目がオフなので操作できない項目を押したときの警告 */
+		dependency: {
+			/**
+			 * 親のスイッチをオンにするよう促す。
+			 * @param {string} label 親の項目の見出し
+			 * @returns {string} 警告
+			 */
+			turnOn: (label) => `Turn on "${label}".`,
+			/**
+			 * 親の選択肢で「オフ」以外を選ぶよう促す。
+			 * @param {string} label 親の項目の見出し
+			 * @param {string} off 親の選択肢のうちオフに当たるものの見出し
+			 * @returns {string} 警告
+			 */
+			chooseOther: (label, off) => `Choose something other than "${off}" in "${label}".`,
+		},
 		SAVE_FAILED: 'Could not save. Check your browser’s settings sync.',
 		RESET_FAILED: 'Could not reset. Check your browser’s settings sync.',
 		tabs: {
@@ -336,7 +352,7 @@ export default {
 				 */
 				option: (value) => `${value}%`,
 			},
-			backdropOpacity: {
+			backdropMode: {
 				label: 'Background darkness',
 				description: 'How dark the black layer behind the image is. Lower values let the page behind show through.',
 				theme: {
@@ -344,29 +360,59 @@ export default {
 					description: '92% in dark mode, 88% in light mode.',
 				},
 				/**
-				 * 選択肢の見出し。値から作る。
-				 * @param {number} value 選択肢の値
-				 * @returns {string} 見出し
+				 * 「カスタム」の選択肢。値は選択肢の下に出るレンジで選ぶ。
+				 * @param {number} min 選べる最小の値 (%)
+				 * @param {number} max 選べる最大の値 (%)
+				 * @returns {{label: string, description: string}} 選択肢の文言
+				 */
+				custom: (min, max) => ({ label: 'Custom', description: `Choose the darkness from ${min}% to ${max}%.` }),
+			},
+			backdropOpacity: {
+				label: 'Darkness',
+				/**
+				 * 値の読み方。レンジの今の値・目盛り・既定の選択肢の見出しに使う。
+				 * @param {number} value 値 (%)
+				 * @returns {string} 読み
 				 */
 				option: (value) => `${value}%`,
 			},
-			navZoneSize: {
+			navZoneMode: {
 				label: 'Edge click area size',
 				description: 'Width (left and right) and height (top and bottom) of the edges used for edge-click navigation, relative to the image area.',
 				/**
-				 * 選択肢の見出し。値から作る。
-				 * @param {number} value 選択肢の値
-				 * @returns {string} 見出し
+				 * 「カスタム」の選択肢。値は選択肢の下に出るレンジで選ぶ。
+				 * @param {number} min 選べる最小の値 (%)
+				 * @param {number} max 選べる最大の値 (%)
+				 * @returns {{label: string, description: string}} 選択肢の文言
+				 */
+				custom: (min, max) => ({ label: 'Custom', description: `Choose the size from ${min}% to ${max}%.` }),
+			},
+			navZoneSize: {
+				label: 'Size',
+				/**
+				 * 値の読み方。レンジの今の値・目盛り・既定の選択肢の見出しに使う。
+				 * @param {number} value 値 (%)
+				 * @returns {string} 読み
 				 */
 				option: (value) => `${value}%`,
 			},
-			zoomZoneSize: {
+			zoomZoneMode: {
 				label: 'Actual-size click area width',
 				description: 'Width of the left and right edges you click to turn pages in actual-size view.',
 				/**
-				 * 選択肢の見出し。値から作る。
-				 * @param {number} value 選択肢の値
-				 * @returns {string} 見出し
+				 * 「カスタム」の選択肢。値は選択肢の下に出るレンジで選ぶ。
+				 * @param {number} min 選べる最小の値 (%)
+				 * @param {number} max 選べる最大の値 (%)
+				 * @returns {{label: string, description: string}} 選択肢の文言
+				 */
+				custom: (min, max) => ({ label: 'Custom', description: `Choose the width from ${min}% to ${max}%.` }),
+			},
+			zoomZoneSize: {
+				label: 'Width',
+				/**
+				 * 値の読み方。レンジの今の値・目盛り・既定の選択肢の見出しに使う。
+				 * @param {number} value 値 (%)
+				 * @returns {string} 読み
 				 */
 				option: (value) => `${value}%`,
 			},

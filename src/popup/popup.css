@@ -152,6 +152,29 @@ h1 {
 	border-left: 2px solid var(--divider);
 }
 
+/* 子の項目の箱。(「ビュワーを使う」の下の 3 つなど) 選択肢の下に出すレンジと同じく、左に線を引いて字下げする */
+.field-children {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	margin-top: 8px;
+	padding-left: 10px;
+	border-left: 2px solid var(--divider);
+}
+
+/* 親の項目がオフで操作できない項目。中身を薄くし、押せないカーソルにする。
+   警告の行・子の箱・下に出すレンジ (それぞれが自分で非活性を持つ) は薄くしない */
+.field.is-locked > :not(.field-lock-warning, .field-children, .field) {
+	opacity: 0.45;
+}
+
+.field.is-locked > .row,
+.field.is-locked > .row input,
+.field.is-locked > select,
+.field.is-locked > input[type='range'] {
+	cursor: not-allowed;
+}
+
 /* .field.range の display はクラス指定なので、UA の [hidden] に勝ってしまう */
 .field.range[hidden] {
 	display: none;
@@ -186,7 +209,8 @@ h1 {
 }
 
 /* 警告の行。アイコンを添えて色だけに頼らない */
-.range-warning {
+.range-warning,
+.field-lock-warning {
 	display: flex;
 	align-items: center;
 	gap: 4px;
@@ -196,25 +220,38 @@ h1 {
 	line-height: 1.45;
 }
 
-/* .range-warning の display はクラス指定なので、UA の [hidden] に勝ってしまう */
-.range-warning[hidden] {
+/* display はクラス指定なので、UA の [hidden] に勝ってしまう */
+.range-warning[hidden],
+.field-lock-warning[hidden] {
 	display: none;
 }
 
-.range-warning svg {
+.range-warning svg,
+.field-lock-warning svg {
 	flex: 0 0 auto;
 	width: 14px;
 	height: 14px;
 	fill: currentColor;
 }
 
-/* 両端の値。つまみの下に小さく添える */
+/* 目盛り。値ごとに、つまみの中心が来る位置へ置く。
+   つまみの中心が動けるのは左右の端からつまみの半分ずつ内側なので、その分を差し引いて並べる */
 .range-scale {
-	display: flex;
-	justify-content: space-between;
+	--range-thumb: 16px;
+	position: relative;
+	height: 14px;
 	color: var(--muted);
 	font-size: 11px;
 	line-height: 1.2;
+	font-variant-numeric: tabular-nums;
+}
+
+.range-tick {
+	position: absolute;
+	top: 0;
+	left: calc(var(--range-thumb) / 2 + (100% - var(--range-thumb)) * var(--tick, 0));
+	transform: translateX(-50%);
+	white-space: nowrap;
 }
 
 /* 保存の失敗など。読み上げには role="alert" で届く。

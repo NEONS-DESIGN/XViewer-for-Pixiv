@@ -29,6 +29,7 @@ import { createIcon } from '../../common/icons.js';
 import { assignImageSrc } from '../../common/image-source.js';
 import { currentLocalePrefix } from '../../common/locale.js';
 import { warn } from '../../common/log.js';
+import { navZoneSizeOf } from '../../common/storage.js';
 import { getJson, FRESH_FETCH_INIT } from '../../pixiv/client.js';
 import { clearUserCache } from '../../pixiv/user.js';
 import { PIXIV_ERROR_KINDS } from '../../pixiv/errors.js';
@@ -72,7 +73,7 @@ const RANGE_PASSTHROUGH_KEYS = Object.freeze([KEYS.PREV_WORK, KEYS.NEXT_WORK]);
  */
 const RERENDER_SETTING_KEYS = Object.freeze(['imageQuality', 'prefetch', 'prefetchCustom', 'showSidebar', 'clickZoom']);
 
-/** % で持つ設定 (navZoneSize) を 0-1 の割合へ直すときの分母。 */
+/** % で持つ設定 (画面端のクリック領域の大きさ) を 0-1 の割合へ直すときの分母。 */
 const PERCENT = 100;
 
 /**
@@ -381,7 +382,7 @@ export function createViewer(deps) {
 		navZones = createNavZones({
 			stage,
 			getMode: () => settings.navZones,
-			getRatio: () => settings.navZoneSize / PERCENT,
+			getRatio: () => navZoneSizeOf(settings) / PERCENT,
 			canMovePage,
 			canMoveWork: (direction) => navigation.canMove(direction),
 			movePage,
@@ -423,15 +424,15 @@ export function createViewer(deps) {
 
 	/**
 	 * 見た目の数値の設定 (サイドバーの幅・幕の濃さなど) をホストの CSS 変数へ写す。
-	 * 既定に当たる値 (skip) のときは上書きを外し、CSS 側の既定 (テーマごとの値など) に任せる。
+	 * モードを持つ項目がカスタムでないときは上書きを外し、CSS 側の既定 (テーマごとの値など) に任せる。
 	 * 描き直しは要らないので、設定が変わったらその場で書き換える。
 	 * @returns {void}
 	 */
 	function applyCssSettings() {
 		if (!host?.style?.setProperty) return;
-		for (const [key, { property, unit = '', divisor = 1, skip }] of Object.entries(VIEWER_CSS_SETTINGS)) {
+		for (const [key, { property, unit = '', divisor = 1, mode }] of Object.entries(VIEWER_CSS_SETTINGS)) {
 			const value = settings[key];
-			if (!Number.isFinite(value) || value === skip) {
+			if (!Number.isFinite(value) || (mode && settings[mode.key] !== mode.custom)) {
 				host.style.removeProperty(property);
 				continue;
 			}
