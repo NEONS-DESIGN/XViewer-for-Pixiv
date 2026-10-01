@@ -786,3 +786,48 @@ test('非活性でも Tab キーは止めない (フォーカスで移れる)', 
 	assert.equal(prevented, false);
 	assert.equal(findRole(root, 'sidebarScroll-lock').hidden, true);
 });
+
+test('「ビュワーを使う」がオフなら、ビュワーを開かないと使われない項目はすべて非活性。グリッドの 3 つは外す', () => {
+	const { root } = build({ settings: { enabled: false, prefetch: PREFETCH_CUSTOM } });
+	const locked = [
+		'viewerOnUser', 'viewerOnHome', 'viewerOnSearch', 'showSidebar', 'sidebarScroll',
+		'imageQuality', 'prefetch', 'prefetchCustom', 'prefetchNeighbor', 'clickZoom', 'closeOnBackdrop', 'navZones',
+		'sidebarWidth', 'sidebarDrawerMax', 'backdropMode', 'navZoneMode', 'zoomZoneMode', 'commentPageSize',
+	];
+	for (const key of locked) assert.equal(findRole(root, key).getAttribute('aria-disabled'), 'true', key);
+	for (const key of ['enabled', 'gridTabSkip', 'hidePickup', 'infiniteScroll']) {
+		assert.equal(findRole(root, key).getAttribute('aria-disabled'), null, key);
+	}
+});
+
+test('定義表の項目は、グリッドの 3 つと「ビュワーを使う」以外すべて、最初の条件が「ビュワーを使う」', () => {
+	const strings = createStrings('ja');
+	const fields = [...createSections(strings), ...createAdvancedSections(strings)]
+		.flatMap((section) => section.fields)
+		.flatMap(function walk(field) { return [field, ...(field.children ?? []).flatMap(walk)]; });
+	for (const field of fields) {
+		if (['enabled', 'gridTabSkip', 'hidePickup', 'infiniteScroll'].includes(field.key)) {
+			assert.equal(field.requires, undefined, field.key);
+		} else {
+			assert.equal(field.requires[0].key, 'enabled', field.key);
+		}
+	}
+});
+
+test('親が 2 つともオフなら外側の親 (ビュワーを使う) を案内し、それをオンにすると内側の親を案内する', () => {
+	const { root } = build({ settings: { enabled: false, showSidebar: false } });
+	const scroll = findRole(root, 'sidebarScroll');
+	scroll.dispatch('mousedown', { preventDefault() {} });
+	const warning = findRole(root, 'sidebarScroll-lock');
+	assert.equal(warning.textContent, '「ビュワーを使う」をオンにしてください。');
+	const enabled = findRole(root, 'enabled');
+	enabled.checked = true;
+	enabled.dispatch('change');
+	// まだサイドバーがオフなので非活性のまま。出ている警告も原因に合わせて書き換わる
+	assert.equal(scroll.getAttribute('aria-disabled'), 'true');
+	assert.equal(warning.textContent, '「サイドバーを表示する」をオンにしてください。');
+	const sidebar = findRole(root, 'showSidebar');
+	sidebar.checked = true;
+	sidebar.dispatch('change');
+	assert.equal(scroll.getAttribute('aria-disabled'), null);
+});

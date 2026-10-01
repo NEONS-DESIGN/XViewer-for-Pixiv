@@ -72,6 +72,41 @@ function requirement(key, strings, off) {
 }
 
 /**
+ * 「ビュワーを使う」(enabled) に関係なく効く項目。ビュワーを開かなくても動くグリッドの機能。
+ * これ以外の項目はビュワーを開いたときにしか使われないので、「ビュワーを使う」がオフなら非活性にする。
+ */
+const VIEWER_INDEPENDENT_KEYS = Object.freeze(['enabled', 'gridTabSkip', 'hidePickup', 'infiniteScroll']);
+
+/**
+ * 見出しごとの項目へ「ビュワーを使う」の条件を足す。子の項目にも足す。
+ * 条件は外側の親 (ビュワーを使う) を先に並べる。警告は満たしていない最初の条件で出すので、
+ * 両方オフのときは元の原因 (ビュワーを使う) を案内する。
+ * @param {readonly object[]} sections 見出しごとの項目
+ * @param {object} strings 文言のカタログ
+ * @returns {readonly object[]} 条件を足した見出しごとの項目
+ */
+function requireViewer(sections, strings) {
+	const needsViewer = requirement('enabled', strings);
+	/**
+	 * 項目 1 つ (と子) に条件を足す。requires は配列にそろえる。
+	 * @param {object} field 項目の定義
+	 * @returns {object} 条件を足した項目
+	 */
+	const withViewer = (field) => {
+		const own = field.requires ? [field.requires] : [];
+		const requires = VIEWER_INDEPENDENT_KEYS.includes(field.key)
+			? own
+			: [needsViewer, ...own.filter((one) => one.key !== needsViewer.key)];
+		return Object.freeze({
+			...field,
+			requires: requires.length > 0 ? Object.freeze(requires) : undefined,
+			children: field.children ? Object.freeze(field.children.map(withViewer)) : undefined,
+		});
+	};
+	return Object.freeze(sections.map((section) => Object.freeze({ ...section, fields: Object.freeze(section.fields.map(withViewer)) })));
+}
+
+/**
  * レンジの下に添える目盛りの値を作る。両端は必ず含め、間は step の倍数を並べる。
  * (1-20 を 5 ごとなら 1 / 5 / 10 / 15 / 20)
  * @param {number} min 最小
@@ -218,7 +253,7 @@ export function createAdvancedSections(strings) {
 	const f = strings.popup.fields;
 	// サイドバーの見た目とコメント (サイドバーの中に出る) は、サイドバーを出すときだけ効く
 	const needsSidebar = requirement('showSidebar', strings);
-	return Object.freeze([
+	return requireViewer([
 		Object.freeze({
 			heading: h.viewer,
 			fields: Object.freeze([
@@ -261,7 +296,7 @@ export function createAdvancedSections(strings) {
 				numberChoiceField('commentPageSize', COMMENT_PAGE_SIZE_CHOICES, strings, {}, needsSidebar),
 			]),
 		}),
-	]);
+	], strings);
 }
 
 /**
@@ -274,7 +309,8 @@ export function createAdvancedSections(strings) {
  * choice は reveal ({when, field}) を持てる。選んだ値が when のときだけ、選択肢の下に field を出す。
  * field の kind は 'range' (min / max / step と、値の読み方 format、目盛り scale (と目盛りの読み方 scaleFormat) を持つ)。
  * どの項目も children (子の項目の配列) を持てる。子は親の下に字下げして常に出す。
- * requires ({key, off?, message}) を持つ項目は、親の条件を満たさない間は非活性になり、押すと message を出す。
+ * requires ({key, off?, message} の配列) を持つ項目は、親の条件を 1 つでも満たさない間は非活性になり、押すと満たしていない最初の条件の message を出す。
+ * 「ビュワーを使う」の条件は requireViewer が VIEWER_INDEPENDENT_KEYS 以外の全項目へ足す。
  * (子は親を requires に持つ。別のタブの親を持つ項目もある) reveal の field は親の choice の requires に従う。
  * warnAt と warning を持つ range は、値が warnAt 以上のとき値を警告の色にし、下に warning を出す。
  * choice の値は select の都合で文字列にしてある。保存時の型は SETTINGS_DEFAULTS の既定値の型から
@@ -284,7 +320,7 @@ export function createAdvancedSections(strings) {
  */
 export function createSections(strings) {
 	const f = strings.popup.fields;
-	return Object.freeze([
+	return requireViewer([
 		Object.freeze({
 			heading: strings.popup.headings.viewer,
 			fields: Object.freeze([
@@ -463,5 +499,5 @@ export function createSections(strings) {
 				}),
 			]),
 		}),
-	]);
+	], strings);
 }

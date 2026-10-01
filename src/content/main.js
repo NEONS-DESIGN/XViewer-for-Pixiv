@@ -33,6 +33,7 @@ import {
 	PAGE_KEY_SEPARATOR,
 	SESSION_WARMUP_TIMEOUT_MS,
 	PAGE_KINDS,
+	GRID_TAB_SKIP,
 } from '../common/constants.js';
 import { readPageLanguage, uiLanguage } from '../common/language.js';
 import { savePageLanguage } from '../common/language-store.js';
@@ -256,10 +257,7 @@ function apply() {
 		onPress: (id) => viewer?.prefetchOnPress(id),
 		onPressCancel: () => viewer?.cancelPressPrefetch(),
 	});
-	// カード 1 枚につき 3 回 Tab を押さずに済むよう、作品を開く導線以外をフォーカス順から外す
-	tabSkip = attachTabSkip(document, settings.gridTabSkip);
-	// どこにフォーカスがあるか分かるようにする。gridTabSkip の設定とは独立して常に出す
-	focusStyle = ensureFocusStyle(document);
+	syncFocusStyle();
 	info('ready on', path);
 }
 
@@ -273,14 +271,50 @@ function stop() {
 	gridListener?.dispose();
 	gridListener = null;
 	// 外したフォーカス順は必ず戻す。戻さないと pixiv 標準の Tab が壊れたままになる
-	tabSkip?.dispose();
-	tabSkip = null;
-	focusStyle?.dispose();
-	focusStyle = null;
 	router?.dispose();
 	router = null;
 	viewer?.dispose();
 	viewer = null;
+	syncFocusStyle();
+}
+
+/**
+ * グリッドの Tab 移動 (フォーカス順の組み替え) を、今の設定と URL に合わせる。
+ * ビュワーの入切とは独立して効かせる。(作品を開かずに Tab で作品を渡り歩く使い方もある)
+ * 外すもの (gridTabSkip) を選んでいて、作品グリッドのあるページ (ユーザー / ホーム / 検索) にいるときだけ張る。
+ * 外したフォーカス順は dispose() が必ず戻す。(戻さないと pixiv 標準の Tab が壊れたままになる)
+ * @returns {void}
+ */
+function syncTabSkip() {
+	// 自分のモーダルの最中は URL が作品ページなので、ページの判定で外してはいけない。外す種類だけを合わせる
+	if (isViewingOwnWork()) {
+		tabSkip?.setMode(settings.gridTabSkip);
+		return;
+	}
+	const active = Boolean(settings) && settings.gridTabSkip !== GRID_TAB_SKIP.NONE && pageKind(location.pathname) !== null;
+	if (!active) {
+		tabSkip?.dispose();
+		tabSkip = null;
+	} else if (tabSkip) {
+		tabSkip.setMode(settings.gridTabSkip);
+	} else {
+		tabSkip = attachTabSkip(document, settings.gridTabSkip);
+	}
+	syncFocusStyle();
+}
+
+/**
+ * グリッドのフォーカス枠の CSS を出し入れする。どこにフォーカスがあるか分かるようにするもので、
+ * ビュワーを組み立てているときと、グリッドの Tab 移動を張っているときに出す。
+ * @returns {void}
+ */
+function syncFocusStyle() {
+	const wanted = activeKey !== null || tabSkip !== null;
+	if (wanted && !focusStyle) focusStyle = ensureFocusStyle(document);
+	if (!wanted && focusStyle) {
+		focusStyle.dispose();
+		focusStyle = null;
+	}
 }
 
 /**
@@ -548,7 +582,8 @@ function writePageParam(page) {
  */
 function needsNavigationWatch() {
 	const infiniteOn = (settings?.infiniteScroll ?? INFINITE_SCROLL.OFF) !== INFINITE_SCROLL.OFF;
-	return Boolean(settings?.enabled || settings?.hidePickup || infiniteOn);
+	const tabSkipOn = (settings?.gridTabSkip ?? GRID_TAB_SKIP.NONE) !== GRID_TAB_SKIP.NONE;
+	return Boolean(settings?.enabled || settings?.hidePickup || infiniteOn || tabSkipOn);
 }
 
 /**
@@ -564,6 +599,7 @@ function handleLocationChange(options = {}) {
 	// pixiv 本体が作品ページへ遷移したときは apply() へ進み、対象外として止める
 	if (isViewingOwnWork()) return;
 	syncPickup();
+	syncTabSkip();
 	if (options.deferInfinite) scheduleInfiniteSync();
 	else syncInfinite();
 	apply();
@@ -674,6 +710,7 @@ async function boot() {
 	// ビュワーの入切とは独立して効かせる。ピックアップ非表示や無限スクロールだけを使う人もいる
 	pickupHider = attachPickupHider(document);
 	syncPickup();
+	syncTabSkip();
 	// この時点ではグリッドがまだ無いのが普通。張れなければ遷移監視の経路で張り直す
 	syncInfinite();
 	if (needsNavigationWatch()) {
@@ -695,7 +732,7 @@ async function boot() {
 function handleSettingsChange(next) {
 	settings = next;
 	viewer?.setSettings(next);
-	tabSkip?.setMode(next.gridTabSkip);
+	syncTabSkip();
 	syncPickup();
 	// ビュワーを切っても無限スクロールは切らない。設定そのものが変わったときだけ追従する
 	syncInfinite();

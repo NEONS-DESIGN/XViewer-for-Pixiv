@@ -112,19 +112,19 @@ function renderHeader(doc, initial, onChange, strings) {
  * @property {object} state 今の設定。変更のたびに更新し、子の項目の非活性の判定に使う
  * @property {(patch: object) => void} onChange 設定を変えたときの処理 (state の更新と非活性の判定を含む)
  * @property {boolean} rich 選択肢の中に説明を入れられるか (appearance: base-select の対応)
- * @property {Array<{requires: object, lock: {setLocked: (locked: boolean) => void}}>} locks 親の条件を持つ項目の一覧
+ * @property {Array<{requires: readonly object[], lock: {setLocked: (locked: boolean, message?: string) => void}}>} locks 親の条件を持つ項目の一覧
  */
 
 /**
  * 親の条件を持つ項目に非活性の振る舞いを付け、一覧へ覚える。条件が無ければ何もしない。
  * @param {RenderContext} ctx 描画の文脈
- * @param {object|undefined} requires 親の条件 (sections.js の requirement)
+ * @param {readonly object[]|undefined} requires 親の条件の配列 (sections.js の requirement)。外側の親が先
  * @param {{wrapper: HTMLElement, control: HTMLElement, kind: string, key: string}} target 付ける先
  * @returns {{isLocked: () => boolean}|null} 非活性の状態。条件が無ければ null
  */
 function lockIfDependent(ctx, requires, target) {
-	if (!requires) return null;
-	const lock = attachFieldLock(ctx.doc, { ...target, message: requires.message });
+	if (!requires?.length) return null;
+	const lock = attachFieldLock(ctx.doc, target);
 	ctx.locks.push({ requires, lock });
 	return lock;
 }
@@ -251,7 +251,7 @@ function renderScale(doc, field) {
  * warnAt 以上の値では、今の値を警告の色にし、レンジの下に warning を出す。(動かしている間も追従する)
  * @param {RenderContext} ctx 描画の文脈
  * @param {object} field 項目の定義 (kind: 'range')
- * @param {object} [requires] 親の条件。親の選択肢が非活性ならレンジも非活性にする
+ * @param {readonly object[]} [requires] 親の条件の配列。親の選択肢が非活性ならレンジも非活性にする
  * @returns {HTMLElement} 項目
  */
 function renderRange(ctx, field, requires) {
@@ -540,11 +540,14 @@ export function renderPopup({ doc, root, settings, strings, onChange, onReset, n
 		},
 	};
 	/**
-	 * 親の条件を持つ項目の非活性を、今の値に合わせる。
+	 * 親の条件を持つ項目の非活性を、今の値に合わせる。満たしていない最初の条件 (外側の親) の文言で警告する。
 	 * @returns {void}
 	 */
 	function refreshLocks() {
-		for (const { requires, lock } of ctx.locks) lock.setLocked(!isRequirementMet(requires, ctx.state));
+		for (const { requires, lock } of ctx.locks) {
+			const unmet = requires.find((one) => !isRequirementMet(one, ctx.state));
+			lock.setLocked(Boolean(unmet), unmet?.message);
+		}
 	}
 
 	const panels = {
