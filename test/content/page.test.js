@@ -46,11 +46,11 @@ test('作品パスでない URL は null', () => {
 test('pageKind はユーザーページ・ホーム・検索を見分け、それ以外は null', () => {
 	assert.equal(pageKind('/users/54734418/artworks'), PAGE_KINDS.USER);
 	for (const home of ['/', '/illustration', '/manga', '/en/', '/en/illustration']) assert.equal(pageKind(home), PAGE_KINDS.HOME, home);
-	for (const search of ['/tags/%E3%82%AA', '/tags/a/artworks', '/tags/a/illustrations', '/tags/a/manga', '/en/tags/a/artworks']) {
+	for (const search of ['/tags/%E3%82%AA', '/tags/a/artworks', '/tags/a/illustrations', '/tags/a/manga', '/en/tags/a/artworks', '/search', '/en/search']) {
 		assert.equal(pageKind(search), PAGE_KINDS.SEARCH, search);
 	}
 	// 小説のタブ・作品ページ・ランキングは対象外
-	for (const other of ['/novel', '/tags/a/novels', '/artworks/149425016', '/ranking.php', '/discovery']) assert.equal(pageKind(other), null, other);
+	for (const other of ['/novel', '/tags/a/novels', '/artworks/149425016', '/ranking.php', '/discovery', '/search/users', '/searchx']) assert.equal(pageKind(other), null, other);
 });
 
 test('isViewerTarget はページの種類ごとの設定で外せる', () => {
