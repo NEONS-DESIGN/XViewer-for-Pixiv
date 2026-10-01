@@ -58,15 +58,17 @@ function toggleToken(element, name, token, present) {
  * @param {HTMLInputElement|HTMLSelectElement} options.control 操作部品
  * @param {'toggle'|'choice'|'range'} options.kind 部品の種類
  * @param {string} options.key 設定キー。警告の行の id と data-role の元にする
- * @param {string} options.message 押されたときに出す警告
+ * @param {string} [options.message] 押されたときに出す警告。setLocked() で差し替えられる
  * @param {{setTimeout?: Function, clearTimeout?: Function}} [options.timers] タイマの差し替え
- * @returns {{setLocked: (locked: boolean) => void, isLocked: () => boolean}} 非活性の切り替え
+ * @returns {{setLocked: (locked: boolean, message?: string) => void, isLocked: () => boolean}} 非活性の切り替え
  */
-export function attachFieldLock(doc, { wrapper, control, kind, key, message, timers = {} }) {
+export function attachFieldLock(doc, { wrapper, control, kind, key, message: initialMessage = '', timers = {} }) {
 	const later = timers.setTimeout ?? ((callback, delay) => setTimeout(callback, delay));
 	const cancel = timers.clearTimeout ?? ((id) => clearTimeout(id));
 	let locked = false;
 	let timer = null;
+	/** 押されたときに出す警告。満たしていない親の条件によって変わる */
+	let message = initialMessage;
 	/** 最後に受け入れた値。非活性の間に値が変わってしまったときに戻す (選択肢とレンジ) */
 	let lastValue = control.value;
 
@@ -165,10 +167,16 @@ export function attachFieldLock(doc, { wrapper, control, kind, key, message, tim
 		/**
 		 * 非活性を切り替える。活性に戻したら出ている警告も消す。
 		 * @param {boolean} next 非活性にするなら true
+		 * @param {string} [nextMessage] 押されたときに出す警告。(満たしていない親の条件の文言) 省くと前のまま
 		 * @returns {void}
 		 */
-		setLocked(next) {
+		setLocked(next, nextMessage) {
 			locked = next;
+			if (nextMessage !== undefined) {
+				message = nextMessage;
+				// 出ている警告も、原因が変わったら書き換える
+				if (!warning.hidden) text.textContent = message;
+			}
 			wrapper.classList.toggle(LOCKED_CLASS, next);
 			if (next) {
 				control.setAttribute('aria-disabled', 'true');
