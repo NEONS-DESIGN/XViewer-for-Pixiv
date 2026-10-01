@@ -9,7 +9,7 @@
  *         node scripts/site-langs.mjs --check  書き直しが要るかだけを見る (要れば終了コード 1)
  */
 import { readFile, writeFile } from 'node:fs/promises';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 /** サイトの公開 URL。末尾のスラッシュまで含める。 */
@@ -183,11 +183,22 @@ export function renderSitemap(previous, today) {
 }
 
 /**
+ * 手元の日付を 'YYYY-MM-DD' にする。(UTC ではなく実行した場所の日付)
+ * @param {Date} [date] 日時
+ * @returns {string} 'YYYY-MM-DD'
+ */
+export function localDate(date = new Date()) {
+	const pad = (value) => String(value).padStart(2, '0');
+	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/**
  * ページと sitemap.xml を書き直す。check が真なら書かずに、差のあるファイルを返すだけにする。
+ * sitemap.xml の改行は元のファイルに合わせる。(無ければ CRLF)
  * @param {{siteDir: string, check?: boolean, today?: string}} options site/ の場所など
  * @returns {Promise<string[]>} 中身が変わる (変わった) ファイルのパス
  */
-export async function syncSiteLanguages({ siteDir, check = false, today = new Date().toISOString().slice(0, 10) }) {
+export async function syncSiteLanguages({ siteDir, check = false, today = localDate() }) {
 	const changed = [];
 	for (const language of SITE_LANGUAGES) {
 		for (const page of SITE_PAGES) {
@@ -201,15 +212,16 @@ export async function syncSiteLanguages({ siteDir, check = false, today = new Da
 	}
 	const sitemapFile = path.join(siteDir, 'sitemap.xml');
 	const sitemap = await readFile(sitemapFile, 'utf8').catch(() => '');
+	const sitemapEol = sitemap === '' || sitemap.includes('\r\n') ? '\r\n' : '\n';
 	const nextSitemap = renderSitemap(sitemap.replace(/\r\n/g, '\n'), today);
 	if (nextSitemap !== sitemap.replace(/\r\n/g, '\n')) {
 		changed.push(sitemapFile);
-		if (!check) await writeFile(sitemapFile, nextSitemap);
+		if (!check) await writeFile(sitemapFile, nextSitemap.replace(/\n/g, sitemapEol));
 	}
 	return changed;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (import.meta.main) {
 	const check = process.argv.includes('--check');
 	const siteDir = fileURLToPath(new URL('../site/', import.meta.url));
 	try {
@@ -218,7 +230,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 		if (changed.length === 0) console.log('言語まわりは揃っています');
 		if (check && changed.length > 0) process.exitCode = 1;
 	} catch (error) {
-		console.error(`site-langs: ${error.message}`);
+		console.error(`[site-langs] ${error?.message ?? error}`);
 		process.exitCode = 1;
 	}
 }

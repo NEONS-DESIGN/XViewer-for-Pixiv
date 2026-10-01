@@ -1,11 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeComment, renderCommentText, renderStamp, createComments, parseCommentDate, commentLabel } from '../../src/content/viewer/comments.js';
-import { commentsFloorHeight, isHeadingStuck } from '../../src/content/viewer/comments-layout.js';
+import { commentsFloorHeight, isHeadingStuck, createCommentsLayout } from '../../src/content/viewer/comments-layout.js';
 import { createConfirmRegistry } from '../../src/content/viewer/comments-delete.js';
 import { fakeElement, fakeDoc, find, findAll, iconName, flush } from '../helpers/dom.js';
 import { clearSessionCache } from '../../src/content/session.js';
 import { PixivError, PIXIV_ERROR_KINDS } from '../../src/pixiv/errors.js';
+import { FRESH_FETCH_INIT } from '../../src/pixiv/client.js';
 import { stampIds } from '../../src/pixiv/stamps.js';
 import { buildNextData } from '../helpers/pixiv.js';
 import { createStrings } from '../../src/i18n/index.js';
@@ -337,6 +338,18 @@ test('ユーザー ID が取れなければリンクにしない', async () => {
 	assert.equal(find(container, '.comment-name').tag, 'span');
 });
 
+test('数字でないユーザー ID はリンクにしない', async () => {
+	// パスに埋めると /users/1/../../logout.php のように同じオリジンの別のページを指しうる
+	const { container, comments } = build(async () => ({
+		comments: [{ ...ROOT, userId: '1/../../logout.php' }],
+		hasNext: false,
+	}));
+	await comments.load(DETAIL);
+	assert.equal(find(container, '.comment-avatar-link'), null);
+	assert.equal(find(container, '.comment-name').tag, 'span');
+	assert.equal(find(container, '.comment-name').textContent, 'みなと');
+});
+
 test('返信の投稿者もユーザーページへのリンクになる', async () => {
 	const { container, comments } = build(async (url) => {
 		if (url.includes('replies')) return { comments: [REPLY], hasNext: false };
@@ -518,6 +531,23 @@ test('コメント区画の下限は中身の高さを超えない (余白を作
 
 test('一覧が無いとき (0 件・コメント不可・失敗) の下限は文言の高さだけ', () => {
 	assert.equal(commentsFloorHeight({ outside: 109, contentHeight: 0, nthBottom: null }), 109);
+});
+
+test('見張っている要素の中の変化では、ResizeObserver があればその場で測らない', () => {
+	// DOM を変えた直後に測ると同期のレイアウトが 1 回余計に走る。測り直しは通知に任せる
+	const container = fakeElement('div');
+	let measured = 0;
+	container.getBoundingClientRect = () => { measured += 1; return { top: 0, height: 0, bottom: 0 }; };
+	const parts = () => ({ scroll: null, list: null, header: null, toTopButton: null });
+
+	const watched = createCommentsLayout({ doc: { defaultView: { ResizeObserver: class {} } }, container, scrollTarget: null, parts });
+	watched.applyFloorUnlessWatched();
+	assert.equal(measured, 0);
+
+	// 見張れない環境では通知が来ないので、その場で測る
+	const unwatched = createCommentsLayout({ doc: {}, container, scrollTarget: null, parts });
+	unwatched.applyFloorUnlessWatched();
+	assert.equal(container.style.minHeight, '0px');
 });
 
 /**
@@ -1136,6 +1166,65 @@ test('返信できたら開いている返信一覧の末尾へ足す', async ()
 	assert.equal(find(replies.children[1], '.comment-reply-toggle'), null);
 });
 
+test('返信の 1 ページ目を読んでいる最中に返信できたら、並べ終えたあとに足す', async () => {
+	// 読んでいる 1 ページ目は投稿より前に頼んだもので、今の 1 件を含まない。
+	// 捨てると、投稿は通っているのに畳んで開き直すまで画面に出ない
+	let releaseReplies;
+	const { container, comments } = buildPostable({
+		fetchJson: async (url) => {
+			if (!url.includes('replies')) return { comments: [ROOT], hasNext: false };
+			await new Promise((resolve) => { releaseReplies = resolve; });
+			return { comments: [REPLY], hasNext: false };
+		},
+	});
+	await comments.load(POST_DETAIL);
+	const item = find(container, '.comment-item');
+	await find(item, '.comment-replies').click();
+	await find(item, '.comment-reply-toggle').click();
+	await submitText(replyForm(item), 'ありがとう');
+	assert.equal(find(item, '.comment-reply-list'), null);
+
+	releaseReplies();
+	await flush();
+	const replies = find(item, '.comment-reply-list');
+	assert.equal(replies.children.length, 2);
+	assert.equal(find(replies.children[1], '.comment-text').textContent, 'ありがとう');
+});
+
+test('読んでいる最中に返信した 1 件が応答に入っていれば二重にしない', async () => {
+	let releaseReplies;
+	const { container, comments } = buildPostable({
+		fetchJson: async (url) => {
+			if (!url.includes('replies')) return { comments: [ROOT], hasNext: false };
+			await new Promise((resolve) => { releaseReplies = resolve; });
+			// 投稿の応答と同じ ID (900) が 1 ページ目に入って返ってきた
+			return { comments: [REPLY, { ...REPLY, id: '900', comment: 'ありがとう' }], hasNext: false };
+		},
+	});
+	await comments.load(POST_DETAIL);
+	const item = find(container, '.comment-item');
+	await find(item, '.comment-replies').click();
+	await find(item, '.comment-reply-toggle').click();
+	await submitText(replyForm(item), 'ありがとう');
+	releaseReplies();
+	await flush();
+	assert.equal(find(item, '.comment-reply-list').children.length, 2);
+});
+
+test('投稿が通った後の描画や件数の反映が投げても、投稿の失敗にはしない', async () => {
+	// 失敗として本文を残すと、送り直した利用者の手で同じコメントが 2 件公開される
+	const { container, comments } = buildPostable({
+		onPosted: () => { throw new Error('受け手が落ちた'); },
+	});
+	await comments.load(POST_DETAIL);
+	const form = find(find(container, '.comments-header'), '.comment-form');
+	await submitText(form, 'こんにちは');
+	assert.equal(find(form, '.comment-form-input').value, '');
+	assert.equal(find(form, '.comment-form-error'), null);
+	// 描画は件数の反映とは別に済んでいる
+	assert.equal(find(find(container, '.comment-list').children[0], '.comment-text').textContent, 'こんにちは');
+});
+
 test('返信が無かったコメントも返信できたら「返信を表示」を出す', async () => {
 	// 畳んだままなら足さずにボタンだけ出す。開けば取り直されるので二重にならない
 	const { container, comments } = buildPostable({
@@ -1517,12 +1606,110 @@ test('返信を消すと返信一覧から外れ、読み込み済みの件数�
 	assert.equal(findAll(container, '.comment-list').length, 1);
 });
 
-test('件数の数え直しはブラウザのキャッシュを外して引く', async () => {
-	// 作品を開いた時点で同じ URL を引いているので、素で引き直すと削除前の件数が返る
+/**
+ * ResizeObserver を持ち、区画が描画されているかを切り替えられる一式を作る。
+ * 描画されていない = display: none の祖先の下 (getClientRects() が空)。
+ * @param {boolean} rendered 最初に描画されているか
+ * @returns {{container: object, comments: object, urls: string[], show: () => void, watchersOf: (el: object) => object[]}} 一式
+ */
+function collapsible(rendered) {
+	const doc = loggedInDoc();
+	const observers = [];
+	doc.defaultView = {
+		ResizeObserver: class {
+			constructor(callback) {
+				this.callback = callback;
+				this.targets = new Set();
+				observers.push(this);
+			}
+
+			observe(target) { this.targets.add(target); }
+
+			disconnect() { this.targets.clear(); }
+		},
+	};
+	const container = fakeElement('div');
+	let visible = rendered;
+	container.getClientRects = () => (visible ? [{}] : []);
 	const urls = [];
-	const { container, comments } = buildPostable({
+	const comments = createComments({
+		doc,
+		container,
+		strings: STRINGS,
 		fetchJson: async (url) => {
 			urls.push(url);
+			return { comments: [ROOT], hasNext: false };
+		},
+	});
+	return {
+		container,
+		comments,
+		urls,
+		show() {
+			visible = true;
+			for (const observer of observers) {
+				if (observer.targets.size > 0) observer.callback([]);
+			}
+		},
+		watchersOf: (el) => observers.filter((observer) => observer.targets.has(el)),
+	};
+}
+
+/** roots の URL か。 */
+const isRootsUrl = (url) => url.includes('/comments/roots');
+
+test('サイドバーが見えていれば、コメントはすぐに読む', async () => {
+	// 投稿文が長くて区画がスクロールの外にあるだけなら遅らせない。届いたときに読み込み中にしない
+	const one = collapsible(true);
+	await one.comments.load(DETAIL);
+	assert.equal(one.urls.filter(isRootsUrl).length, 1);
+	assert.equal(one.watchersOf(one.container).length, 0);
+	assert.equal(one.container.querySelector('.comment-list').children.length, 1);
+	one.comments.dispose();
+});
+
+test('サイドバーが畳まれている間はコメントを読まず、引き出されたら読む', async () => {
+	// 狭い画面ではサイドバーが CSS で畳まれる。誰も見ていない一覧のために作品ごとに通信しない
+	const one = collapsible(false);
+	await one.comments.load(DETAIL);
+	assert.equal(one.urls.filter(isRootsUrl).length, 0);
+	assert.equal(one.watchersOf(one.container).length, 1);
+
+	one.show();
+	await flush();
+	assert.equal(one.urls.filter(isRootsUrl).length, 1);
+	assert.equal(one.container.querySelector('.comment-list').children.length, 1);
+	// 読んだら見張りは外す。もう一度大きさが変わっても読み直さない
+	assert.equal(one.watchersOf(one.container).length, 0);
+	one.show();
+	await flush();
+	assert.equal(one.urls.filter(isRootsUrl).length, 1);
+	one.comments.dispose();
+});
+
+test('畳まれたまま別の作品へ移るか破棄したら、描画の見張りを外す', async () => {
+	// 外し忘れると、引き出した時点で前の作品の分まで読みに行く
+	const one = collapsible(false);
+	await one.comments.load(DETAIL);
+	const first = one.watchersOf(one.container);
+	assert.equal(first.length, 1);
+	await one.comments.load({ ...DETAIL, id: '200' });
+	assert.equal(first[0].targets.size, 0);
+	assert.equal(one.watchersOf(one.container).length, 1);
+
+	one.comments.dispose();
+	assert.equal(one.watchersOf(one.container).length, 0);
+	one.show();
+	await flush();
+	assert.equal(one.urls.filter(isRootsUrl).length, 0);
+});
+
+test('件数の数え直しはブラウザのキャッシュを外して引く', async () => {
+	// 作品を開いた時点で同じ URL を引いているので、素で引き直すと削除前の件数が返る
+	const calls = [];
+	const { container, comments } = buildPostable({
+		fetchJson: async (url, clientDeps, init) => {
+			calls.push({ url, clientDeps, init });
 			return url.includes('/ajax/illust/')
 				? { commentCount: 0 }
 				: { comments: [{ ...ROOT, editable: true, hasReplies: false }], hasNext: false };
@@ -1536,8 +1723,49 @@ test('件数の数え直しはブラウザのキャッシュを外して引く',
 	await button.click();
 	await button.click();
 	await flush();
-	const counted = urls.find((url) => url.includes('/ajax/illust/'));
-	assert.match(counted, /[?&]_=\d+/);
+	const counted = calls.find((call) => call.url.includes('/ajax/illust/'));
+	// 作品詳細の本取得と同じく、HTTP キャッシュを使わずサーバーへ確かめ直させる
+	assert.deepEqual(counted.init, FRESH_FETCH_INIT);
+	// URL は本取得と同じ。毎回違う URL にしてキャッシュの項目を増やさない
+	assert.equal(counted.url, '/ajax/illust/149425016?lang=ja');
+	// 一覧の取得と同じ中断の合図を持つ。別の作品へ移るか破棄されたら数え直しも止まる
+	const roots = calls.find((call) => call.url.includes('/comments/roots'));
+	assert.equal(counted.clientDeps.signal, roots.clientDeps.signal);
+	comments.dispose();
+	assert.equal(counted.clientDeps.signal.aborted, true);
+});
+
+test('数え直しが中断で終わっても記録を残さず、件数も渡さない', async () => {
+	// 中断は失敗ではない。破棄の後に前の作品の件数を書かない
+	const warned = [];
+	const originalWarn = console.warn;
+	console.warn = (...args) => { warned.push(args); };
+	try {
+		const counts = [];
+		let rejectCount;
+		const { container, comments } = buildPostable({
+			fetchJson: async (url) => {
+				if (url.includes('/ajax/illust/')) {
+					return new Promise((_resolve, reject) => { rejectCount = reject; });
+				}
+				return { comments: [{ ...ROOT, editable: true, hasReplies: false }], hasNext: false };
+			},
+			actions: { deleteComment: async () => {} },
+			onDeleted: (count) => { counts.push(count); },
+		});
+		await comments.load(POST_DETAIL);
+		const button = find(container, '.comment-delete');
+		await button.click();
+		await button.click();
+		await flush();
+		comments.dispose();
+		rejectCount(new PixivError(PIXIV_ERROR_KINDS.ABORTED, '中断'));
+		await flush();
+		assert.deepEqual(counts, []);
+		assert.equal(warned.some((args) => args.some((arg) => String(arg).includes('failed to re-read comment count'))), false);
+	} finally {
+		console.warn = originalWarn;
+	}
 });
 
 test('削除で空に戻した作品へ投稿すると案内が消える', async () => {

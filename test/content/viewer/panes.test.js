@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { planPanes, MAIN_PANE, renderWork, disposeAll } from '../../../src/content/viewer/panes.js';
+import { planPanes, MAIN_PANE, renderWork, rerenderMain, currentPage, disposeAll } from '../../../src/content/viewer/panes.js';
 import { ILLUST_TYPES } from '../../../src/pixiv/normalize.js';
 import { fakeDoc, fakeElement } from '../../helpers/dom.js';
 import { createStrings } from '../../../src/i18n/index.js';
@@ -202,43 +202,63 @@ test('ブロック表示は今どおりサイドバーを先に作ってから�
 	assert.deepEqual(order, ['sidebar']);
 });
 
-test('うごイラには温めた meta を takeUgoiraMeta から渡す', async () => {
-	const warmed = Promise.resolve({ frames: [] });
-	const asked = [];
-	let received;
-	await renderWork(detail({ illustType: ILLUST_TYPES.UGOIRA }), LOGGED_IN, settings(false), {
-		...targets(),
-		takeUgoiraMeta: (id) => { asked.push(id); return warmed; },
-		createUgoiraPlayer: (deps) => {
-			received = deps.preloadedMeta;
-			return { render: () => Promise.resolve(), dispose() {} };
-		},
-	});
-	disposeAll();
-	assert.deepEqual(asked, ['149425016']);
-	assert.equal(received, warmed);
-});
-
-test('温めた meta が無ければ preloadedMeta は null', async () => {
+test('うごイラのペインへ温めた meta を手渡ししない', async () => {
+	// 隣の先読みで取った ugoira_meta は作品単位で覚える取得 (pixiv/illust-assets.js) に入り、再生器が自分で引く
 	let received;
 	await renderWork(detail({ illustType: ILLUST_TYPES.UGOIRA }), LOGGED_IN, settings(false), {
 		...targets(),
 		createUgoiraPlayer: (deps) => {
-			received = deps.preloadedMeta;
+			received = deps;
 			return { render: () => Promise.resolve(), dispose() {} };
 		},
 	});
 	disposeAll();
-	assert.equal(received, null);
+	assert.equal('preloadedMeta' in received, false);
 });
 
-test('一枚絵では温めた meta を取り出さない', async () => {
-	let asked = 0;
-	await renderWork(detail(), LOGGED_IN, settings(false), {
+test('rerenderMain は主役だけを作り直し、サイドバーは作り直さない。今のページから開く', async () => {
+	const order = [];
+	const disposed = [];
+	let startPage;
+	let made = 0;
+	const base = {
 		...targets(),
-		takeUgoiraMeta: () => { asked += 1; return null; },
-		createImagePane: () => ({ render: () => Promise.resolve(), dispose() {} }),
-	});
+		createImagePane: () => {
+			made += 1;
+			const id = made;
+			return {
+				render: (_detail, options) => { order.push(`main${id}`); startPage = options.startPage; return Promise.resolve(); },
+				pageIndex: () => 2,
+				dispose() { disposed.push(id); },
+			};
+		},
+		createSidebar: () => fakeSidebarPane(order),
+	};
+	await renderWork(detail({ commentOff: true }), LOGGED_IN, settings(true), base);
+	assert.equal(currentPage(), 2);
+	const result = rerenderMain(detail({ commentOff: true }), LOGGED_IN, settings(true), { ...base, startPage: currentPage() }, ['imageQuality']);
+	assert.equal(result.rebuilt, true);
+	await result.done;
 	disposeAll();
-	assert.equal(asked, 0);
+	assert.deepEqual(order, ['main1', 'sidebar', 'main2']);
+	assert.equal(startPage, 2);
+	assert.deepEqual(disposed, [1, 2]);
+});
+
+test('rerenderMain は主役が読まない設定の変更では何もしない', async () => {
+	let made = 0;
+	const base = {
+		...targets(),
+		createUgoiraPlayer: () => { made += 1; return { render: () => Promise.resolve(), dispose() {} }; },
+	};
+	const ugoira = detail({ illustType: ILLUST_TYPES.UGOIRA });
+	await renderWork(ugoira, LOGGED_IN, settings(false), base);
+	// 先読みの枚数や原寸表示はうごイラに関係しない。作り直すと zip を読み直すことになる
+	assert.equal(rerenderMain(ugoira, LOGGED_IN, settings(false), base, ['prefetch', 'clickZoom']).rebuilt, false);
+	assert.equal(rerenderMain(ugoira, LOGGED_IN, settings(false), base, ['imageQuality']).rebuilt, true);
+	// ブロック表示は設定を読まない
+	assert.equal(rerenderMain(detail({ xRestrict: 2 }), LOGGED_IN, settings(false), base, ['imageQuality']).rebuilt, false);
+	disposeAll();
+	assert.equal(made, 2);
+	assert.equal(currentPage(), null, '画像ペインが無ければ null');
 });

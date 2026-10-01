@@ -255,6 +255,26 @@ test('初期化するを押すと onReset が呼ばれる', () => {
 	assert.equal(resets(), 1);
 });
 
+test('初期化するを素早く 2 回押しても onReset は 1 回だけ', () => {
+	// 描き直しが済むまで確認の行は残る。2 回目で初期化の書き込みをもう 1 回走らせない
+	const { root, resets } = build();
+	findRole(root, 'reset').dispatch('click');
+	const confirm = findRole(root, 'reset-confirm');
+	confirm.dispatch('click');
+	confirm.dispatch('click');
+	assert.equal(resets(), 1);
+});
+
+test('1 回だけの制限は確認の行ごとで、開き直した行ではまた初期化できる', () => {
+	const { root, resets } = build();
+	findRole(root, 'reset').dispatch('click');
+	findRole(root, 'reset-confirm').dispatch('click');
+	findRole(root, 'reset-cancel').dispatch('click');
+	findRole(root, 'reset').dispatch('click');
+	findRole(root, 'reset-confirm').dispatch('click');
+	assert.equal(resets(), 2);
+});
+
 test('選択肢を装飾できる環境では説明を選択肢の中へ入れる', () => {
 	const { root } = build({ rich: true, settings: { imageQuality: 'regular' } });
 	const select = findRole(root, 'imageQuality');

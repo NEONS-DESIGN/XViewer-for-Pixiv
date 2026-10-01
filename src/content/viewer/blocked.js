@@ -1,10 +1,7 @@
 /**
  * 表示できない作品のブロック表示。
  *
- * 判定は作品の xRestrict とユーザー設定の xRestrict の比較で行う。
- * error フラグや urls では判定できない:
- *   - 未ログイン      urls が全て null
- *   - 表示設定 OFF    urls は有効な URL が返る。/pages だけが 404
+ * 判定は作品の xRestrict とユーザー設定の xRestrict の比較だけで行う。(error フラグや urls では判定できない)
  *
  * ぼかしには urls.mini (48x48) を使う。元画像が極小なので拡大しても中身が分からない。
  * regular をぼかすと解除の余地が残るため、この方式を守ること。

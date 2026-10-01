@@ -4,10 +4,15 @@
  * pixiv のカードはフォーカス可能な要素が「サムネイル → ブックマーク → タイトル」の
  * 3 つ並んでいるため、素の Tab では次の作品まで 3 回押すことになる。
  * ここでは掴んだ要素に tabindex="-1" を足して、押す回数を 1 回に戻す。
- * クラス名はビルドごとに変わるので、掴んでよいのは作品リンクとカード内の位置関係だけ。
+ * クラス名はビルドごとに変わるので、掴んでよいのは作品リンクとカード内の位置関係、計測用の data 属性だけ。
  */
 import {
 	ARTWORK_LINK_SELECTOR,
+	THUMB_LINK_SELECTOR,
+	BOOKMARK_BUTTON_SELECTOR,
+	ENTITY_CARD_SELECTOR,
+	GA4_LABEL_ATTR,
+	TITLE_LINK_LABEL,
 	CARD_SELECTOR,
 	CARD_BUTTON_SELECTOR,
 	GRID_TAB_SKIP,
@@ -47,6 +52,39 @@ export function planSkipTargets(card, mode, links = [...card.querySelectorAll(AR
 }
 
 /**
+ * li ではない作品カード (検索の結果・ホームのフィード) の中で、フォーカス順から外す要素を選ぶ。
+ * 位置ではなく計測用ラベルで選ぶ。フィードの投稿は画像ごとにサムネのリンクを持ち、
+ * 共有・通報などのボタンも並ぶので、「2 本目以降のリンク」「全部のボタン」では外しすぎる。
+ * @param {ParentNode} card 作品カード (ENTITY_CARD_SELECTOR に合う要素)
+ * @param {string} mode GRID_TAB_SKIP のいずれか
+ * @param {Element[]} [links] カード内の作品リンク。呼び出し側が既に集めていれば渡す
+ * @returns {Element[]} 外す要素 (タイトルのリンクと、both ならブックマークのボタン)。mode が不明なら空
+ */
+export function planLabeledSkipTargets(card, mode, links = [...card.querySelectorAll(ARTWORK_LINK_SELECTOR)]) {
+	if (!isSkippingMode(mode)) return [];
+	const targets = links.filter((link) => link.getAttribute(GA4_LABEL_ATTR) === TITLE_LINK_LABEL);
+	if (mode === GRID_TAB_SKIP.BOTH) {
+		for (const button of card.querySelectorAll(CARD_BUTTON_SELECTOR)) {
+			if (button.closest?.(BOOKMARK_BUTTON_SELECTOR)) targets.push(button);
+		}
+	}
+	return targets;
+}
+
+/**
+ * 作品リンクが属するカードを探す。
+ * ユーザーページとホームの横送りは li、検索の結果とホームのフィードは作品の ID を持つ div。
+ * @param {Element} link 作品リンク
+ * @returns {{card: Element, labeled: boolean}|null} カードと、ラベルで選ぶカードか。取れなければ null
+ */
+function findCard(link) {
+	const item = link.closest?.(CARD_SELECTOR);
+	if (item) return { card: item, labeled: false };
+	const entity = link.closest?.(ENTITY_CARD_SELECTOR);
+	return entity ? { card: entity, labeled: true } : null;
+}
+
+/**
  * サムネイルのリンクが読み上げ名を既に持っているか。
  * img の alt は作品サマリの alt (「#タグ タイトル - 作者のイラスト」) なので、
  * alt があれば作品名は読み上げられる。そこへ aria-label を足すと alt を上書きし、
@@ -55,7 +93,15 @@ export function planSkipTargets(card, mode, links = [...card.querySelectorAll(AR
  * @returns {boolean} 名前が取れるなら true
  */
 function hasAccessibleName(thumb) {
-	if (thumb.hasAttribute('aria-label')) return true;
+	return thumb.hasAttribute('aria-label') || hasImageAlt(thumb);
+}
+
+/**
+ * サムネイルの中の img が alt を持っているか。未読込 (img が無い) なら false。
+ * @param {Element} thumb サムネイルのリンク
+ * @returns {boolean} 空でない alt があれば true
+ */
+function hasImageAlt(thumb) {
 	const alt = thumb.querySelector?.('img')?.getAttribute('alt') ?? '';
 	return alt.trim() !== '';
 }
@@ -80,7 +126,8 @@ export function stripTabSkipMarks(root) {
 }
 
 /**
- * 増えたノードの下にある作品リンクを集める。ノード自身が作品リンクならそれも含める。
+ * 増えたノードの下にある作品リンクを集める。ノード自身か祖先が作品リンクならそれも含める。
+ * (サムネの img が読み込まれると、リンクの中に img だけが増える。そのカードも当て直したい)
  * 要素でないノード (テキスト等) は querySelectorAll を持たないので空にする。
  * @param {Node} root 増えたノード
  * @returns {Element[]} 作品リンク
@@ -88,7 +135,8 @@ export function stripTabSkipMarks(root) {
 function linksUnder(root) {
 	if (typeof root?.querySelectorAll !== 'function') return [];
 	const links = [...root.querySelectorAll(ARTWORK_LINK_SELECTOR)];
-	if (root.matches?.(ARTWORK_LINK_SELECTOR)) links.push(root);
+	const owner = root.closest?.(ARTWORK_LINK_SELECTOR);
+	if (owner) links.push(owner);
 	return links;
 }
 
@@ -120,11 +168,12 @@ export function attachTabSkip(doc, mode, deps = {}) {
 	 * 1 枚のカードを処理する。
 	 * pixiv が既に tabindex や aria-label を持たせている要素には触らない。
 	 * @param {ParentNode} card 作品カード
+	 * @param {boolean} labeled 計測用ラベルで選ぶカード (li ではないカード) か
 	 * @returns {void}
 	 */
-	const applyCard = (card) => {
+	const applyCard = (card, labeled) => {
 		const links = [...card.querySelectorAll(ARTWORK_LINK_SELECTOR)];
-		const targets = planSkipTargets(card, current, links);
+		const targets = labeled ? planLabeledSkipTargets(card, current, links) : planSkipTargets(card, current, links);
 		for (const el of targets) {
 			if (el.hasAttribute('tabindex')) continue;
 			el.setAttribute('tabindex', '-1');
@@ -132,7 +181,17 @@ export function attachTabSkip(doc, mode, deps = {}) {
 		}
 		// タイトルのリンクを飛ばすと、サムネイルに名前が無いカードでは読み上げから作品名が消える。
 		// alt が空のときだけ補う (alt があれば作品名は既に読める)
-		const [thumb, title] = links;
+		const [thumb, title] = labeled
+			? [card.querySelector(THUMB_LINK_SELECTOR), links.find((link) => link.getAttribute(GA4_LABEL_ATTR) === TITLE_LINK_LABEL)]
+			: links;
+		// 補った後で img が読み込まれ alt が付いたら外す。alt のほうがタグと作者名まで読める
+		if (thumb?.hasAttribute(TAB_SKIP_LABEL_ATTR)) {
+			if (hasImageAlt(thumb)) {
+				thumb.removeAttribute('aria-label');
+				thumb.removeAttribute(TAB_SKIP_LABEL_ATTR);
+			}
+			return;
+		}
 		if (!thumb || !title || !targets.includes(title)) return;
 		if (hasAccessibleName(thumb)) return;
 		const name = (title.textContent ?? '').trim();
@@ -153,11 +212,11 @@ export function attachTabSkip(doc, mode, deps = {}) {
 			const done = new Set();
 			for (const root of roots) {
 				for (const link of linksUnder(root)) {
-					const card = link.closest?.(CARD_SELECTOR);
+					const found = findCard(link);
 					// カードが取れない置き方は対象外。掴めないものへ当てにいかない
-					if (!card || done.has(card)) continue;
-					done.add(card);
-					applyCard(card);
+					if (!found || done.has(found.card)) continue;
+					done.add(found.card);
+					applyCard(found.card, found.labeled);
 				}
 			}
 		} catch (error) {

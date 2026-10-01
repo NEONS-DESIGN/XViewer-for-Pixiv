@@ -19,9 +19,9 @@
  * 描画先が 2 つに分かれるので container (カウンタの行) と followContainer を別々に受け取る。
  *
  * フォロー状態は作品詳細 (/ajax/illust/{id}) には入っておらず、
- * /ajax/user/{id}?full=1 を別に引く。覚えるのは pixiv/user.js の 1 か所で、
+ * /ajax/user/{id} を別に引く。覚えるのは pixiv/user.js の 1 か所で、
  * 自分でフォロー / 解除したときは patchUser で書き戻す。ここに別のキャッシュは持たない。
- * pixiv 本体のヘッダで変えた場合はページを再読み込みするまで追従しない。
+ * ビュワーを開いている間に pixiv 本体側で変えた場合は、ビュワーを開き直すまで追従しない。
  */
 import { STATUS_KINDS } from '../../common/constants.js';
 import { createIcon } from '../../common/icons.js';
@@ -81,7 +81,7 @@ export function countLabel(label, count, strings) {
  * @property {Document} doc
  * @property {HTMLElement} container カウンタの行 (.counts)。中の .count-like / .count-bookmark を差し替える
  * @property {HTMLElement} [followContainer] フォローの描画先 (.follow-slot)。無ければフォローを出さない
- * @property {(userId: string, lang: string) => Promise<object>} [fetchUser] ユーザー情報の取得。既定は /ajax/user/{id}?full=1
+ * @property {(userId: string, lang: string) => Promise<object>} [fetchUser] ユーザー情報の取得。既定は /ajax/user/{id}
  * @property {(userId: string, patch: object) => void} [patchUser] 覚えているユーザー情報の書き換え。既定は pixiv/user.js
  * @property {object} [actions] 更新系の差し替え。テストから通信させないために使う
  * @property {object} strings 文言のカタログ (src/i18n)
@@ -277,10 +277,12 @@ export function createActionsBar(deps) {
 			try {
 				if (following) await api.unfollowUser(detail.userId, token);
 				else await api.followUser(detail.userId, token);
+				const next = !following;
+				// 覚えている応答へ書き戻す。次の作品でも取り直さずに今の状態が出る。
+				// 画面ではなく共有の控えなので、待つ間に次の作品へ送られていても書く
+				patchUser(detail.userId, { isFollowed: next });
 				if (disposed) return;
-				following = !following;
-				// 覚えている応答へ書き戻す。次の作品でも取り直さずに今の状態が出る
-				patchUser(detail.userId, { isFollowed: following });
+				following = next;
 				applyFollowState(button, following);
 				announce(following ? strings.actionsBar.messages.FOLLOWED : strings.actionsBar.messages.UNFOLLOWED);
 			} catch (error) {
@@ -384,10 +386,10 @@ export function createActionsBar(deps) {
 				const hadFocus = isFocused(doc, bookmarkButton);
 				bookmarkButton.disabled = true;
 				const wasBookmarked = Boolean(bookmarkId);
-				// 反映が遅れるので画面を先に変える
 				const token = readSession(doc).csrfToken;
 				try {
 					if (wasBookmarked) {
+						// 削除は件数の反映が遅れるので、取り直さずに成功の応答で手元の件数を引く
 						await api.deleteBookmark(bookmarkId, token);
 						// 破棄済みのボタンを触らない。状態の書き換えも await の直後で止める
 						if (disposed) return;

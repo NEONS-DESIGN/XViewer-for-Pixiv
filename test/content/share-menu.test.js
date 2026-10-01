@@ -13,15 +13,16 @@ const STRINGS = createStrings('ja');
 /**
  * メニューを組み立てる。
  * @param {object} [overrides] 依存の差し替え
- * @returns {object} doc / menu / button / list / items をまとめたもの
+ * @returns {object} doc / menu / button / list / menuItems / items をまとめたもの
  */
 function build(overrides = {}) {
 	const doc = fakeDoc();
 	const menu = createShareMenu({ doc, detail: DETAIL, strings: STRINGS, ...overrides });
 	const button = menu.element.children[0];
 	const list = menu.element.children[1];
-	const items = list.children.filter((child) => child.className === 'share-item');
-	return { doc, menu, button, list, items };
+	const menuItems = list.children.find((child) => child.getAttribute('role') === 'menu');
+	const items = menuItems.children.filter((child) => child.className === 'share-item');
+	return { doc, menu, button, list, menuItems, items };
 }
 
 /**
@@ -68,8 +69,8 @@ test('項目は X / Facebook / Pawoo / リンクをコピーの順に並ぶ', ()
 });
 
 test('外部サイトへのリンクは新しいタブで開き、opener を渡さない', () => {
-	const { list } = build();
-	const links = list.children.filter((child) => child.tag === 'a');
+	const { menuItems } = build();
+	const links = menuItems.children.filter((child) => child.tag === 'a');
 	assert.equal(links.length, 3);
 	for (const link of links) {
 		assert.equal(link.getAttribute('target'), '_blank');
@@ -80,10 +81,10 @@ test('外部サイトへのリンクは新しいタブで開き、opener を渡�
 
 test('リンクを押したら閉じてボタンへフォーカスを戻す', () => {
 	// 押した a は hidden の中に入る。戻さないとフォーカスが body へ落ち、モーダルのキー操作が効かなくなる
-	const { menu, button, list } = build();
+	const { menu, button, menuItems } = build();
 	button.dispatch('click', {});
 	button.focused = false;
-	const link = list.children.find((child) => child.tag === 'a');
+	const link = menuItems.children.find((child) => child.tag === 'a');
 	link.dispatch('click', {});
 	assert.equal(menu.isOpen(), false);
 	assert.equal(button.focused, true);
@@ -91,9 +92,9 @@ test('リンクを押したら閉じてボタンへフォーカスを戻す', ()
 
 test('リンクをコピーは作品 URL をクリップボードへ書き、できたことを伝える', async () => {
 	const written = [];
-	const { menu, button, list } = build({ writeText: async (value) => { written.push(value); } });
+	const { menu, button, list, menuItems } = build({ writeText: async (value) => { written.push(value); } });
 	button.dispatch('click', {});
-	const copy = list.children.find((child) => child.tag === 'button');
+	const copy = menuItems.children.find((child) => child.tag === 'button');
 	copy.dispatch('click', {});
 	await flush();
 	assert.deepEqual(written, ['https://www.pixiv.net/artworks/149763512']);
@@ -108,9 +109,9 @@ test('リンクをコピーは作品 URL をクリップボードへ書き、で
 });
 
 test('コピーに失敗しても落ちず、その旨を伝える', async () => {
-	const { menu, button, list } = build({ writeText: async () => { throw new Error('拒否された'); } });
+	const { menu, button, list, menuItems } = build({ writeText: async () => { throw new Error('拒否された'); } });
 	button.dispatch('click', {});
-	const copy = list.children.find((child) => child.tag === 'button');
+	const copy = menuItems.children.find((child) => child.tag === 'button');
 	copy.dispatch('click', {});
 	await flush();
 	const status = list.children.find((child) => child.className === 'share-status');
@@ -120,9 +121,9 @@ test('コピーに失敗しても落ちず、その旨を伝える', async () =>
 
 test('クリップボードが無くて同期で落ちても、失敗として伝える', async () => {
 	// navigator.clipboard が undefined の環境では Promise を作る前に TypeError が出る
-	const { button, list } = build({ writeText: () => { throw new TypeError('clipboard is undefined'); } });
+	const { button, list, menuItems } = build({ writeText: () => { throw new TypeError('clipboard is undefined'); } });
 	button.dispatch('click', {});
-	const copy = list.children.find((child) => child.tag === 'button');
+	const copy = menuItems.children.find((child) => child.tag === 'button');
 	await copy.dispatch('click', {});
 	await flush();
 	const status = list.children.find((child) => child.className === 'share-status');
@@ -216,10 +217,35 @@ test('メニューの外を押すと閉じる', () => {
 });
 
 test('dispose は document と自分に付けたリスナを外す', () => {
-	const { doc, menu } = build();
+	const { doc, menu, button } = build();
+	button.dispatch('click', {});
 	menu.dispose();
 	assert.equal((doc.listeners.pointerdown ?? []).length, 0);
 	assert.equal((menu.element.listeners.focusout ?? []).length, 0);
+});
+
+test('document の押下を見張るのは開いている間だけ', () => {
+	// 閉じている間まで document の全ての押下を受けない。開閉を繰り返しても積み上がらない
+	const { doc, button } = build();
+	assert.equal((doc.listeners.pointerdown ?? []).length, 0);
+	button.dispatch('click', {});
+	assert.equal((doc.listeners.pointerdown ?? []).length, 1);
+	button.dispatch('click', {});
+	assert.equal((doc.listeners.pointerdown ?? []).length, 0);
+	button.dispatch('click', {});
+	doc.dispatch('pointerdown', { composedPath: () => [fakeElement('div')] });
+	assert.equal((doc.listeners.pointerdown ?? []).length, 0);
+});
+
+test('role="menu" の子は項目だけ。見出しとコピーの結果は menu の外に置く', () => {
+	// menu が持てる子は menuitem だけ。それ以外は読み上げで無視されることがある
+	const { list, menuItems } = build();
+	assert.equal(list.getAttribute('role'), null);
+	assert.equal(menuItems.getAttribute('aria-label'), 'この作品をシェア');
+	assert.ok(menuItems.children.every((child) => child.getAttribute('role') === 'menuitem'));
+	assert.ok(list.children.some((child) => child.className === 'share-status'));
+	const heading = list.children.find((child) => child.className === 'share-menu-heading');
+	assert.equal(heading.getAttribute('aria-hidden'), 'true');
 });
 
 test('英語のカタログを渡すと文言が英語になる', () => {

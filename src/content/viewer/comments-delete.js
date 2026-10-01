@@ -108,7 +108,7 @@ export function attachDelete(comment, target, deps) {
 	/** 聞き返している最中か */
 	let confirming = false;
 	/** @type {HTMLElement|null} 失敗の表示。1 つだけ持つ */
-	let failureNode = null;
+	let errorNode = null;
 
 	const button = doc.createElement('button');
 	button.type = 'button';
@@ -140,13 +140,13 @@ export function attachDelete(comment, target, deps) {
 	 * @param {unknown} error 失敗の中身
 	 * @returns {void}
 	 */
-	function showFailure(error) {
-		failureNode?.remove();
-		failureNode = doc.createElement('p');
-		failureNode.className = 'comment-error';
-		failureNode.setAttribute('role', 'alert');
-		failureNode.textContent = deps.errorMessage(error);
-		body.appendChild(failureNode);
+	function showError(error) {
+		errorNode?.remove();
+		errorNode = doc.createElement('p');
+		errorNode.className = 'comment-error';
+		errorNode.setAttribute('role', 'alert');
+		errorNode.textContent = deps.errorMessage(error);
+		body.appendChild(errorNode);
 		warn('failed to delete comment', comment.id, error);
 	}
 
@@ -171,13 +171,13 @@ export function attachDelete(comment, target, deps) {
 		try {
 			await deps.deleteComment(illustId, comment.id, deps.csrfToken());
 			if (!stillCurrent()) return;
-			failureNode?.remove();
-			failureNode = null;
+			errorNode?.remove();
+			errorNode = null;
 			removed = true;
 		} catch (error) {
 			if (!stillCurrent()) return;
 			// 消せていないのに画面から外すと、読み直したときに戻ってきて食い違う
-			showFailure(error);
+			showError(error);
 			refocus = true;
 		} finally {
 			button.disabled = false;

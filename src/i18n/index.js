@@ -5,8 +5,7 @@
  * カタログは自分の言語を `lang` として持つので、書式の関数へ言語を渡すためだけに
  * 引数を引き回す必要がない。受け取る側は常に `strings` 1 つで済む。
  *
- * 言語を足すときは、カタログを 1 ファイル作って CATALOGS へ 1 行足し、
- * language.js の SUPPORTED_LANGUAGES へ 1 つ足す。他は触らなくてよい。
+ * 言語を足すときは、ここの CATALOGS と load.js の LOADERS の両方へ 1 行ずつ足す。
  */
 import { SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE } from '../common/language.js';
 import { buildStrings } from './freeze.js';

@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { register } from 'node:module';
 import { clearSessionCache } from '../../../src/content/session.js';
@@ -7,6 +7,10 @@ import { createStrings } from '../../../src/i18n/index.js';
 import { PixivError, PIXIV_ERROR_KINDS } from '../../../src/pixiv/errors.js';
 import { fakeElement, fakeDoc as fakeDocBase, find, findAll, flush, iconName } from '../../helpers/dom.js';
 import { fakeSequence } from '../../helpers/sequence.js';
+import { clearIllustAssetCache, fetchIllustPages, fetchUgoiraMeta } from '../../../src/pixiv/illust-assets.js';
+
+// 隣の先読みは /pages と ugoira_meta を作品単位で覚える取得へ入れる。テストの間で持ち越さない
+beforeEach(() => { clearIllustAssetCache(); });
 
 // viewer.js は viewer.css と common/tokens.css を import する。(esbuild が文字列にする)
 // node はそのままでは .css を読めないので、空文字を返す読み込みフックを先に登録してから
@@ -537,6 +541,28 @@ test('描画に失敗したら描きかけのペインを捨ててから文言�
 	assert.equal(findAll(stage(), '.frame').length, 0);
 });
 
+test('描画に失敗した後に主役の設定を変えたら、取得から組み直して文言とサイドバーの欠けを残さない', async () => {
+	// 失敗の表示はペインを全部捨てている。主役だけを描き足すと、文言が出たままサイドバーも空になる
+	let failing = true;
+	const flaky = settings({ showSidebar: true });
+	Object.defineProperty(flaky, 'imageQuality', {
+		get() {
+			if (failing) throw new Error('壊れた設定');
+			return 'regular';
+		},
+	});
+	const { viewer, stage, shadow, fetched } = setup({ settings: flaky, fetchUser: async () => ({}) });
+	await viewer.open('1');
+	assert.ok(find(stage(), '.status'));
+	failing = false;
+	viewer.setSettings(settings({ showSidebar: true, imageQuality: 'original' }));
+	await flush();
+	assert.deepEqual(fetched, ['/ajax/illust/1?lang=ja', '/ajax/illust/1?lang=ja']);
+	assert.equal(find(stage(), '.status'), null);
+	assert.equal(findAll(stage(), '.frame').length, 1);
+	assert.ok(find(shadow(), '.sidebar').children.length > 0, 'サイドバーも組み直す');
+});
+
 test('overlay の aria-label に作品名が乗る', async () => {
 	const { viewer, shadow } = setup();
 	await viewer.open('1');
@@ -930,12 +956,7 @@ test('見られない作品は詳細だけで、画像は読まない', async ()
 	assert.equal(images.length, 0);
 });
 
-test('隣がうごイラなら meta まで温め、開いたときに meta を取り直さない', async (t) => {
-	// 再生器は zip を取りに行くので、zip は 403 で返して止める。失敗の warn は黙らせる
-	t.mock.method(console, 'warn', () => {});
-	// 閉じるときに再生器が rAF を取り消す。Node には無いので足し、終わったら外す
-	globalThis.cancelAnimationFrame = () => {};
-	t.after(() => { delete globalThis.cancelAnimationFrame; });
+test('隣がうごイラなら poster と meta まで温め、zip は読まない', async (t) => {
 	const pageFetched = [];
 	t.mock.method(globalThis, 'fetch', async (url) => {
 		pageFetched.push(String(url));
@@ -958,14 +979,34 @@ test('隣がうごイラなら meta まで温め、開いたときに meta を�
 	await viewer.open('1', fakeSequence(['1', '2']));
 	await flush();
 	assert.deepEqual(fetched, ['/ajax/illust/1?lang=ja', '/ajax/illust/2?lang=ja', '/ajax/illust/2/ugoira_meta?lang=ja']);
-	// zip も画像も温めない
-	assert.equal(images.length, 0);
+	// poster (標準画質) を温める。zip は読まない
+	assert.equal(images[0].src, REGULAR_URL);
 	assert.deepEqual(pageFetched, []);
-	await doc.dispatch('keydown', nextWorkKey());
+	// 温めた meta は作品単位で覚えた取得に入っている。開いたときの再生器はここから引く
+	const meta = await fetchUgoiraMeta('2', 'ja', { getJsonImpl: async () => { throw new Error('取り直してはいけない'); } });
+	assert.deepEqual(meta.frames, []);
+	viewer.close();
+	assert.equal(doc.body.children.length, 0);
+});
+
+test('隣が複数枚なら /pages も温める。1 枚の作品では取らない', async () => {
+	const { createImage } = imageRecorder();
+	const fetched = [];
+	const { viewer } = setup({
+		settings: settings({ prefetchNeighbor: true }),
+		createImage,
+		getJsonImpl: async (url) => {
+			fetched.push(url);
+			if (url.includes('/pages')) return [{ urls: { regular: REGULAR_URL }, width: 1, height: 1 }];
+			const id = idOf(url);
+			return rawDetail(id, id === '2' ? { pageCount: 3 } : {});
+		},
+	});
+	await viewer.open('1', fakeSequence(['1', '2', '3']));
 	await flush();
-	assert.equal(fetched.filter((url) => url.includes('ugoira_meta')).length, 1);
-	assert.equal(pageFetched.filter((url) => url.includes('ugoira_meta')).length, 0);
-	assert.equal(pageFetched.length, 1, '再生器は zip だけを取りに行く');
+	assert.deepEqual(fetched, ['/ajax/illust/1?lang=ja', '/ajax/illust/2?lang=ja', '/ajax/illust/2/pages?lang=ja']);
+	const pages = await fetchIllustPages('2', 'ja', { getJsonImpl: async () => { throw new Error('取り直してはいけない'); } });
+	assert.equal(pages.length, 1);
 	viewer.close();
 });
 
@@ -979,17 +1020,13 @@ test('閉じたら隣の先読みを止める', async () => {
 	assert.equal(signals['2'].aborted, true);
 });
 
-test('閉じたら温めている画像と meta も止める', async () => {
+test('閉じたら温めている画像も止める', async () => {
 	const { createImage, images } = imageRecorder();
-	let metaSignal = null;
 	const { viewer } = setup({
 		settings: settings({ prefetchNeighbor: true }),
 		createImage,
-		getJsonImpl: (url, jsonDeps) => {
-			if (url.includes('ugoira_meta')) {
-				metaSignal = jsonDeps.signal;
-				return new Promise(() => {});
-			}
+		getJsonImpl: (url) => {
+			if (url.includes('ugoira_meta')) return new Promise(() => {});
 			const id = idOf(url);
 			return Promise.resolve(rawDetail(id, id === '3' ? { illustType: 2 } : {}));
 		},
@@ -1000,13 +1037,12 @@ test('閉じたら温めている画像と meta も止める', async () => {
 	assert.equal(images[0].src, REGULAR_URL);
 	viewer.close();
 	assert.equal(images[0].src, '');
-	// 2 を開くと 3 (うごイラ) の meta を温める
+	// 2 を開くと 3 (うごイラ) の poster を温める
 	await viewer.open('2', fakeSequence(['1', '2', '3']));
 	await flush();
-	assert.ok(metaSignal);
-	assert.equal(metaSignal.aborted, false);
+	assert.equal(images[0].src, REGULAR_URL);
 	viewer.close();
-	assert.equal(metaSignal.aborted, true);
+	assert.equal(images[0].src, '');
 	// Image は作り直さず 1 つを使い回す
 	assert.equal(images.length, 1);
 });
@@ -1251,4 +1287,56 @@ test('isRangeInput はレンジ (シークバー) の上で押されたキーだ
 	assert.equal(isRangeInput({ composedPath: () => [{ tagName: 'INPUT', type: 'text' }] }), false);
 	assert.equal(isRangeInput({ composedPath: () => [{ tagName: 'TEXTAREA' }] }), false);
 	assert.equal(isRangeInput({ composedPath: () => [] }), false);
+});
+
+test('作品の読み込み中は画面端のページ送りの領域を、押しても閉じない印にする', async () => {
+	const { getJsonImpl } = holdingFetch('2');
+	const { viewer, stage } = setup({ settings: settings({ navZones: 'both' }), getJsonImpl });
+	await viewer.open('1', fakeSequence(['1', '2']));
+	stage().getBoundingClientRect = () => ({ left: 0, top: 0, width: 1000, height: 800 });
+	await stage().dispatch('pointermove', { clientX: 990, clientY: 400 });
+	// 1 枚の作品の右端はどちらにも送れないので領域として扱わない
+	assert.equal(stage().dataset.navZone, undefined);
+	void viewer.open('2');
+	// 主役のペインを捨てた直後に描き直す。送れるかが分からない間は閉じない印
+	assert.equal(stage().dataset.navZone, 'idle');
+	viewer.close();
+});
+
+test('読み込みに失敗したら、ページ送りの領域を読み込み中の扱いから戻す', async () => {
+	const { viewer, stage } = setup({
+		settings: settings({ navZones: 'both' }),
+		getJsonImpl: async (url) => {
+			if (idOf(url) === '2') throw new PixivError(PIXIV_ERROR_KINDS.NETWORK, 'offline');
+			return rawDetail(idOf(url));
+		},
+	});
+	await viewer.open('1');
+	stage().getBoundingClientRect = () => ({ left: 0, top: 0, width: 1000, height: 800 });
+	await stage().dispatch('pointermove', { clientX: 990, clientY: 400 });
+	await viewer.open('2');
+	assert.equal(stage().dataset.navZone, undefined);
+});
+
+test('主役の設定だけが変わったら、サイドバーは作り直さず作品詳細も取り直さない', async () => {
+	const { viewer, fetched, shadow, stage } = setupWithSidebar();
+	await viewer.open('1');
+	const sidebarContent = find(shadow(), '.sidebar').children[0];
+	const frame = find(stage(), '.frame');
+	viewer.setSettings(settings({ showSidebar: true, imageQuality: 'original' }));
+	await flush();
+	assert.equal(fetched.length, 1);
+	assert.equal(find(shadow(), '.sidebar').children[0], sidebarContent, 'コメント欄も読んでいた位置もそのまま');
+	assert.notEqual(find(stage(), '.frame'), frame, '画像は新しい設定で作り直す');
+	assert.equal(findAll(stage(), '.frame').length, 1);
+});
+
+test('サイドバーの設定が変わったら作品詳細から取り直して組み直す', async () => {
+	// 覚えている詳細には、開いてから押したいいね・ブックマークが入っていない
+	const { viewer, fetched, shadow } = setup({ fetchUser: async () => ({}) });
+	await viewer.open('1');
+	viewer.setSettings(settings({ showSidebar: true }));
+	await flush();
+	assert.deepEqual(fetched, ['/ajax/illust/1?lang=ja', '/ajax/illust/1?lang=ja']);
+	assert.equal(find(shadow(), '.sidebar').hidden, false);
 });

@@ -62,16 +62,24 @@ export function createShareMenu(deps) {
 	buttonText.textContent = strings.shareMenu.SHARE;
 	button.appendChild(buttonText);
 
+	/** 開閉する枠。見出し・項目・コピーの結果をまとめて出し入れする */
 	const list = doc.createElement('div');
 	list.className = 'share-menu';
 	list.hidden = true;
-	list.setAttribute('role', 'menu');
-	list.setAttribute('aria-label', strings.shareMenu.SHARE);
 
 	const heading = doc.createElement('p');
 	heading.className = 'share-menu-heading';
 	heading.textContent = strings.shareMenu.SHARE;
+	// 同じ文字を menu の aria-label が持っているので、読み上げでは二重にしない
+	heading.setAttribute('aria-hidden', 'true');
 	list.appendChild(heading);
+
+	// role="menu" の子に置けるのは menuitem だけ。見出しとコピーの結果は外に置き、項目だけをここへ入れる
+	const menu = doc.createElement('div');
+	menu.className = 'share-menu-items';
+	menu.setAttribute('role', 'menu');
+	menu.setAttribute('aria-label', strings.shareMenu.SHARE);
+	list.appendChild(menu);
 
 	/** コピーの結果を伝える場所。読み上げにも渡す */
 	const status = doc.createElement('p');
@@ -84,6 +92,10 @@ export function createShareMenu(deps) {
 	 * @returns {void}
 	 */
 	function setOpen(next) {
+		// 外側のクリックを見張るのは開いている間だけ。閉じている間まで document の全ての押下を受けない。
+		// 捕捉フェーズで受けるのは、pixiv 側が途中で止めても届くようにするため
+		if (next && !open) doc.addEventListener('pointerdown', onPointerDown, true);
+		if (!next && open) doc.removeEventListener('pointerdown', onPointerDown, true);
 		open = next;
 		list.hidden = !next;
 		button.setAttribute('aria-expanded', String(next));
@@ -146,7 +158,7 @@ export function createShareMenu(deps) {
 			fillItem(link, target);
 			// 押した a は hidden の中に入るので、ボタンへ戻さないとフォーカスが body へ落ちる
 			link.addEventListener('click', closeAndRefocus);
-			list.appendChild(link);
+			menu.appendChild(link);
 			continue;
 		}
 		const copy = doc.createElement('button');
@@ -163,7 +175,7 @@ export function createShareMenu(deps) {
 				},
 			);
 		});
-		list.appendChild(copy);
+		menu.appendChild(copy);
 	}
 	list.appendChild(status);
 
@@ -205,9 +217,6 @@ export function createShareMenu(deps) {
 		setOpen(false);
 	}
 
-	// 捕捉フェーズで受ける。pixiv 側が途中で止めても届くようにする
-	doc.addEventListener('pointerdown', onPointerDown, true);
-
 	/**
 	 * キーを食い止める。
 	 * ビュワー本体のキー操作 (Escape で閉じる・上下で作品を移動) より先に呼ばれ、
@@ -235,9 +244,9 @@ export function createShareMenu(deps) {
 		consumeKey,
 
 		dispose() {
-			doc.removeEventListener('pointerdown', onPointerDown, true);
-			element.removeEventListener('focusout', onFocusOut);
+			// 開いていれば setOpen(false) が document の見張りも外す
 			setOpen(false);
+			element.removeEventListener('focusout', onFocusOut);
 		},
 	};
 }

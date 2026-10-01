@@ -69,18 +69,34 @@ test('clear を挟むと、古い Promise が後から失敗しても新しい�
 	assert.equal(cache.get('a'), fresh, '古い失敗で新しいキャッシュが消されている');
 });
 
-test('上限を超えたら最古のキーから捨てる', async () => {
+test('上限を超えたら最も長く使われていないキーから捨てる', async () => {
 	const cache = createPromiseCache(LIMIT);
 	for (let i = 0; i < LIMIT; i += 1) {
 		cache.remember(String(i), () => i);
 	}
-	// まだ上限内。最古 (0) は残っている
-	assert.notEqual(cache.get('0'), undefined);
 	// 1 つ増えると最古 (0) が押し出される。次に古い 1 と新しい new は残る
 	cache.remember('new', () => 'new');
 	assert.equal(cache.get('0'), undefined);
 	assert.notEqual(cache.get('1'), undefined);
 	assert.notEqual(cache.get('new'), undefined);
+});
+
+test('get で当たったキーは最新扱いになり、押し出されにくい', async () => {
+	const cache = createPromiseCache(LIMIT);
+	for (let i = 0; i < LIMIT; i += 1) {
+		cache.remember(String(i), () => i);
+	}
+	// 最古の 0 を使うと、次に押し出されるのは 1 になる
+	assert.notEqual(cache.get('0'), undefined);
+	cache.remember('new', () => 'new');
+	assert.notEqual(cache.get('0'), undefined);
+	assert.equal(cache.get('1'), undefined);
+});
+
+test('replace は覚えていないキーには何もしない', () => {
+	const cache = createPromiseCache(LIMIT);
+	cache.replace('a', Promise.resolve('A'));
+	assert.equal(cache.get('a'), undefined);
 });
 
 test('replace は覚えている Promise を差し替え、数は増やさない', async () => {

@@ -80,6 +80,12 @@ export function createUgoiraControls(deps) {
 	let menuOpen = false;
 	/** シークバーをマウス・指でつかんでいるか */
 	let grabbing = false;
+	/** 再生中か。再生中は読み上げ用の値 (aria-valuetext) をコマごとには書かない */
+	let playing = false;
+	/** 最後に受け取った今のコマ番号 (0 始まり) */
+	let lastIndex = 0;
+	/** 最後に受け取った全体のコマ数。-1 はまだ受け取っていない */
+	let lastTotal = -1;
 
 	const element = doc.createElement('div');
 	element.className = 'ugoira-controls';
@@ -103,12 +109,22 @@ export function createUgoiraControls(deps) {
 	seek.setAttribute('aria-label', text.SEEK);
 
 	/**
+	 * 今のコマを読み上げ用の値へ写す。
+	 * @returns {void}
+	 */
+	function writeValueText() {
+		seek.setAttribute('aria-valuetext', text.frame(lastIndex + 1, Math.max(0, lastTotal)));
+	}
+
+	/**
 	 * つかんでいた状態を終える。離した・取り消された・フォーカスが外れたのどれでも 1 回だけ伝える。
+	 * つかんでいる間は動かさなかったつまみを、今のコマへ合わせ直す。(読めていない位置で離されたとき)
 	 * @returns {void}
 	 */
 	function release() {
 		if (!grabbing) return;
 		grabbing = false;
+		seek.value = String(lastIndex);
 		deps.onSeekEnd();
 	}
 
@@ -116,7 +132,13 @@ export function createUgoiraControls(deps) {
 		grabbing = true;
 		deps.onSeekStart();
 	});
-	seek.addEventListener('input', () => deps.onSeek(Number(seek.value)));
+	seek.addEventListener('input', () => {
+		deps.onSeek(Number(seek.value));
+		// キーで動かしたときも、移った先を読み上げる
+		writeValueText();
+	});
+	// フォーカスが来たときに再生中の古い値を読ませない
+	seek.addEventListener('focus', writeValueText);
 	// 離したときは change が来る。指が外へ出て取り消されたときは change が来ないので両方で終える
 	seek.addEventListener('change', release);
 	seek.addEventListener('pointerup', release);
@@ -238,29 +260,34 @@ export function createUgoiraControls(deps) {
 
 	/**
 	 * 再生ボタンの見た目を再生状態に合わせる。ボタンは「押すと何になるか」を示す。
-	 * @param {boolean} playing 再生中か
+	 * @param {boolean} next 再生中か
 	 * @returns {void}
 	 */
-	function setPlaying(playing) {
-		const next = playing ? TOGGLE.PLAYING : TOGGLE.PAUSED;
-		const label = text[next.labelKey];
+	function setPlaying(next) {
+		playing = next;
+		const look = next ? TOGGLE.PLAYING : TOGGLE.PAUSED;
+		const label = text[look.labelKey];
 		toggle.setAttribute('aria-label', label);
 		toggle.title = label;
-		toggle.replaceChildren(createIcon(doc, next.icon));
+		toggle.replaceChildren(createIcon(doc, look.icon));
+		// 止まったら今のコマを読み上げ用の値へ入れる。(再生中はコマごとに書かない)
+		if (!next) writeValueText();
 	}
 
 	/**
 	 * 今のコマをシークバーとコマ数へ写す。つかんでいる間はつまみを動かさない。(指の下から逃げる)
+	 * 読み上げ用の値は、止まっているときとつかんでいるときだけ書く。再生中に書くと読み上げが鳴り続ける
 	 * @param {number} index 今のコマ番号 (0 始まり)
 	 * @param {number} total 全体のコマ数
 	 * @returns {void}
 	 */
 	function setFrame(index, total) {
-		const last = Math.max(0, total - 1);
-		seek.max = String(last);
+		if (total !== lastTotal) seek.max = String(Math.max(0, total - 1));
+		lastIndex = index;
+		lastTotal = total;
 		if (!grabbing) seek.value = String(index);
 		seek.style.setProperty(SEEK_VARS.PLAYED, `${seekPercent(index, total)}%`);
-		seek.setAttribute('aria-valuetext', text.frame(index + 1, total));
+		if (!playing || grabbing) writeValueText();
 		counter.textContent = `${index + 1} / ${total}`;
 	}
 

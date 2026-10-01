@@ -36,7 +36,7 @@ export default {
 		WORK_PAGE_TITLE: 'Open the artwork page in a new tab',
 		SIDEBAR_OPEN: 'Open the sidebar',
 		SIDEBAR_CLOSE: 'Close the sidebar',
-		LOADING: 'Loading...',
+		LOADING: 'Loading…',
 		LOAD_FAILED: 'Could not load this artwork',
 		NOT_FOUND: 'This artwork could not be found. It may have been deleted or made private',
 		NETWORK_FAILED: 'Could not connect. Check your connection and open it again',
@@ -72,7 +72,7 @@ export default {
 			BOOKMARKED_PRIVATE: 'Bookmarked privately',
 			UNBOOKMARKED: 'Bookmark removed',
 			BOOKMARK_FAILED: 'Could not change the bookmark',
-			FOLLOWED: 'Following',
+			FOLLOWED: 'Followed',
 			UNFOLLOWED: 'Unfollowed',
 			FOLLOW_FAILED: 'Could not change the follow state',
 		},
@@ -127,7 +127,7 @@ export default {
 		POST_FAILED: 'Could not post your comment',
 		SESSION_EXPIRED: 'Your session has expired. Log in to pixiv again and reload this page',
 		DELETE: 'Delete',
-		DELETE_CONFIRM: 'Delete for real?',
+		DELETE_CONFIRM: 'Really delete?',
 		DELETE_FAILED: 'Could not delete the comment',
 		roles: {
 			SELF: 'You',
@@ -139,7 +139,6 @@ export default {
 		PICK: 'Emoji and stamps',
 		STAMP_ALT: 'Stamp',
 		STAMP_CLEAR: 'Remove the selected stamp',
-		FAILED: 'Could not post your comment',
 	},
 	commentPicker: {
 		EMOJI: 'Emoji',
@@ -263,15 +262,15 @@ export default {
 			},
 			viewerOnUser: {
 				label: 'Use on user pages',
-				description: 'Show the viewer when you open a work from a creator\'s works list.',
+				description: 'Show the viewer when you open an artwork from a user page’s artwork list.',
 			},
 			viewerOnHome: {
 				label: 'Use on the home page',
-				description: 'Show the viewer for works on pixiv\'s home (Home / Illustrations / Manga tabs).',
+				description: 'Show the viewer for artworks on pixiv’s home (Home / Illustrations / Manga tabs).',
 			},
 			viewerOnSearch: {
 				label: 'Use on search results',
-				description: 'Show the viewer when you open a work from tag search results.',
+				description: 'Show the viewer when you open an artwork from search results (tag pages and the search screen).',
 			},
 			showSidebar: {
 				label: 'Show the sidebar',
@@ -325,7 +324,7 @@ export default {
 					? { label: '1 image each way', description: 'Loads only the adjacent image ahead.' }
 					: {
 						label: `${count} images each way`,
-						description: `Loads ${count} images ahead. Smoother when browsing continuously.`,
+						description: `Loads ${count} images ahead in each direction. Smoother when browsing continuously.`,
 					}),
 			},
 			prefetchCustom: {
@@ -407,7 +406,7 @@ export default {
 			},
 			zoomZoneMode: {
 				label: 'Actual-size click area width',
-				description: 'Width of the left and right edges you click to turn pages in actual-size view.',
+				description: 'Width of the left and right edges used to turn pages in actual-size view.',
 				/**
 				 * 「カスタム」の選択肢。値は選択肢の下に出るレンジで選ぶ。
 				 * @param {number} min 選べる最小の値 (%)
@@ -427,7 +426,7 @@ export default {
 			},
 			commentPageSize: {
 				label: 'Comments loaded at once',
-				description: 'Number of comments loaded when a work opens and when you press "Show more". Applies from the next work you open.',
+				description: 'Number of comments loaded when an artwork opens and when you press "Show more". Applies from the next artwork you open.',
 				/**
 				 * 選択肢の見出し。値から作る。
 				 * @param {number} value 選択肢の値
@@ -436,8 +435,8 @@ export default {
 				option: (value) => `${value} comments`,
 			},
 			prefetchNeighbor: {
-				label: 'Also preload the adjacent work',
-				description: 'After a work finishes showing, loads just one work you may move to next with ↑ ↓. Moving is faster, but data is used even if you close without moving.',
+				label: 'Also prefetch the adjacent artwork',
+				description: 'After an artwork finishes showing, prefetches just one artwork you may move to next with ↑ ↓. Moving is faster, but data is used even if you close without moving.',
 			},
 			clickZoom: {
 				label: 'Click to view at actual size',
@@ -469,7 +468,7 @@ export default {
 			},
 			navZones: {
 				label: 'Click the edges to navigate',
-				description: 'Click near the edges of the viewer to turn pages or switch works. The cursor turns into an arrow there.',
+				description: 'Click near the edges of the viewer to turn pages or switch artworks. The cursor turns into an arrow there.',
 				off: {
 					label: 'Off',
 					description: 'Use only the arrow buttons and keys.',
@@ -479,12 +478,12 @@ export default {
 					description: 'Click the left or right edge to go to the previous or next page. Works on top of the image too.',
 				},
 				vertical: {
-					label: 'Top/bottom: works',
-					description: 'Click the top or bottom edge to go to the previous or next work. Turn pages with the arrow buttons.',
+					label: 'Top/bottom: artworks',
+					description: 'Click the top or bottom edge to go to the previous or next artwork. Turn pages with the arrow buttons.',
 				},
 				both: {
-					label: 'Left/right: pages, top/bottom: works',
-					description: 'Left and right turn pages, top and bottom switch works. The corners belong to left and right.',
+					label: 'Left/right: pages, top/bottom: artworks',
+					description: 'Left and right turn pages, top and bottom switch artworks. The corners belong to left and right.',
 				},
 			},
 			gridTabSkip: {
@@ -492,7 +491,7 @@ export default {
 				description: 'What Tab skips when moving to the next artwork.',
 				both: {
 					label: 'Skip bookmark and title',
-					description: 'A card steps through thumbnail, bookmark, then title. Skipping them moves to the next artwork with a single Tab, and you can still do the skipped actions inside the viewer.',
+					description: 'On user pages, a card steps through thumbnail, bookmark, then title. Skipping them moves to the next artwork with a single Tab. On the home page and in search results, artist links are not skipped.',
 				},
 				title: {
 					label: 'Skip the title only',

@@ -82,7 +82,8 @@ export function parseStoredZip(buffer) {
 /**
  * @typedef {object} StoredZipReader
  * @property {(chunk: Uint8Array) => StreamedZipEntry[]} push チャンクを渡し、中身が揃ったエントリを受け取る
- * @property {() => boolean} needsFallback 受信しながらは読めない形 (data descriptor か STORE 以外) を見つけたか。true になった後の push は空配列を返す
+ * @property {() => boolean} needsFallback 受信しながらは読めない形 (data descriptor か STORE 以外) を見つけたか。true になった後の push は空配列を返す。
+ *   呼ぶ側は取り直さず失敗にする。(parseStoredZip() もこの 2 つの形は読めない)
  * @property {() => boolean} ended ローカルファイルヘッダの並びが終わったか (中央ディレクトリか知らない署名に来た)。true になった後の push は空配列を返す
  */
 

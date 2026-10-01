@@ -4,7 +4,7 @@
 		"description": "拡張機能の名前。ブラウザの拡張機能一覧とストアに出る"
 	},
 	"extDescription": {
-		"message": "为 pixiv 的用户页面添加 X 风格的图片查看器。这是利用 pixiv 平台开发的非官方扩展程序，并非由 pixiv Inc. 制作或发布。",
+		"message": "为 pixiv 的用户页面、首页和搜索结果添加 X 风格的图片查看器。这是利用 pixiv 平台开发的非官方扩展程序，并非由 pixiv Inc. 制作或发布。",
 		"description": "拡張機能の説明。商標ガイドラインが求める非公式である旨を含む"
 	}
 }

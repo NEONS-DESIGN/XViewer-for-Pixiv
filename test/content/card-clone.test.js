@@ -216,7 +216,7 @@ test('雛形に残った aria-label を消す', () => {
 });
 
 test('雛形に残った tabindex="-1" と目印を外す', () => {
-	// 雛形は tab-skip が当てた後に採られることが多い。ビュワーを切った後 (tab-skip が居ない) に
+	// 雛形は tab-skip が当てた後に採られることが多い。Tab 移動を切った後 (tab-skip が居ない) に
 	// 組んだカードだけ Tab 順が違ってはいけない。当て直しは生きている tab-skip に任せる
 	const source = makeCard({ id: '1', tabSkipped: true });
 	const title = source.querySelectorAll('a[href^="/artworks/"]').find((link) => !link.querySelector('img'));

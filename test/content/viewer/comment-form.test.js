@@ -404,6 +404,24 @@ test('dispose は自分の欄で開いているピッカーだけ閉じる', () 
 	assert.deepEqual(other.closed, []);
 });
 
+test('別の欄でピッカーが開いているときに押すと、こちらで開く', async () => {
+	// 1 枚を共有しているので「どこかで開いている」で閉じると、キーボードでは 2 回押さないと開かない
+	const { picker, picked, closed } = fakePicker({ openIn: false });
+	picker.isOpen = () => true;
+	const { element } = build({ picker });
+	await find(element, '.comment-form-pick').click();
+	assert.equal(picked.length, 1);
+	assert.deepEqual(closed, []);
+});
+
+test('自分の欄で開いているときに押すと閉じる', async () => {
+	const { picker, picked, closed } = fakePicker({ openIn: true });
+	const { element } = build({ picker });
+	await find(element, '.comment-form-pick').click();
+	assert.equal(picked.length, 0);
+	assert.deepEqual(closed, [1]);
+});
+
 test('英語のカタログでは送信ボタンが英語になる', () => {
 	const { element } = build({ strings: createStrings('en') });
 	assert.equal(find(element, '.comment-form-submit').textContent, 'Post');

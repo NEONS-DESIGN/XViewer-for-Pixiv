@@ -168,3 +168,47 @@ test('描画が例外を投げても握りつぶさず記録する', async () =>
 	assert.match(reports[0][0], /描画に失敗/);
 	assert.equal(reports[0][1], failure);
 });
+
+test('初期化できたら読み直さず既定で描き直す', async () => {
+	// 書いた中身は既定そのものなので、読み直しは通信を 1 回増やすだけ
+	const { loads, last, resetNow } = await boot();
+	resetNow();
+	await flush();
+	assert.equal(loads.length, 1);
+	assert.deepEqual(last().settings, { ...SETTINGS_DEFAULTS });
+});
+
+test('初期化に失敗したら保存済みの値を読み直して描き直す', async () => {
+	const { loads, resetNow } = await boot({ reset: false });
+	resetNow();
+	await flush();
+	assert.equal(loads.length, 2);
+});
+
+test('文言のカタログが読めなければ既定の言語で描き、記録を残す', async () => {
+	const failure = new Error('断片を読めない');
+	const asked = [];
+	const { renders, reports } = await boot({
+		deps: {
+			loadPageLanguage: async () => 'en',
+			loadStrings: async (lang) => {
+				asked.push(lang);
+				if (lang === 'en') throw failure;
+				return createStrings(lang);
+			},
+		},
+	});
+	assert.deepEqual(asked, ['en', 'ja']);
+	assert.equal(renders.length, 1);
+	assert.equal(renders[0].strings.lang, 'ja');
+	assert.equal(reports.length, 1);
+	assert.equal(reports[0].at(-1), failure);
+});
+
+test('既定の言語のカタログも読めなければ描かずに reject する', async () => {
+	const failure = new Error('断片を読めない');
+	await assert.rejects(
+		boot({ deps: { loadPageLanguage: async () => 'ja', loadStrings: async () => { throw failure; } } }),
+		failure,
+	);
+});

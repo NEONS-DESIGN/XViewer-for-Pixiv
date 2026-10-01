@@ -30,6 +30,13 @@
 	}
 }
 
+/* hidden 属性を必ず効かせる。display をクラスで書いた部品 (.panel / .field.range / 警告の行) は
+   UA の [hidden] { display: none } に勝ってしまい、hidden を立てても消えない。
+   部品ごとに書くと、足し忘れた部品だけ隠れなくなるので 1 本にまとめる */
+[hidden] {
+	display: none !important;
+}
+
 body {
 	/* Chrome 拡張の popup は幅を固定する。
 	   中身に合わせると、説明の長さで画面ごとに幅が変わる */
@@ -175,11 +182,6 @@ h1 {
 	cursor: not-allowed;
 }
 
-/* .field.range の display はクラス指定なので、UA の [hidden] に勝ってしまう */
-.field.range[hidden] {
-	display: none;
-}
-
 /* 見出しと今の値を左右に並べる */
 .range-head {
 	display: flex;
@@ -218,12 +220,6 @@ h1 {
 	color: var(--warning);
 	font-size: 11px;
 	line-height: 1.45;
-}
-
-/* display はクラス指定なので、UA の [hidden] に勝ってしまう */
-.range-warning[hidden],
-.field-lock-warning[hidden] {
-	display: none;
 }
 
 .range-warning svg,
@@ -532,12 +528,6 @@ select selectedcontent [data-role='option-hint'] {
 	overflow-y: auto;
 	/* つまみとテキストが触れないよう、右に隙間を空ける */
 	padding-right: 6px;
-}
-
-/* .panel の display はクラス指定なので、UA の [hidden] { display: none } に勝ってしまう。
-   これを書かないと、隠したはずのパネルが両方描かれる */
-.panel[hidden] {
-	display: none;
 }
 
 /* .panel のスクロールバーの見た目 (細く、軌道も見せる) は tokens.css の ::-webkit-scrollbar が

@@ -85,7 +85,7 @@ function intInRange(value, { min, max }, fallback) {
 
 /**
  * 範囲の中の段階 (step の倍数) へ寄せて読む。数値でなければ既定へ倒す。
- * 範囲の外は端へ、段階の間は近い段階へ寄せる。(前の版で選べた値を、選べる値のうち近いものとして引き継ぐ)
+ * 範囲の外は端へ、段階の間は近い段階へ寄せる。(今は選べない値が保存されていても、選べる値のうち近いものとして読む)
  * @param {unknown} value 保存値
  * @param {{min: number, max: number, step: number}} range 範囲と段階
  * @param {number} fallback 既定
@@ -99,7 +99,7 @@ function snapToRange(value, { min, max, step }, fallback) {
 
 /**
  * 「既定のまま / カスタム」の持ち方を読む。保存値が無いときは、数値の側が既定と違えばカスタムとみなす。
- * 前の版はモードを持たず数値だけを保存していたので、選んでいた値をカスタムとして引き継ぐため。
+ * (モードを持たず数値だけが保存されている値は、その数値を選んでいたものとして読む)
  * @param {unknown} mode 保存されていたモード
  * @param {readonly string[]} modes 許すモード
  * @param {string} custom カスタムを表すモード
@@ -133,7 +133,7 @@ export function normalizeSettings(raw) {
 		sidebarScroll: oneOf(source.sidebarScroll, Object.values(SIDEBAR_SCROLL), d.sidebarScroll),
 		sidebarWidth: oneOf(source.sidebarWidth, SIDEBAR_WIDTH_CHOICES, d.sidebarWidth),
 		sidebarDrawerMax: oneOf(source.sidebarDrawerMax, SIDEBAR_DRAWER_MAX_CHOICES, d.sidebarDrawerMax),
-		// 前の版は 0 を「テーマに合わせる」として保存していた。0 より大きい数値だけをカスタムとして引き継ぐ
+		// backdropMode が無いとき、backdropOpacity の 0 は「テーマに合わせる」と読む。0 より大きい数値だけをカスタムとして読む
 		backdropMode: readMode(source.backdropMode, Object.values(BACKDROP_MODES), BACKDROP_MODES.CUSTOM,
 			typeof source.backdropOpacity === 'number' && source.backdropOpacity > 0, d.backdropMode),
 		backdropOpacity: source.backdropMode === undefined && source.backdropOpacity === 0
@@ -146,7 +146,7 @@ export function normalizeSettings(raw) {
 			[source.navZoneSize, source.navZoneSizeVertical].some((size) => typeof size === 'number' && size !== DEFAULT_NAV_ZONE_SIZE),
 			d.navZoneMode),
 		navZoneSize: snapToRange(source.navZoneSize, ZONE_SIZE_RANGE, d.navZoneSize),
-		// 前の版は左右と上下を navZoneSize 1 つで持っていた。上下が無ければ左右と同じ幅を引き継ぐ
+		// 上下の幅が保存されていなければ、左右の幅 (navZoneSize) と同じ幅として読む
 		navZoneSizeVertical: snapToRange(source.navZoneSizeVertical ?? source.navZoneSize, ZONE_SIZE_RANGE, d.navZoneSizeVertical),
 		clickZoom: asBoolean(source.clickZoom, d.clickZoom),
 		zoomZoneMode: readMode(source.zoomZoneMode, Object.values(SETTING_MODES), SETTING_MODES.CUSTOM,
@@ -180,22 +180,56 @@ export function navZoneSizesOf(settings) {
 }
 
 /**
- * 設定を読む。読めなければ既定を返す。
+ * 保存されている生の値を、設定のキーだけ読む。
+ * @param {{area?: object|null}} deps 保存領域の差し替え
+ * @returns {Promise<object|null>} 保存値。領域が無い・読めなければ null
+ */
+function readRaw(deps) {
+	return withArea(deps, (area) => area.get(Object.keys(SETTINGS_DEFAULTS)), null);
+}
+
+/**
+ * 設定を読む。読めなければ既定を返す。読むだけで、保存領域へは書かない。
  * @param {{area?: object}} [deps] 保存領域の差し替え
  * @returns {Promise<typeof SETTINGS_DEFAULTS>} 設定
  */
-export function loadSettings(deps = {}) {
-	return withArea(
-		deps,
-		async (area) => normalizeSettings(await area.get(Object.keys(SETTINGS_DEFAULTS))),
-		{ ...SETTINGS_DEFAULTS },
-	);
+export async function loadSettings(deps = {}) {
+	return normalizeSettings(await readRaw(deps));
+}
+
+/**
+ * 1 項目を書くときに、同じ set へ入れる組を作る。
+ * 保存値に無いキーや古い形の値は、他のキーから読み替えて決まる。(上下の幅は左右の幅から、など)
+ * 1 項目だけを書くと読み替えの元が変わり、他の項目の読み出し結果まで変わってしまうので、
+ * 書く前と書いた後で読み出し結果が変わる項目は、書く前の値で一緒に書いて固定する。
+ * 一緒に書いた項目は以後保存値にあるので、同じ固定は二度起きない。
+ * 保存値が読めなければ 1 項目だけを返す。(固定はできないが、保存そのものは止めない)
+ * @param {object} area 保存領域
+ * @param {string} key 設定キー
+ * @param {unknown} value 値
+ * @returns {Promise<object>} set に渡す組
+ */
+async function pinnedPatch(area, key, value) {
+	let raw;
+	try {
+		raw = await area.get(Object.keys(SETTINGS_DEFAULTS));
+	} catch {
+		return { [key]: value };
+	}
+	const before = normalizeSettings(raw);
+	const after = normalizeSettings({ ...raw, [key]: value });
+	const patch = { [key]: value };
+	for (const name of Object.keys(SETTINGS_DEFAULTS)) {
+		if (name !== key && before[name] !== after[name]) patch[name] = before[name];
+	}
+	return patch;
 }
 
 /**
  * 設定を 1 項目書く。失敗しても投げない。(見た目の反映は保存を待たない)
  * 呼び出し側が結果を伝えられるよう、成否は戻り値で返す。
  * SETTINGS_DEFAULTS に無いキーは書かない。読み出しが捨てる値で sync 領域の容量を食わないため。
+ * 書いても他の項目の読み出し結果は変わらない。(読み替えで決まっていた項目は同じ set で固定する。set は 1 回)
  * @param {string} key 設定キー
  * @param {unknown} value 値
  * @param {{area?: object}} [deps] 保存領域の差し替え
@@ -206,12 +240,33 @@ export function saveSetting(key, value, deps = {}) {
 		warn('知らない設定キーです', key);
 		return Promise.resolve(false);
 	}
-	return withArea(deps, async (area) => { await area.set({ [key]: value }); return true; }, false);
+	return withArea(deps, async (area) => {
+		await area.set(await pinnedPatch(area, key, value));
+		return true;
+	}, false);
+}
+
+/**
+ * onChanged の changes を生の保存値へ重ねる。設定のキーだけを見る。
+ * newValue を持たない変更は、そのキーが消されたものとして扱う。
+ * @param {object} raw 重ねる前の保存値
+ * @param {Record<string, {newValue?: unknown}>|null|undefined} changes onChanged の changes
+ * @returns {object} 重ねた保存値 (raw は変えない)
+ */
+function applyChanges(raw, changes) {
+	const next = { ...raw };
+	for (const [key, change] of Object.entries(changes ?? {})) {
+		if (!Object.hasOwn(SETTINGS_DEFAULTS, key)) continue;
+		if (change !== null && typeof change === 'object' && Object.hasOwn(change, 'newValue')) next[key] = change.newValue;
+		else delete next[key];
+	}
+	return next;
 }
 
 /**
  * 設定の変更を購読する。popup で変えた値を開いているページへ即座に届けるために使う。
- * コールバックが投げても unhandled rejection にせず warn に残す。
+ * 保存領域を読むのは最初の通知の 1 回だけで、以後は通知の changes を手元の保存値へ重ねる。(読めなかったら次の通知で読み直す)
+ * 通知は届いた順に処理する。コールバックが投げても unhandled rejection にせず warn に残す。
  * @param {(settings: typeof SETTINGS_DEFAULTS) => void} callback 変更後の設定を受け取る
  * @param {{storage?: object}} [deps] chrome.storage の差し替え
  * @returns {{dispose: () => void}} 購読の解除
@@ -219,11 +274,21 @@ export function saveSetting(key, value, deps = {}) {
 export function watchSettings(callback, deps = {}) {
 	const storage = deps.storage ?? globalThis.chrome?.storage ?? null;
 	if (!storage?.onChanged) return { dispose() {} };
+	// 差し替えた storage の sync 領域から読む。sync が無ければ「領域なし」で、既定の chrome.storage.sync へ戻さない
+	const area = storage.sync ?? null;
+	/** 手元の保存値。まだ読んでいない・読めなかったときは null */
+	let raw = null;
+	/** 通知を届いた順に処理するための鎖 */
+	let queue = Promise.resolve();
 
-	const listener = (_changes, areaName) => {
+	const listener = (changes, areaName) => {
 		if (areaName !== SYNC_AREA_NAME) return;
-		// 差し替えた storage があればその sync 領域から読む。既定の chrome.storage.sync へ戻さない
-		loadSettings({ area: storage.sync ?? undefined })
+		queue = queue
+			.then(async () => {
+				// 最初に読んだ値は、この通知の変更を既に含んでいる
+				raw = raw === null ? await readRaw({ area }) : applyChanges(raw, changes);
+				return normalizeSettings(raw);
+			})
 			.then(callback)
 			.catch((error) => warn('設定の変更を反映できませんでした', error));
 	};

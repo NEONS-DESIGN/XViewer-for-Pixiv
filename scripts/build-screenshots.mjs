@@ -33,23 +33,42 @@ const COLOR = Object.freeze({
 /** 見出しと本文の書体。Windows に載っているものを順に指定する。 */
 const FONT = "'Yu Gothic UI','Yu Gothic','Meiryo','Segoe UI',sans-serif";
 
-/** ストア素材の置き場所。このスクリプトは scripts/ にあるので、1 つ上の store/ を指す。(実行時のカレントに依らない) */
-const STORE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'store');
+/** リポジトリのルート。このスクリプトは scripts/ にあるので 1 つ上。(実行時のカレントに依らない) */
+const ROOT_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+/** ストア素材の置き場所。 */
+const STORE_DIR = path.join(ROOT_DIR, 'store');
 const SOURCES = path.join(STORE_DIR, 'sources');
 const OUT = path.join(STORE_DIR, 'screenshots');
+
+/** 左上に出す拡張機能のアイコン。build-icons.mjs の生成物をそのまま使う。 */
+const BRAND_ICON = path.join(ROOT_DIR, 'src', 'icons', 'icon-128.png');
+
+/**
+ * ファイルを読む。
+ * @param {string} file ファイルの場所
+ * @returns {Buffer} 中身
+ * @throws {Error} 読めないとき (素材の置き忘れが分かる文言にする)
+ */
+function readInput(file) {
+	try {
+		return fs.readFileSync(file);
+	} catch (error) {
+		throw new Error(`素材を読めません: ${file} (store/sources/ に撮影素材を置いてから実行してください): ${error.message}`);
+	}
+}
 
 /** 1〜3 枚目で共通の、図を置く箱。 */
 const STAGE = Object.freeze({ x: 56, y: 216, width: 1168, height: 560 });
 
 /**
- * 素材を data URI にする。
- * @param {string} name store/sources の中のファイル名
+ * 画像を data URI にする。
+ * @param {string} file 画像の場所
  * @returns {string} data URI
  */
-function dataUri(name) {
-	const file = path.join(SOURCES, name);
-	const type = path.extname(name).toLowerCase() === '.png' ? 'image/png' : 'image/jpeg';
-	return `data:${type};base64,${fs.readFileSync(file).toString('base64')}`;
+function dataUri(file) {
+	const type = path.extname(file).toLowerCase() === '.png' ? 'image/png' : 'image/jpeg';
+	return `data:${type};base64,${readInput(file).toString('base64')}`;
 }
 
 /**
@@ -67,7 +86,7 @@ function escapeXml(text) {
  * @returns {{width: number, height: number}} 実寸
  */
 function readSize(name) {
-	const bytes = fs.readFileSync(path.join(SOURCES, name));
+	const bytes = readInput(path.join(SOURCES, name));
 	if (bytes.subarray(1, 4).toString('ascii') === 'PNG') {
 		return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
 	}
@@ -128,7 +147,7 @@ function background() {
  */
 function brand() {
 	return `
-	<image x="56" y="44" width="30" height="30" href="${dataUri('icon-128.png')}"/>
+	<image x="56" y="44" width="30" height="30" href="${dataUri(BRAND_ICON)}"/>
 	<text x="96" y="65" font-family="${FONT}" font-size="19" font-weight="700" fill="${COLOR.muted}">XViewer for Pixiv</text>`;
 }
 
@@ -164,7 +183,7 @@ function framed(spec) {
 		</clipPath>
 	</defs>
 	<image clip-path="url(#${spec.id})" x="${spec.x}" y="${spec.y}" width="${spec.width}" height="${spec.height}"
-		preserveAspectRatio="none" href="${dataUri(spec.name)}"/>
+		preserveAspectRatio="none" href="${dataUri(path.join(SOURCES, spec.name))}"/>
 	<rect x="${spec.x}" y="${spec.y}" width="${spec.width}" height="${spec.height}" rx="${radius}" ry="${radius}"
 		fill="none" stroke="${COLOR.border}" stroke-width="1"/>`;
 }
@@ -350,16 +369,29 @@ function encodeRgbPng(rgba, width, height) {
 	]);
 }
 
-fs.mkdirSync(OUT, { recursive: true });
-for (const sheet of SHEETS) {
-	const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}"
-		viewBox="0 0 ${WIDTH} ${HEIGHT}">${sheet.build()}</svg>`;
-	const rendered = new Resvg(svg, {
-		font: { loadSystemFonts: true },
-		fitTo: { mode: 'width', value: WIDTH },
-	}).render();
-	const png = encodeRgbPng(rendered.pixels, rendered.width, rendered.height);
-	const file = path.join(OUT, `${sheet.name}.png`);
-	fs.writeFileSync(file, png);
-	console.log(`${sheet.name}.png ${rendered.width}x${rendered.height} 24bit ${Math.round(png.length / 1024)}KB`);
+/**
+ * すべてのスクリーンショットを書き出す。
+ * @returns {void}
+ */
+function build() {
+	fs.mkdirSync(OUT, { recursive: true });
+	for (const sheet of SHEETS) {
+		const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}"
+			viewBox="0 0 ${WIDTH} ${HEIGHT}">${sheet.build()}</svg>`;
+		const rendered = new Resvg(svg, {
+			font: { loadSystemFonts: true },
+			fitTo: { mode: 'width', value: WIDTH },
+		}).render();
+		const png = encodeRgbPng(rendered.pixels, rendered.width, rendered.height);
+		const file = path.join(OUT, `${sheet.name}.png`);
+		fs.writeFileSync(file, png);
+		console.log(`${sheet.name}.png ${rendered.width}x${rendered.height} 24bit ${Math.round(png.length / 1024)}KB`);
+	}
+}
+
+try {
+	build();
+} catch (error) {
+	console.error(`[build-screenshots] ${error?.message ?? error}`);
+	process.exit(1);
 }

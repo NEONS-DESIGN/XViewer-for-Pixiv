@@ -12,8 +12,8 @@ import { warn } from '../../common/log.js';
 const PASS_THROUGH_SELECTOR = 'button, a, input, textarea, select, .blocked-panel, .ugoira-controls';
 
 /**
- * 端に着いて今は送れない領域に付ける data-nav-zone の値。
- * 押しても何も起きないが、閉じたり原寸表示に入ったりもしない。カーソルは既定へ戻す
+ * 今は送れない領域に付ける data-nav-zone の値。(端に着いた向き・作品の読み込み中のページ送り)
+ * 押しても何も起きないが、閉じたり原寸表示に入ったりもしない。カーソルは送れないことを示す印にする
  */
 export const NAV_ZONE_IDLE = 'idle';
 
@@ -55,24 +55,36 @@ export function zoneAt(x, y, rect, mode, ratios = NAV_ZONE_RATIOS) {
 }
 
 /**
- * イベントが領域より優先する部品の上で起きたか。
- * 発火した時点の道筋 (composedPath) を boundary の手前まで見る。
+ * イベントが selector に当たる要素の上で起きたか。
+ * 発火した時点の道筋 (composedPath) を boundary の手前まで見る。押された要素がその後で
+ * 文書から外れても (ボタンの中のアイコンの差し替えなど)、道筋は変わらない。
  * 道筋を持たない相手 (合成したイベント等) は event.target の closest() で見る。
+ * @param {Event} event pointer / click
+ * @param {EventTarget} boundary ここより外側 (boundary 自身と祖先) は見ない
+ * @param {string} selector 当たりにする要素のセレクタ
+ * @returns {boolean} 当たる要素の上なら true
+ */
+export function eventPathMatches(event, boundary, selector) {
+	const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+	if (path.length === 0) {
+		const target = event.target;
+		return typeof target?.closest === 'function' && Boolean(target.closest(selector));
+	}
+	for (const node of path) {
+		if (node === boundary) return false;
+		if (typeof node.matches === 'function' && node.matches(selector)) return true;
+	}
+	return false;
+}
+
+/**
+ * イベントが領域より優先する部品の上で起きたか。
  * @param {Event} event pointer / click
  * @param {EventTarget} boundary ここより外側は見ない
  * @returns {boolean} 部品の上なら true
  */
 function passesThrough(event, boundary) {
-	const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
-	if (path.length === 0) {
-		const target = event.target;
-		return typeof target?.closest === 'function' && Boolean(target.closest(PASS_THROUGH_SELECTOR));
-	}
-	for (const node of path) {
-		if (node === boundary) return false;
-		if (typeof node.matches === 'function' && node.matches(PASS_THROUGH_SELECTOR)) return true;
-	}
-	return false;
+	return eventPathMatches(event, boundary, PASS_THROUGH_SELECTOR);
 }
 
 /**
@@ -84,6 +96,8 @@ function passesThrough(event, boundary) {
  * @property {(direction: number) => boolean} canMoveWork その向きへ作品を送れるか
  * @property {(direction: number) => void} movePage ページを送る
  * @property {(direction: number) => Promise<void>} moveWork 作品を送る
+ * @property {() => boolean} [isPending] 作品の読み込み中 (主役のペインがまだ無い) なら true。
+ *   その間のページ送りの領域は、送れるかが分からないので押しても閉じない (idle) 扱いにする
  */
 
 /**
@@ -98,16 +112,20 @@ export function createNavZones(deps) {
 	let lastPoint = null;
 	/** @type {string|null} 押し始めた領域。離した領域と同じときだけ送る */
 	let pressedKind = null;
+	/** @type {string|null} 今 data-nav-zone に書いている値。同じ値を書き直さない */
+	let paintedZone = null;
 
 	/**
 	 * 領域が今どう使えるかを返す。
 	 * ready はその向きへ送れる。idle は逆向きにだけ送れる (最後のページの右など)。
-	 * none はどちらにも送れない (1 枚の作品やうごイラの左右など) ので、領域として扱わない
+	 * none はどちらにも送れない (1 枚の作品やうごイラの左右など) ので、領域として扱わない。
+	 * 作品の読み込み中のページ送りは、送れるかがまだ分からないので idle にする
 	 * @param {string} kind NAV_ZONE_KINDS の値
 	 * @returns {'ready'|'idle'|'none'} 状態
 	 */
 	function stateOf(kind) {
 		const { axis, direction } = ZONE_ACTIONS[kind];
+		if (axis === 'page' && deps.isPending?.() === true) return 'idle';
 		const canMove = axis === 'page' ? deps.canMovePage : deps.canMoveWork;
 		if (canMove(direction)) return 'ready';
 		if (canMove(-direction)) return 'idle';
@@ -147,11 +165,11 @@ export function createNavZones(deps) {
 	 * @returns {void}
 	 */
 	function paint(hit) {
-		if (!hit) {
-			delete stage.dataset.navZone;
-			return;
-		}
-		stage.dataset.navZone = hit.ready ? hit.kind : NAV_ZONE_IDLE;
+		const next = hit ? (hit.ready ? hit.kind : NAV_ZONE_IDLE) : null;
+		if (next === paintedZone) return;
+		paintedZone = next;
+		if (next === null) delete stage.dataset.navZone;
+		else stage.dataset.navZone = next;
 	}
 
 	/**
@@ -178,6 +196,12 @@ export function createNavZones(deps) {
 	}
 
 	stage.addEventListener('pointermove', (event) => {
+		// オフのときは道筋も見ない。(既定がオフなので、使わない人のポインタ移動に手間を掛けない)
+		if (deps.getMode() === NAV_ZONES.OFF) {
+			lastPoint = null;
+			paint(null);
+			return;
+		}
 		lastPoint = { x: event.clientX, y: event.clientY, passed: passesThrough(event, stage) };
 		refresh();
 	});
@@ -190,10 +214,16 @@ export function createNavZones(deps) {
 	stage.addEventListener('pointerdown', (event) => {
 		pressedKind = resolve(event)?.kind ?? null;
 	}, true);
+	// 押し始めが click に届かずに終わったら覚えを捨てる。(タッチのスクロールなど)
+	// 残すと、次のキーボードでのボタンの click (pointerdown を伴わない) を止めてしまう
+	stage.addEventListener('pointercancel', () => { pressedKind = null; });
 	stage.addEventListener('click', (event) => {
 		const pressed = pressedKind;
 		pressedKind = null;
-		const hit = resolve(event);
+		// 部品の上の click は部品に任せる。領域で押し始めて部品で離したときの click は
+		// 共通祖先で起きるので、ここで抜けるのは押し始めも部品の上だったときだけ
+		if (passesThrough(event, stage)) return;
+		const hit = resolveAt(event.clientX, event.clientY, false);
 		if (!hit && !pressed) return;
 		// 領域で押し始めたか離したなら、閉じたり原寸表示に入ったりはさせない
 		event.stopImmediatePropagation();

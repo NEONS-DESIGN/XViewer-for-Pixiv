@@ -186,29 +186,30 @@ export function ugoiraMetaUrl(illustId, lang) {
  * @returns {string} URL
  */
 export function commentRootsUrl(illustId, offset, limit, lang) {
-	return `${AJAX}/illusts/comments/roots?illust_id=${illustId}&offset=${offset}&limit=${limit}&${langParam(lang)}`;
+	return `${AJAX}/illusts/comments/roots?illust_id=${encodeURIComponent(illustId)}&offset=${offset}&limit=${limit}&${langParam(lang)}`;
 }
 
 /**
  * ルートコメントへの返信。
  * offset/limit ではなく 1 始まりの page で送る。
- * @param {string} commentId ルートコメントの ID
+ * @param {string} commentId ルートコメントの ID。API の値なのでエンコードして埋める
  * @param {number} page ページ番号。1 始まり
  * @param {string} lang 言語コード (strings.lang)
  * @returns {string} URL
  */
 export function commentRepliesUrl(commentId, page, lang) {
-	return `${AJAX}/illusts/comments/replies?comment_id=${commentId}&page=${page}&${langParam(lang)}`;
+	return `${AJAX}/illusts/comments/replies?comment_id=${encodeURIComponent(commentId)}&page=${page}&${langParam(lang)}`;
 }
 
 /**
  * ユーザー情報。
+ * full=1 は付けない。使うのはアイコン (image) とフォロー状態 (isFollowed) だけで、どちらも付けなくても返る
  * @param {string} userId ユーザー ID
  * @param {string} lang 言語コード (strings.lang)
  * @returns {string} URL
  */
 export function userUrl(userId, lang) {
-	return `${AJAX}/user/${userId}?full=1&${langParam(lang)}`;
+	return `${AJAX}/user/${userId}?${langParam(lang)}`;
 }
 
 /**
@@ -227,14 +228,14 @@ export function userProfileAllUrl(userId, lang) {
  * work_category は pixiv 本体と同じ値を送る。イラスト / 漫画タブなら illust / manga、
  * 両方を並べる artworks タブなら illustManga。
  * @param {string} userId ユーザー ID
- * @param {string[]} ids 作品 ID の配列
+ * @param {string[]} ids 作品 ID の配列。API の値なのでエンコードして埋める
  * @param {boolean} isFirstPage 一覧の 1 ページ目か
  * @param {string|null} category 絞り込む種別 (WORK_CATEGORY)。null なら両方
  * @param {string} lang 言語コード (strings.lang)
  * @returns {string} URL
  */
 export function userProfileIllustsUrl(userId, ids, isFirstPage, category, lang) {
-	const query = ids.map((id) => `ids%5B%5D=${id}`).join('&');
+	const query = ids.map((id) => `ids%5B%5D=${encodeURIComponent(id)}`).join('&');
 	const firstPage = isFirstPage ? 1 : 0;
 	// 知らない値 (null / undefined を含む) は両方扱いへ倒す。値は WORK_CATEGORY_BY_TAB 経由でしか来ない
 	const workCategory = WORK_CATEGORY_QUERY[category] ?? WORK_CATEGORY_QUERY_BOTH;

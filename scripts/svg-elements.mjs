@@ -2,10 +2,8 @@
  * SVG の中身 (svg 要素の内側) を、要素名と属性の組の配列に分解する。
  * build-symbols.mjs が使う。(ここは I/O を持たない純粋な計算だけ)
  *
- * 実行時に innerHTML で文字列を流し込まず、createElementNS と setAttribute で組み立てるための下ごしらえ。
- * (innerHTML はホストページが Trusted Types を強制すると例外になり、AMO の lint も警告を出す)
+ * 実行時に innerHTML を使わず、createElementNS と setAttribute で組み立てるための下ごしらえ。
  * 受け付けるのは「子を持たない自己終了要素の並び」だけ。それ以外は黙って捨てずに例外にする。
- * 図形が欠けたまま生成が成功すると、アイコンが空に見える不具合に気づけないため。
  */
 
 /**

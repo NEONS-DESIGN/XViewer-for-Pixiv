@@ -331,6 +331,25 @@ test('フォローを切り替えたら覚えているユーザー情報へ書�
 	bar.dispose();
 });
 
+test('フォローの応答を待つ間に破棄されても、覚えているユーザー情報へは書き戻す', async () => {
+	// 押した直後に同じ作者の次の作品へ送ると、ここで書き戻さなければ
+	// その後の作品で fetchUser が押す前の状態を返し続ける。外れたボタンには触らない
+	let finish;
+	const { followContainer, bar, patched } = setup({
+		actions: { followUser: () => new Promise((resolve) => { finish = resolve; }) },
+	});
+	bar.render(DETAIL);
+	await settle();
+	const button = followContainer.children[0];
+	const clicking = button.dispatch('click');
+	bar.dispose();
+	finish();
+	await clicking;
+	assert.deepEqual(patched, [['54734418', { isFollowed: true }]]);
+	assert.equal(button.title, 'フォロー');
+	assert.equal(button.classList.contains('is-on'), false);
+});
+
 test('フォローに失敗したら書き戻さない', async () => {
 	const { followContainer, bar, patched } = setup({
 		actions: { followUser: async () => { throw new Error('500'); } },

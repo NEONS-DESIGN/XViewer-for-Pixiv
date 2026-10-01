@@ -26,7 +26,7 @@ test('getJson は FRESH_FETCH_INIT を渡すと HTTP キャッシュを確かめ
 	// pixiv の API は private, max-age=10 で返すので、指定しないと
 	// ページ側でフォローした直後でも 10 秒前の応答が使い回される
 	const { impl, calls } = fakeFetch({ json: { error: false, body: {} } });
-	await getJson('/ajax/user/1?full=1', { fetchImpl: impl }, FRESH_FETCH_INIT);
+	await getJson('/ajax/user/1?lang=ja', { fetchImpl: impl }, FRESH_FETCH_INIT);
 	assert.equal(calls[0].init.cache, 'no-cache');
 	assert.equal(calls[0].init.credentials, 'include');
 });
@@ -124,11 +124,86 @@ test('getJson は body が null でもそのまま返す', async () => {
 	assert.equal(await getJson('/ajax/x', { fetchImpl: impl }), null);
 });
 
-test('getJson は signal を fetch へ渡す', async () => {
+test('getJson が fetch へ渡す合図は、呼び出し側の中断で中断される', async () => {
+	// 時間切れを重ねるので渡した signal そのものではないが、中断は伝わる
 	const { impl, calls } = fakeFetch({ json: { error: false, body: {} } });
 	const controller = new AbortController();
 	await getJson('/ajax/x', { fetchImpl: impl, signal: controller.signal });
-	assert.equal(calls[0].init.signal, controller.signal);
+	const sent = calls[0].init.signal;
+	assert.ok(sent instanceof AbortSignal);
+	assert.equal(sent.aborted, false);
+	controller.abort();
+	assert.equal(sent.aborted, true);
+});
+
+test('getJson は init の signal も中断の合図として使う', async () => {
+	const { impl, calls } = fakeFetch({ json: { error: false, body: {} } });
+	const controller = new AbortController();
+	await getJson('/ajax/x', { fetchImpl: impl }, { signal: controller.signal });
+	controller.abort();
+	assert.equal(calls[0].init.signal.aborted, true);
+});
+
+/**
+ * 渡された signal が中断されるまで返らない fetch を作る。中断されたら signal の理由で拒否する。
+ * @param {{bodyStalls?: boolean}} [options] true なら応答は返し、本文の読み込みで止まる
+ * @returns {Function} 偽の fetch
+ */
+function hangingFetch(options = {}) {
+	const waitAbort = (signal) => new Promise((_resolve, reject) => {
+		const fail = () => reject(signal.reason ?? new DOMException('aborted', 'AbortError'));
+		if (signal.aborted) fail();
+		else signal.addEventListener('abort', fail, { once: true });
+	});
+	return async (_url, init) => {
+		if (!options.bodyStalls) return waitAbort(init.signal);
+		return { ok: true, status: 200, text: () => waitAbort(init.signal) };
+	};
+}
+
+test('getJson は時間内に応答が無ければ network として投げる', async () => {
+	await assert.rejects(
+		() => getJson('/ajax/x', { fetchImpl: hangingFetch(), timeoutMs: 10 }),
+		(error) => error.kind === PIXIV_ERROR_KINDS.NETWORK && /時間内/.test(error.message),
+	);
+});
+
+test('getJson は本文の受信中の時間切れも network として投げる', async () => {
+	await assert.rejects(
+		() => getJson('/ajax/x', { fetchImpl: hangingFetch({ bodyStalls: true }), timeoutMs: 10 }),
+		(error) => error.kind === PIXIV_ERROR_KINDS.NETWORK && /時間内/.test(error.message),
+	);
+});
+
+test('getJson は本文の受信中に中断されたら aborted として投げる', async () => {
+	// 応答のヘッダが届いた後の中断も、dispose 後の中断として黙れるように揃える
+	const controller = new AbortController();
+	const pending = getJson('/ajax/x', { fetchImpl: hangingFetch({ bodyStalls: true }), signal: controller.signal });
+	controller.abort();
+	await assert.rejects(pending, (error) => error.kind === PIXIV_ERROR_KINDS.ABORTED);
+});
+
+test('getJson は AbortSignal.any が無い環境でも時間切れと中断を見分ける', async () => {
+	const original = AbortSignal.any;
+	AbortSignal.any = undefined;
+	try {
+		await assert.rejects(
+			() => getJson('/ajax/x', { fetchImpl: hangingFetch(), timeoutMs: 10 }),
+			(error) => error.kind === PIXIV_ERROR_KINDS.NETWORK && /時間内/.test(error.message),
+		);
+		const controller = new AbortController();
+		const pending = getJson('/ajax/x', { fetchImpl: hangingFetch({ bodyStalls: true }), signal: controller.signal });
+		controller.abort();
+		await assert.rejects(pending, (error) => error.kind === PIXIV_ERROR_KINDS.ABORTED);
+	} finally {
+		AbortSignal.any = original;
+	}
+});
+
+test('POST には時間切れを付けず、渡した signal をそのまま使う', async () => {
+	const { impl, calls } = fakeFetch({ json: { error: false, body: {} } });
+	await postJson('/ajax/illusts/like', { illust_id: '1' }, 'token', { fetchImpl: impl });
+	assert.equal(calls[0].init.signal, undefined);
 });
 
 test('getJson は中断を aborted として投げる', async () => {

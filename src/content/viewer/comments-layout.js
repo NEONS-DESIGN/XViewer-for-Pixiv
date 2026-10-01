@@ -72,7 +72,7 @@ export function commentsFloorHeight({ outside, contentHeight, nthBottom }) {
 /**
  * コメント区画の採寸を作る。
  * @param {CommentsLayoutDeps} deps 依存
- * @returns {{applyFloor: () => void, watchSize: (el: HTMLElement) => void, syncScrollState: () => void, scrollToTop: () => void, watchScroll: () => void, reset: () => void, dispose: () => void}} 採寸の口
+ * @returns {{applyFloor: () => void, applyFloorUnlessWatched: () => void, watchSize: (el: HTMLElement) => void, syncScrollState: () => void, scrollToTop: () => void, watchScroll: () => void, reset: () => void, dispose: () => void}} 採寸の口
  */
 export function createCommentsLayout(deps) {
 	const { doc, container, scrollTarget, parts } = deps;
@@ -129,6 +129,17 @@ export function createCommentsLayout(deps) {
 		const next = `${Math.ceil(height)}px`;
 		// 同じ値を書くと ResizeObserver が無駄に回る
 		if (container.style.minHeight !== next) container.style.minHeight = next;
+	}
+
+	/**
+	 * 見張っている要素 (一覧・見出しの入れ物) の中を変えたあとに呼ぶ。
+	 * ResizeObserver が通知して測り直すので、見張れない環境でだけその場で測る。
+	 * DOM を変えた直後に測ると、同期のレイアウトが 1 回余計に走るため
+	 * @returns {void}
+	 */
+	function applyFloorUnlessWatched() {
+		if (doc.defaultView?.ResizeObserver) return;
+		applyFloor();
 	}
 
 	/**
@@ -223,5 +234,5 @@ export function createCommentsLayout(deps) {
 		unwatchScroll = null;
 	}
 
-	return { applyFloor, watchSize, syncScrollState, scrollToTop, watchScroll, reset, dispose };
+	return { applyFloor, applyFloorUnlessWatched, watchSize, syncScrollState, scrollToTop, watchScroll, reset, dispose };
 }

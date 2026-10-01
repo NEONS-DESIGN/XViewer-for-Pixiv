@@ -43,6 +43,16 @@ function asCount(value) {
 }
 
 /**
+ * ページ数として読む。1 以上の整数に倒す。
+ * 欠けた値をそのまま通すと、分母が NaN になり、単ページの作品でも全ページの取得へ進む。
+ * @param {unknown} value 応答の pageCount
+ * @returns {number} 1 以上の整数
+ */
+function asPageCount(value) {
+	return Math.max(1, Math.trunc(Number(value)) || 1);
+}
+
+/**
  * tags.tags[] からタグ名だけを取り出す。null 要素や名前の無い要素は落とす。
  * @param {Array<{tag?: unknown}|null>|undefined} tags raw.tags.tags
  * @returns {string[]} タグ名
@@ -58,12 +68,11 @@ function tagNames(tags) {
  * @property {string} id
  * @property {string} title
  * @property {number} illustType ILLUST_TYPES のいずれか
- * @property {number} pageCount
+ * @property {number} pageCount 1 以上の整数
  * @property {number} width 1 枚目 (単ページ作品ではその 1 枚) の実寸の幅
  * @property {number} height 1 枚目 (単ページ作品ではその 1 枚) の実寸の高さ
  * @property {number} xRestrict 0=全年齢 1=R-18 2=R-18G
  * @property {number} aiType 1=非AI 2=AI生成。未使用。
- * @property {string|null} thumbUrl
  * @property {string} userId
  * @property {string} userName
  * @property {string} createDate
@@ -127,14 +136,13 @@ export function normalizeDetail(raw) {
 	const urls = sanitizeUrls(raw.urls);
 	return {
 		id: raw.illustId,
-		title: raw.illustTitle,
+		title: raw.illustTitle ?? '',
 		illustType: raw.illustType,
-		pageCount: raw.pageCount,
+		pageCount: asPageCount(raw.pageCount),
 		width: raw.width,
 		height: raw.height,
 		xRestrict: raw.xRestrict,
 		aiType: raw.aiType,
-		thumbUrl: urls.thumb ?? null,
 		userId: raw.userId,
 		userName: raw.userName,
 		createDate: raw.createDate,

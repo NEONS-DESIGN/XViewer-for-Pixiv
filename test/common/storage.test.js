@@ -387,3 +387,157 @@ test('normalizeSettings は無限スクロールの onReach と prefetch をそ�
 		assert.equal(normalizeSettings({ infiniteScroll: value }).infiniteScroll, value);
 	}
 });
+
+/**
+ * set に渡された組を 1 回ずつ記録する保存領域。(fakeArea の written は書いた分を混ぜてしまうため)
+ * @param {object} [initial] 最初から入っている値
+ * @returns {{area: object, store: object, patches: object[], reads: () => number}} 領域・中身・set の記録・get の回数
+ */
+function recordingArea(initial = {}) {
+	const { area: inner, store } = fakeArea(initial);
+	const patches = [];
+	let reads = 0;
+	const area = {
+		async get(keys) { reads += 1; return inner.get(keys); },
+		async set(patch) { patches.push({ ...patch }); return inner.set(patch); },
+	};
+	return { area, store, patches, reads: () => reads };
+}
+
+test('saveSetting は上下の幅が保存されていない値で左右の幅を変えても、上下の幅を変えない', async () => {
+	// 上下の幅は保存されていなければ左右の幅として読む。左右だけを書くと上下まで変わってしまう
+	const { area, patches } = recordingArea({ navZoneMode: SETTING_MODES.CUSTOM, navZoneSize: 30 });
+	assert.equal(await saveSetting('navZoneSize', 20, { area }), true);
+	assert.deepEqual(patches, [{ navZoneSize: 20, navZoneSizeVertical: 30 }]);
+	assert.deepEqual(navZoneSizesOf(await loadSettings({ area })), { horizontal: 20, vertical: 30 });
+});
+
+test('saveSetting はモードが保存されていない値で幅を既定に戻しても、カスタムのままにする', async () => {
+	const { area, patches } = recordingArea({ navZoneSize: 30 });
+	await saveSetting('navZoneSize', 25, { area });
+	assert.deepEqual(patches, [{ navZoneSize: 25, navZoneSizeVertical: 30, navZoneMode: SETTING_MODES.CUSTOM }]);
+	const settings = await loadSettings({ area });
+	assert.equal(settings.navZoneMode, SETTING_MODES.CUSTOM);
+	assert.deepEqual(navZoneSizesOf(settings), { horizontal: 25, vertical: 30 });
+});
+
+test('saveSetting は何も保存していない人が左右の幅だけを変えても、上下の幅を既定のままにする', async () => {
+	const { area, patches } = recordingArea();
+	await saveSetting('navZoneMode', SETTING_MODES.CUSTOM, { area });
+	await saveSetting('navZoneSize', 10, { area });
+	assert.deepEqual(patches, [
+		{ navZoneMode: SETTING_MODES.CUSTOM },
+		{ navZoneSize: 10, navZoneSizeVertical: SETTINGS_DEFAULTS.navZoneSizeVertical },
+	]);
+});
+
+test('saveSetting はモードの無い背景の濃さを 0 にしても、カスタムの 0 として残す', async () => {
+	// モードが無いときの 0 は「テーマに合わせる」と読むので、濃さだけを書くとテーマの濃さに変わってしまう
+	const { area, patches } = recordingArea({ backdropOpacity: 70 });
+	await saveSetting('backdropOpacity', 0, { area });
+	assert.deepEqual(patches, [{ backdropOpacity: 0, backdropMode: BACKDROP_MODES.CUSTOM }]);
+	const settings = await loadSettings({ area });
+	assert.equal(settings.backdropMode, BACKDROP_MODES.CUSTOM);
+	assert.equal(settings.backdropOpacity, 0);
+});
+
+test('saveSetting は「テーマに合わせる」の 0 が残っている値でカスタムを選んでも、画面に出ていた濃さにする', async () => {
+	const { area, patches } = recordingArea({ backdropOpacity: 0 });
+	await saveSetting('backdropMode', BACKDROP_MODES.CUSTOM, { area });
+	assert.deepEqual(patches, [{ backdropMode: BACKDROP_MODES.CUSTOM, backdropOpacity: SETTINGS_DEFAULTS.backdropOpacity }]);
+	assert.equal((await loadSettings({ area })).backdropOpacity, SETTINGS_DEFAULTS.backdropOpacity);
+});
+
+test('saveSetting は読み替えで決まっていた項目を 1 回だけ一緒に書き、2 回目からは 1 項目だけ書く', async () => {
+	const { area, patches } = recordingArea({ navZoneMode: SETTING_MODES.CUSTOM, navZoneSize: 30 });
+	await saveSetting('navZoneSize', 20, { area });
+	await saveSetting('navZoneSize', 15, { area });
+	await saveSetting('navZoneSizeVertical', 10, { area });
+	assert.deepEqual(patches.slice(1), [{ navZoneSize: 15 }, { navZoneSizeVertical: 10 }]);
+});
+
+test('saveSetting は全項目が保存されている値では 1 項目だけ書く', async () => {
+	const { area, patches } = recordingArea({ ...SETTINGS_DEFAULTS });
+	for (const [key, value] of [['navZoneSize', 10], ['backdropOpacity', 0], ['backdropMode', BACKDROP_MODES.CUSTOM], ['zoomZoneSize', 5]]) {
+		await saveSetting(key, value, { area });
+	}
+	assert.deepEqual(patches, [{ navZoneSize: 10 }, { backdropOpacity: 0 }, { backdropMode: BACKDROP_MODES.CUSTOM }, { zoomZoneSize: 5 }]);
+});
+
+test('saveSetting は保存値を読めなくても 1 項目は書く', async () => {
+	const patches = [];
+	const area = {
+		get: async () => { throw new Error('no storage'); },
+		set: async (patch) => { patches.push(patch); },
+	};
+	assert.equal(await saveSetting('enabled', false, { area }), true);
+	assert.deepEqual(patches, [{ enabled: false }]);
+});
+
+test('loadSettings は読み替えの要る古い形の値でも保存領域へ書かない', async () => {
+	// 読むたびに書くと、content script の購読 (書く → onChanged → 読む) が止まらなくなる
+	const { area, patches } = recordingArea({ navZoneSize: 30, backdropOpacity: 0, zoomZoneSize: 33 });
+	const settings = await loadSettings({ area });
+	assert.equal(settings.navZoneSizeVertical, 30);
+	assert.deepEqual(patches, []);
+});
+
+test('watchSettings は最初の通知でだけ読み、以後は変更を重ね、保存領域へは書かない', async () => {
+	let listener = null;
+	const { area, patches, reads } = recordingArea({ navZoneSize: 30, prefetch: 1 });
+	const storage = {
+		sync: area,
+		onChanged: {
+			addListener(fn) { listener = fn; },
+			removeListener() { listener = null; },
+		},
+	};
+	const received = [];
+	const watch = watchSettings((settings) => received.push(settings), { storage });
+	listener({ prefetch: { oldValue: 0, newValue: 1 } }, 'sync');
+	listener({ prefetch: { oldValue: 1, newValue: 3 }, unknownKey: { newValue: true } }, 'sync');
+	listener({ navZoneSize: { oldValue: 30 } }, 'sync');
+	await flush();
+	await flush();
+	assert.equal(reads(), 1);
+	assert.deepEqual(patches, []);
+	assert.deepEqual(received.map((one) => one.prefetch), [1, 3, 3]);
+	assert.deepEqual(received.map((one) => one.navZoneSizeVertical), [30, 30, SETTINGS_DEFAULTS.navZoneSizeVertical]);
+	watch.dispose();
+});
+
+test('watchSettings は最初に読めなければ既定を渡し、次の通知で読み直す', async () => {
+	let listener = null;
+	let fail = true;
+	const { area: inner } = fakeArea({ prefetch: 3 });
+	const area = {
+		async get(keys) {
+			if (fail) throw new Error('no storage');
+			return inner.get(keys);
+		},
+	};
+	const storage = { sync: area, onChanged: { addListener(fn) { listener = fn; }, removeListener() {} } };
+	const received = [];
+	watchSettings((settings) => received.push(settings), { storage });
+	listener({}, 'sync');
+	await flush();
+	fail = false;
+	listener({}, 'sync');
+	await flush();
+	assert.deepEqual(received.map((one) => one.prefetch), [SETTINGS_DEFAULTS.prefetch, 3]);
+});
+
+test('watchSettings は sync 領域の無い storage では既定の chrome.storage.sync へ戻らず既定を渡す', async () => {
+	let listener = null;
+	const original = globalThis.chrome;
+	globalThis.chrome = { storage: { sync: fakeArea({ prefetch: 3 }).area } };
+	try {
+		const received = [];
+		watchSettings((settings) => received.push(settings), { storage: { onChanged: { addListener(fn) { listener = fn; }, removeListener() {} } } });
+		listener({}, 'sync');
+		await flush();
+		assert.deepEqual(received, [SETTINGS_DEFAULTS]);
+	} finally {
+		globalThis.chrome = original;
+	}
+});

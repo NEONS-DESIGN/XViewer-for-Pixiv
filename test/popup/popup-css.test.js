@@ -51,8 +51,8 @@ const SHARED_TOKENS = [
 	'--focus-ring',
 ];
 
-test('ここで読む popup.css / tokens.css はビルドがそのまま dist へコピーする', () => {
-	// 実物と同じファイルを見ている根拠。コピー対象から落ちると popup.html の <link> が空を指す
+test('ここで読む popup.css / tokens.css はビルドが dist の同じ相対位置へ置く (圧縮して書く)', () => {
+	// 実物と同じファイルを見ている根拠。表から落ちると popup.html の <link> が空を指す
 	for (const [from, to] of [
 		['src/popup/popup.css', `${OUT_DIR}/popup/popup.css`],
 		['src/common/tokens.css', `${OUT_DIR}/common/tokens.css`],

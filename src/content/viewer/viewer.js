@@ -33,14 +33,15 @@ import { navZoneSizesOf } from '../../common/storage.js';
 import { getJson, FRESH_FETCH_INIT } from '../../pixiv/client.js';
 import { clearUserCache } from '../../pixiv/user.js';
 import { PIXIV_ERROR_KINDS } from '../../pixiv/errors.js';
-import { artworkPath, illustUrl, safeCdnUrl, ugoiraMetaUrl } from '../../pixiv/endpoints.js';
+import { artworkPath, illustUrl, safeCdnUrl } from '../../pixiv/endpoints.js';
+import { fetchIllustPages, fetchUgoiraMeta } from '../../pixiv/illust-assets.js';
 import { normalizeDetail, ILLUST_TYPES } from '../../pixiv/normalize.js';
 import { readSession } from '../session.js';
-import { renderWork, disposeAll, movePage, canMovePage, consumeKey } from './panes.js';
+import { renderWork, rerenderMain, disposeAll, movePage, canMovePage, currentPage, consumeKey } from './panes.js';
 import { blockReason } from './blocked.js';
 import { createZoomLayer } from './zoom.js';
 import { createNavigation } from './navigation.js';
-import { createNavZones } from './nav-zones.js';
+import { createNavZones, eventPathMatches } from './nav-zones.js';
 import { createPrefetchSlot } from './prefetch-slot.js';
 
 /** ホストページのスクロールを止めるために body へ付ける style。 */
@@ -72,6 +73,13 @@ const RANGE_PASSTHROUGH_KEYS = Object.freeze([KEYS.PREV_WORK, KEYS.NEXT_WORK]);
  * closeOnBackdrop は押されたときに読むので入れない。popupTheme はビュワーに関係ない
  */
 const RERENDER_SETTING_KEYS = Object.freeze(['imageQuality', 'prefetch', 'prefetchCustom', 'showSidebar', 'clickZoom']);
+
+/**
+ * 変わったらサイドバーごと組み直す設定。(それ以外は主役のペインだけ作り直す)
+ * 覚えている作品詳細のいいね・ブックマークは、開いてから押した分が反映されていないので、
+ * 組み直すときは作品詳細から取り直す
+ */
+const SIDEBAR_RERENDER_SETTING_KEYS = Object.freeze(['showSidebar']);
 
 /** % で持つ設定 (画面端のクリック領域の幅) を 0-1 の割合へ直すときの分母。 */
 const PERCENT = 100;
@@ -141,34 +149,15 @@ function isRendered(element) {
 }
 
 /**
- * 押された相手が「押しても閉じない要素」の中にあるか。
- * テキストノードや Shadow DOM の境界で closest を持たない相手が来ることがある。
- * @param {EventTarget|null} target 押された相手
- * @returns {boolean} 閉じない要素の中なら true
- */
-function keepsOpen(target) {
-	return typeof target?.closest === 'function' && Boolean(target.closest(KEEP_OPEN_SELECTOR));
-}
-
-/**
  * イベントが「押しても閉じない要素」の上で起きたか。
- *
- * 押された要素から boundary の手前までを、発火した時点の道筋 (composedPath) で見る。
  * ボタンの click 処理が中のアイコンを差し替えると、ステージへ届いた時点の event.target は
- * 文書から外れていて closest() ではボタンを辿れないため。
- * 道筋を持たない相手 (合成したイベント等) は event.target の closest() で見る。
+ * 文書から外れていて closest() ではボタンを辿れないので、発火した時点の道筋で見る。
  * @param {Event} event click / pointerdown
  * @param {EventTarget} boundary ここより外側 (ステージ自身と祖先) は見ない
  * @returns {boolean} 閉じない要素の上なら true
  */
 function eventKeepsOpen(event, boundary) {
-	const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
-	if (path.length === 0) return keepsOpen(event.target);
-	for (const node of path) {
-		if (node === boundary) return false;
-		if (typeof node.matches === 'function' && node.matches(KEEP_OPEN_SELECTOR)) return true;
-	}
-	return false;
+	return eventPathMatches(event, boundary, KEEP_OPEN_SELECTOR);
 }
 
 /**
@@ -217,7 +206,9 @@ export function loadFailedMessage(error, strings) {
  * ビュワーを作る。
  * 生成した時点では画面に何も出さない。open() で初めて表示する。
  * @param {ViewerDeps} deps 依存
- * @returns {{open: (workId: string, nextSequence?: import('../sequence.js').Sequence) => Promise<void>, close: () => void, isOpen: () => boolean, dispose: () => void, setSettings: (s: object) => void, prefetchOnPress: (workId: string) => void, cancelPressPrefetch: () => void}}
+ * @returns {{open: (workId: string, nextSequence?: import('../sequence.js').Sequence, options?: {startPage?: number}) => Promise<void>,
+ *   close: () => void, isOpen: () => boolean, dispose: () => void, setSettings: (s: object) => void,
+ *   prefetchOnPress: (workId: string) => void, cancelPressPrefetch: () => void}}
  */
 export function createViewer(deps) {
 	const { doc, strings } = deps;
@@ -266,15 +257,20 @@ export function createViewer(deps) {
 	let openAborter = null;
 	/** 読み込み中の文言を出すタイマー ID。0 は動いていない */
 	let loadingTimer = 0;
+	/**
+	 * 作品を開いてから主役のペインを作るまでの間か。(作品詳細の取得待ち)
+	 * この間は画面端のページ送りの領域を、押しても閉じない扱いにする
+	 */
+	let awaitingPanes = false;
+	/** 開いている作品で最初に出すと頼まれたページ。描き終える前に設定が変わって開き直すときに引き継ぐ */
+	let requestedStartPage = 0;
 	/** 押し始めに取った作品詳細。押してから離すまでの間に取得を進める */
 	const pressSlot = createPrefetchSlot({ ttlMs: PRESS_PREFETCH_TTL_MS });
 	/** 前後の作品の先読み。描き終えた後に、最後に動いた向きの隣の詳細を 1 件だけ持つ */
 	const neighborSlot = createPrefetchSlot({ ttlMs: NEIGHBOR_PREFETCH_TTL_MS });
-	/** @type {{id: string, promise: Promise<object>, controller: AbortController}|null} 隣のうごイラの ugoira_meta。開いたときに一度だけ渡す */
-	let neighborMeta = null;
 	/** @type {HTMLImageElement|null} 隣の作品の 1 枚目を読んでおく Image。1 つだけ作って使い回す */
 	let neighborImage = null;
-	/** @type {string|null} 画像か meta を温めている作品 ID。別の作品を開いたら止める */
+	/** @type {string|null} 1 枚目の画像を温めている作品 ID。別の作品を開いたら止める */
 	let warmedId = null;
 	// 作品間の移動とキー操作の割り振りは navigation.js が持つ。
 	// ここに残るのはホストの構築と描画の指揮だけ
@@ -390,6 +386,7 @@ export function createViewer(deps) {
 			canMoveWork: (direction) => navigation.canMove(direction),
 			movePage,
 			moveWork: (direction) => navigation.moveWork(direction),
+			isPending: () => awaitingPanes,
 		});
 
 		// 原寸表示は overlay の直下に敷く。ステージの中に入れるとサイドバーが上に残る。
@@ -606,21 +603,12 @@ export function createViewer(deps) {
 	}
 
 	/**
-	 * 隣のうごイラの ugoira_meta の取得を止めて捨てる。
-	 * @returns {void}
-	 */
-	function stopNeighborMeta() {
-		neighborMeta?.controller.abort();
-		neighborMeta = null;
-	}
-
-	/**
-	 * 隣の作品の先読み (詳細・画像・meta) をすべて止める。
+	 * 隣の作品の先読み (詳細と画像) を止める。
+	 * /pages と ugoira_meta は作品単位で覚えて共有する取得なので止めない。(小さい JSON で、届けば次に使える)
 	 * @returns {void}
 	 */
 	function stopNeighborWarm() {
 		neighborSlot.drop();
-		stopNeighborMeta();
 		if (neighborImage) assignImageSrc(neighborImage, '');
 		warmedId = null;
 	}
@@ -634,7 +622,6 @@ export function createViewer(deps) {
 	function warmImage(workId, url) {
 		const safe = safeCdnUrl(url);
 		if (!safe) return;
-		stopNeighborMeta();
 		if (!neighborImage) {
 			neighborImage = createImage();
 			neighborImage.fetchPriority = NEIGHBOR_IMAGE_PRIORITY;
@@ -644,35 +631,25 @@ export function createViewer(deps) {
 	}
 
 	/**
-	 * 隣のうごイラの ugoira_meta を取っておく。zip は読まない。
-	 * @param {string} workId 作品 ID
+	 * 隣の作品の、開いたときに要る小さな JSON (複数枚の /pages、うごイラの ugoira_meta) を取っておく。
+	 * 作品単位で覚える取得 (pixiv/illust-assets.js) へ入れるだけで、開いたときのペインが同じものを使う。
+	 * 失敗は覚えないので、開いたときに取り直す
+	 * @param {object} detail 隣の作品の正規化した詳細
 	 * @returns {void}
 	 */
-	function warmUgoiraMeta(workId) {
-		stopNeighborMeta();
-		const controller = new AbortController();
-		const promise = fetchJson(ugoiraMetaUrl(workId, strings.lang), { signal: controller.signal });
-		// 使われずに捨てられたときに未処理の拒否を出さない
-		promise.catch(() => {});
-		neighborMeta = { id: workId, promise, controller };
-		warmedId = workId;
-	}
-
-	/**
-	 * 取っておいた ugoira_meta を渡して空にする。
-	 * @param {string} workId 作品 ID
-	 * @returns {Promise<object>|null} ugoira_meta の取得。別の作品のものか無ければ null
-	 */
-	function takeUgoiraMeta(workId) {
-		if (!neighborMeta || neighborMeta.id !== String(workId)) return null;
-		const { promise } = neighborMeta;
-		neighborMeta = null;
-		return promise;
+	function warmAssets(detail) {
+		const assetDeps = { getJsonImpl: fetchJson };
+		const pending = detail.illustType === ILLUST_TYPES.UGOIRA
+			? fetchUgoiraMeta(detail.id, strings.lang, assetDeps)
+			: detail.pageCount > 1 ? fetchIllustPages(detail.id, strings.lang, assetDeps) : null;
+		// 使われないまま失敗しても未処理の拒否を出さない
+		pending?.catch(() => {});
 	}
 
 	/**
 	 * 隣の作品を温める。設定が有効で、隣があるときだけ。
-	 * 詳細を取り、見られる作品なら 1 枚目 (うごイラは meta) まで読む。
+	 * 詳細を取り、見られる作品なら 1 枚目の画像 (うごイラは poster) と、
+	 * 複数枚の /pages・うごイラの ugoira_meta まで取る。zip は読まない。
 	 * 見られない作品は詳細だけで、画像は読まない。
 	 * @returns {void}
 	 */
@@ -687,10 +664,14 @@ export function createViewer(deps) {
 			if (neighborSlot.peekPromise() !== promise) return;
 			const detail = normalizeDetail(raw);
 			if (blockReason(detail, readSession(doc))) return;
-			if (detail.illustType === ILLUST_TYPES.UGOIRA) warmUgoiraMeta(id);
-			else warmImage(id, detail.urls[settings.imageQuality] ?? detail.urls[IMAGE_QUALITY.REGULAR]);
+			// 1 枚目は開いたときと同じ URL を選ぶ。(うごイラの poster は画質の設定に依らず標準画質)
+			warmImage(id, detail.illustType === ILLUST_TYPES.UGOIRA
+				? detail.urls[IMAGE_QUALITY.REGULAR]
+				: detail.urls[settings.imageQuality] ?? detail.urls[IMAGE_QUALITY.REGULAR]);
+			warmAssets(detail);
 		}).catch(() => {
-			// 失敗した応答を開くときに使わせない。開いたときに取り直させる
+			// 取得の失敗は枠が自分で捨てる。ここに来るのは届いた詳細を読めなかったとき (正規化の失敗など)。
+			// 読めない応答を開くときに使わせない。開いたときに取り直させる
 			if (neighborSlot.peekPromise() === promise) neighborSlot.drop();
 		});
 	}
@@ -749,6 +730,41 @@ export function createViewer(deps) {
 	}
 
 	/**
+	 * ペインへ渡す描画先と差し替え口を組む。
+	 * @param {number} startPage 最初に出すページ (0 始まり)
+	 * @returns {import('./panes.js').RenderTargets} 描画先
+	 */
+	function renderTargets(startPage) {
+		return {
+			doc,
+			stage,
+			sidebar,
+			zoom: zoomLayer,
+			fetchUser: deps.fetchUser,
+			strings,
+			startPage,
+			ugoiraRate,
+			onUgoiraRateChange: (rate) => { ugoiraRate = rate; },
+		};
+	}
+
+	/**
+	 * 描画の失敗を出す。描きかけのペインを捨ててから文言を出す。
+	 * 捨てないと、主役の描画で落ちたときに .frame や .ugoira の横に文言が並ぶ。
+	 * 覚えている作品詳細も捨てる。設定が変わったときに主役だけを描き足さず、取得から組み直させるため
+	 * @param {string} workId 作品 ID (warn に残す)
+	 * @param {unknown} error 失敗の理由
+	 * @returns {void}
+	 */
+	function showRenderFailure(workId, error) {
+		lastDetail = null;
+		zoomLayer?.close();
+		disposeAll();
+		showStatus(strings.viewer.LOAD_FAILED, STATUS_KINDS.ERROR);
+		warn('failed to render', workId, error);
+	}
+
+	/**
 	 * 作品詳細を描く。取得済みの detail からペインを組み立てる部分だけを持つ。
 	 * 失敗したら描きかけのペインを捨ててから文言を出す。
 	 * 捨てないと、主役の描画で落ちたときに .frame や .ugoira の横に文言が並ぶ。
@@ -759,33 +775,55 @@ export function createViewer(deps) {
 	 */
 	async function renderDetail(detail, token, startPage = 0) {
 		cancelLoadingStatus();
+		// ここから主役のペインを作るので、ページ送りの領域を読み込み中の扱いから戻す
+		awaitingPanes = false;
 		try {
 			clearStatus();
 			overlay.setAttribute('aria-label', `${detail.title} - ${strings.viewer.DIALOG_LABEL}`);
-			await renderWork(detail, readSession(doc), settings, {
-				doc,
-				stage,
-				sidebar,
-				zoom: zoomLayer,
-				fetchUser: deps.fetchUser,
-				strings,
-				takeUgoiraMeta,
-				startPage,
-				ugoiraRate,
-				onUgoiraRateChange: (rate) => { ugoiraRate = rate; },
-			});
+			await renderWork(detail, readSession(doc), settings, renderTargets(startPage));
 		} catch (error) {
 			if (token !== requestToken) return;
-			zoomLayer?.close();
-			disposeAll();
-			showStatus(strings.viewer.LOAD_FAILED, STATUS_KINDS.ERROR);
-			warn('failed to render', detail.id, error);
+			showRenderFailure(detail.id, error);
 			return;
 		}
 		if (token !== requestToken) return;
 		// 枚数が決まったので、ポインタの下の領域のカーソルを合わせ直す
 		navZones?.refresh();
 		// 主役を組み終えてから、低い優先度で隣を温める
+		warmNeighbor();
+	}
+
+	/**
+	 * 設定が変わったときに、主役 (画像 / うごイラ) だけを描き直す。
+	 * サイドバー・コメント・アクションは作り直さないので、通信も読んでいた位置もそのまま。
+	 * 画像は今見ているページから開き直す。主役が変わった設定を読んでいなければ何もしない
+	 * @param {string[]} changedKeys 変わった設定のキー
+	 * @returns {Promise<void>}
+	 */
+	async function redrawMain(changedKeys) {
+		const startPage = currentPage() ?? 0;
+		// 原寸表示を開けるのは画像だけで、画像は主役の設定のどれが変わっても作り直す
+		zoomLayer?.close();
+		let done;
+		let token;
+		try {
+			const result = rerenderMain(lastDetail, readSession(doc), settings, renderTargets(startPage), changedKeys);
+			if (!result.rebuilt) return;
+			token = ++requestToken;
+			done = result.done;
+		} catch (error) {
+			showRenderFailure(lastDetail.id, error);
+			return;
+		}
+		try {
+			await done;
+		} catch (error) {
+			if (token !== requestToken) return;
+			showRenderFailure(lastDetail?.id, error);
+			return;
+		}
+		if (token !== requestToken) return;
+		navZones?.refresh();
 		warmNeighbor();
 	}
 
@@ -798,6 +836,8 @@ export function createViewer(deps) {
 	async function openWork(workId, startPage = 0) {
 		const token = ++requestToken;
 		navigation.setCurrentWorkId(workId);
+		requestedStartPage = startPage;
+		awaitingPanes = true;
 		// 前の作品の取得は止める。世代で捨てるだけだと応答を最後まで受信してしまう
 		openAborter?.abort();
 		const hit = takePrefetched(workId);
@@ -835,6 +875,8 @@ export function createViewer(deps) {
 		// 原寸表示も一緒に閉じる。開いたまま作品を移ると、次の作品の原寸画像を毎回読むことになる
 		zoomLayer?.close();
 		disposeAll();
+		// 主役のペインが無くなったので、ポインタの下の領域を読み込み中の扱いに描き直す
+		navZones?.refresh();
 		// 開いた直後のキー操作がモーダルへ届くようにする。
 		// 作品を送ったときは押していたボタンがペインごと消えてフォーカスが body へ落ちるので、
 		// 中に無くなっていたらダイアログ本体へ戻す。(読み上げが文脈を失わないように)
@@ -860,6 +902,11 @@ export function createViewer(deps) {
 			// 中断による失敗は次の要求が引き継ぐので、画面にも warn にも出さない
 			if (token !== requestToken || error?.kind === PIXIV_ERROR_KINDS.ABORTED) return;
 			cancelLoadingStatus();
+			// 描けないことが決まったので、ページ送りの領域は今までどおり余白として扱う
+			awaitingPanes = false;
+			// 同じ作品の開き直しに失敗したときも、前の詳細から主役だけを描き足させない
+			lastDetail = null;
+			navZones?.refresh();
 			showStatus(loadFailedMessage(error, strings), STATUS_KINDS.ERROR);
 			warn('failed to open', workId, error);
 			return;
@@ -887,6 +934,8 @@ export function createViewer(deps) {
 		// 取得の途中で閉じたときに、応答が返ってから描き直さないようにする
 		requestToken += 1;
 		lastDetail = null;
+		awaitingPanes = false;
+		requestedStartPage = 0;
 		pressKeptOpen = false;
 		doc.removeEventListener('keydown', onKeyDown, true);
 		unlockBody();
@@ -937,8 +986,9 @@ export function createViewer(deps) {
 		 * 設定を差し替える。popup で変えた値を即座に反映するため。
 		 * 描画に効く項目が変わっていて作品を開いていれば、その作品を描き直す。
 		 * ペインは生成時の設定を掴んでいるので、差し替えるだけでは今の作品に効かない。
-		 * 描き直しは覚えている作品詳細から行い、通信はしない。
-		 * 取得の途中 (覚えている詳細が今の作品と違う) なら取得からやり直す
+		 * 主役の設定だけなら主役のペインだけを覚えている作品詳細から作り直す。(作品詳細もコメントも取り直さない)
+		 * サイドバーの設定が変わったときと、取得の途中 (主役のペインをまだ作っていない) なら取得からやり直す。
+		 * どちらも今見ているページ (取得の途中なら頼まれていたページ) から開く
 		 * @param {object} next 新しい設定
 		 * @returns {void}
 		 */
@@ -954,15 +1004,14 @@ export function createViewer(deps) {
 			applyWorkLink(workId);
 			applySidebarToggle();
 			navZones?.refresh();
-			if (!RERENDER_SETTING_KEYS.some((key) => previous[key] !== next[key])) return;
-			if (!lastDetail || String(lastDetail.id) !== String(workId)) {
-				void openWork(workId);
+			const changed = RERENDER_SETTING_KEYS.filter((key) => previous[key] !== next[key]);
+			if (changed.length === 0) return;
+			const midFetch = awaitingPanes || !lastDetail || String(lastDetail.id) !== String(workId);
+			if (midFetch || changed.some((key) => SIDEBAR_RERENDER_SETTING_KEYS.includes(key))) {
+				void openWork(workId, midFetch ? requestedStartPage : (currentPage() ?? requestedStartPage));
 				return;
 			}
-			const token = ++requestToken;
-			zoomLayer?.close();
-			disposeAll();
-			void renderDetail(lastDetail, token);
+			void redrawMain(changed);
 		},
 
 		// close と同じ。呼び出し側 (main.js) の撤去の作法に合わせた別名

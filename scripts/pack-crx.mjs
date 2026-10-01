@@ -16,7 +16,7 @@
 import { spawnSync } from 'node:child_process';
 import { createPrivateKey, createPublicKey } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { copyFile, cp, mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -131,16 +131,36 @@ async function readPublicKeyFromPrivate(path) {
 }
 
 /**
+ * JSON ファイルを読む。
+ * @param {string} path ファイルの場所
+ * @returns {Promise<object>} 中身
+ * @throws {Error} 読めない・JSON として解釈できないとき
+ */
+async function readJson(path) {
+	let text;
+	try {
+		text = await readFile(path, 'utf8');
+	} catch (error) {
+		throw new Error(`${path} を読めません: ${error.message}`);
+	}
+	try {
+		return JSON.parse(text);
+	} catch (error) {
+		throw new Error(`${path} を JSON として読めません: ${error.message}`);
+	}
+}
+
+/**
  * ビルドし直し、dist の manifest が package.json の version になっているかを確かめる。
  * @returns {Promise<string>} package.json の version
  * @throws {Error} ビルドの失敗、version の不一致
  */
 async function buildAndCheckVersion() {
-	const { version } = JSON.parse(await readFile(PACKAGE_JSON, 'utf8'));
+	const { version } = await readJson(PACKAGE_JSON);
 	// CRX は Chrome 系の出力 (dist) だけを使う。Firefox 側のビルドの失敗に巻き込まれないよう Chrome 系だけ作る
 	const result = spawnSync(process.execPath, ['scripts/build.mjs', '--target=chrome'], { stdio: 'inherit' });
 	if (result.status !== 0) throw new Error('ビルドに失敗しました');
-	const manifest = JSON.parse(await readFile(join(OUT_DIR, 'manifest.json'), 'utf8'));
+	const manifest = await readJson(join(OUT_DIR, 'manifest.json'));
 	const expected = toManifestVersion(version);
 	if (manifest.version !== expected) {
 		throw new Error(`dist/manifest.json の version (${manifest.version}) が package.json (${expected}) と合いません`);
@@ -201,7 +221,11 @@ async function packWithChrome(chrome, keyPath, workDir) {
 		// 失敗してもダイアログで止まらないようにする
 		'--no-message-box',
 	], { timeout: CHROME_TIMEOUT_MS, stdio: 'inherit' });
+	if (result.error?.code === 'ETIMEDOUT') {
+		throw new Error(`Chrome が ${CHROME_TIMEOUT_MS / 1000} 秒以内に終わりませんでした`);
+	}
 	if (result.error) throw new Error(`Chrome を起動できません: ${result.error.message}`);
+	if (result.signal) throw new Error(`Chrome がシグナル ${result.signal} で止まりました`);
 	if (result.status !== 0) throw new Error(`Chrome が異常終了しました (終了コード ${result.status})`);
 	const crxPath = `${extensionDir}.crx`;
 	await waitForFile(crxPath);
@@ -228,7 +252,8 @@ async function main() {
 		const crx = await packWithChrome(chrome, options.key, workDir);
 		const { archiveSize } = verifyCrx3(crx, publicKey);
 		await mkdir(options.outDir, { recursive: true });
-		await copyFile(join(workDir, `${PACK_DIR_NAME}.crx`), outPath);
+		// 検証したバイト列そのものを書く
+		await writeFile(outPath, crx);
 		console.log(`[pack:crx] 署名を検証しました (zip 本体 ${archiveSize} bytes)`);
 		console.log(`[pack:crx] ${outPath} (${crx.length} bytes, version ${version})`);
 	} finally {

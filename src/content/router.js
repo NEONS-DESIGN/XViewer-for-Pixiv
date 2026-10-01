@@ -84,7 +84,7 @@ export function createEntryTracker(win = window) {
 export function replaceUrlKeepingState(url, win = window) {
 	win.dispatchEvent(new CustomEvent(NAV_EVENTS.REPLACE_URL, { detail: url }));
 	if (win.location.href !== url) {
-		throw new Error(`URL を書き換えられませんでした: ${url}`);
+		throw new Error(`URL replace failed: ${url}`);
 	}
 }
 

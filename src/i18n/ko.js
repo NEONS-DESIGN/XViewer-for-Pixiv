@@ -52,7 +52,7 @@ export default {
 		WORK_PAGE_TITLE: '작품 페이지를 새 탭에서 열기',
 		SIDEBAR_OPEN: '사이드바 열기',
 		SIDEBAR_CLOSE: '사이드바 닫기',
-		LOADING: '불러오는 중...',
+		LOADING: '불러오는 중…',
 		LOAD_FAILED: '작품을 불러오지 못했습니다',
 		NOT_FOUND: '작품을 찾을 수 없습니다. 삭제되었거나 비공개로 바뀌었을 수 있습니다',
 		NETWORK_FAILED: '통신에 실패했습니다. 연결을 확인한 뒤 다시 열어 주세요',
@@ -171,7 +171,6 @@ export default {
 		PICK: '이모지와 스탬프',
 		STAMP_ALT: '스탬프',
 		STAMP_CLEAR: '선택한 스탬프 취소',
-		FAILED: '댓글을 등록하지 못했습니다',
 	},
 	commentPicker: {
 		EMOJI: '이모지',
@@ -254,14 +253,14 @@ export default {
 			 * @param {string} label 親の項目の見出し
 			 * @returns {string} 警告
 			 */
-			turnOn: (label) => `「${label}」을(를) 켜 주세요.`,
+			turnOn: (label) => `‘${label}’을(를) 켜 주세요.`,
 			/**
 			 * 親の選択肢で「オフ」以外を選ぶよう促す。
 			 * @param {string} label 親の項目の見出し
 			 * @param {string} off 親の選択肢のうちオフに当たるものの見出し
 			 * @returns {string} 警告
 			 */
-			chooseOther: (label, off) => `「${label}」에서 「${off}」 이외의 항목을 선택해 주세요.`,
+			chooseOther: (label, off) => `‘${label}’에서 ‘${off}’ 이외의 항목을 선택해 주세요.`,
 		},
 		SAVE_FAILED: '저장하지 못했습니다. 브라우저의 설정 동기화를 확인해 주세요.',
 		RESET_FAILED: '초기화하지 못했습니다. 브라우저의 설정 동기화를 확인해 주세요.',
@@ -295,15 +294,15 @@ export default {
 			},
 			viewerOnUser: {
 				label: '사용자 페이지에서 사용',
-				description: '작가 페이지의 작품 목록에서 열 때 뷰어를 표시합니다.',
+				description: '사용자 페이지의 작품 목록에서 열 때 뷰어를 표시합니다.',
 			},
 			viewerOnHome: {
 				label: '홈에서 사용',
-				description: 'pixiv 홈 (홈 / 일러스트 / 만화) 의 작품에서 열 때 뷰어를 표시합니다.',
+				description: 'pixiv 홈(홈 / 일러스트 / 만화)의 작품에서 열 때 뷰어를 표시합니다.',
 			},
 			viewerOnSearch: {
 				label: '검색 결과에서 사용',
-				description: '태그 검색 결과에서 열 때 뷰어를 표시합니다.',
+				description: '검색 결과(태그 페이지와 검색 화면)에서 열 때 뷰어를 표시합니다.',
 			},
 			showSidebar: {
 				label: '사이드바 표시',
@@ -439,7 +438,7 @@ export default {
 			},
 			zoomZoneMode: {
 				label: '원본 크기 보기의 클릭 영역 너비',
-				description: '원본 크기 보기 화면에서 좌우 가장자리를 눌러 페이지를 넘기는 범위의 너비입니다.',
+				description: '원본 크기 보기 화면에서 페이지를 넘길 때 쓰는 좌우 가장자리의 너비입니다.',
 				/**
 				 * 「カスタム」の選択肢。値は選択肢の下に出るレンジで選ぶ。
 				 * @param {number} min 選べる最小の値 (%)
@@ -459,7 +458,7 @@ export default {
 			},
 			commentPageSize: {
 				label: '한 번에 불러올 댓글 수',
-				description: '열었을 때와 「더보기」를 눌렀을 때 불러오는 개수입니다. 다음에 여는 작품부터 바뀝니다.',
+				description: '열었을 때와 ‘더보기’를 눌렀을 때 불러오는 개수입니다. 다음에 여는 작품부터 바뀝니다.',
 				/**
 				 * 選択肢の見出し。値から作る。
 				 * @param {number} value 選択肢の値
@@ -524,7 +523,7 @@ export default {
 				description: 'Tab으로 다음 작품으로 이동할 때 건너뛰는 방식입니다.',
 				both: {
 					label: '북마크와 제목 건너뛰기',
-					description: '카드는 ‘썸네일 → 북마크 → 제목’ 3곳을 차례로 거칩니다. 건너뛰면 Tab 한 번으로 다음 작품으로 이동할 수 있으며, 건너뛴 조작은 뷰어 안에서 할 수 있습니다.',
+					description: '사용자 페이지의 카드는 ‘썸네일 → 북마크 → 제목’ 3곳을 차례로 거칩니다. 건너뛰면 Tab 한 번으로 다음 작품으로 이동할 수 있습니다. 홈과 검색에서는 작가 링크를 건너뛰지 않습니다.',
 				},
 				title: {
 					label: '제목만 건너뛰기',

@@ -6,7 +6,8 @@
 import { loadSettings as loadSettingsImpl, saveSetting as saveSettingImpl, resetSettings as resetSettingsImpl } from '../common/storage.js';
 import { logError } from '../common/log.js';
 import { loadPageLanguage as loadPageLanguageImpl } from '../common/language-store.js';
-import { normalizeLanguage, uiLanguage } from '../common/language.js';
+import { normalizeLanguage, uiLanguage, DEFAULT_LANGUAGE } from '../common/language.js';
+import { SETTINGS_DEFAULTS } from '../common/constants.js';
 import { loadStrings as loadStringsImpl } from '../i18n/load.js';
 import { renderPopup as renderPopupImpl } from './popup-ui.js';
 
@@ -42,6 +43,24 @@ export async function resolvePopupLanguage(deps = {}) {
 	return uiLanguage(stored ?? normalizeLanguage(getUILanguage()));
 }
 
+/**
+ * 文言カタログを読む。その言語の分が読めなければ既定の言語 (DEFAULT_LANGUAGE) で読み直す。
+ * (言語ごとの断片が読めないだけで設定画面を空にしない)
+ * @param {(lang: string) => Promise<object>} loadStrings カタログの読み出し
+ * @param {string} lang 使いたい言語
+ * @param {(message: string, ...details: unknown[]) => void} report 読み直したことの記録
+ * @returns {Promise<object>} 文言のカタログ。既定の言語でも読めなければ reject
+ */
+async function loadCatalog(loadStrings, lang, report) {
+	try {
+		return await loadStrings(lang);
+	} catch (error) {
+		if (lang === DEFAULT_LANGUAGE) throw error;
+		report('popup: 文言を読めなかったので既定の言語で描きます', lang, error);
+		return loadStrings(DEFAULT_LANGUAGE);
+	}
+}
+
 /** 描き先の要素の id (popup.html)。 */
 const ROOT_ID = 'app';
 
@@ -62,7 +81,7 @@ function roleSelector(role) {
  * @param {typeof saveSettingImpl} [deps.saveSetting] 設定の保存
  * @param {typeof resetSettingsImpl} [deps.resetSettings] 設定の初期化
  * @param {typeof renderPopupImpl} [deps.renderPopup] 画面の描画
- * @param {typeof logError} [deps.report] 描画に失敗したときの記録
+ * @param {typeof logError} [deps.report] 失敗の記録 (描画・保存・初期化・文言の読み直し)
  * @param {() => Promise<string|null>} [deps.loadPageLanguage] pixiv の表示言語の読み出し (resolvePopupLanguage へ渡す)
  * @param {() => string} [deps.getUILanguage] ブラウザの UI 言語の読み出し (resolvePopupLanguage へ渡す)
  * @param {typeof loadStringsImpl} [deps.loadStrings] 文言カタログの読み出し
@@ -87,7 +106,7 @@ export async function main({
 		loadSettings(),
 		resolvePopupLanguage({ loadPageLanguage, getUILanguage }),
 	]);
-	const strings = await loadStrings(lang);
+	const strings = await loadCatalog(loadStrings, lang, report);
 	// popup.html は lang="ja" で書いてある。実際に描く言語へ合わせる
 	doc.documentElement.lang = strings.lang;
 
@@ -126,7 +145,7 @@ export async function main({
 	 * 利用者の現在地 (開いているタブ・フォーカス) は描き直しの外で持って復元する。
 	 * 描画の例外はここで受けて記録する。呼び出し側は結果を待たないので、放すと素の unhandled rejection になる
 	 * @param {{focusRole?: string|null, settings?: object}} [options] 描き直した後にフォーカスを戻す要素の data-role。
-	 *   settings を渡すと読み直さずそれを使う (main() が言語の解決と同時に読んだ初回分の使い回し)
+	 *   settings を渡すと読み直さずそれを使う (main() が言語の解決と同時に読んだ初回分と、初期化できた後の既定)
 	 * @returns {Promise<void>} 完了
 	 */
 	async function refresh({ focusRole = null, settings: preloadedSettings } = {}) {
@@ -184,8 +203,9 @@ export async function main({
 	function onReset() {
 		void track(resetSettings()).then((done) => {
 			notice = done ? null : strings.popup.RESET_FAILED;
-			// 確定ボタンを押した直後の現在地は、描き直した後の初期化ボタンに戻す
-			return refresh({ focusRole: 'reset' });
+			// 確定ボタンを押した直後の現在地は、描き直した後の初期化ボタンに戻す。
+			// 戻せたなら中身は既定そのものなので読み直さない。失敗したときは保存済みの値を読み直す
+			return refresh({ focusRole: 'reset', settings: done ? { ...SETTINGS_DEFAULTS } : undefined });
 		}).catch((error) => report('popup: 設定の初期化に失敗しました', error));
 	}
 

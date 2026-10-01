@@ -159,3 +159,22 @@ test('応答に無い ID (非公開になった作品など) は落とす', asyn
 	const page = await source.loadPage(1);
 	assert.deepEqual(page.map((w) => w.id), ['300', '100']);
 });
+
+test('profile/all の body がオブジェクトでなければ拒否し、覚えずに次で取り直す', async () => {
+	// 空の索引を成功として覚えると、ページを開いている間ずっとその作者の並びが空になる
+	let calls = 0;
+	const impl = async () => {
+		calls += 1;
+		return calls === 1 ? null : { illusts: { 200: null, 100: null }, manga: {} };
+	};
+	await assert.rejects(() => loadAllWorkIds('1', null, 'ja', { getJsonImpl: impl }), (error) => error.kind === 'parse');
+	assert.deepEqual(await loadAllWorkIds('1', null, 'ja', { getJsonImpl: impl }), ['200', '100']);
+	assert.equal(calls, 2);
+});
+
+test('知らない category は両方の並びへ倒す', async () => {
+	const { impl } = fakeGet(['300', '100'], ['200']);
+	assert.deepEqual(await loadAllWorkIds('1', 'unknown', 'ja', { getJsonImpl: impl }), ['300', '200', '100']);
+	const source = createPageSource('1', 'unknown', 'ja', { getJsonImpl: impl });
+	assert.equal(await source.pageCount(), 1);
+});

@@ -12,29 +12,19 @@ import { KEYS, INERT_ATTRIBUTE } from '../../common/constants.js';
 import { createIcon } from '../../common/icons.js';
 import { assignImageSrc } from '../../common/image-source.js';
 import { createNoticeArea, NOTICE_KINDS } from '../../common/notice.js';
+import { hasModifier } from './navigation.js';
 
 /** 標準画質の仮表示中に出す通知の ID。1 つしか出さないので固定値で足りる。 */
 const PREVIEW_NOTICE_ID = 'zoom-preview';
 
 /**
  * 左右のクリック領域の見た目。
- * pixiv 本体は上下 (上 20% が前 / 下 40% が次) に置くが、この拡張では左右に置く。
  * 幅は viewer.css の --zoom-zone-width が持つ。ラベルは文言カタログ (strings.zoom) から引く
  */
 const ZONE_SHAPES = Object.freeze({
 	prev: Object.freeze({ messageKey: 'PREV_PAGE', key: '←', icon: 'chevronLeft', step: -1 }),
 	next: Object.freeze({ messageKey: 'NEXT_PAGE', key: '→', icon: 'chevronRight', step: 1 }),
 });
-
-/**
- * 修飾キーが押されているか。
- * Alt+← (ブラウザの「戻る」) を原寸表示が潰さないための判定。navigation.js と同じ扱い。
- * @param {KeyboardEvent} event キー
- * @returns {boolean} Alt / Ctrl / Meta のどれかが押されていれば true
- */
-function hasModifier(event) {
-	return event.altKey === true || event.ctrlKey === true || event.metaKey === true;
-}
 
 /**
  * @typedef {object} ZoomPages 原寸表示に渡すページの指定
@@ -46,6 +36,8 @@ function hasModifier(event) {
  *   通信を起こさず読み込み済みのものだけを返す。無ければ仮表示をしない
  * @property {Array<{width: number, height: number} | null>} [sizes] ページごとの実寸。
  *   仮表示を原寸と同じ大きさへ引き伸ばすために使う
+ * @property {() => void} [onClose] 利用者の操作 (押す・Escape・上下キー) で閉じたときに呼ばれる。
+ *   close() を外から呼んだとき (作品の移動・描き直し・ビュワーを閉じる) は呼ばない
  */
 
 /**
@@ -61,7 +53,8 @@ function hasModifier(event) {
  * 原寸表示のレイヤを作る。
  * 生成した時点では何も出さない。open() で初めて組み立てる。
  * @param {ZoomLayerDeps} deps 依存
- * @returns {{open: (pages: ZoomPages) => void, close: () => void, isOpen: () => boolean, consumeKey: (event: KeyboardEvent) => boolean, dispose: () => void}}
+ * @returns {{open: (pages: ZoomPages) => void, updatePages: (pages: {urls: string[], sizes?: Array<{width: number, height: number} | null>}) => void,
+ *   close: () => void, isOpen: () => boolean, consumeKey: (event: KeyboardEvent) => boolean, dispose: () => void}}
  */
 export function createZoomLayer(deps) {
 	const { doc, container, strings } = deps;
@@ -93,6 +86,8 @@ export function createZoomLayer(deps) {
 	let placeholderAt = null;
 	/** @type {Array<{width: number, height: number} | null>|null} ページごとの実寸 */
 	let sizes = null;
+	/** @type {(() => void)|null} 利用者の操作で閉じたことの通知先 (画像ペイン) */
+	let onClose = null;
 	/** @type {HTMLImageElement|null} 原寸を読み込み中の Image。仮表示をしていない間は null */
 	let upgrade = null;
 	/** @type {{onLoad: () => void, onError: () => void}|null} upgrade に付けたリスナ。取り消すときに外す */
@@ -254,6 +249,14 @@ export function createZoomLayer(deps) {
 			assignImageSrc(image, url);
 		}
 		if (!url) showZoomError();
+		paintControls();
+	}
+
+	/**
+	 * カウンタとクリック領域を今の番号と枚数に合わせる。画像には触らない
+	 * @returns {void}
+	 */
+	function paintControls() {
 		if (counter) {
 			counter.textContent = `${index + 1}/${urls.length}`;
 			counter.hidden = urls.length <= 1;
@@ -305,7 +308,18 @@ export function createZoomLayer(deps) {
 		onIndexChange = null;
 		placeholderAt = null;
 		sizes = null;
+		onClose = null;
 		deps.restoreFocus?.();
+	}
+
+	/**
+	 * 利用者の操作で閉じる。閉じたことを渡し元 (画像ペイン) へ知らせる。
+	 * @returns {void}
+	 */
+	function dismiss() {
+		const notify = onClose;
+		close();
+		notify?.();
 	}
 
 	return {
@@ -327,6 +341,7 @@ export function createZoomLayer(deps) {
 			onIndexChange = typeof pages.onIndexChange === 'function' ? pages.onIndexChange : null;
 			placeholderAt = typeof pages.placeholderAt === 'function' ? pages.placeholderAt : null;
 			sizes = Array.isArray(pages.sizes) ? pages.sizes : null;
+			onClose = typeof pages.onClose === 'function' ? pages.onClose : null;
 
 			layer = doc.createElement('div');
 			layer.className = 'zoom';
@@ -353,11 +368,26 @@ export function createZoomLayer(deps) {
 			// 中身より先に空の置き場を置く。支援技術は既にある live region の変化を読み上げる
 			notices = createNoticeArea(doc, layer);
 			// 画像の上でも余白でも、クリック領域以外を押したら閉じる (pixiv 本体と同じ)
-			layer.addEventListener('click', () => close());
+			layer.addEventListener('click', () => dismiss());
 			container.appendChild(layer);
 			lockBehind();
 			paint();
 			layer.focus?.();
+		},
+
+		/**
+		 * 開いたままページの並びを差し替える。(開いた後に /pages が届いたとき)
+		 * 今のページの画像は読み直さず、カウンタとクリック領域だけを合わせる。
+		 * 閉じている・空の並びなら何もしない
+		 * @param {{urls: string[], sizes?: Array<{width: number, height: number} | null>}} pages 新しい並び
+		 * @returns {void}
+		 */
+		updatePages(pages) {
+			if (!layer || !Array.isArray(pages?.urls) || pages.urls.length === 0) return;
+			urls = pages.urls;
+			if (Array.isArray(pages.sizes)) sizes = pages.sizes;
+			index = Math.min(index, urls.length - 1);
+			paintControls();
 		},
 
 		close,
@@ -378,7 +408,7 @@ export function createZoomLayer(deps) {
 			if (!layer) return false;
 			if (event.isComposing === true) return false;
 			if (event.key === KEYS.CLOSE) {
-				close();
+				dismiss();
 				return true;
 			}
 			if (hasModifier(event)) return false;
@@ -391,7 +421,7 @@ export function createZoomLayer(deps) {
 				return true;
 			}
 			if (event.key === KEYS.NEXT_WORK || event.key === KEYS.PREV_WORK) {
-				close();
+				dismiss();
 				return false;
 			}
 			return false;

@@ -24,7 +24,7 @@ import { toManifestVersion } from './manifest-version.mjs';
 // コピーする静的ファイルの表は static-files.mjs にある。(副作用なしのモジュールにしてテストからも読む)
 import { staticFilesFor } from './static-files.mjs';
 import { resolveTargets } from './browsers.mjs';
-import { cssTextPlugin } from './css-text-plugin.mjs';
+import { cssTextPlugin, minifyCssText } from './css-text-plugin.mjs';
 
 /** 監視モードで起動するか。 */
 const WATCH = process.argv.includes('--watch');
@@ -41,6 +41,9 @@ const ENTRY_POINTS = Object.freeze({
 	// page world へ注入する分。content.js とは別 world なので束を分ける
 	inject: 'src/inject/inject.js',
 });
+
+/** 静的ファイルのうち、コピーの代わりに圧縮して書き出すもの。(popup が <link> で読む CSS) 監視中は素のまま置く。 */
+const CSS_FILE_PATTERN = /\.css$/;
 
 /** popup だけの束ねる入口。popup は拡張のページなので ESM で言語のカタログを分割できる。 */
 const POPUP_ENTRY_POINTS = Object.freeze({ 'popup/popup': 'src/popup/popup.js' });
@@ -59,6 +62,8 @@ function buildOptionsFor(target) {
 		target: target.esbuildTarget,
 		// 監視中は読みやすさを残す。配布物は縮める
 		minify: !WATCH,
+		// 日本語などの文字を \uXXXX に逃がさず UTF-8 のまま出す
+		charset: 'utf8',
 		// viewer.css と common/tokens.css を圧縮してから文字列として import する
 		plugins: [cssTextPlugin(target.esbuildTarget)],
 		logLevel: 'info',
@@ -139,9 +144,13 @@ async function copyStatic(target) {
 		// コピー先からディレクトリを決める。置き場所が増えても書き足さなくて済む
 		await mkdir(dirname(to), { recursive: true });
 		try {
-			await copyFile(from, to);
+			if (CSS_FILE_PATTERN.test(from) && !WATCH) {
+				await writeFile(to, await minifyCssText(await readFile(from, 'utf8'), target.esbuildTarget), 'utf8');
+			} else {
+				await copyFile(from, to);
+			}
 		} catch (error) {
-			// ENOENT の素の文言だけでは、アイコンの生成忘れ (npm run build:icons) に気づきにくい
+			// コピー元の名前を付ける。(npm run build:icons の生成忘れなどに気づけるように)
 			throw new Error(`${from} をコピーできません: ${error.message}`);
 		}
 	}));
@@ -221,10 +230,7 @@ try {
 	await build(targets);
 } catch (error) {
 	console.error(`[build] ${error?.message ?? error}`);
-	// 途中で落ちた出力を残すと、古い成果物を読み込んで動かしてしまう。
-	// 落ちたブラウザと、まだ手を付けていないブラウザ (前の版が残っている) の出力を消す。
-	// **作り終えた出力は残す。** Firefox 側の失敗で Chrome 系の dist を巻き込まないため
-	// 片付け自体が失敗 (ブラウザが出力先を掴んでいる等) しても、元のエラーの表示を邪魔しない
+	// 作り終えていないブラウザの出力だけを消す。片付けの失敗は表示するだけにする
 	for (const target of targets) {
 		if (completed.has(target.name)) {
 			console.error(`[build] ${target.outDir} は作り終えているので残します`);

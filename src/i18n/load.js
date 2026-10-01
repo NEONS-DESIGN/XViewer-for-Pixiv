@@ -18,11 +18,12 @@ const LOADERS = Object.freeze({
  * 指定した言語のカタログを読む。
  * @param {string} lang 言語コード
  * @param {{loaders?: Record<string, () => Promise<{default: object}>>}} [deps] テスト用の依存
- * @returns {Promise<object>} 文言のカタログ。未知の言語なら既定の言語
+ * @returns {Promise<object>} 文言のカタログ。未知の言語や、読み込みの表に無い言語なら既定の言語
  */
 export async function loadStrings(lang, deps = {}) {
 	const loaders = deps.loaders ?? LOADERS;
-	const resolved = SUPPORTED_LANGUAGES.includes(lang) ? lang : DEFAULT_LANGUAGE;
+	const supported = SUPPORTED_LANGUAGES.includes(lang) && Object.hasOwn(loaders, lang);
+	const resolved = supported ? lang : DEFAULT_LANGUAGE;
 	const module = await loaders[resolved]();
 	return buildStrings(resolved, module.default);
 }

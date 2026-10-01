@@ -8,7 +8,7 @@
 import { createIcon } from '../../common/icons.js';
 import { setImageSrcAttribute } from '../../common/image-source.js';
 import { currentLocalePrefix } from '../../common/locale.js';
-import { getJson } from '../../pixiv/client.js';
+import { getJson, FRESH_FETCH_INIT } from '../../pixiv/client.js';
 import { commentRootsUrl, commentRepliesUrl, emojiUrl, stampUrl, userPath, illustUrl } from '../../pixiv/endpoints.js';
 import { createAvatar, showAvatar } from './avatar.js';
 import { createCommentForm } from './comment-form.js';
@@ -20,11 +20,8 @@ import { parseCommentText } from '../../pixiv/emoji.js';
 import { postComment, postStamp, deleteComment } from '../../pixiv/actions.js';
 import { PIXIV_ERROR_KINDS } from '../../pixiv/errors.js';
 import { readSession, clearSessionCache } from '../session.js';
-import { COMMENT_PAGE_SIZE, DISPLAY_TIME_ZONE_OFFSET, KEYS } from '../../common/constants.js';
+import { DEFAULT_COMMENT_PAGE_SIZE, DISPLAY_TIME_ZONE_OFFSET, KEYS, USER_ID_PATTERN } from '../../common/constants.js';
 import { warn } from '../../common/log.js';
-
-/** 件数を数え直すときに付ける、キャッシュを外すためのパラメータ名。 */
-const CACHE_BUSTER = '_';
 
 /** 返信の 1 ページ目。replies API は offset ではなく 1 始まりの page で送る。 */
 const FIRST_REPLY_PAGE = 1;
@@ -159,9 +156,11 @@ export function renderStamp(doc, stampId, strings) {
  * @property {Document} doc
  * @property {HTMLElement} container 描画先
  * @property {object} strings 文言のカタログ (src/i18n)
+ * @property {string} [localePrefix] 投稿者へのリンクに付ける表示言語の接頭辞 (`/en` か空文字)。無ければ currentLocalePrefix(doc)
  * @property {HTMLElement} [scrollTarget] 「上部へ」で先頭に戻す相手 (.sidebar)。無ければボタンを出さない
- * @property {number} [pageSize] コメントを 1 回に読む件数。無ければ COMMENT_PAGE_SIZE
- * @property {(url: string, init?: {signal?: AbortSignal}) => Promise<object>} [fetchJson] 取得の差し替え。テストから通信させないために使う
+ * @property {number} [pageSize] コメントを 1 回に読む件数。無ければ DEFAULT_COMMENT_PAGE_SIZE
+ * @property {(url: string, deps?: {signal?: AbortSignal}, init?: RequestInit) => Promise<object>} [fetchJson] 取得の差し替え。テストから通信させないために使う。
+ *   第 2 引数は getJson の依存 (中断の signal)、第 3 引数は fetch の init に足すもの (FRESH_FETCH_INIT など)
  * @property {{postComment?: Function, postStamp?: Function, deleteComment?: Function}} [actions] 更新系の差し替え。テストから通信させないために使う
  * @property {() => void} [onPosted] 投稿できたときに 1 回呼ぶ。コメント件数の +1 に使う
  * @property {(count: number|null) => void} [onDeleted] 削除できたときに 1 回呼ぶ。引数は数え直した件数で、引けなければ null
@@ -177,8 +176,8 @@ export function createComments(deps) {
 	// コメント主のリンクは pixiv 本体のページを指すので、今の表示言語の接頭辞 (/en) を付ける
 	const localePrefix = deps.localePrefix ?? currentLocalePrefix(doc);
 	const scrollTarget = deps.scrollTarget ?? null;
-	const pageSize = deps.pageSize ?? COMMENT_PAGE_SIZE;
-	const fetchJson = deps.fetchJson ?? ((url, init = {}) => getJson(url, init));
+	const pageSize = deps.pageSize ?? DEFAULT_COMMENT_PAGE_SIZE;
+	const fetchJson = deps.fetchJson ?? ((url, clientDeps = {}, init = {}) => getJson(url, clientDeps, init));
 	const api = { postComment, postStamp, deleteComment, ...deps.actions };
 	/** roots / replies の取得を中断するためのもの。load() の冒頭で前の分を中断して作り直す */
 	let aborter = new AbortController();
@@ -193,7 +192,7 @@ export function createComments(deps) {
 	/** @type {HTMLButtonElement|null} */
 	let moreButton = null;
 	/** @type {HTMLElement|null} 読み込み失敗の表示。再試行で消す */
-	let failure = null;
+	let errorNode = null;
 	/** @type {HTMLElement|null} 「まだコメントはありません」。1 件目を投稿したら消す */
 	let emptyEl = null;
 	/** @type {HTMLElement|null} 見出しと入力欄をまとめた入れ物。貼り付いたかを見るのはこれ */
@@ -210,6 +209,8 @@ export function createComments(deps) {
 	const forms = new Set();
 	/** @type {object|null} 今開いている作品。投稿に作者 ID が要る */
 	let detailRef = null;
+	/** @type {(() => void)|null} 区画が描画されるのを待つ見張りを解く。待っていなければ null */
+	let unwatchRendered = null;
 	/** 聞き返し中の削除ボタンの台帳。同時に 1 つだけ */
 	const confirmations = createConfirmRegistry();
 	/** 区画の採寸。測る相手は描き直すたびに変わるので、毎回この状態から引かせる */
@@ -312,8 +313,18 @@ export function createComments(deps) {
 					: await api.postStamp(detailRef.id, detailRef.userId, value.stampId, options.parentId, token);
 				// 待っている間に別の作品へ移ったか描き直されていたら画面へは足さない (投稿自体は通っている)
 				if (workId !== requestedWorkId || list !== requestedList) return;
-				options.onPosted(posted, value);
-				deps.onPosted?.();
+				// ここから先は投稿が通った後の処理。投げても投稿の失敗にはしない。
+				// 失敗として本文を残すと、送り直した利用者の手で同じコメントが 2 件公開される
+				try {
+					options.onPosted(posted, value);
+				} catch (error) {
+					warn('failed to show posted comment', requestedWorkId, error);
+				}
+				try {
+					deps.onPosted?.();
+				} catch (error) {
+					warn('failed to apply posted comment count', requestedWorkId, error);
+				}
 			},
 		});
 		forms.add(form);
@@ -418,7 +429,8 @@ export function createComments(deps) {
 		if (list && list.children.length === 0) showEmpty();
 		// 行ごと消えるとフォーカスが body へ落ち、キーボード利用者が Tab の起点を失う
 		receiver?.focus();
-		layout.applyFloor();
+		// 消した行は一覧の中にあり、一覧の高さの変化は ResizeObserver が拾う
+		layout.applyFloorUnlessWatched();
 		// 受け手がいなければ数え直しも走らない。
 		// 件数を出していない呼び出し元に無駄な通信をさせないので、これでよい
 		if (!deps.onDeleted) return;
@@ -444,8 +456,9 @@ export function createComments(deps) {
 		const item = doc.createElement('li');
 		item.className = 'comment-item';
 
-		// 退会したユーザーと ID が取れなかったコメントには飛び先が無い。押せないままにする
-		const userPage = comment.userId && !comment.isDeleted ? userPath(comment.userId, localePrefix) : null;
+		// 退会したユーザーと ID が取れなかったコメントには飛び先が無い。押せないままにする。
+		// 数字でない ID はパスに埋めると別のページを指しうるので、取れなかったのと同じ扱いにする
+		const userPage = USER_ID_PATTERN.test(comment.userId) && !comment.isDeleted ? userPath(comment.userId, localePrefix) : null;
 
 		// 作者行と同じ部品。CDN 以外の URL や読み込み失敗は枠だけ残して黙って続ける。
 		// 一覧に何十件も並ぶので、画面に入るまで読み込みを遅らせる
@@ -532,7 +545,9 @@ export function createComments(deps) {
 		/** @type {HTMLButtonElement|null} */
 		let replyMore = null;
 		/** @type {HTMLElement|null} 返信の読み込み失敗の表示。1 つだけ持ち、次の読み込みの前に消す */
-		let replyError = null;
+		let replyErrorNode = null;
+		/** @type {object[]} 1 ページ目を読んでいる最中に投稿できた返信。並べ終わったら末尾へ足す */
+		let pendingPosted = [];
 
 		const toggle = doc.createElement('button');
 		toggle.type = 'button';
@@ -563,9 +578,9 @@ export function createComments(deps) {
 		 * 失敗の表示を消す。
 		 * @returns {void}
 		 */
-		function clearFailure() {
-			replyError?.remove();
-			replyError = null;
+		function clearError() {
+			replyErrorNode?.remove();
+			replyErrorNode = null;
 		}
 
 		/**
@@ -574,13 +589,13 @@ export function createComments(deps) {
 		 * @param {unknown} error 失敗の中身
 		 * @returns {void}
 		 */
-		function showFailure(error) {
-			clearFailure();
-			replyError = doc.createElement('p');
-			replyError.className = 'reply-error';
-			replyError.setAttribute('role', 'alert');
-			replyError.textContent = strings.comments.REPLY_FAILED;
-			body.appendChild(replyError);
+		function showError(error) {
+			clearError();
+			replyErrorNode = doc.createElement('p');
+			replyErrorNode.className = 'reply-error';
+			replyErrorNode.setAttribute('role', 'alert');
+			replyErrorNode.textContent = strings.comments.REPLY_FAILED;
+			body.appendChild(replyErrorNode);
 			warn('failed to load replies', comment.id, error);
 		}
 
@@ -601,7 +616,7 @@ export function createComments(deps) {
 				if (workId !== requestedWorkId) return;
 				// 畳まれていたら並べない
 				if (!open) return;
-				clearFailure();
+				clearError();
 				if (!area) {
 					area = doc.createElement('div');
 					area.className = 'comment-replies-area';
@@ -610,9 +625,16 @@ export function createComments(deps) {
 					area.appendChild(replyList);
 					body.appendChild(area);
 				}
-				for (const raw of responseBody?.comments ?? []) {
-					replyList.appendChild(createItem(normalizeComment(raw, strings)).item);
+				const loaded = (responseBody?.comments ?? []).map((raw) => normalizeComment(raw, strings));
+				for (const reply of loaded) {
+					replyList.appendChild(createItem(reply).item);
 				}
+				// 読んでいる間に投稿した返信を足す。応答に既に入っていれば二重にしない
+				const loadedIds = new Set(loaded.map((reply) => reply.id));
+				for (const posted of pendingPosted) {
+					if (!loadedIds.has(posted.id)) replyList.appendChild(createItem(fromPosted(posted)).item);
+				}
+				pendingPosted = [];
 				page += 1;
 				if (responseBody?.hasNext === true) {
 					if (!replyMore) {
@@ -633,13 +655,15 @@ export function createComments(deps) {
 				// 中断による失敗 (別の作品へ移った・load() を呼び直した) は伝えない
 				if (error?.kind === PIXIV_ERROR_KINDS.ABORTED) return;
 				if (page === FIRST_REPLY_PAGE) {
-					// 1 件も出せていない。閉じた状態に戻し、押し直せばもう一度試せるようにする
+					// 1 件も出せていない。閉じた状態に戻し、押し直せばもう一度試せるようにする。
+					// 待たせていた投稿は開き直したときの取得に入っている
 					setOpen(false);
+					pendingPosted = [];
 				} else if (replyMore) {
 					// 続きだけが取れなかった。見えている返信は残し、ボタンを再試行に替える
 					replyMore.textContent = strings.comments.RETRY;
 				}
-				showFailure(error);
+				showError(error);
 			} finally {
 				toggle.disabled = false;
 				if (replyMore) replyMore.disabled = false;
@@ -656,8 +680,9 @@ export function createComments(deps) {
 				area = null;
 				replyList = null;
 				replyMore = null;
-				clearFailure();
+				clearError();
 				page = FIRST_REPLY_PAGE;
+				pendingPosted = [];
 				return;
 			}
 			setOpen(true);
@@ -677,9 +702,16 @@ export function createComments(deps) {
 			 */
 			appendPosted(posted) {
 				toggle.hidden = false;
-				if (!open || !replyList) return;
+				if (!open) return;
+				if (!replyList) {
+					// 1 ページ目を読んでいる最中。その応答は投稿より前に頼んだもので、今の 1 件を含まない。
+					// 並べ終わったところで足す
+					pendingPosted.push(posted);
+					return;
+				}
 				replyList.appendChild(createItem(fromPosted(posted)).item);
-				layout.applyFloor();
+				// 返信一覧は区画の一覧の中にあり、高さの変化は ResizeObserver が拾う
+				layout.applyFloorUnlessWatched();
 			},
 		};
 	}
@@ -711,7 +743,8 @@ export function createComments(deps) {
 				form.dispose();
 				form = null;
 				toggle.setAttribute('aria-expanded', 'false');
-				layout.applyFloor();
+				// 返信欄は一覧の中にあり、出し入れによる高さの変化は ResizeObserver が拾う
+				layout.applyFloorUnlessWatched();
 				// 入力欄ごと消えるとフォーカスが body へ落ちる。押したボタンへ戻す
 				toggle.focus();
 				return;
@@ -728,7 +761,7 @@ export function createComments(deps) {
 			if (area) body.insertBefore(form.element, area);
 			else body.appendChild(form.element);
 			toggle.setAttribute('aria-expanded', 'true');
-			layout.applyFloor();
+			layout.applyFloorUnlessWatched();
 			form.focus();
 		});
 
@@ -789,7 +822,8 @@ export function createComments(deps) {
 		// 一覧から読んだ 1 件と同じ導線を付ける。付けないと、描き直すまで
 		// この 1 件にだけ返信できない。返信はまだ無いので「返信を表示」は隠れる
 		list.prepend(createRootItem(fromPosted(posted)));
-		layout.applyFloor();
+		// 一覧は watchSize() で見張っているので、高さの変化は ResizeObserver が拾う
+		layout.applyFloorUnlessWatched();
 	}
 
 	/**
@@ -820,13 +854,15 @@ export function createComments(deps) {
 		try {
 			// 同じ URL を作品を開いた時点で引いているため、そのまま引き直すと
 			// ブラウザのキャッシュが**削除前の件数**を返すことがある。
-			// 数え直しの意味が消えるので、毎回違う URL にして必ず取り直す
-			const body = await fetchJson(`${illustUrl(illustId, strings.lang)}&${CACHE_BUSTER}=${Date.now()}`);
+			// 数え直しの意味が消えるので、キャッシュを使わずサーバーへ確かめ直させる。
+			// 別の作品へ移るか破棄されたら、使い道の無くなった数え直しも止める
+			const body = await fetchJson(illustUrl(illustId, strings.lang), { signal: aborter.signal }, FRESH_FETCH_INIT);
 			const count = body?.commentCount;
 			return typeof count === 'number' ? count : null;
 		} catch (error) {
-			// 数え直せなくても削除自体は通っている。件数は呼び出し側の控えに任せる
-			warn('failed to re-read comment count', illustId, error);
+			// 数え直せなくても削除自体は通っている。件数は呼び出し側の控えに任せる。
+			// 中断は失敗ではない (呼び出し側も世代の確認で捨てる) ので記録しない
+			if (error?.kind !== PIXIV_ERROR_KINDS.ABORTED) warn('failed to re-read comment count', illustId, error);
 			return null;
 		}
 	}
@@ -866,6 +902,49 @@ export function createComments(deps) {
 	}
 
 	/**
+	 * 区画が描画されているか。畳まれたサイドバー (display: none の祖先) の下では false。
+	 * 測る口が無い相手 (テスト用の DOM) は描画されているものとして扱う
+	 * @returns {boolean} 描画されていれば true
+	 */
+	function isRendered() {
+		if (typeof container.getClientRects !== 'function') return true;
+		return container.getClientRects().length > 0;
+	}
+
+	/**
+	 * 描画を待っている見張りを解く。待っていなければ何もしない。
+	 * @returns {void}
+	 */
+	function stopWaitingForRender() {
+		unwatchRendered?.();
+		unwatchRendered = null;
+	}
+
+	/**
+	 * 区画が描画されてから task を走らせる。描画されていれば今すぐ走らせる。
+	 *
+	 * 遅らせるのは描画されていない (畳まれている) ときだけ。サイドバーのスクロールの外に
+	 * あるだけなら今すぐ読む。(遅らせると、スクロールして届いたときにまだ読み込み中になる)
+	 * ResizeObserver が無い環境でも今すぐ走らせる。見張れずに読まないままになるより良い
+	 * @param {() => Promise<void>} task 描画されたら走らせる処理
+	 * @returns {Promise<void>} 今すぐ走らせたらその完了。待つことにしたら即座に解決する
+	 */
+	function whenRendered(task) {
+		stopWaitingForRender();
+		const Observer = doc.defaultView?.ResizeObserver;
+		if (!Observer || isRendered()) return task();
+		// 畳まれていた区画が出てくると大きさが 0 から変わるので、ResizeObserver の通知で拾える
+		const observer = new Observer(() => {
+			if (!isRendered()) return;
+			stopWaitingForRender();
+			void task();
+		});
+		observer.observe(container);
+		unwatchRendered = () => { observer.disconnect(); };
+		return Promise.resolve();
+	}
+
+	/**
 	 * 続きを読み込んで並べる。
 	 * @returns {Promise<void>}
 	 */
@@ -888,8 +967,8 @@ export function createComments(deps) {
 				list.appendChild(createRootItem(comment));
 			}
 			offset += comments.length;
-			failure?.remove();
-			failure = null;
+			errorNode?.remove();
+			errorNode = null;
 			if (moreButton) {
 				moreButton.textContent = strings.comments.MORE;
 				moreButton.hidden = body?.hasNext !== true;
@@ -904,15 +983,15 @@ export function createComments(deps) {
 			if (error?.kind === PIXIV_ERROR_KINDS.ABORTED) return;
 			// 一時的な失敗で以降が読めなくならないよう、ボタンは再試行として残す。
 			// 表示は 1 つだけ。失敗のたびに積み上げない
-			failure?.remove();
-			failure = doc.createElement('p');
-			failure.className = 'status';
-			failure.dataset.kind = 'error';
-			failure.setAttribute('role', 'alert');
-			failure.textContent = strings.comments.LOAD_FAILED;
-			container.appendChild(failure);
+			errorNode?.remove();
+			errorNode = doc.createElement('p');
+			errorNode.className = 'status';
+			errorNode.dataset.kind = 'error';
+			errorNode.setAttribute('role', 'alert');
+			errorNode.textContent = strings.comments.LOAD_FAILED;
+			container.appendChild(errorNode);
 			// watchSize() の初回通知が測り直しを担う
-			layout.watchSize(failure);
+			layout.watchSize(errorNode);
 			if (moreButton) {
 				moreButton.textContent = strings.comments.RETRY;
 				moreButton.hidden = false;
@@ -928,14 +1007,16 @@ export function createComments(deps) {
 	return {
 		/**
 		 * 作品のコメントを読み込む。
-		 * 前の作品の描画は全て捨てる。
+		 * 前の作品の描画は全て捨てる。区画が畳まれていれば一覧は引き出されたときに読む。
 		 * @param {object} detail 正規化した作品詳細
-		 * @returns {Promise<void>}
+		 * @returns {Promise<void>} 最初の 1 ページを並べ終えたら解決する。畳まれていて読むのを待つときは、待たずに解決する
 		 */
 		async load(detail) {
-			// 同じインスタンスで load() を呼び直す経路がある。前の取得は必ず止めてから作り直す
+			// 同じインスタンスで load() を呼び直す経路がある。前の取得は必ず止めてから作り直す。
+			// 描画を待っている前の作品の読み込みも捨てる
 			aborter.abort();
 			aborter = new AbortController();
+			stopWaitingForRender();
 			workId = detail.id;
 			offset = 0;
 			container.textContent = '';
@@ -948,7 +1029,7 @@ export function createComments(deps) {
 			scroll = null;
 			list = null;
 			moreButton = null;
-			failure = null;
+			errorNode = null;
 			emptyEl = null;
 			confirmations.clear();
 			// 前の作品の入力欄は捨てる。書きかけごと消えるが、別の作品へ送るほうが害が大きい
@@ -984,7 +1065,8 @@ export function createComments(deps) {
 			}
 
 			ensureList();
-			await loadMore();
+			// 畳まれたサイドバーの中で誰も見ていないなら、引き出されるまで読みに行かない
+			await whenRendered(loadMore);
 		},
 
 		/**
@@ -1010,6 +1092,7 @@ export function createComments(deps) {
 		 */
 		dispose() {
 			aborter.abort();
+			stopWaitingForRender();
 			layout.dispose();
 			headerEl = null;
 			headingEl = null;
@@ -1017,7 +1100,7 @@ export function createComments(deps) {
 			list = null;
 			scroll = null;
 			moreButton = null;
-			failure = null;
+			errorNode = null;
 			emptyEl = null;
 			confirmations.clear();
 			workId = null;

@@ -68,12 +68,13 @@ test('zoneAt: オフ・壊れた値・ステージの外・大きさの無い矩
  * @param {number[]} [options.pages] 送れるページの向き
  * @param {number[]} [options.works] 送れる作品の向き
  * @param {() => void} [options.onMovePage] ページを送ったときに状態を変える
+ * @param {boolean} [options.pending] 作品の読み込み中か
  * @returns {object} ステージ・状態・記録・ゾーン
  */
-function build({ mode = NAV_ZONES.BOTH, pages = [-1, 1], works = [-1, 1], onMovePage = () => {} } = {}) {
+function build({ mode = NAV_ZONES.BOTH, pages = [-1, 1], works = [-1, 1], onMovePage = () => {}, pending = false } = {}) {
 	const stage = fakeElement('div');
 	stage.getBoundingClientRect = () => RECT;
-	const state = { mode, pages, works };
+	const state = { mode, pages, works, pending };
 	const moved = [];
 	const zones = createNavZones({
 		stage,
@@ -82,6 +83,7 @@ function build({ mode = NAV_ZONES.BOTH, pages = [-1, 1], works = [-1, 1], onMove
 		canMoveWork: (direction) => state.works.includes(direction),
 		movePage: (direction) => { moved.push(['page', direction]); onMovePage(); },
 		moveWork: async (direction) => { moved.push(['work', direction]); },
+		isPending: () => state.pending,
 	});
 	return { stage, state, moved, zones };
 }
@@ -179,7 +181,7 @@ test('ポインタの下の領域を data-nav-zone に書き、部品の上と�
 	await stage.dispatch('pointermove', pointer(stage, 1090, 450));
 	assert.equal(stage.dataset.navZone, NAV_ZONE_KINDS.NEXT_PAGE);
 	await stage.dispatch('pointermove', pointer(stage, 110, 450));
-	assert.equal(stage.dataset.navZone, NAV_ZONE_IDLE, '前へは送れないので既定のカーソル');
+	assert.equal(stage.dataset.navZone, NAV_ZONE_IDLE, '前へは送れないので送れない印のカーソル');
 	await stage.dispatch('pointermove', pointer(stage, 600, 60));
 	assert.equal(stage.dataset.navZone, NAV_ZONE_KINDS.PREV_WORK);
 	await stage.dispatch('pointermove', pointer(stage, 600, 60, fakeElement('button')));
@@ -213,4 +215,60 @@ test('オフでは何もしない (測りもしない)', async () => {
 	assert.equal(click.stopped, 0);
 	assert.deepEqual(moved, []);
 	assert.equal(stage.dataset.navZone, undefined);
+});
+
+test('作品の読み込み中はページ送りの領域を押しても閉じず、送りもしない', async () => {
+	// 主役のペインが無い間は送れる向きが分からない。どちらにも送れない (none) 扱いにすると余白として閉じる
+	const { stage, state, moved } = build({ pages: [], pending: true });
+	await stage.dispatch('pointermove', pointer(stage, 1090, 450));
+	assert.equal(stage.dataset.navZone, NAV_ZONE_IDLE);
+	const click = await press(stage, 1090, 450);
+	assert.equal(click.stopped, 1);
+	assert.deepEqual(moved, []);
+	// 作品送りは読み込み中でも今までどおり
+	await press(stage, 600, 840);
+	assert.deepEqual(moved, [['work', 1]]);
+	// 描き終えたら、どちらにも送れない領域は領域として扱わない
+	state.pending = false;
+	const single = await press(stage, 1090, 450);
+	assert.equal(single.stopped, 0);
+});
+
+test('押し始めが click に届かなくても、次のキーボードでのボタンの click は止めない', async () => {
+	const { stage } = build();
+	// 領域で押してステージの外で離した (click はステージを通らない)
+	await stage.dispatch('pointerdown', pointer(stage, 1090, 450));
+	// Tab でボタンへ移って Enter。pointerdown は起きない
+	const keyboard = pointer(stage, 0, 0, fakeElement('button'));
+	await stage.dispatch('click', keyboard);
+	assert.equal(keyboard.stopped, 0);
+});
+
+test('pointercancel で押し始めの覚えを捨てる', async () => {
+	const { stage, moved } = build();
+	await stage.dispatch('pointerdown', pointer(stage, 1090, 450));
+	await stage.dispatch('pointercancel', {});
+	// pointerdown を伴わない click (合成やキーボード) が中央に来ても止めない
+	const click = pointer(stage, 600, 450);
+	await stage.dispatch('click', click);
+	assert.equal(click.stopped, 0);
+	assert.deepEqual(moved, []);
+});
+
+test('オフのときはポインタが動いても道筋を見ない。同じ領域では印を書き直さない', async () => {
+	const { stage, state } = build({ mode: NAV_ZONES.OFF });
+	let walked = 0;
+	const event = pointer(stage, 1090, 450);
+	event.composedPath = () => { walked += 1; return [stage]; };
+	await stage.dispatch('pointermove', event);
+	assert.equal(walked, 0);
+	state.mode = NAV_ZONES.BOTH;
+	await stage.dispatch('pointermove', pointer(stage, 1090, 450));
+	assert.equal(stage.dataset.navZone, NAV_ZONE_KINDS.NEXT_PAGE);
+	// 書いた値を外から変えても、同じ領域の上を動く間は書き直さない (書いたかどうかを見分ける印)
+	stage.dataset.navZone = 'marker';
+	await stage.dispatch('pointermove', pointer(stage, 1080, 450));
+	assert.equal(stage.dataset.navZone, 'marker');
+	await stage.dispatch('pointermove', pointer(stage, 110, 450));
+	assert.equal(stage.dataset.navZone, NAV_ZONE_KINDS.PREV_PAGE);
 });

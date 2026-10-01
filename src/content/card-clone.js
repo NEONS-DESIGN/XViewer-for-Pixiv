@@ -217,7 +217,7 @@ export function buildCard(templates, work, deps) {
 			if (link.getAttribute('data-gtm-user-id')) link.setAttribute('data-gtm-user-id', String(work.userId));
 		}
 		// 雛形は tab-skip.js が当てた後に採られることが多い。印 (tabindex="-1" / aria-label) を
-		// 残すと、ビュワーを切った後に組んだカードだけ Tab 順が違い、読み上げが全部同じ作品名になる。
+		// 残すと、tab-skip が居ない間に組んだカードだけ Tab 順が違い、読み上げが全部同じ作品名になる。
 		// tab-skip が生きていれば次の当て直しで付け直される
 		stripTabSkipMarks(card);
 

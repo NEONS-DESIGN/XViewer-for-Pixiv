@@ -219,8 +219,8 @@
 					<p>The zip is decoded into frames and played in the viewer. A control bar along the bottom lets you play and pause, drag the seek bar to any frame, and change the speed from 0.25× to 2×.</p>
 				</div>
 				<div class="card">
-					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-zoom"></use></svg></span>Full size</h3>
-					<p>Click the image to open it at its original resolution, filling the screen. You can keep paging through the work while it is open.</p>
+					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-zoom"></use></svg></span>Actual size</h3>
+					<p>Click the image to open it at actual size, filling the screen. You can keep paging through the work while it is open.</p>
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-comment"></use></svg></span>Read and write comments</h3>
@@ -365,25 +365,25 @@
 							<td>Viewer</td>
 							<td>Use the viewer</td>
 							<td class="default">On</td>
-							<td>Turn it off and pixiv behaves normally. Hiding the pickup section, infinite scroll and grid tab order keep working even when it is off</td>
+							<td>Turn it off and pixiv behaves normally. Hide the Pickup section, Infinite scroll and Tab movement in the grid keep working even when it is off</td>
 						</tr>
 						<tr>
 							<td>Viewer</td>
 							<td class="child">Use on user pages</td>
 							<td class="default">On</td>
-							<td>Shows the viewer when you open a work from a creator's works list</td>
+							<td>Shows the viewer when you open an artwork from a user page's artwork list</td>
 						</tr>
 						<tr>
 							<td>Viewer</td>
 							<td class="child">Use on the home page</td>
 							<td class="default">On</td>
-							<td>Shows the viewer for works on pixiv's home (Home, Illustrations and Manga tabs)</td>
+							<td>Shows the viewer for artworks on pixiv's home (Home / Illustrations / Manga tabs)</td>
 						</tr>
 						<tr>
 							<td>Viewer</td>
 							<td class="child">Use on search results</td>
 							<td class="default">On</td>
-							<td>Shows the viewer when you open a work from search results (tag pages and the search screen)</td>
+							<td>Shows the viewer when you open an artwork from search results (tag pages and the search screen)</td>
 						</tr>
 						<tr>
 							<td>Viewer</td>
@@ -398,58 +398,58 @@
 							<td>Scroll caption and comments as one, or pin the caption and scroll only the comments</td>
 						</tr>
 						<tr>
-							<td>Image</td>
-							<td>Resolution</td>
-							<td class="default">Regular</td>
+							<td>Images</td>
+							<td>Image resolution</td>
+							<td class="default">Standard</td>
 							<td>Original is sharper but slower to load</td>
 						</tr>
 						<tr>
-							<td>Image</td>
+							<td>Images</td>
 							<td>Prefetch</td>
-							<td class="default">1 each way</td>
-							<td>How many neighbouring pages to load ahead of time: off, 1 or 3 each way, or Custom, which lets you choose 1 to 20 each way with a slider. At 10 or more, a note warns that it uses a lot of memory</td>
+							<td class="default">1 image each way</td>
+							<td>How many neighbouring pages to load ahead of time: Off, 1 or 3 images each way, or Custom, which lets you choose 1 to 20 each way with a slider. At 10 or more, a note warns that it uses a lot of memory</td>
 						</tr>
 						<tr>
-							<td>Image</td>
-							<td>Also preload the adjacent work</td>
+							<td>Images</td>
+							<td>Also prefetch the adjacent artwork</td>
 							<td class="default">Off</td>
-							<td>After a work finishes showing, loads just one work you may move to next</td>
+							<td>After an artwork finishes showing, prefetches just one artwork you may move to next</td>
 						</tr>
 						<tr>
-							<td>Image</td>
-							<td>Click to view full size</td>
+							<td>Images</td>
+							<td>Click to view at actual size</td>
 							<td class="default">Off</td>
-							<td>Clicking the image opens it at its original resolution</td>
+							<td>Clicking the image opens it at actual size, filling the screen</td>
 						</tr>
 						<tr>
-							<td>User page</td>
-							<td>Hide the pickup section</td>
+							<td>User pages</td>
+							<td>Hide the Pickup section</td>
 							<td class="default">Off</td>
-							<td>Hides the pickup block on a profile home</td>
+							<td>Hides the "Pickup" section on a profile home</td>
 						</tr>
 						<tr>
-							<td>User page</td>
+							<td>User pages</td>
 							<td>Infinite scroll</td>
 							<td class="default">Off</td>
 							<td>Load at the bottom, or always keep one page ahead</td>
 						</tr>
 						<tr>
-							<td>Interaction</td>
-							<td>Close on backdrop click</td>
+							<td>Controls</td>
+							<td>Click the background to close</td>
 							<td class="default">On</td>
 							<td>Whether clicking outside the image closes the viewer</td>
 						</tr>
 						<tr>
-							<td>Interaction</td>
+							<td>Controls</td>
 							<td>Click the edges to navigate</td>
 							<td class="default">Off</td>
-							<td>The left and right edges of the screen turn pages, the top and bottom edges switch works. Choose left/right only, top/bottom only, or both. Edges you cannot move past show a not-allowed cursor, so they are easy to tell from the empty area that closes the viewer</td>
+							<td>The left and right edges of the screen turn pages, the top and bottom edges switch artworks. Choose left/right only, top/bottom only, or both. Edges you cannot move past show a not-allowed cursor, so they are easy to tell from the empty area that closes the viewer</td>
 						</tr>
 						<tr>
-							<td>Interaction</td>
-							<td>Grid tab order</td>
-							<td class="default">Keep all stops</td>
-							<td>Whether Tab skips the bookmark button and title on grid cards</td>
+							<td>Controls</td>
+							<td>Tab movement in the grid</td>
+							<td class="default">Do not skip</td>
+							<td>Whether Tab skips the bookmark button and title in artwork lists (user pages, the home page and search results). Artist links are not skipped</td>
 						</tr>
 					</tbody>
 				</table>
@@ -486,22 +486,22 @@
 							<td>How dark the black layer behind the image is: match the theme (92% in dark mode, 88% in light mode) or, with Custom, choose from 0% to 100% in 10% steps with a slider. Lower values let the page behind show through</td>
 						</tr>
 						<tr>
-							<td>Interaction</td>
+							<td>Controls</td>
 							<td>Edge click area width</td>
 							<td class="default">25%</td>
 							<td>Width of the edges used for edge-click navigation, relative to the image area. With Custom, choose the left/right and top/bottom widths separately, from 5% to 35% in 5% steps. When only left/right or only top/bottom is in use, the width for the unused direction cannot be changed</td>
 						</tr>
 						<tr>
-							<td>Interaction</td>
+							<td>Controls</td>
 							<td>Actual-size click area width</td>
 							<td class="default">25%</td>
-							<td>Width of the left and right edges you click to turn pages in actual-size view. With Custom, choose from 5% to 35% in 5% steps</td>
+							<td>Width of the left and right edges used to turn pages in actual-size view. With Custom, choose from 5% to 35% in 5% steps</td>
 						</tr>
 						<tr>
 							<td>Comments</td>
 							<td>Comments loaded at once</td>
 							<td class="default">30 comments</td>
-							<td>Number of comments loaded when a work opens and when you press "Show more". Choose 10, 20, 30 or 50. Applies from the next work you open</td>
+							<td>Number of comments loaded when an artwork opens and when you press "Show more". Choose 10, 20, 30 or 50. Applies from the next artwork you open</td>
 						</tr>
 					</tbody>
 				</table>
@@ -509,14 +509,14 @@
 
 			<h3 style="margin-block:56px 20px;font-size:19px">Keyboard</h3>
 			<div class="keys">
-				<div class="key-row"><kbd>←</kbd><kbd>→</kbd><span>Page through the current work (also at full size)</span></div>
+				<div class="key-row"><kbd>←</kbd><kbd>→</kbd><span>Page through the current work (also at actual size)</span></div>
 				<div class="key-row"><kbd>↑</kbd><kbd>↓</kbd><span>Previous or next work</span></div>
 				<div class="key-row"><kbd>Ctrl</kbd><kbd>Enter</kbd><span>Send a comment (<kbd>Cmd</kbd> on Mac)</span></div>
 				<div class="key-row"><kbd>Esc</kbd><span>Close the frontmost thing first</span></div>
 				<div class="key-row"><kbd>Tab</kbd><span>Move focus inside the viewer</span></div>
 			</div>
 			<p class="key-note">
-				<kbd>Esc</kbd> closes the emoji panel, then full size or the share menu, then the viewer. It will not close the viewer while a draft is unsent.<br>
+				<kbd>Esc</kbd> closes the emoji panel, then actual size or the share menu, then the viewer. It will not close the viewer while a draft is unsent.<br>
 				While you are writing a comment, <kbd>Enter</kbd> is a line break and <kbd>&larr;</kbd> <kbd>&rarr;</kbd> <kbd>&uarr;</kbd> <kbd>&darr;</kbd> move the caret instead of the work.<br>
 				With the ugoira seek bar focused, <kbd>&larr;</kbd> <kbd>&rarr;</kbd> step one frame at a time, while <kbd>&uarr;</kbd> <kbd>&darr;</kbd> still switch works.
 			</p>

@@ -116,7 +116,7 @@ export async function unfollowUser(userId, token, deps) {
 		type: 'bookuser',
 		id: userId,
 	}, token, deps);
-	// 数値で返ることもあるので文字列にそろえて比べる
+	// 型が変わっても比べられるよう、文字列にそろえて比べる
 	const returned = Array.isArray(body) ? undefined : body?.user_id;
 	if (returned === null || returned === undefined || String(returned) !== String(userId)) {
 		throw new PixivError(PIXIV_ERROR_KINDS.API, UNFOLLOW_REJECTED);

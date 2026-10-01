@@ -315,7 +315,7 @@ export function createAdvancedSections(strings) {
  * 設定画面の定義表を組み立てる。
  * **構造 (並び・キー・kind・選択肢の値) はここが持ち、文言はカタログから引く。**
  * 構造をカタログへ移さないこと。言語ごとに同じ構造が複製され、片方だけ直したずれが起きる。
- * キーは SETTINGS_DEFAULTS と 1 対 1 に対応させる。(test/popup/popup-ui.test.js が見張る)
+ * キーは createAdvancedSections と合わせて、popupTheme を除く SETTINGS_DEFAULTS と 1 対 1 に対応させる。
  *
  * kind が 'toggle' ならスイッチ、'choice' なら選択肢。
  * choice は reveal ({when, fields}) を持てる。選んだ値が when のときだけ、選択肢の下に fields を順に出す。

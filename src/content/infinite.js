@@ -15,6 +15,7 @@ import { PIXIV_ERROR_KINDS } from '../pixiv/errors.js';
 import { warn } from '../common/log.js';
 import { createStyleHandle } from '../common/style-injector.js';
 import { runWhenIdle } from '../common/idle.js';
+import { currentLocalePrefix } from '../common/locale.js';
 import {
 	INFINITE_SCROLL,
 	XV_CARD_ATTR,
@@ -53,10 +54,7 @@ const RETRYABLE_STATES = new Set(Object.keys(FAILURE_TEXT_KEY));
 /** prefetch モードで組み立て直後 / setMode() 直後に先読みを始めるまで待てる空き時間の上限 (ms)。 */
 const PREFETCH_IDLE_TIMEOUT_MS = 1000;
 
-/**
- * sentinel が引く strings.infinite のキーの一覧。
- * カタログ側と過不足が無いことは test/i18n/coverage.test.js がこれを基準に確かめる
- */
+/** sentinel が引く strings.infinite のキーの一覧。カタログ側との過不足を確かめる基準にもなる */
 export const SENTINEL_TEXT_KEYS = Object.freeze([
 	'LOADING',
 	'RETRY',
@@ -218,9 +216,12 @@ function inactiveHandle() {
 /**
  * 無限スクロールを始める。
  * @param {Document} doc 対象のドキュメント
- * @param {{ul: Element, source: {pageCount: () => Promise<number>, loadPage: (page: number) => Promise<object[]>},
+ * @param {{ul: Element,
+ *   source: {pageCount: () => Promise<number>, loadPage: (page: number, options?: {signal?: AbortSignal}) => Promise<object[]>},
  *   mode: string, loggedIn: boolean, startPage?: number, onPageChange?: (page: number) => void,
- *   strings: object, deps?: {createObserver?: Function, computedStyle?: Function, actions?: object}}} options
+ *   strings: object,
+ *   deps?: {createObserver?: Function, computedStyle?: Function, actions?: object,
+ *     rectTop?: (node: object) => number, schedule?: (fn: () => void) => void, runWhenIdle?: Function}}} options
  *   組み立ての材料。strings は文言のカタログ (src/i18n)
  * @returns {InfiniteHandle} 操作
  */
@@ -487,6 +488,8 @@ export function attachInfiniteScroll(doc, options) {
 	 */
 	function render(works, page) {
 		const existing = existingWorkIds();
+		// href の表示言語の接頭辞は 1 ページの間は変わらないので、カードごとに読まない
+		const buildDeps = { loggedIn, localePrefix: currentLocalePrefix() };
 		const fragment = doc.createDocumentFragment();
 		let added = 0;
 		let skipped = 0;
@@ -496,7 +499,7 @@ export function attachInfiniteScroll(doc, options) {
 				skipped += 1;
 				continue;
 			}
-			const card = buildCard(templates, work, { loggedIn });
+			const card = buildCard(templates, work, buildDeps);
 			if (!card) continue;
 			fragment.appendChild(card);
 			if (added === 0) pageMarks.push({ page, el: card });
@@ -557,7 +560,7 @@ export function attachInfiniteScroll(doc, options) {
 	function schedulePrefetch() {
 		if (mode !== INFINITE_SCROLL.PREFETCH || done || disposed || loading || prefetched || prefetchTask) return;
 		runIdle(() => {
-			if (!disposed && !loading && !prefetchTask && !prefetched && mode === INFINITE_SCROLL.PREFETCH) startPrefetch(lastPage + 1);
+			if (!disposed && !done && !loading && !prefetchTask && !prefetched && mode === INFINITE_SCROLL.PREFETCH) startPrefetch(lastPage + 1);
 		}, { timeoutMs: PREFETCH_IDLE_TIMEOUT_MS, view });
 	}
 

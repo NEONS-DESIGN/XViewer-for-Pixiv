@@ -160,7 +160,7 @@ function renderToggle(ctx, field) {
 
 	const input = doc.createElement('input');
 	input.type = 'checkbox';
-	// 見た目は pixiv 本体のスイッチに合わせてある。(popup.css)
+	// 見た目は pixiv 本体のスイッチに合わせてある。
 	// 形が変わる以上、読み上げの役割も checkbox ではなく switch にする。
 	// 入りと切りは type=checkbox の checked がそのまま伝わるので aria-checked は置かない
 	input.setAttribute('role', 'switch');

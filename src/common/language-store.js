@@ -33,8 +33,8 @@ function withArea(deps, run, fallback) {
 }
 
 /**
- * 今見ている pixiv の表示言語を覚える。
- * @param {string} language 正規化済みの言語コード (normalizeLanguage の結果)
+ * 今見ている pixiv の表示言語から決めた UI の言語を覚える。
+ * @param {string} language UI の言語コード (uiLanguage の結果。SUPPORTED_LANGUAGES のどれか)
  * @param {{area?: object}} [deps] 保存領域の差し替え
  * @returns {Promise<boolean>} 書けたら true
  */

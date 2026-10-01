@@ -38,12 +38,12 @@ import { warn } from '../../common/log.js';
 
 /**
  * 修飾キーが押されているか。
- * Alt+← (ブラウザの「戻る」) や Ctrl+← (OS の操作) をビュワーが潰さないための判定。
+ * Alt+← (ブラウザの「戻る」) や Ctrl+← (OS の操作) をビュワーと原寸表示が潰さないための判定。
  * Shift は含めない。(Shift+Tab は逆向きの巡回として focusNext が扱う)
  * @param {KeyboardEvent} event キー
  * @returns {boolean} Alt / Ctrl / Meta のどれかが押されていれば true
  */
-function hasModifier(event) {
+export function hasModifier(event) {
 	return event.altKey === true || event.ctrlKey === true || event.metaKey === true;
 }
 

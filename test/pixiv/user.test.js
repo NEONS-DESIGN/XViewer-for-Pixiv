@@ -16,10 +16,10 @@ function fakeGetJson(respond = () => ({ name: '作者' })) {
 	return { getJsonImpl, urls };
 }
 
-test('既定では /ajax/user/{id}?full=1 を取りに行く', async () => {
+test('既定では /ajax/user/{id} を full=1 なしで取りに行く', async () => {
 	const { getJsonImpl, urls } = fakeGetJson();
 	await fetchUserProfile('54734418', 'ja', { getJsonImpl });
-	assert.deepEqual(urls, ['/ajax/user/54734418?full=1&lang=ja']);
+	assert.deepEqual(urls, ['/ajax/user/54734418?lang=ja']);
 });
 
 test('フォロー状態を読む取得なので HTTP キャッシュを確かめ直させる', async () => {

@@ -35,8 +35,11 @@ export function createPrefetchSlot({ ttlMs, now = () => performance.now() }) {
 			drop();
 			const controller = new AbortController();
 			const promise = start(controller.signal);
-			// 使われずに捨てられたときに未処理の拒否を出さない
-			promise.catch(() => {});
+			// 失敗した中身は自分で捨てる。残すと、寿命の間に同じ ID を入れ直しても取り直さず、
+			// 開いたときに失敗を渡してしまう。(使われずに捨てられたときの未処理の拒否もここで止める)
+			promise.catch(() => {
+				if (entry?.promise === promise) entry = null;
+			});
 			entry = { id, promise, controller, at: now() };
 		},
 		/**
@@ -55,7 +58,11 @@ export function createPrefetchSlot({ ttlMs, now = () => performance.now() }) {
 			entry = null;
 			return { promise, controller };
 		},
-		peekId: () => entry?.id ?? null,
+		/**
+		 * 中身の ID を空にせずに覗く。寿命が切れていれば (開いても使われないので) null。
+		 * @returns {string|null} 寿命内の中身の ID
+		 */
+		peekId: () => (entry && now() - entry.at < ttlMs ? entry.id : null),
 		peekPromise: () => entry?.promise ?? null,
 		drop,
 	};
