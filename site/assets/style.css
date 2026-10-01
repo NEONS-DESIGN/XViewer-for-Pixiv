@@ -835,6 +835,11 @@ td.default {
 	white-space: nowrap;
 }
 
+/* 設定表の区分 (ビュワー / 操作 など) は短い語なので折り返さない。折ると「ビュワ / ー」のように切れる */
+#settings tbody td:first-child {
+	white-space: nowrap;
+}
+
 /* カードの中に置く小さな表 (対応言語)。列が少ないので横スクロールの下限を外す */
 .table-scroll.in-card {
 	margin-top: 16px;
