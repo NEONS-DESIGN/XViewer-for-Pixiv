@@ -4,6 +4,7 @@
  */
 import {
 	isViewerTarget,
+	pageKind,
 	isProfileHome,
 	isInfiniteScrollTarget,
 	parseArtworkPath,
@@ -12,7 +13,7 @@ import {
 	parsePageParam,
 } from './page.js';
 import { createRouter, createEntryTracker, replaceUrlKeepingState } from './router.js';
-import { attachGridListener, collectWorkIds, findGridList } from './grid.js';
+import { attachGridListener, collectWorkIds, collectGroupIds, findGridList } from './grid.js';
 import { attachTabSkip } from './tab-skip.js';
 import { ensureFocusStyle } from './grid-focus.js';
 import { attachPickupHider } from './pickup.js';
@@ -31,6 +32,7 @@ import {
 	INFINITE_SCROLL,
 	PAGE_KEY_SEPARATOR,
 	SESSION_WARMUP_TIMEOUT_MS,
+	PAGE_KINDS,
 } from '../common/constants.js';
 import { readPageLanguage, uiLanguage } from '../common/language.js';
 import { savePageLanguage } from '../common/language-store.js';
@@ -123,6 +125,14 @@ let viewer = null;
 let currentPage = null;
 /** 今購読しているページのキー。未起動なら null */
 let activeKey = null;
+/** 今組み立てているページの種類 (PAGE_KINDS)。組み立てていなければ null */
+let activeKind = null;
+/**
+ * 最後に作品を開いたときの並び。進むで自分のモーダルへ戻ったときに使い直す。
+ * ホームと検索では押したカードの欄から並びを作るので、URL からは作り直せない
+ * @type {string[]|null}
+ */
+let lastOpenedIds = null;
 /** @type {{dispose: () => void}|null} 遷移監視の購読。設定でオフにしたら外す */
 let navigationWatch = null;
 /** MutationObserver 経路で前回見たパス。変わっていなければ何もしない */
@@ -135,14 +145,19 @@ let infiniteSyncTimer = 0;
 /**
  * 作品が開かれたときの処理。
  * @param {string} workId 作品 ID
+ * @param {{link?: Element, startPage?: number}} [opened] 押されたリンクと、リンクが指すページ (0 始まり)
  * @returns {void}
  */
-function handleOpen(workId) {
+function handleOpen(workId, opened = {}) {
 	// タブ (イラスト / 漫画) の切り替えはページの組み直しを伴わないので、開くたびに読み直す
 	rememberPage(location.pathname);
-	const ids = collectWorkIds(document, location.origin);
+	// ユーザーページは作品グリッドの並び (端で全作品へ広げる)。ホームと検索は押したカードの欄の中だけ
+	const ids = activeKind === PAGE_KINDS.USER || !opened.link
+		? collectWorkIds(document, location.origin)
+		: collectGroupIds(opened.link, location.origin);
+	lastOpenedIds = ids;
 	router.open(workId);
-	void viewer.open(workId, createSequence(ids));
+	void viewer.open(workId, createSequence(ids), { startPage: opened.startPage ?? 0 });
 }
 
 /**
@@ -161,7 +176,7 @@ function handlePopState(workId) {
 	}
 	// 既に開いている作品なら描き直さない (作品移動で replaceState した直後など)
 	if (!viewer.isOpen()) {
-		void viewer.open(workId, createSequence(collectWorkIds(document, location.origin)));
+		void viewer.open(workId, createSequence(lastOpenedIds ?? collectWorkIds(document, location.origin)));
 	}
 }
 
@@ -204,7 +219,7 @@ function apply() {
 	// 自分のモーダルの URL は対象外ページに見えるが、開いている最中なので止めてはいけない。
 	// 設定変更の通知でもここを通る (設定そのものは watchSettings が viewer へ渡し済み)
 	if (isViewingOwnWork()) return;
-	if (!isViewerTarget(path)) {
+	if (!isViewerTarget(path, settings)) {
 		stop();
 		return;
 	}
@@ -215,7 +230,10 @@ function apply() {
 	// 別のページへ移った。古い購読を捨ててから組み立て直す
 	stop();
 	activeKey = key;
-	rememberPage(path);
+	activeKind = pageKind(path);
+	// ユーザーページ以外では前に見ていた作者を持ち越さない。(端で別人の全作品へ広げてしまう)
+	currentPage = parseUserPage(path);
+	lastOpenedIds = null;
 
 	router = createRouter(handlePopState, { entry: historyEntry });
 	viewer = createViewer({
@@ -251,6 +269,7 @@ function apply() {
  */
 function stop() {
 	activeKey = null;
+	activeKind = null;
 	gridListener?.dispose();
 	gridListener = null;
 	// 外したフォーカス順は必ず戻す。戻さないと pixiv 標準の Tab が壊れたままになる

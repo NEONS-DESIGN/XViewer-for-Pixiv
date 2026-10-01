@@ -173,10 +173,14 @@ function createChoiceOption(doc, option, rich) {
 	return element;
 }
 
+/** レンジの警告の行に添えるアイコン。色だけに頼らず形でも示す */
+const RANGE_WARNING_ICON = 'error';
+
 /**
  * レンジ (スライダー) の項目を組み立てる。今の値は見出しの右に format で読んで出す。
  * 動かしている間は表示だけを追従させ、保存は離したとき (change) に 1 回だけ行う。
  * (input のたびに書くと sync 領域の書き込み回数の上限に当たる)
+ * warnAt 以上の値では、今の値を警告の色にし、レンジの下に warning を出す。(動かしている間も追従する)
  * @param {Document} doc 対象のドキュメント
  * @param {object} field 項目の定義 (kind: 'range')
  * @param {object} settings 現在の設定
@@ -216,15 +220,36 @@ function renderRange(doc, field, settings, onChange) {
 	// 今の値がどの入力の結果かを結び付ける
 	output.setAttribute('for', inputId);
 
+	// 警告の行。文言は警告するときだけ入れる。role="status" なので、出たときに読み上げへも届く
+	const warningId = `${field.key}-warning`;
+	const warning = field.warning ? doc.createElement('p') : null;
+	const warningText = warning ? doc.createElement('span') : null;
+	if (warning) {
+		warning.className = 'range-warning';
+		warning.setAttribute('id', warningId);
+		warning.dataset.role = warningId;
+		warning.setAttribute('role', 'status');
+		warning.hidden = true;
+		warning.append(createIcon(doc, RANGE_WARNING_ICON), warningText);
+	}
+
 	/**
-	 * 今の値の読みを見出しの右と読み上げへ写す。
+	 * 今の値の読みを見出しの右と読み上げへ写し、警告の出し入れをする。
 	 * @returns {void}
 	 */
 	function showValue() {
-		const text = field.format(Number(input.value));
+		const value = Number(input.value);
+		const text = field.format(value);
 		output.textContent = text;
 		// 読み上げは数字だけでなく単位まで読ませる
 		input.setAttribute('aria-valuetext', text);
+		if (!warning) return;
+		const warn = Number.isFinite(field.warnAt) && value >= field.warnAt;
+		output.classList.toggle('is-warning', warn);
+		warning.hidden = !warn;
+		warningText.textContent = warn ? field.warning : '';
+		if (warn) input.setAttribute('aria-describedby', warningId);
+		else input.removeAttribute('aria-describedby');
 	}
 
 	input.addEventListener('input', showValue);
@@ -243,6 +268,7 @@ function renderRange(doc, field, settings, onChange) {
 
 	head.append(label, output);
 	wrapper.append(head, input, scale);
+	if (warning) wrapper.append(warning);
 	return wrapper;
 }
 

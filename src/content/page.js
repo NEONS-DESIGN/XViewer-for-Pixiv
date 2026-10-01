@@ -17,6 +17,10 @@ import {
 	WORK_CATEGORY_BY_TAB,
 	ARTWORK_PATH_PATTERN,
 	PAGE_KEY_SEPARATOR,
+	HOME_PATH_PATTERN,
+	SEARCH_PATH_PATTERN,
+	PAGE_KINDS,
+	VIEWER_PAGE_SETTING,
 } from '../common/constants.js';
 
 /**
@@ -79,12 +83,29 @@ export function pageKey(pathname) {
 }
 
 /**
- * ビュワーを動かす対象のページか。
+ * ビュワーを動かせるページの種類を返す。ユーザーページ・ホーム・検索 (タグ) のどれか。
  * @param {string} pathname location.pathname
+ * @returns {string|null} PAGE_KINDS の値。どれでもなければ null
+ */
+export function pageKind(pathname) {
+	if (parseUserPage(pathname)) return PAGE_KINDS.USER;
+	const path = stripLocale(pathname);
+	if (HOME_PATH_PATTERN.test(path)) return PAGE_KINDS.HOME;
+	if (SEARCH_PATH_PATTERN.test(path)) return PAGE_KINDS.SEARCH;
+	return null;
+}
+
+/**
+ * ビュワーを動かす対象のページか。ページの種類ごとの設定 (viewerOn*) で外せる。
+ * 設定を渡さないときは種類だけで決める。(ビュワー全体の入切 enabled は見ない。呼び出し側が先に見る)
+ * @param {string} pathname location.pathname
+ * @param {object} [settings] 設定。VIEWER_PAGE_SETTING のキーが false の種類は対象外
  * @returns {boolean} 対象なら true
  */
-export function isViewerTarget(pathname) {
-	return parseUserPage(pathname) !== null;
+export function isViewerTarget(pathname, settings) {
+	const kind = pageKind(pathname);
+	if (!kind) return false;
+	return settings?.[VIEWER_PAGE_SETTING[kind]] !== false;
 }
 
 /**

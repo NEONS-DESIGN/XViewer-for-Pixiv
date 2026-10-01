@@ -65,6 +65,19 @@ test('先読みの選択肢は PREFETCH_CHOICES の値と並びから起こし�
 	}
 });
 
+test('ビュワーの見出しに、ビュワーを使う画面のスイッチが 3 つ並ぶ', () => {
+	const { root, changes } = build();
+	for (const key of ['viewerOnUser', 'viewerOnHome', 'viewerOnSearch']) {
+		const input = findRole(root, key);
+		assert.equal(input.getAttribute('role'), 'switch', key);
+		assert.equal(input.checked, true, key);
+	}
+	const home = findRole(root, 'viewerOnHome');
+	home.checked = false;
+	home.dispatch('change');
+	assert.deepEqual(changes, [{ viewerOnHome: false }]);
+});
+
 test('設定タブの見出しは ビュワー / 画像 / ユーザーページ / 操作 の順に並ぶ', () => {
 	const { root } = build();
 	const headings = collect(findRole(root, 'panel-settings'), 'h2');
@@ -508,6 +521,33 @@ test('カスタムを選ぶと文字列のまま保存し、レンジが現れ�
 	select.dispatch('change');
 	assert.deepEqual(changes.at(-1), { prefetch: 3 });
 	assert.equal(wrapper.hidden, true);
+});
+
+test('先読みのレンジは 20 枚まで。10 枚以上では値を警告の色にし、下に警告を出す', () => {
+	const { root } = build({ settings: { prefetch: PREFETCH_CUSTOM, prefetchCustom: 9 } });
+	const range = findRole(root, 'prefetchCustom');
+	const output = findRole(root, 'prefetchCustom-value');
+	const warning = findRole(root, 'prefetchCustom-warning');
+	assert.equal(range.max, '20');
+	assert.equal(warning.hidden, true);
+	assert.equal(output.className.includes('is-warning'), false);
+	assert.equal(range.getAttribute('aria-describedby'), null);
+	range.value = '10';
+	range.dispatch('input');
+	assert.equal(warning.hidden, false, '動かしている間も追従する');
+	assert.equal(warning.getAttribute('role'), 'status');
+	assert.equal(warning.textContent, createStrings('ja').popup.fields.prefetchCustom.warning);
+	assert.equal(output.className.includes('is-warning'), true);
+	assert.equal(range.getAttribute('aria-describedby'), 'prefetchCustom-warning');
+	range.value = '3';
+	range.dispatch('input');
+	assert.equal(warning.hidden, true);
+	assert.equal(output.className.includes('is-warning'), false);
+});
+
+test('保存されていた枚数が 10 以上なら、開いた時点で警告を出す', () => {
+	const { root } = build({ settings: { prefetch: PREFETCH_CUSTOM, prefetchCustom: 15 } });
+	assert.equal(findRole(root, 'prefetchCustom-warning').hidden, false);
 });
 
 test('レンジは動かす間は表示だけを変え、離したときに数値で 1 回保存する', () => {

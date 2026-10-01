@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { WORK_CATEGORY } from '../../src/common/constants.js';
-import { parseUserPage, parseArtworkPath, isViewerTarget, isProfileHome, pageKey, isInfiniteScrollTarget, parsePageParam } from '../../src/content/page.js';
+import { parseUserPage, parseArtworkPath, isViewerTarget, pageKind, isProfileHome, pageKey, isInfiniteScrollTarget, parsePageParam } from '../../src/content/page.js';
+import { PAGE_KINDS } from '../../src/common/constants.js';
 
 test('ユーザーページの各タブを認識する', () => {
 	const works = { userId: '54734418', isWorksGrid: true, isTagFiltered: false, category: null };
@@ -42,10 +43,26 @@ test('作品パスでない URL は null', () => {
 	assert.equal(parseArtworkPath('/artworks/123/extra'), null);
 });
 
-test('isViewerTarget はユーザーページでだけ true', () => {
+test('pageKind はユーザーページ・ホーム・検索を見分け、それ以外は null', () => {
+	assert.equal(pageKind('/users/54734418/artworks'), PAGE_KINDS.USER);
+	for (const home of ['/', '/illustration', '/manga', '/en/', '/en/illustration']) assert.equal(pageKind(home), PAGE_KINDS.HOME, home);
+	for (const search of ['/tags/%E3%82%AA', '/tags/a/artworks', '/tags/a/illustrations', '/tags/a/manga', '/en/tags/a/artworks']) {
+		assert.equal(pageKind(search), PAGE_KINDS.SEARCH, search);
+	}
+	// 小説のタブ・作品ページ・ランキングは対象外
+	for (const other of ['/novel', '/tags/a/novels', '/artworks/149425016', '/ranking.php', '/discovery']) assert.equal(pageKind(other), null, other);
+});
+
+test('isViewerTarget はページの種類ごとの設定で外せる', () => {
 	assert.equal(isViewerTarget('/users/54734418/artworks'), true);
+	assert.equal(isViewerTarget('/'), true);
+	assert.equal(isViewerTarget('/tags/a/artworks'), true);
 	assert.equal(isViewerTarget('/artworks/149425016'), false);
-	assert.equal(isViewerTarget('/'), false);
+	const settings = { viewerOnUser: true, viewerOnHome: false, viewerOnSearch: false };
+	assert.equal(isViewerTarget('/users/54734418/artworks', settings), true);
+	assert.equal(isViewerTarget('/', settings), false);
+	assert.equal(isViewerTarget('/tags/a/artworks', settings), false);
+	assert.equal(isViewerTarget('/users/54734418', { viewerOnUser: false }), false);
 });
 
 test('pageKey は同じ作者の作品グリッドを同じキーにする', () => {

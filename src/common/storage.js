@@ -91,6 +91,9 @@ export function normalizeSettings(raw) {
 	const d = SETTINGS_DEFAULTS;
 	return {
 		enabled: asBoolean(source.enabled, d.enabled),
+		viewerOnUser: asBoolean(source.viewerOnUser, d.viewerOnUser),
+		viewerOnHome: asBoolean(source.viewerOnHome, d.viewerOnHome),
+		viewerOnSearch: asBoolean(source.viewerOnSearch, d.viewerOnSearch),
 		imageQuality: oneOf(source.imageQuality, Object.values(IMAGE_QUALITY), d.imageQuality),
 		prefetch: oneOf(source.prefetch, [...PREFETCH_CHOICES, PREFETCH_CUSTOM], d.prefetch),
 		prefetchCustom: intInRange(source.prefetchCustom, PREFETCH_CUSTOM_RANGE, d.prefetchCustom),

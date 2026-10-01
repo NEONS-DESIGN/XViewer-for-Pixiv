@@ -10,12 +10,15 @@
 	--switch-on: #0096fa;
 	--switch-off: #858585;
 	--switch-knob: #f5f5f5;
+	/* 設定の値が負担の大きい側にあるときの警告の色。(先読みの枚数など) 取り消せない操作の --danger とは分ける */
+	--warning: #ff7070;
 }
 
 /* ライトの値。下のメディアクエリの中にも同じ宣言がある。
    片方だけ直さないこと (中身が同じであることは test/popup/popup-css.test.js が見張る) */
 :root[data-theme='light'] {
 	--switch-knob: #ffffff;
+	--warning: #d0302f;
 }
 
 /* data-theme が付く前 (設定を読む前の最初の描画) だけ OS の設定に従ってライトで描く。
@@ -23,6 +26,7 @@
 @media (prefers-color-scheme: light) {
 	:root:not([data-theme]) {
 		--switch-knob: #ffffff;
+		--warning: #d0302f;
 	}
 }
 
@@ -174,6 +178,34 @@ h1 {
 	margin: 0;
 	accent-color: var(--accent);
 	cursor: pointer;
+}
+
+/* 負担の大きい値を選んでいるとき。値と警告の行を同じ色にする */
+.range-value.is-warning {
+	color: var(--warning);
+}
+
+/* 警告の行。アイコンを添えて色だけに頼らない */
+.range-warning {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	margin: 4px 0 0;
+	color: var(--warning);
+	font-size: 11px;
+	line-height: 1.45;
+}
+
+/* .range-warning の display はクラス指定なので、UA の [hidden] に勝ってしまう */
+.range-warning[hidden] {
+	display: none;
+}
+
+.range-warning svg {
+	flex: 0 0 auto;
+	width: 14px;
+	height: 14px;
+	fill: currentColor;
 }
 
 /* 両端の値。つまみの下に小さく添える */

@@ -750,9 +750,10 @@ export function createViewer(deps) {
 	 * 捨てないと、主役の描画で落ちたときに .frame や .ugoira の横に文言が並ぶ。
 	 * @param {object} detail 正規化した作品詳細
 	 * @param {number} token 呼び出し時点の世代。違っていれば失敗も報告しない
+	 * @param {number} [startPage] 最初に出すページ (0 始まり)。複数枚の画像の作品だけに効く
 	 * @returns {Promise<void>}
 	 */
-	async function renderDetail(detail, token) {
+	async function renderDetail(detail, token, startPage = 0) {
 		cancelLoadingStatus();
 		try {
 			clearStatus();
@@ -765,6 +766,7 @@ export function createViewer(deps) {
 				fetchUser: deps.fetchUser,
 				strings,
 				takeUgoiraMeta,
+				startPage,
 				ugoiraRate,
 				onUgoiraRateChange: (rate) => { ugoiraRate = rate; },
 			});
@@ -786,9 +788,10 @@ export function createViewer(deps) {
 	/**
 	 * 作品を開く。(内部)
 	 * @param {string} workId 作品 ID
+	 * @param {number} [startPage] 最初に出すページ (0 始まり)。作品を送ったときは渡さない (1 枚目から)
 	 * @returns {Promise<void>}
 	 */
-	async function openWork(workId) {
+	async function openWork(workId, startPage = 0) {
 		const token = ++requestToken;
 		navigation.setCurrentWorkId(workId);
 		// 前の作品の取得は止める。世代で捨てるだけだと応答を最後まで受信してしまう
@@ -859,7 +862,7 @@ export function createViewer(deps) {
 		}
 		cancelLoadingStatus();
 		lastDetail = detail;
-		await renderDetail(detail, token);
+		await renderDetail(detail, token, startPage);
 	}
 
 	/**
@@ -908,15 +911,16 @@ export function createViewer(deps) {
 		 * 作品を開く。
 		 * @param {string} workId 作品 ID
 		 * @param {import('../sequence.js').Sequence} [nextSequence] 新しい並び。渡されたときだけ差し替える
+		 * @param {{startPage?: number}} [options] 最初に出すページ (0 始まり)。ホームのフィードで押した画像から開くのに使う
 		 * @returns {Promise<void>}
 		 */
-		async open(workId, nextSequence) {
+		async open(workId, nextSequence, options = {}) {
 			if (nextSequence) {
 				navigation.setSequence(nextSequence);
 				// 前の並びで決めた隣は、新しい並びの隣とは限らない
 				stopNeighborWarm();
 			}
-			await openWork(workId);
+			await openWork(workId, options.startPage ?? 0);
 		},
 
 		close,

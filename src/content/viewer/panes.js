@@ -78,6 +78,7 @@ export function planPanes(detail, session, settings) {
  * @property {typeof createUgoiraPlayer} [createUgoiraPlayer] うごイラペインの差し替え口。テストが組み立ての順番を記録するために使う
  * @property {typeof createSidebar} [createSidebar] サイドバーの差し替え口。テストが組み立ての順番を記録するために使う
  * @property {(workId: string) => Promise<object>|null} [takeUgoiraMeta] 先に取っておいた ugoira_meta を受け取る。一度渡したら空になる。無ければ null
+ * @property {number} [startPage] 最初に出すページ (0 始まり)。複数枚の画像の作品だけに効く
  * @property {number} [ugoiraRate] うごイラを再生し始める速度 (倍率)。前の作品で選んだ速度を引き継ぐ
  * @property {(rate: number) => void} [onUgoiraRateChange] うごイラの再生速度が選ばれたら呼ぶ
  */
@@ -137,7 +138,7 @@ export async function renderWork(detail, session, settings, targets) {
 	} else {
 		// 原寸表示を開けるのは静止画だけ。うごイラ (canvas) と見られない作品には渡さない
 		imagePane = makeImagePane({ doc, container: stage, settings, zoom: targets.zoom, strings });
-		mainDone = imagePane.render(detail);
+		mainDone = imagePane.render(detail, { startPage: targets.startPage ?? 0 });
 	}
 
 	// サイドバーの中身 (本文・コメント・アクション) は主役の取得を待たずに組み立てる。

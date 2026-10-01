@@ -380,10 +380,12 @@ export function createImagePane(deps) {
 		/**
 		 * 作品を描画する。
 		 * ビュワーの状態表示 (.status) は呼び出し側が消してから呼ぶ。
+		 * 最初に出すページを渡すと、/pages が届いたところでそのページへ移る。(届くまでは 1 枚目を出す)
 		 * @param {object} detail 正規化した作品詳細
+		 * @param {{startPage?: number}} [options] 最初に出すページ (0 始まり)
 		 * @returns {Promise<void>}
 		 */
-		async render(detail) {
+		async render(detail, options = {}) {
 			frame = doc.createElement('div');
 			frame.className = 'frame';
 
@@ -417,10 +419,12 @@ export function createImagePane(deps) {
 			pageSizes = [Number.isFinite(detail.width) && Number.isFinite(detail.height)
 				? { width: detail.width, height: detail.height } : null];
 			index = 0;
-			pendingIndex = null;
 			lastDirection = 1;
 			// 分母と矢印は /pages を待たず detail.pageCount で先に出す
 			total = Math.max(detail.pageCount, 1);
+			// 2 枚目以降から開くときは行き先として覚え、/pages が届いたら移る。(矢印を先に押したときと同じ扱い)
+			const startPage = Number.isSafeInteger(options.startPage) ? clamp(options.startPage, 0, total - 1) : 0;
+			pendingIndex = startPage > 0 ? startPage : null;
 			paint();
 
 			if (detail.pageCount <= 1) return;
