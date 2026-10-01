@@ -15,21 +15,21 @@ const STRINGS = createStrings('ja');
 
 test('コメントを共通の形にする', () => {
 	const raw = {
-		userId: '92064764',
-		userName: 'キーー',
+		userId: '90000001',
+		userName: 'みなと',
 		img: 'https://s.pximg.net/common/images/no_profile.png',
 		id: '233674946',
-		comment: 'タグに橘さんを入れるなwww',
+		comment: '配色がすごく好みです',
 		stampId: null,
 		commentDate: '2026-09-10 09:20',
 		hasReplies: false,
 	};
 	assert.deepEqual(normalizeComment(raw, STRINGS), {
 		id: '233674946',
-		userId: '92064764',
-		userName: 'キーー',
+		userId: '90000001',
+		userName: 'みなと',
 		avatarUrl: 'https://s.pximg.net/common/images/no_profile.png',
-		text: 'タグに橘さんを入れるなwww',
+		text: '配色がすごく好みです',
 		date: new Date('2026-09-10T09:20:00+09:00'),
 		isStamp: false,
 		stampId: null,
@@ -109,8 +109,8 @@ test('スタンプの ID が使えなければ画像を出さない', () => {
 
 /** ルートコメント 1 件の生データ。 */
 const ROOT = Object.freeze({
-	userId: '92064764',
-	userName: 'キーー',
+	userId: '90000001',
+	userName: 'みなと',
 	img: 'https://s.pximg.net/common/images/no_profile.png',
 	id: '233573595',
 	comment: 'かわいい',
@@ -299,7 +299,7 @@ test('投稿者のアイコンと名前をユーザーページへのリンク�
 
 	const avatarLink = find(container, '.comment-avatar-link');
 	assert.equal(avatarLink.tag, 'a');
-	assert.equal(avatarLink.href, '/users/92064764');
+	assert.equal(avatarLink.href, '/users/90000001');
 	// 同じ飛び先のリンクが 1 件に 2 つ並ぶので、アイコン側は読み上げと Tab から外す
 	assert.equal(avatarLink.getAttribute('aria-hidden'), 'true');
 	assert.equal(avatarLink.getAttribute('tabindex'), '-1');
@@ -307,8 +307,8 @@ test('投稿者のアイコンと名前をユーザーページへのリンク�
 
 	const name = find(container, '.comment-name');
 	assert.equal(name.tag, 'a');
-	assert.equal(name.href, '/users/92064764');
-	assert.equal(name.textContent, 'キーー');
+	assert.equal(name.href, '/users/90000001');
+	assert.equal(name.textContent, 'みなと');
 	// 同じタブで開く。サイドバーの作者行 (.author) と揃える
 	assert.equal(name.getAttribute('target'), null);
 });
@@ -1267,7 +1267,7 @@ test('投稿者のラベルは自分が最優先', () => {
 	assert.equal(commentLabel({ userId: '99' }, '99', '99', STRINGS), 'あなた');
 	assert.equal(commentLabel({ userId: '99' }, '99', '54734418', STRINGS), 'あなた');
 	assert.equal(commentLabel({ userId: '54734418' }, '99', '54734418', STRINGS), '作者');
-	assert.equal(commentLabel({ userId: '92064764' }, '99', '54734418', STRINGS), null);
+	assert.equal(commentLabel({ userId: '90000001' }, '99', '54734418', STRINGS), null);
 });
 
 test('ラベルは ID が欠けていたら出さない', () => {

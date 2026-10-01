@@ -5,7 +5,7 @@ import { fakeElement, fakeDoc, iconName, flush } from '../helpers/dom.js';
 import { createStrings } from '../../src/i18n/index.js';
 
 /** シェア対象の作品詳細の代わり。 */
-const DETAIL = Object.freeze({ id: '149431011', title: 'モンブラン', userName: 'チャイ' });
+const DETAIL = Object.freeze({ id: '149763512', title: '灯台とねこ', userName: 'NEONS' });
 
 /** 文言のカタログ (日本語)。 */
 const STRINGS = createStrings('ja');
@@ -96,7 +96,7 @@ test('リンクをコピーは作品 URL をクリップボードへ書き、で
 	const copy = list.children.find((child) => child.tag === 'button');
 	copy.dispatch('click', {});
 	await flush();
-	assert.deepEqual(written, ['https://www.pixiv.net/artworks/149431011']);
+	assert.deepEqual(written, ['https://www.pixiv.net/artworks/149763512']);
 	const status = list.children.find((child) => child.className === 'share-status');
 	assert.equal(status.getAttribute('role'), 'status');
 	assert.equal(status.textContent, 'リンクをコピーしました');
