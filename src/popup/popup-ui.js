@@ -13,6 +13,7 @@ import { POPUP_THEMES, THEME_TOGGLE, SETTINGS_DEFAULTS } from '../common/constan
 import { createDescription } from './description.js';
 import { renderLicensePanel, renderBriefDisclaimer } from './license-panel.js';
 import { TITLE, createTabs, createResetField, createSections, createAdvancedSections } from './sections.js';
+import { attachFieldLock, isRequirementMet } from './field-lock.js';
 
 /** OS の配色を尋ねるメディアクエリ。 */
 const LIGHT_QUERY = '(prefers-color-scheme: light)';
@@ -106,14 +107,51 @@ function renderHeader(doc, initial, onChange, strings) {
 }
 
 /**
+ * @typedef {object} RenderContext 項目を描くときに引き回すもの
+ * @property {Document} doc 対象のドキュメント
+ * @property {object} state 今の設定。変更のたびに更新し、子の項目の非活性の判定に使う
+ * @property {(patch: object) => void} onChange 設定を変えたときの処理 (state の更新と非活性の判定を含む)
+ * @property {boolean} rich 選択肢の中に説明を入れられるか (appearance: base-select の対応)
+ * @property {Array<{requires: object, lock: {setLocked: (locked: boolean) => void}}>} locks 親の条件を持つ項目の一覧
+ */
+
+/**
+ * 親の条件を持つ項目に非活性の振る舞いを付け、一覧へ覚える。条件が無ければ何もしない。
+ * @param {RenderContext} ctx 描画の文脈
+ * @param {object|undefined} requires 親の条件 (sections.js の requirement)
+ * @param {{wrapper: HTMLElement, control: HTMLElement, kind: string, key: string}} target 付ける先
+ * @returns {{isLocked: () => boolean}|null} 非活性の状態。条件が無ければ null
+ */
+function lockIfDependent(ctx, requires, target) {
+	if (!requires) return null;
+	const lock = attachFieldLock(ctx.doc, { ...target, message: requires.message });
+	ctx.locks.push({ requires, lock });
+	return lock;
+}
+
+/**
+ * 子の項目を親の下に字下げして並べる。子が無ければ何もしない。
+ * @param {RenderContext} ctx 描画の文脈
+ * @param {HTMLElement} wrapper 親の項目
+ * @param {readonly object[]|undefined} children 子の項目の定義
+ * @returns {void}
+ */
+function appendChildren(ctx, wrapper, children) {
+	if (!children?.length) return;
+	const box = ctx.doc.createElement('div');
+	box.className = 'field-children';
+	for (const child of children) box.append(renderField(ctx, child));
+	wrapper.append(box);
+}
+
+/**
  * スイッチの項目を組み立てる。
- * @param {Document} doc 対象のドキュメント
+ * @param {RenderContext} ctx 描画の文脈
  * @param {object} field 項目の定義
- * @param {object} settings 現在の設定
- * @param {(patch: object) => void} onChange 変更時の処理
  * @returns {HTMLElement} 項目
  */
-function renderToggle(doc, field, settings, onChange) {
+function renderToggle(ctx, field) {
+	const { doc } = ctx;
 	const wrapper = doc.createElement('div');
 	wrapper.className = 'field';
 
@@ -126,10 +164,9 @@ function renderToggle(doc, field, settings, onChange) {
 	// 形が変わる以上、読み上げの役割も checkbox ではなく switch にする。
 	// 入りと切りは type=checkbox の checked がそのまま伝わるので aria-checked は置かない
 	input.setAttribute('role', 'switch');
-	input.checked = Boolean(settings[field.key]);
+	input.checked = Boolean(ctx.state[field.key]);
 	input.dataset.role = field.key;
 	input.setAttribute('aria-describedby', descriptionId(field.key));
-	input.addEventListener('change', () => onChange({ [field.key]: input.checked }));
 
 	const text = doc.createElement('span');
 	text.className = 'label';
@@ -137,6 +174,12 @@ function renderToggle(doc, field, settings, onChange) {
 
 	label.append(input, text);
 	wrapper.append(label, createDescription(doc, field.description, descriptionId(field.key)));
+	const lock = lockIfDependent(ctx, field.requires, { wrapper, control: input, kind: 'toggle', key: field.key });
+	input.addEventListener('change', () => {
+		if (lock?.isLocked()) return;
+		ctx.onChange({ [field.key]: input.checked });
+	});
+	appendChildren(ctx, wrapper, field.children);
 	return wrapper;
 }
 
@@ -177,17 +220,42 @@ function createChoiceOption(doc, option, rich) {
 const RANGE_WARNING_ICON = 'error';
 
 /**
+ * レンジの目盛りを組み立てる。値ごとに、つまみの中心が来る位置へ置く。
+ * 位置は CSS 変数 --tick (0-1) で渡し、つまみの幅の分を CSS が差し引く。
+ * @param {Document} doc 対象のドキュメント
+ * @param {object} field 項目の定義 (kind: 'range')
+ * @returns {HTMLElement} 目盛り
+ */
+function renderScale(doc, field) {
+	const scale = doc.createElement('div');
+	scale.className = 'range-scale';
+	// 範囲は min / max で読み上げに届くので、目盛りは目で見る用
+	scale.setAttribute('aria-hidden', 'true');
+	const ticks = field.scale ?? [field.min, field.max];
+	const read = field.scaleFormat ?? String;
+	const span = field.max - field.min;
+	for (const value of ticks) {
+		const tick = doc.createElement('span');
+		tick.className = 'range-tick';
+		tick.textContent = read(value);
+		tick.style.setProperty('--tick', String(span > 0 ? (value - field.min) / span : 0));
+		scale.append(tick);
+	}
+	return scale;
+}
+
+/**
  * レンジ (スライダー) の項目を組み立てる。今の値は見出しの右に format で読んで出す。
  * 動かしている間は表示だけを追従させ、保存は離したとき (change) に 1 回だけ行う。
  * (input のたびに書くと sync 領域の書き込み回数の上限に当たる)
  * warnAt 以上の値では、今の値を警告の色にし、レンジの下に warning を出す。(動かしている間も追従する)
- * @param {Document} doc 対象のドキュメント
+ * @param {RenderContext} ctx 描画の文脈
  * @param {object} field 項目の定義 (kind: 'range')
- * @param {object} settings 現在の設定
- * @param {(patch: object) => void} onChange 変更時の処理
+ * @param {object} [requires] 親の条件。親の選択肢が非活性ならレンジも非活性にする
  * @returns {HTMLElement} 項目
  */
-function renderRange(doc, field, settings, onChange) {
+function renderRange(ctx, field, requires) {
+	const { doc } = ctx;
 	const wrapper = doc.createElement('div');
 	wrapper.className = 'field range';
 	// 出し入れする単位。親の選択肢から hidden を付け外しする
@@ -215,7 +283,7 @@ function renderRange(doc, field, settings, onChange) {
 	const inputId = `${field.key}-input`;
 	input.setAttribute('id', inputId);
 	input.setAttribute('aria-labelledby', labelId);
-	const saved = settings[field.key];
+	const saved = ctx.state[field.key];
 	input.value = String(Number.isFinite(saved) ? saved : SETTINGS_DEFAULTS[field.key]);
 	// 今の値がどの入力の結果かを結び付ける
 	output.setAttribute('for', inputId);
@@ -252,38 +320,32 @@ function renderRange(doc, field, settings, onChange) {
 		else input.removeAttribute('aria-describedby');
 	}
 
-	input.addEventListener('input', showValue);
-	input.addEventListener('change', () => onChange({ [field.key]: Number(input.value) }));
-	showValue();
-
-	// 端の値を両脇に添え、選べる範囲を見せる
-	const scale = doc.createElement('div');
-	scale.className = 'range-scale';
-	scale.setAttribute('aria-hidden', 'true');
-	const low = doc.createElement('span');
-	low.textContent = String(field.min);
-	const high = doc.createElement('span');
-	high.textContent = String(field.max);
-	scale.append(low, high);
-
 	head.append(label, output);
-	wrapper.append(head, input, scale);
+	wrapper.append(head, input, renderScale(doc, field));
 	if (warning) wrapper.append(warning);
+	const lock = lockIfDependent(ctx, requires, { wrapper, control: input, kind: 'range', key: field.key });
+	input.addEventListener('input', () => {
+		if (lock?.isLocked()) return;
+		showValue();
+	});
+	input.addEventListener('change', () => {
+		if (lock?.isLocked()) return;
+		ctx.onChange({ [field.key]: Number(input.value) });
+	});
+	showValue();
 	return wrapper;
 }
 
 /**
  * 選択肢の項目を組み立てる。保存値が選択肢に無ければ既定を選んだ状態で描く。
- * @param {Document} doc 対象のドキュメント
+ * @param {RenderContext} ctx 描画の文脈
  * @param {object} field 項目の定義
- * @param {object} settings 現在の設定
- * @param {(patch: object) => void} onChange 変更時の処理
- * @param {boolean} rich 選択肢の中に説明を入れられるか (appearance: base-select の対応)
  * @returns {HTMLElement} 項目
  */
-function renderChoice(doc, field, settings, onChange, rich) {
+function renderChoice(ctx, field) {
+	const { doc, rich } = ctx;
 	const values = field.options.map((option) => option.value);
-	const saved = String(settings[field.key]);
+	const saved = String(ctx.state[field.key]);
 	const current = values.includes(saved) ? saved : String(SETTINGS_DEFAULTS[field.key]);
 	// select の値は常に文字列。保存の型は既定値の型から導く。
 	// 数値の項目でも、数字でない選択肢 (カスタム) は文字列のまま保存する
@@ -324,18 +386,6 @@ function renderChoice(doc, field, settings, onChange, rich) {
 	const hasHints = field.options.some((option) => option.description);
 	const hint = rich || !hasHints ? null : createDescription(doc, '', hintId);
 
-	// 特定の値を選んだときだけ下に出す項目 (先読みのカスタムの枚数など)
-	const reveal = field.reveal ? renderRange(doc, field.reveal.field, settings, onChange) : null;
-
-	/**
-	 * 選んでいる値に合わせて、下に出す項目を出し入れする。
-	 * @param {string} value 選ばれている値
-	 * @returns {void}
-	 */
-	function showReveal(value) {
-		if (reveal) reveal.hidden = value !== field.reveal.when;
-	}
-
 	/**
 	 * 選んでいる項目の説明を出す。
 	 * @param {string} value 選ばれている値
@@ -346,12 +396,6 @@ function renderChoice(doc, field, settings, onChange, rich) {
 		hint.textContent = field.options.find((option) => option.value === value)?.description ?? '';
 	}
 
-	select.addEventListener('change', () => {
-		onChange({ [field.key]: toSaved(select.value) });
-		showHint(select.value);
-		showReveal(select.value);
-	});
-
 	wrapper.append(title, lead, select);
 	if (hint) {
 		showHint(current);
@@ -360,76 +404,96 @@ function renderChoice(doc, field, settings, onChange, rich) {
 	} else {
 		select.setAttribute('aria-describedby', descriptionId(field.key));
 	}
+	// 警告の行は選択肢のすぐ下に出す。(下に出すレンジより上)
+	const lock = lockIfDependent(ctx, field.requires, { wrapper, control: select, kind: 'choice', key: field.key });
+
+	// 特定の値を選んだときだけ下に出す項目 (先読みのカスタムの枚数など)。親の条件はレンジにも効かせる
+	const reveal = field.reveal ? renderRange(ctx, field.reveal.field, field.requires) : null;
+
+	/**
+	 * 選んでいる値に合わせて、下に出す項目を出し入れする。
+	 * @param {string} value 選ばれている値
+	 * @returns {void}
+	 */
+	function showReveal(value) {
+		if (reveal) reveal.hidden = value !== field.reveal.when;
+	}
+
+	select.addEventListener('change', () => {
+		if (lock?.isLocked()) return;
+		ctx.onChange({ [field.key]: toSaved(select.value) });
+		showHint(select.value);
+		showReveal(select.value);
+	});
+
 	if (reveal) {
 		showReveal(current);
 		wrapper.append(reveal);
 	}
+	appendChildren(ctx, wrapper, field.children);
 	return wrapper;
 }
 
 /**
+ * 項目を種類に合わせて組み立てる。
+ * @param {RenderContext} ctx 描画の文脈
+ * @param {object} field 項目の定義
+ * @returns {HTMLElement} 項目
+ */
+function renderField(ctx, field) {
+	return field.kind === 'toggle' ? renderToggle(ctx, field) : renderChoice(ctx, field);
+}
+
+/**
  * 定義表の見出しごとに項目を並べ、パネルへ足す。
- * @param {Document} doc 対象のドキュメント
+ * @param {RenderContext} ctx 描画の文脈
  * @param {HTMLElement} panel 足し先
  * @param {readonly object[]} sections 見出しごとの項目 (createSections / createAdvancedSections の戻り値)
- * @param {object} settings 現在の設定 (正規化済み)
- * @param {(patch: object) => void} onChange 設定を変えたときの処理
  * @returns {void}
  */
-function appendSections(doc, panel, sections, settings, onChange) {
-	// 判定の結果は環境で決まり項目ごとに変わらないので 1 回だけ尋ねる
-	const rich = supportsRichOptions(doc.defaultView);
-
+function appendSections(ctx, panel, sections) {
 	for (const { heading, fields } of sections) {
-		const section = doc.createElement('section');
+		const section = ctx.doc.createElement('section');
 		section.className = 'section';
 
-		const title = doc.createElement('h2');
+		const title = ctx.doc.createElement('h2');
 		title.textContent = heading;
 		section.append(title);
 
-		for (const field of fields) {
-			section.append(field.kind === 'toggle'
-				? renderToggle(doc, field, settings, onChange)
-				: renderChoice(doc, field, settings, onChange, rich));
-		}
+		for (const field of fields) section.append(renderField(ctx, field));
 		panel.append(section);
 	}
 }
 
 /**
  * 設定タブの中身を組み立てる。
- * @param {Document} doc 対象のドキュメント
- * @param {object} settings 現在の設定 (正規化済み)
- * @param {(patch: object) => void} onChange 設定を変えたときの処理
+ * @param {RenderContext} ctx 描画の文脈
  * @param {() => void} onReset 初期化を確定したときの処理
  * @param {object} strings 文言のカタログ
  * @returns {HTMLElement} パネル
  */
-function renderSettingsPanel(doc, settings, onChange, onReset, strings) {
-	const panel = doc.createElement('div');
+function renderSettingsPanel(ctx, onReset, strings) {
+	const panel = ctx.doc.createElement('div');
 	panel.className = 'panel settings';
-	appendSections(doc, panel, createSections(strings), settings, onChange);
+	appendSections(ctx, panel, createSections(strings));
 
-	const reset = renderConfirmRow(doc, createResetField(strings), onReset);
+	const reset = renderConfirmRow(ctx.doc, createResetField(strings), onReset);
 	// 設定項目との区切り。置き場所に依る見た目なので、汎用の確認の行ではなくここで付ける
 	reset.classList.add('reset');
-	panel.append(reset, renderBriefDisclaimer(doc, strings));
+	panel.append(reset, renderBriefDisclaimer(ctx.doc, strings));
 	return panel;
 }
 
 /**
  * 詳細設定タブの中身を組み立てる。
- * @param {Document} doc 対象のドキュメント
- * @param {object} settings 現在の設定 (正規化済み)
- * @param {(patch: object) => void} onChange 設定を変えたときの処理
+ * @param {RenderContext} ctx 描画の文脈
  * @param {object} strings 文言のカタログ
  * @returns {HTMLElement} パネル
  */
-function renderAdvancedPanel(doc, settings, onChange, strings) {
-	const panel = doc.createElement('div');
+function renderAdvancedPanel(ctx, strings) {
+	const panel = ctx.doc.createElement('div');
 	panel.className = 'panel advanced';
-	appendSections(doc, panel, createAdvancedSections(strings), settings, onChange);
+	appendSections(ctx, panel, createAdvancedSections(strings));
 	return panel;
 }
 
@@ -463,11 +527,32 @@ export function renderPopup({ doc, root, settings, strings, onChange, onReset, n
 		parts.push(message);
 	}
 
+	// 子の項目の非活性は、保存の完了を待たずに今の画面の値で決める。(別のタブの親を持つ項目もあるので 1 つの state を共有する)
+	const ctx = {
+		doc,
+		state: { ...settings },
+		rich: supportsRichOptions(doc.defaultView),
+		locks: [],
+		onChange: (patch) => {
+			Object.assign(ctx.state, patch);
+			refreshLocks();
+			onChange(patch);
+		},
+	};
+	/**
+	 * 親の条件を持つ項目の非活性を、今の値に合わせる。
+	 * @returns {void}
+	 */
+	function refreshLocks() {
+		for (const { requires, lock } of ctx.locks) lock.setLocked(!isRequirementMet(requires, ctx.state));
+	}
+
 	const panels = {
-		settings: renderSettingsPanel(doc, settings, onChange, onReset, strings),
-		advanced: renderAdvancedPanel(doc, settings, onChange, strings),
+		settings: renderSettingsPanel(ctx, onReset, strings),
+		advanced: renderAdvancedPanel(ctx, strings),
 		license: renderLicensePanel(doc, strings),
 	};
+	refreshLocks();
 	const entries = createTabs(strings).map(({ id, label }) => ({ id, label, panel: panels[id] }));
 	const tabs = renderTabs(doc, entries, { label: strings.popup.TABS_LABEL, initialId: initialTab });
 

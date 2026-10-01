@@ -42,7 +42,9 @@ test('定義表の全 field の key が strings.popup.fields のキーと一致�
 		const strings = createStrings(lang);
 		const fieldKeys = [...createSections(strings), ...createAdvancedSections(strings)]
 			.flatMap((section) => section.fields)
-			.flatMap((field) => (field.reveal ? [field.key, field.reveal.field.key] : [field.key]));
+			.flatMap(function walk(field) {
+				return [field.key, ...(field.reveal ? [field.reveal.field.key] : []), ...(field.children ?? []).flatMap(walk)];
+			});
 		assertSameKeySet(fieldKeys, Object.keys(strings.popup.fields), `[${lang}] popup.fields`);
 	}
 });

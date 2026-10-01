@@ -263,6 +263,9 @@ export const PREFETCH_CUSTOM_RANGE = Object.freeze({ min: 1, max: 20, step: 1 })
 /** カスタムの先読みでこの枚数以上を選んだら、メモリを圧迫する旨の警告を出す。 */
 export const PREFETCH_CUSTOM_WARN_AT = 10;
 
+/** カスタムの先読みのレンジの下に添える目盛りの間隔 (枚)。端の値は必ず出す */
+export const PREFETCH_CUSTOM_SCALE_STEP = 5;
+
 /** カスタムの先読みの既定の枚数。既存の選択肢 (1 / 3) の間に置く */
 const DEFAULT_PREFETCH_CUSTOM = 2;
 
@@ -365,25 +368,31 @@ export const NAV_ZONES = Object.freeze({
 });
 
 /**
- * クリック領域の幅 (左右) と高さ (上下) の選択肢。ステージの大きさに対する % で、昇順。
- * 左右 (または上下) の 2 つが重ならないよう 50 未満に留める。
+ * 数値の設定を「既定のまま」か「カスタム (レンジで選ぶ)」かで持つ設定の値。
+ * 画面端のクリック領域・原寸表示のクリック領域が使う。(背景の濃さは BACKDROP_MODES)
  */
-export const NAV_ZONE_SIZE_CHOICES = Object.freeze([15, 20, 25, 33, 40]);
-
-/** クリック領域の大きさの既定値 (%)。 */
-const DEFAULT_NAV_ZONE_SIZE = 25;
-
-/** クリック領域の幅と高さの既定の割合。(0-1) 設定を渡さないときに使う */
-export const NAV_ZONE_RATIO = DEFAULT_NAV_ZONE_SIZE / 100;
+export const SETTING_MODES = Object.freeze({
+	DEFAULT: 'default',
+	CUSTOM: 'custom',
+});
 
 /**
- * 原寸表示の左右のクリック領域の幅の選択肢。画面の幅に対する % で、昇順。
- * 左右の 2 つが重ならないよう 50 未満に留める。
+ * クリック領域の大きさをカスタムで選べる範囲 (%)。画面端のクリック領域と原寸表示のクリック領域で共有する。
+ * 左右 (または上下) の 2 つが重ならないよう 50 未満に留める。
  */
-export const ZOOM_ZONE_SIZE_CHOICES = Object.freeze([15, 20, 25, 33, 40]);
+export const ZONE_SIZE_RANGE = Object.freeze({ min: 5, max: 35, step: 5 });
 
-/** 原寸表示のクリック領域の幅の既定値 (%)。 */
-const DEFAULT_ZOOM_ZONE_SIZE = 25;
+/** クリック領域のレンジの下に添える目盛りの間隔 (%)。 */
+export const ZONE_SIZE_SCALE_STEP = 5;
+
+/** クリック領域の大きさの既定値 (%)。 */
+export const DEFAULT_NAV_ZONE_SIZE = 25;
+
+/** クリック領域の幅と高さの既定の割合。(0-1) カスタムでないときと、設定を渡さないときに使う */
+export const NAV_ZONE_RATIO = DEFAULT_NAV_ZONE_SIZE / 100;
+
+/** 原寸表示のクリック領域の幅の既定値 (%)。CSS の --zoom-zone-width の既定と同じ値 */
+export const DEFAULT_ZOOM_ZONE_SIZE = 25;
 
 /** サイドバーの幅の選択肢 (px)。昇順 */
 export const SIDEBAR_WIDTH_CHOICES = Object.freeze([320, 384, 448, 512]);
@@ -398,25 +407,42 @@ export const SIDEBAR_DRAWER_MAX_CHOICES = Object.freeze([50, 60, 70, 80]);
 const DEFAULT_SIDEBAR_DRAWER_MAX = 60;
 
 /**
- * 背景の幕の不透明度で「テーマに合わせる」を表す値。
- * このときは上書きせず、テーマごとの既定 (ダーク 92% / ライト 88%) のまま描く。
+ * 背景の幕の濃さの持ち方。
+ * THEME はテーマごとの既定 (ダーク 92% / ライト 88%) のまま描く。CUSTOM は設定 backdropOpacity の濃さで描く。
  */
-export const BACKDROP_OPACITY_THEME = 0;
+export const BACKDROP_MODES = Object.freeze({
+	THEME: 'theme',
+	CUSTOM: 'custom',
+});
 
-/** 背景の幕の不透明度の選択肢 (%)。先頭はテーマに合わせる。以降は濃い順 */
-export const BACKDROP_OPACITY_CHOICES = Object.freeze([BACKDROP_OPACITY_THEME, 100, 90, 80, 70, 60]);
+/** 背景の幕の濃さをカスタムで選べる範囲 (%)。 */
+export const BACKDROP_OPACITY_RANGE = Object.freeze({ min: 0, max: 100, step: 10 });
+
+/** 背景の幕の濃さのレンジの下に添える目盛りの間隔 (%)。10 刻みで全部出すと文字が重なる */
+export const BACKDROP_OPACITY_SCALE_STEP = 20;
+
+/** カスタムにした直後の背景の幕の濃さ (%)。ダークの既定 (92%) に近い値 */
+const DEFAULT_BACKDROP_OPACITY = 90;
 
 /**
  * 設定の値をビュワーの CSS 変数へ写す表。キーは設定名。
  * unit は値の後ろに付ける単位。divisor は値を割る数。(% を 0-1 の不透明度にする等。掛け算だと 0.7000000000000001 のような誤差が出る)
- * skip に当たる値のときは変数を上書きせず、CSS の既定に任せる。
- * @type {Readonly<Record<string, {property: string, unit?: string, divisor?: number, skip?: number}>>}
+ * mode を持つ項目は、設定 mode.key が mode.custom のときだけ上書きし、それ以外は CSS の既定に任せる。
+ * @type {Readonly<Record<string, {property: string, unit?: string, divisor?: number, mode?: {key: string, custom: string}}>>}
  */
 export const VIEWER_CSS_SETTINGS = Object.freeze({
 	sidebarWidth: Object.freeze({ property: '--sidebar-width', unit: 'px' }),
 	sidebarDrawerMax: Object.freeze({ property: '--sidebar-drawer-max', unit: '%' }),
-	backdropOpacity: Object.freeze({ property: '--backdrop-alpha', divisor: 100, skip: BACKDROP_OPACITY_THEME }),
-	zoomZoneSize: Object.freeze({ property: '--zoom-zone-width', unit: '%' }),
+	backdropOpacity: Object.freeze({
+		property: '--backdrop-alpha',
+		divisor: 100,
+		mode: Object.freeze({ key: 'backdropMode', custom: BACKDROP_MODES.CUSTOM }),
+	}),
+	zoomZoneSize: Object.freeze({
+		property: '--zoom-zone-width',
+		unit: '%',
+		mode: Object.freeze({ key: 'zoomZoneMode', custom: SETTING_MODES.CUSTOM }),
+	}),
 });
 
 /**
@@ -476,12 +502,15 @@ export const SETTINGS_DEFAULTS = Object.freeze({
 	sidebarScroll: SIDEBAR_SCROLL.WHOLE,
 	sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
 	sidebarDrawerMax: DEFAULT_SIDEBAR_DRAWER_MAX,
-	backdropOpacity: BACKDROP_OPACITY_THEME,
+	backdropMode: BACKDROP_MODES.THEME,
+	backdropOpacity: DEFAULT_BACKDROP_OPACITY,
 	commentPageSize: COMMENT_PAGE_SIZE,
 	closeOnBackdrop: true,
 	navZones: NAV_ZONES.OFF,
+	navZoneMode: SETTING_MODES.DEFAULT,
 	navZoneSize: DEFAULT_NAV_ZONE_SIZE,
 	clickZoom: false,
+	zoomZoneMode: SETTING_MODES.DEFAULT,
 	zoomZoneSize: DEFAULT_ZOOM_ZONE_SIZE,
 	gridTabSkip: GRID_TAB_SKIP.NONE,
 	hidePickup: false,

@@ -247,6 +247,22 @@ export default {
 		 * @returns {string} 印を付けた見出し
 		 */
 		withDefault: (label) => `${label} (기본값)`,
+		/** 親の項目がオフなので操作できない項目を押したときの警告 */
+		dependency: {
+			/**
+			 * 親のスイッチをオンにするよう促す。
+			 * @param {string} label 親の項目の見出し
+			 * @returns {string} 警告
+			 */
+			turnOn: (label) => `「${label}」을(를) 켜 주세요.`,
+			/**
+			 * 親の選択肢で「オフ」以外を選ぶよう促す。
+			 * @param {string} label 親の項目の見出し
+			 * @param {string} off 親の選択肢のうちオフに当たるものの見出し
+			 * @returns {string} 警告
+			 */
+			chooseOther: (label, off) => `「${label}」에서 「${off}」 이외의 항목을 선택해 주세요.`,
+		},
 		SAVE_FAILED: '저장하지 못했습니다. 브라우저의 설정 동기화를 확인해 주세요.',
 		RESET_FAILED: '초기화하지 못했습니다. 브라우저의 설정 동기화를 확인해 주세요.',
 		tabs: {
@@ -368,7 +384,7 @@ export default {
 				 */
 				option: (value) => `${value}%`,
 			},
-			backdropOpacity: {
+			backdropMode: {
 				label: '배경 농도',
 				description: '이미지 뒤에 까는 검은 막의 농도입니다. 낮추면 뒤의 페이지가 비쳐 보입니다.',
 				theme: {
@@ -376,29 +392,59 @@ export default {
 					description: '다크에서는 92%, 라이트에서는 88%로 합니다.',
 				},
 				/**
-				 * 選択肢の見出し。値から作る。
-				 * @param {number} value 選択肢の値
-				 * @returns {string} 見出し
+				 * 「カスタム」の選択肢。値は選択肢の下に出るレンジで選ぶ。
+				 * @param {number} min 選べる最小の値 (%)
+				 * @param {number} max 選べる最大の値 (%)
+				 * @returns {{label: string, description: string}} 選択肢の文言
+				 */
+				custom: (min, max) => ({ label: '사용자 지정', description: `농도를 ${min}~${max}% 중에서 고릅니다.` }),
+			},
+			backdropOpacity: {
+				label: '농도',
+				/**
+				 * 値の読み方。レンジの今の値・目盛り・既定の選択肢の見出しに使う。
+				 * @param {number} value 値 (%)
+				 * @returns {string} 読み
 				 */
 				option: (value) => `${value}%`,
 			},
-			navZoneSize: {
+			navZoneMode: {
 				label: '화면 가장자리 클릭 영역 크기',
 				description: '화면 가장자리 클릭으로 넘길 때 쓰는 가장자리의 너비 (좌우) 와 높이 (상하) 입니다. 이미지를 표시하는 부분에 대한 비율입니다.',
 				/**
-				 * 選択肢の見出し。値から作る。
-				 * @param {number} value 選択肢の値
-				 * @returns {string} 見出し
+				 * 「カスタム」の選択肢。値は選択肢の下に出るレンジで選ぶ。
+				 * @param {number} min 選べる最小の値 (%)
+				 * @param {number} max 選べる最大の値 (%)
+				 * @returns {{label: string, description: string}} 選択肢の文言
+				 */
+				custom: (min, max) => ({ label: '사용자 지정', description: `크기를 ${min}~${max}% 중에서 고릅니다.` }),
+			},
+			navZoneSize: {
+				label: '크기',
+				/**
+				 * 値の読み方。レンジの今の値・目盛り・既定の選択肢の見出しに使う。
+				 * @param {number} value 値 (%)
+				 * @returns {string} 読み
 				 */
 				option: (value) => `${value}%`,
 			},
-			zoomZoneSize: {
+			zoomZoneMode: {
 				label: '원본 크기 보기의 클릭 영역 너비',
 				description: '원본 크기 보기 화면에서 좌우 가장자리를 눌러 페이지를 넘기는 범위의 너비입니다.',
 				/**
-				 * 選択肢の見出し。値から作る。
-				 * @param {number} value 選択肢の値
-				 * @returns {string} 見出し
+				 * 「カスタム」の選択肢。値は選択肢の下に出るレンジで選ぶ。
+				 * @param {number} min 選べる最小の値 (%)
+				 * @param {number} max 選べる最大の値 (%)
+				 * @returns {{label: string, description: string}} 選択肢の文言
+				 */
+				custom: (min, max) => ({ label: '사용자 지정', description: `너비를 ${min}~${max}% 중에서 고릅니다.` }),
+			},
+			zoomZoneSize: {
+				label: '너비',
+				/**
+				 * 値の読み方。レンジの今の値・目盛り・既定の選択肢の見出しに使う。
+				 * @param {number} value 値 (%)
+				 * @returns {string} 読み
 				 */
 				option: (value) => `${value}%`,
 			},

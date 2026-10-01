@@ -14,11 +14,13 @@ import {
 	SIDEBAR_SCROLL,
 	INFINITE_SCROLL,
 	NAV_ZONES,
-	NAV_ZONE_SIZE_CHOICES,
-	ZOOM_ZONE_SIZE_CHOICES,
+	SETTING_MODES,
+	ZONE_SIZE_RANGE,
+	DEFAULT_NAV_ZONE_SIZE,
 	SIDEBAR_WIDTH_CHOICES,
 	SIDEBAR_DRAWER_MAX_CHOICES,
-	BACKDROP_OPACITY_CHOICES,
+	BACKDROP_MODES,
+	BACKDROP_OPACITY_RANGE,
 	COMMENT_PAGE_SIZE_CHOICES,
 } from './constants.js';
 import { warn } from './log.js';
@@ -82,6 +84,35 @@ function intInRange(value, { min, max }, fallback) {
 }
 
 /**
+ * 範囲の中の段階 (step の倍数) へ寄せて読む。数値でなければ既定へ倒す。
+ * 範囲の外は端へ、段階の間は近い段階へ寄せる。(前の版で選べた値を、選べる値のうち近いものとして引き継ぐ)
+ * @param {unknown} value 保存値
+ * @param {{min: number, max: number, step: number}} range 範囲と段階
+ * @param {number} fallback 既定
+ * @returns {number} 寄せた値
+ */
+function snapToRange(value, { min, max, step }, fallback) {
+	if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+	const clamped = Math.min(max, Math.max(min, value));
+	return min + Math.round((clamped - min) / step) * step;
+}
+
+/**
+ * 「既定のまま / カスタム」の持ち方を読む。保存値が無いときは、数値の側が既定と違えばカスタムとみなす。
+ * 前の版はモードを持たず数値だけを保存していたので、選んでいた値をカスタムとして引き継ぐため。
+ * @param {unknown} mode 保存されていたモード
+ * @param {readonly string[]} modes 許すモード
+ * @param {string} custom カスタムを表すモード
+ * @param {boolean} hasCustomValue 数値の側に既定と違う値が保存されているか
+ * @param {string} fallback 既定のモード
+ * @returns {string} モード
+ */
+function readMode(mode, modes, custom, hasCustomValue, fallback) {
+	if (modes.includes(mode)) return mode;
+	return hasCustomValue ? custom : fallback;
+}
+
+/**
  * 保存値を既定へ丸める。
  * @param {object|null} raw 保存されていた値
  * @returns {typeof SETTINGS_DEFAULTS} 丸めた設定
@@ -102,13 +133,22 @@ export function normalizeSettings(raw) {
 		sidebarScroll: oneOf(source.sidebarScroll, Object.values(SIDEBAR_SCROLL), d.sidebarScroll),
 		sidebarWidth: oneOf(source.sidebarWidth, SIDEBAR_WIDTH_CHOICES, d.sidebarWidth),
 		sidebarDrawerMax: oneOf(source.sidebarDrawerMax, SIDEBAR_DRAWER_MAX_CHOICES, d.sidebarDrawerMax),
-		backdropOpacity: oneOf(source.backdropOpacity, BACKDROP_OPACITY_CHOICES, d.backdropOpacity),
+		// 前の版は 0 を「テーマに合わせる」として保存していた。0 より大きい数値だけをカスタムとして引き継ぐ
+		backdropMode: readMode(source.backdropMode, Object.values(BACKDROP_MODES), BACKDROP_MODES.CUSTOM,
+			typeof source.backdropOpacity === 'number' && source.backdropOpacity > 0, d.backdropMode),
+		backdropOpacity: source.backdropMode === undefined && source.backdropOpacity === 0
+			? d.backdropOpacity
+			: snapToRange(source.backdropOpacity, BACKDROP_OPACITY_RANGE, d.backdropOpacity),
 		commentPageSize: oneOf(source.commentPageSize, COMMENT_PAGE_SIZE_CHOICES, d.commentPageSize),
 		closeOnBackdrop: asBoolean(source.closeOnBackdrop, d.closeOnBackdrop),
 		navZones: oneOf(source.navZones, Object.values(NAV_ZONES), d.navZones),
-		navZoneSize: oneOf(source.navZoneSize, NAV_ZONE_SIZE_CHOICES, d.navZoneSize),
+		navZoneMode: readMode(source.navZoneMode, Object.values(SETTING_MODES), SETTING_MODES.CUSTOM,
+			typeof source.navZoneSize === 'number' && source.navZoneSize !== DEFAULT_NAV_ZONE_SIZE, d.navZoneMode),
+		navZoneSize: snapToRange(source.navZoneSize, ZONE_SIZE_RANGE, d.navZoneSize),
 		clickZoom: asBoolean(source.clickZoom, d.clickZoom),
-		zoomZoneSize: oneOf(source.zoomZoneSize, ZOOM_ZONE_SIZE_CHOICES, d.zoomZoneSize),
+		zoomZoneMode: readMode(source.zoomZoneMode, Object.values(SETTING_MODES), SETTING_MODES.CUSTOM,
+			typeof source.zoomZoneSize === 'number' && source.zoomZoneSize !== d.zoomZoneSize, d.zoomZoneMode),
+		zoomZoneSize: snapToRange(source.zoomZoneSize, ZONE_SIZE_RANGE, d.zoomZoneSize),
 		gridTabSkip: oneOf(source.gridTabSkip, Object.values(GRID_TAB_SKIP), d.gridTabSkip),
 		hidePickup: asBoolean(source.hidePickup, d.hidePickup),
 		infiniteScroll: oneOf(source.infiniteScroll, Object.values(INFINITE_SCROLL), d.infiniteScroll),
@@ -123,6 +163,17 @@ export function normalizeSettings(raw) {
  */
 export function prefetchCount(settings) {
 	return settings.prefetch === PREFETCH_CUSTOM ? settings.prefetchCustom : settings.prefetch;
+}
+
+/**
+ * 実際に使う画面端のクリック領域の大きさ (%) を返す。カスタムのときだけ navZoneSize を使う。
+ * @param {{navZoneMode?: string, navZoneSize?: number}} settings 正規化済みの設定
+ * @returns {number} 大きさ (%)
+ */
+export function navZoneSizeOf(settings) {
+	return settings.navZoneMode === SETTING_MODES.CUSTOM && Number.isFinite(settings.navZoneSize)
+		? settings.navZoneSize
+		: DEFAULT_NAV_ZONE_SIZE;
 }
 
 /**

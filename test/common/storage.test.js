@@ -1,6 +1,6 @@
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeSettings, loadSettings, saveSetting, resetSettings, watchSettings, prefetchCount } from '../../src/common/storage.js';
+import { normalizeSettings, loadSettings, saveSetting, resetSettings, watchSettings, prefetchCount, navZoneSizeOf } from '../../src/common/storage.js';
 import { LOG_PREFIX } from '../../src/common/log.js';
 import { fakeArea } from '../helpers/storage.js';
 import { flush } from '../helpers/dom.js';
@@ -16,12 +16,12 @@ import {
 	PREFETCH_CUSTOM_WARN_AT,
 	IMAGE_QUALITY,
 	NAV_ZONES,
-	NAV_ZONE_SIZE_CHOICES,
-	ZOOM_ZONE_SIZE_CHOICES,
+	SETTING_MODES,
+	ZONE_SIZE_RANGE,
 	SIDEBAR_WIDTH_CHOICES,
 	SIDEBAR_DRAWER_MAX_CHOICES,
-	BACKDROP_OPACITY_CHOICES,
-	BACKDROP_OPACITY_THEME,
+	BACKDROP_MODES,
+	BACKDROP_OPACITY_RANGE,
 	COMMENT_PAGE_SIZE_CHOICES,
 } from '../../src/common/constants.js';
 
@@ -84,10 +84,7 @@ test('数値の段階の設定は選択肢の値だけ通し、既定は選択�
 	const table = {
 		sidebarWidth: SIDEBAR_WIDTH_CHOICES,
 		sidebarDrawerMax: SIDEBAR_DRAWER_MAX_CHOICES,
-		backdropOpacity: BACKDROP_OPACITY_CHOICES,
 		commentPageSize: COMMENT_PAGE_SIZE_CHOICES,
-		navZoneSize: NAV_ZONE_SIZE_CHOICES,
-		zoomZoneSize: ZOOM_ZONE_SIZE_CHOICES,
 	};
 	for (const [key, choices] of Object.entries(table)) {
 		assert.ok(choices.includes(SETTINGS_DEFAULTS[key]), `${key} の既定が選択肢に無い`);
@@ -99,12 +96,48 @@ test('数値の段階の設定は選択肢の値だけ通し、既定は選択�
 	}
 });
 
-test('クリック領域の大きさは左右 (上下) が重ならない 50% 未満に留める', () => {
-	for (const value of [...NAV_ZONE_SIZE_CHOICES, ...ZOOM_ZONE_SIZE_CHOICES]) assert.ok(value > 0 && value < 50, String(value));
+test('クリック領域の大きさは 5% から 35% を 5% 刻みで選べ、左右 (上下) が重ならない 50% 未満に留める', () => {
+	assert.deepEqual({ ...ZONE_SIZE_RANGE }, { min: 5, max: 35, step: 5 });
+	assert.ok(ZONE_SIZE_RANGE.max < 50);
+	for (const key of ['navZoneSize', 'zoomZoneSize']) {
+		assert.equal(normalizeSettings({ [key]: 5 })[key], 5);
+		assert.equal(normalizeSettings({ [key]: 35 })[key], 35);
+		// 範囲の外は端へ、刻みの間は近い刻みへ寄せる。(前の版の 33% / 40% を引き継ぐ)
+		assert.equal(normalizeSettings({ [key]: 40 })[key], 35);
+		assert.equal(normalizeSettings({ [key]: 33 })[key], 35);
+		assert.equal(normalizeSettings({ [key]: 12 })[key], 10);
+		assert.equal(normalizeSettings({ [key]: '20' })[key], SETTINGS_DEFAULTS[key]);
+	}
 });
 
-test('幕の濃さの既定はテーマに合わせる (上書きしない)', () => {
-	assert.equal(SETTINGS_DEFAULTS.backdropOpacity, BACKDROP_OPACITY_THEME);
+test('背景の濃さは 0% から 100% を 10% 刻みで選べ、既定はテーマに合わせる', () => {
+	assert.deepEqual({ ...BACKDROP_OPACITY_RANGE }, { min: 0, max: 100, step: 10 });
+	assert.equal(SETTINGS_DEFAULTS.backdropMode, BACKDROP_MODES.THEME);
+	assert.equal(normalizeSettings({ backdropMode: BACKDROP_MODES.CUSTOM, backdropOpacity: 0 }).backdropOpacity, 0);
+	assert.equal(normalizeSettings({ backdropMode: BACKDROP_MODES.CUSTOM, backdropOpacity: 64 }).backdropOpacity, 60);
+	assert.equal(normalizeSettings({ backdropMode: 'other' }).backdropMode, BACKDROP_MODES.THEME);
+});
+
+test('前の版 (モードを持たず数値だけ) の保存値を、カスタムとして引き継ぐ', () => {
+	// 1.7.0 は背景の濃さの 0 を「テーマに合わせる」として保存していた
+	const fromTheme = normalizeSettings({ backdropOpacity: 0, navZoneSize: 25, zoomZoneSize: 25 });
+	assert.equal(fromTheme.backdropMode, BACKDROP_MODES.THEME);
+	assert.equal(fromTheme.backdropOpacity, SETTINGS_DEFAULTS.backdropOpacity, '0% のカスタムとして読まない');
+	assert.equal(fromTheme.navZoneMode, SETTING_MODES.DEFAULT);
+	assert.equal(fromTheme.zoomZoneMode, SETTING_MODES.DEFAULT);
+	const fromCustom = normalizeSettings({ backdropOpacity: 70, navZoneSize: 40, zoomZoneSize: 15 });
+	assert.equal(fromCustom.backdropMode, BACKDROP_MODES.CUSTOM);
+	assert.equal(fromCustom.backdropOpacity, 70);
+	assert.equal(fromCustom.navZoneMode, SETTING_MODES.CUSTOM);
+	assert.equal(fromCustom.navZoneSize, 35);
+	assert.equal(fromCustom.zoomZoneMode, SETTING_MODES.CUSTOM);
+	assert.equal(fromCustom.zoomZoneSize, 15);
+});
+
+test('navZoneSizeOf はカスタムのときだけ navZoneSize を使い、それ以外は既定の 25%', () => {
+	assert.equal(navZoneSizeOf({ navZoneMode: SETTING_MODES.CUSTOM, navZoneSize: 10 }), 10);
+	assert.equal(navZoneSizeOf({ navZoneMode: SETTING_MODES.DEFAULT, navZoneSize: 10 }), 25);
+	assert.equal(navZoneSizeOf({}), 25);
 });
 
 test('normalizeSettings は画面端のクリック領域を選択肢の値だけ通す', () => {
@@ -129,13 +162,16 @@ test('normalizeSettings は正しい値をそのまま通す', () => {
 		sidebarScroll: SIDEBAR_SCROLL.WHOLE,
 		sidebarWidth: 512,
 		sidebarDrawerMax: 80,
-		backdropOpacity: 70,
+		backdropMode: BACKDROP_MODES.CUSTOM,
+		backdropOpacity: 0,
 		commentPageSize: 50,
 		closeOnBackdrop: false,
 		navZones: NAV_ZONES.BOTH,
-		navZoneSize: 40,
+		navZoneMode: SETTING_MODES.CUSTOM,
+		navZoneSize: 35,
 		clickZoom: true,
-		zoomZoneSize: 15,
+		zoomZoneMode: SETTING_MODES.CUSTOM,
+		zoomZoneSize: 5,
 		gridTabSkip: GRID_TAB_SKIP.TITLE,
 		hidePickup: true,
 		infiniteScroll: INFINITE_SCROLL.ON_REACH,

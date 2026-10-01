@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { register } from 'node:module';
 import { clearSessionCache } from '../../../src/content/session.js';
-import { KEYS, LOADING_STATUS_DELAY_MS, BACKDROP_OPACITY_THEME } from '../../../src/common/constants.js';
+import { KEYS, LOADING_STATUS_DELAY_MS, BACKDROP_MODES, SETTING_MODES } from '../../../src/common/constants.js';
 import { createStrings } from '../../../src/i18n/index.js';
 import { PixivError, PIXIV_ERROR_KINDS } from '../../../src/pixiv/errors.js';
 import { fakeElement, fakeDoc as fakeDocBase, find, findAll, flush, iconName } from '../../helpers/dom.js';
@@ -564,17 +564,19 @@ test('描画に効く設定が変わったら通信せずに描き直す', async
 });
 
 test('見た目の数値の設定はホストの CSS 変数へ写し、既定に当たる値は上書きを外す', async () => {
-	const { viewer, doc } = setup({ settings: settings({ sidebarWidth: 512, sidebarDrawerMax: 70, backdropOpacity: 70, zoomZoneSize: 40 }) });
+	const { viewer, doc } = setup({ settings: settings({ sidebarWidth: 512, sidebarDrawerMax: 70, backdropMode: BACKDROP_MODES.CUSTOM, backdropOpacity: 70, zoomZoneMode: SETTING_MODES.CUSTOM, zoomZoneSize: 35 }) });
 	await viewer.open('1');
 	const style = doc.body.children[0].style;
 	assert.equal(style.getPropertyValue('--sidebar-width'), '512px');
 	assert.equal(style.getPropertyValue('--backdrop-alpha'), '0.7');
-	assert.equal(style.getPropertyValue('--zoom-zone-width'), '40%');
+	assert.equal(style.getPropertyValue('--zoom-zone-width'), '35%');
 	assert.equal(style.getPropertyValue('--sidebar-drawer-max'), '70%');
 	// テーマに合わせる (0) へ戻したら上書きを外し、テーマごとの既定に任せる。描き直しは要らない
-	viewer.setSettings(settings({ sidebarWidth: 384, backdropOpacity: BACKDROP_OPACITY_THEME }));
+	viewer.setSettings(settings({ sidebarWidth: 384, backdropMode: BACKDROP_MODES.THEME, backdropOpacity: 70, zoomZoneMode: SETTING_MODES.DEFAULT, zoomZoneSize: 35 }));
 	assert.equal(style.getPropertyValue('--sidebar-width'), '384px');
+	// カスタムでなければ、値が残っていても上書きを外す
 	assert.equal(style.getPropertyValue('--backdrop-alpha'), '');
+	assert.equal(style.getPropertyValue('--zoom-zone-width'), '');
 	viewer.dispose();
 });
 
