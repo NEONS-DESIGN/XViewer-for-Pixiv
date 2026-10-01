@@ -47,6 +47,16 @@ test('説明はストアの文字数の上限に収まる', async () => {
 	}
 });
 
+/** Edge アドオンが受け付ける説明の文字数の上限。上限を見ない言語にも掛かる */
+const EDGE_DESCRIPTION_MAX_LENGTH = 190;
+
+test('どの言語の説明も Edge アドオンの文字数の上限に収まる', async () => {
+	for (const locale of MANIFEST_LOCALES) {
+		const { extDescription } = await readMessages(locale);
+		assert.ok(extDescription.message.length <= EDGE_DESCRIPTION_MAX_LENGTH, `${locale} の説明が ${extDescription.message.length} 文字ある`);
+	}
+});
+
 test('どの言語の説明にも pixiv Inc. と無関係である旨が残っている', async () => {
 	// 日英は文面まで下のテストで縛る。他の言語は社名の表記だけを見る
 	for (const locale of MANIFEST_LOCALES.filter((one) => one !== 'ja')) {
