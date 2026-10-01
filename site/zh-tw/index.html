@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#14161c" media="(prefers-color-scheme: dark)">
 <title>XViewer for Pixiv - 為 pixiv 加入 X 風格圖片檢視器的瀏覽器擴充功能</title>
-<meta name="description" content="在 pixiv 的用戶頁面點擊作品後，不必跳轉頁面，就會直接在原處開啟對話框。從切換多張圖片、播放動圖、閱讀作品說明與評論，到發表評論，全都能在對話框中完成的非官方瀏覽器擴充功能。支援 Chrome / Edge / Firefox。">
+<meta name="description" content="在 pixiv 的用戶頁面、首頁及搜尋結果中點擊作品後，不必跳轉頁面，就會直接在原處開啟對話框。從切換多張圖片、播放動圖、閱讀作品說明與評論，到發表評論，全都能在對話框中完成的非官方瀏覽器擴充功能。支援 Chrome / Edge / Firefox。">
 <!-- lang:head -->
 <link rel="canonical" href="https://xviewer.neonsdesign.com/zh-tw/">
 <link rel="alternate" hreflang="ja" href="https://xviewer.neonsdesign.com/">
@@ -23,7 +23,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="XViewer for Pixiv">
 <meta property="og:title" content="XViewer for Pixiv">
-<meta property="og:description" content="一款瀏覽器擴充功能，為 pixiv 的用戶頁面加入近似 X.com 媒體瀏覽體驗的圖片檢視器。支援 Chrome / Edge / Firefox。">
+<meta property="og:description" content="一款瀏覽器擴充功能，為 pixiv 的用戶頁面、首頁及搜尋結果加入近似 X.com 媒體瀏覽體驗的圖片檢視器。支援 Chrome / Edge / Firefox。">
 <meta property="og:url" content="https://xviewer.neonsdesign.com/zh-tw/">
 <meta property="og:image" content="https://xviewer.neonsdesign.com/assets/img/og-viewer-en.jpg">
 <meta property="og:image:type" content="image/jpeg">
@@ -56,7 +56,7 @@
 			"url": "https://xviewer.neonsdesign.com/zh-tw/",
 			"name": "XViewer for Pixiv",
 			"inLanguage": "zh-TW",
-			"description": "瀏覽器擴充功能 XViewer for Pixiv 的介紹網站。此擴充功能為 pixiv 的用戶頁面加入近似 X.com 媒體瀏覽體驗的圖片檢視器。"
+			"description": "瀏覽器擴充功能 XViewer for Pixiv 的介紹網站。此擴充功能為 pixiv 的用戶頁面、首頁及搜尋結果加入近似 X.com 媒體瀏覽體驗的圖片檢視器。"
 		},
 		{
 			"@type": "SoftwareApplication",
@@ -66,7 +66,7 @@
 			"operatingSystem": "Windows, macOS, Linux, ChromeOS",
 			"softwareRequirements": "Chrome 120 以上的 Chromium 系瀏覽器（Chrome / Brave / Edge），或 Firefox 140 以上（桌面版）",
 			"inLanguage": "zh-TW",
-			"description": "在 pixiv 的用戶頁面點擊作品後，不必跳轉頁面，就會直接在原處開啟對話框的非官方瀏覽器擴充功能。從切換多張圖片、播放動圖、閱讀作品說明與評論，到發表評論，全都能在對話框中完成。",
+			"description": "在 pixiv 的用戶頁面、首頁及搜尋結果中點擊作品後，不必跳轉頁面，就會直接在原處開啟對話框的非官方瀏覽器擴充功能。從切換多張圖片、播放動圖、閱讀作品說明與評論，到發表評論，全都能在對話框中完成。",
 			"isAccessibleForFree": true,
 			"license": "https://opensource.org/licenses/MIT",
 			"sameAs": "https://github.com/NEONS-DESIGN/XViewer-for-Pixiv",
@@ -82,12 +82,13 @@
 				"https://xviewer.neonsdesign.com/assets/img/shot-popup-en.webp"
 			],
 			"featureList": [
-				"不跳轉頁面，直接在對話框中開啟作品",
+				"不跳轉頁面，直接在對話框中開啟用戶頁面、首頁及搜尋結果中的作品",
 				"用鍵盤切換多張圖片的作品",
 				"播放動圖",
 				"在側邊欄顯示作品說明、標籤、計數及評論",
 				"按讚、收藏、追蹤及發表評論",
-				"用戶頁面的無限捲動"
+				"用戶頁面的無限捲動",
+				"細部設定使用檢視器的頁面、背景濃度與點擊區域寬度"
 			]
 		}
 	]
@@ -163,7 +164,7 @@
 			<p class="eyebrow">支援 Chrome / Brave / Edge / Firefox</p>
 			<h1>像瀏覽 <span class="brand-x">X</span> 一樣，瀏覽 <span class="brand-pixiv">pixiv</span>。</h1>
 			<p class="lede">
-				在用戶頁面點擊作品後，不必跳轉頁面，就會直接在原處開啟對話框。
+				在用戶頁面、首頁及搜尋結果中點擊作品後，不必跳轉頁面，就會直接在原處開啟對話框。
 				從切換多張圖片、播放動圖、閱讀作品說明與評論，到按讚、收藏、追蹤及發表評論，
 				全都能在對話框中完成。
 				關閉後，就會回到原本的網格與原本的捲動位置。
@@ -204,7 +205,7 @@
 			<div class="card-grid">
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-open"></use></svg></span>以對話框開啟</h3>
-					<p>接收網格中的點擊，不跳轉頁面直接顯示。網址會替換為作品頁面的網址，因此也能重新整理或分享。</p>
+					<p>接收網格中的點擊，不跳轉頁面直接顯示。除了用戶頁面的作品列表，也能從首頁及搜尋結果中的作品開啟。網址會替換為作品頁面的網址，因此也能重新整理或分享。</p>
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-next"></use></svg></span>切換多張圖片</h3>
@@ -212,7 +213,7 @@
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-scroll"></use></svg></span>從作品到作品</h3>
-					<p>用上下鍵移到網格中的上一個或下一個作品。開啟設定後，點擊畫面上下邊緣也能切換。到達盡頭時，會自動載入下一頁的作品。在插畫與漫畫分頁中，只會瀏覽該類型的作品。</p>
+					<p>用上下鍵移到網格中的上一個或下一個作品。開啟設定後，點擊畫面上下邊緣也能切換。在用戶頁面中，到達盡頭時會自動載入下一頁的作品；在插畫與漫畫分頁中，只會瀏覽該類型的作品。在首頁及搜尋結果中，會在所點擊作品所在的區塊內切換。</p>
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-play"></use></svg></span>播放動圖</h3>
@@ -236,7 +237,7 @@
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-tune"></use></svg></span>細部調整</h3>
-					<p>在設定畫面的「詳細設定」分頁中，可以依段數選擇側邊欄寬度、背景濃度、螢幕邊緣點擊區域寬度與一次讀取的評論數。預先載入也能在前後 1～10 張的範圍內指定。</p>
+					<p>在設定畫面的「詳細設定」分頁中，可以依段數選擇側邊欄寬度與一次讀取的評論數，並用滑桿選擇背景濃度與點擊區域寬度。螢幕邊緣點擊區域可分別指定左右與上下，預先載入也能在前後 1～20 張的範圍內選擇。</p>
 				</div>
 			</div>
 		</div>
@@ -318,9 +319,11 @@
 					</p>
 					<ul class="feature-list">
 						<li>可依網路環境或喜好，選擇圖片解析度與預先載入的張數</li>
+						<li>可分別選擇在用戶頁面、首頁及搜尋結果中是否使用檢視器</li>
 						<li>連側邊欄的顯示方式、捲動方式，以及點擊背景是否關閉、點擊畫面邊緣是否翻頁都能變更</li>
-						<li>在「詳細設定」分頁中，還能依段數選擇側邊欄寬度、背景濃度、點擊區域寬度與一次讀取的評論數</li>
-						<li>關閉檢視器本身，就會恢復為 pixiv 的標準行為</li>
+						<li>在「詳細設定」分頁中，還能依段數選擇側邊欄寬度與一次讀取的評論數，並用滑桿細部選擇背景濃度與點擊區域寬度</li>
+						<li>相關的項目依父子關係歸在一起，父項目關閉期間無法操作子項目。需要開啟哪個項目，會當場提示</li>
+						<li>關閉檢視器本身，就會恢復為 pixiv 的標準行為（隱藏精選欄、無限捲動與網格中的 Tab 移動仍可照常使用）</li>
 					</ul>
 				</div>
 				<!-- 設定ポップアップの上半分と下半分を一定時間ごとに重ねて切り替える (site.js)。JS が無ければ上半分のまま -->
@@ -345,7 +348,7 @@
 		<div class="wrap">
 			<div class="section-head">
 				<h2>設定可以做到的事</h2>
-				<p>全部都能從工具列的彈出視窗變更。常用項目放在「設定」分頁，側邊欄寬度、點擊區域寬度等細部調整則集中在「詳細設定」分頁。設定會儲存在瀏覽器的同步儲存空間中，不會傳送到外部。</p>
+				<p>全部都能從工具列的彈出視窗變更。常用項目放在「設定」分頁，側邊欄寬度、點擊區域寬度等細部調整則集中在「詳細設定」分頁。相關的項目依父子關係歸在一起，父項目關閉期間無法操作子項目（即下表中縮排的項目。「詳細設定」分頁中的項目，也會依側邊欄的顯示、點擊畫面邊緣翻頁等相關項目而定）。設定會儲存在瀏覽器的同步儲存空間中，不會傳送到外部。</p>
 			</div>
 			<div class="table-scroll">
 				<table>
@@ -362,7 +365,25 @@
 							<td>檢視器</td>
 							<td>使用檢視器</td>
 							<td class="default">開啟</td>
-							<td>關閉後會恢復為 pixiv 的標準行為</td>
+							<td>關閉後會恢復為 pixiv 的標準行為。即使關閉，隱藏精選欄、無限捲動與網格中的 Tab 移動仍然有效</td>
+						</tr>
+						<tr>
+							<td>檢視器</td>
+							<td class="child">在使用者頁面使用</td>
+							<td class="default">開啟</td>
+							<td>從作者頁面的作品列表開啟時顯示檢視器</td>
+						</tr>
+						<tr>
+							<td>檢視器</td>
+							<td class="child">在首頁使用</td>
+							<td class="default">開啟</td>
+							<td>從 pixiv 首頁（首頁 / 插畫 / 漫畫）的作品開啟時顯示檢視器</td>
+						</tr>
+						<tr>
+							<td>檢視器</td>
+							<td class="child">在搜尋結果中使用</td>
+							<td class="default">開啟</td>
+							<td>從搜尋結果（標籤頁面與搜尋頁面）開啟時顯示檢視器</td>
 						</tr>
 						<tr>
 							<td>檢視器</td>
@@ -372,7 +393,7 @@
 						</tr>
 						<tr>
 							<td>檢視器</td>
-							<td>側邊欄的捲動方式</td>
+							<td class="child">側邊欄的捲動方式</td>
 							<td class="default">整個側邊欄</td>
 							<td>要從作品說明到評論連成一體捲動，還是固定作品說明、只捲動評論</td>
 						</tr>
@@ -386,7 +407,7 @@
 							<td>圖片</td>
 							<td>預先載入</td>
 							<td class="default">前後 1 張</td>
-							<td>可選擇預先載入下一頁的張數：不預先載入 / 前後 1 張 / 前後 3 張 / 自訂。選擇自訂時，可從 1～10 張中選擇前後預先載入的張數</td>
+							<td>可選擇預先載入下一頁的張數：不預先載入 / 前後 1 張 / 前後 3 張 / 自訂。選擇自訂時，可用滑桿從 1～20 張中選擇前後預先載入的張數。選擇 10 張以上時，會提示可能佔用大量記憶體</td>
 						</tr>
 						<tr>
 							<td>圖片</td>
@@ -462,13 +483,13 @@
 							<td>檢視器</td>
 							<td>背景濃度</td>
 							<td class="default">跟隨主題</td>
-							<td>鋪在圖片後方的黑色幕布濃度。可選擇跟隨主題（深色 92% / 淺色 88%），或從 100 / 90 / 80 / 70 / 60% 中選擇。調低後可以透過它看到後方的頁面</td>
+							<td>鋪在圖片後方的黑色幕布濃度。可選擇跟隨主題（深色 92% / 淺色 88%），或選擇自訂，用滑桿從 0～100%（以 10% 為單位）中選擇。調低後可以透過它看到後方的頁面</td>
 						</tr>
 						<tr>
 							<td>操作</td>
 							<td>螢幕邊緣點擊區域寬度</td>
 							<td class="default">25%</td>
-							<td>點擊螢幕邊緣翻頁時所用邊緣的寬度，為相對於圖片顯示區域的比例。選擇自訂時，可分別從 5～35%（以 5% 為單位）中選擇左右寬度與上下寬度</td>
+							<td>點擊螢幕邊緣翻頁時所用邊緣的寬度，為相對於圖片顯示區域的比例。選擇自訂時，可分別從 5～35%（以 5% 為單位）中選擇左右寬度與上下寬度。只用左右或只用上下翻頁時，無法操作不使用方向的寬度</td>
 						</tr>
 						<tr>
 							<td>操作</td>
@@ -517,7 +538,7 @@
 				</div>
 				<div class="card">
 					<h3>適用頁面</h3>
-					<p><code>https://www.pixiv.net/</code> 的用戶頁面。在其他網站上不會運作。</p>
+					<p><code>https://www.pixiv.net/</code> 的用戶頁面、首頁（首頁 / 插畫 / 漫畫）及搜尋結果（標籤頁面與搜尋頁面）。在其他網站上不會運作。</p>
 				</div>
 				<div class="card">
 					<h3>授權</h3>
@@ -590,7 +611,7 @@
 				</div>
 				<div class="card">
 					<h3>儲存的資料</h3>
-					<p>您選擇的 21 項設定，以及最後看到的 pixiv 顯示語言。兩者都只保留在瀏覽器中，不會傳到外部伺服器。</p>
+					<p>您選擇的 27 項設定，以及最後看到的 pixiv 顯示語言。兩者都只保留在瀏覽器中，不會傳到外部伺服器。</p>
 				</div>
 				<div class="card">
 					<h3>要求的權限</h3>
@@ -616,7 +637,7 @@
 					<li>R-18 作品的顯示依照 pixiv 端的設定。擴充功能不會規避年齡限制</li>
 					<li>讚無法取消。這是 pixiv 的規格，即使按錯也無法復原</li>
 					<li>評論的發表與刪除，與在 pixiv 本身操作相同。每按一次都會直接送到 pixiv。刪除後無法復原，因此會經過兩段式確認</li>
-					<li>沒有收集作品的功能。既沒有下載功能，也沒有自動化的批次操作，只會取得目前開啟的作品及其前後的幾張圖片</li>
+					<li>沒有收集作品的功能。既沒有下載功能，也沒有自動化的批次操作，只會取得目前開啟的作品，以及預先載入所選的範圍</li>
 					<li>可能因 pixiv 的規格變更而無法運作</li>
 				</ul>
 			</div>

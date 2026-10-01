@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#14161c" media="(prefers-color-scheme: dark)">
 <title>XViewer for Pixiv - An X-style image viewer for pixiv</title>
-<meta name="description" content="Click an artwork on a pixiv user page and it opens in place, without navigating away. Page through multi-image works, play ugoira, and read and post comments without ever leaving the grid.">
+<meta name="description" content="Click an artwork on a pixiv user page, the home page or search results and it opens in place, without navigating away. Page through multi-image works, play ugoira, and read and post comments without ever leaving the grid.">
 <!-- lang:head -->
 <link rel="canonical" href="https://xviewer.neonsdesign.com/en/">
 <link rel="alternate" hreflang="ja" href="https://xviewer.neonsdesign.com/">
@@ -23,7 +23,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="XViewer for Pixiv">
 <meta property="og:title" content="XViewer for Pixiv">
-<meta property="og:description" content="An X-style image viewer for pixiv user pages, as a browser extension for Chrome, Edge and Firefox.">
+<meta property="og:description" content="An X-style image viewer for pixiv user pages, the home page and search results, as a browser extension for Chrome, Edge and Firefox.">
 <meta property="og:url" content="https://xviewer.neonsdesign.com/en/">
 <meta property="og:image" content="https://xviewer.neonsdesign.com/assets/img/og-viewer-en.jpg">
 <meta property="og:image:type" content="image/jpeg">
@@ -56,7 +56,7 @@
 			"url": "https://xviewer.neonsdesign.com/en/",
 			"name": "XViewer for Pixiv",
 			"inLanguage": "en",
-			"description": "The website for a browser extension that adds an X.com-style image viewer to pixiv user pages."
+			"description": "The website for a browser extension that adds an X.com-style image viewer to pixiv user pages, the home page and search results."
 		},
 		{
 			"@type": "SoftwareApplication",
@@ -66,7 +66,7 @@
 			"operatingSystem": "Windows, macOS, Linux, ChromeOS",
 			"softwareRequirements": "Chrome 120 or newer, another Chromium browser (Brave, Edge), or Firefox 140 or newer (desktop)",
 			"inLanguage": "en",
-			"description": "An unofficial browser extension that opens a pixiv artwork in place, without navigating away. Page through multi-image works, play ugoira, and read and post comments without ever leaving the grid.",
+			"description": "An unofficial browser extension that opens a pixiv artwork you click on a user page, the home page or search results in place, without navigating away. Page through multi-image works, play ugoira, and read and post comments without ever leaving the grid.",
 			"isAccessibleForFree": true,
 			"license": "https://opensource.org/licenses/MIT",
 			"sameAs": "https://github.com/NEONS-DESIGN/XViewer-for-Pixiv",
@@ -82,12 +82,13 @@
 				"https://xviewer.neonsdesign.com/assets/img/shot-popup-en.webp"
 			],
 			"featureList": [
-				"Opens artworks in a modal without navigating away",
+				"Opens artworks from user pages, the home page and search results in a modal without navigating away",
 				"Pages through multi-image works from the keyboard",
 				"Plays ugoira",
 				"Shows the caption, tags, counters and comments in a sidebar",
 				"Like, bookmark, follow and post comments",
-				"Infinite scroll on user pages"
+				"Infinite scroll on user pages",
+				"Lets you fine-tune which pages use the viewer, the background darkness and the click area widths"
 			]
 		}
 	]
@@ -163,7 +164,7 @@
 			<p class="eyebrow">Chrome / Brave / Edge / Firefox</p>
 			<h1>Read <span class="brand-pixiv">pixiv</span> the way you read <span class="brand-x">X</span>.</h1>
 			<p class="lede">
-				Click an artwork on a user page and it opens right there, without navigating away.
+				Click an artwork on a user page, the home page or search results and it opens right there, without navigating away.
 				Page through multi-image works, play ugoira, read the caption and comments, like, bookmark, follow and
 				post a comment - all inside the viewer. Close it and you are back on the grid, at the scroll position you left.
 			</p>
@@ -203,7 +204,7 @@
 			<div class="card-grid">
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-open"></use></svg></span>Opens in place</h3>
-					<p>The viewer takes over the grid click and renders without navigating. The URL still changes to the artwork page, so reloading and sharing both work.</p>
+					<p>The viewer takes over the grid click and renders without navigating. Besides the works list on user pages, works on the home page and in search results open this way too. The URL still changes to the artwork page, so reloading and sharing both work.</p>
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-next"></use></svg></span>Multi-image works</h3>
@@ -211,7 +212,7 @@
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-scroll"></use></svg></span>Work to work</h3>
-					<p>Up and down move to the previous or next work in the grid. With the setting on, clicking the top or bottom edge of the screen does too. Reach the end and the next page is loaded for you. On the illustration and manga tabs, only works of that kind are visited.</p>
+					<p>Up and down move to the previous or next work in the grid. With the setting on, clicking the top or bottom edge of the screen does too. On user pages, reaching the end loads the next page for you, and on the illustration and manga tabs only works of that kind are visited. On the home page and in search results, you move within the section of the work you clicked.</p>
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-play"></use></svg></span>Ugoira playback</h3>
@@ -235,7 +236,7 @@
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-tune"></use></svg></span>Fine-tune it</h3>
-					<p>Pick the sidebar width, background darkness, edge click area width and how many comments load at once from preset steps on the settings popup's Advanced tab. Prefetch can be set anywhere from 1 to 10 images each way.</p>
+					<p>On the settings popup's Advanced tab, pick the sidebar width and how many comments load at once from preset steps, and set the background darkness and click area widths with sliders. The edge click area takes separate left/right and top/bottom widths, and prefetch can be set anywhere from 1 to 20 images each way.</p>
 				</div>
 			</div>
 		</div>
@@ -318,9 +319,11 @@
 					</p>
 					<ul class="feature-list">
 						<li>Pick the image resolution and how many pages to prefetch, to suit your connection</li>
+						<li>Choose whether to use the viewer on user pages, the home page and search results, one by one</li>
 						<li>Choose how the sidebar appears and scrolls, whether clicking the backdrop closes the viewer, and even whether clicking the screen edges moves you along</li>
-						<li>On the Advanced tab, pick the sidebar width, background darkness, click area widths and how many comments load at once from preset steps</li>
-						<li>Turn the viewer off and pixiv behaves exactly as it did before</li>
+						<li>On the Advanced tab, pick the sidebar width and how many comments load at once from preset steps, and fine-tune the background darkness and click area widths with sliders</li>
+						<li>Related options are grouped as parent and child. While a parent is off, its children cannot be changed, and the popup tells you which option to turn on</li>
+						<li>Turn the viewer off and pixiv behaves exactly as it did before, while hiding the pickup section, infinite scroll and grid tab order keep working</li>
 					</ul>
 				</div>
 				<!-- 設定ポップアップの上半分と下半分を一定時間ごとに重ねて切り替える (site.js)。JS が無ければ上半分のまま -->
@@ -345,7 +348,7 @@
 		<div class="wrap">
 			<div class="section-head">
 				<h2>What you can change</h2>
-				<p>Everything lives in the toolbar popup. Everyday options are on the Settings tab, and finer adjustments such as the sidebar width and the width of the click areas are on the Advanced tab. Settings are kept in the browser's sync storage and are never sent anywhere.</p>
+				<p>Everything lives in the toolbar popup. Everyday options are on the Settings tab, and finer adjustments such as the sidebar width and the width of the click areas are on the Advanced tab. Related options are grouped as parent and child: while a parent is off, its children cannot be changed. (Children are indented in the table below. Options on the Advanced tab also follow the related ones, such as the sidebar and edge clicks.) Settings are kept in the browser's sync storage and are never sent anywhere.</p>
 			</div>
 			<div class="table-scroll">
 				<table>
@@ -362,7 +365,25 @@
 							<td>Viewer</td>
 							<td>Use the viewer</td>
 							<td class="default">On</td>
-							<td>Turn it off and pixiv behaves normally</td>
+							<td>Turn it off and pixiv behaves normally. Hiding the pickup section, infinite scroll and grid tab order keep working even when it is off</td>
+						</tr>
+						<tr>
+							<td>Viewer</td>
+							<td class="child">Use on user pages</td>
+							<td class="default">On</td>
+							<td>Shows the viewer when you open a work from a creator's works list</td>
+						</tr>
+						<tr>
+							<td>Viewer</td>
+							<td class="child">Use on the home page</td>
+							<td class="default">On</td>
+							<td>Shows the viewer for works on pixiv's home (Home, Illustrations and Manga tabs)</td>
+						</tr>
+						<tr>
+							<td>Viewer</td>
+							<td class="child">Use on search results</td>
+							<td class="default">On</td>
+							<td>Shows the viewer when you open a work from search results (tag pages and the search screen)</td>
 						</tr>
 						<tr>
 							<td>Viewer</td>
@@ -372,7 +393,7 @@
 						</tr>
 						<tr>
 							<td>Viewer</td>
-							<td>Sidebar scrolling</td>
+							<td class="child">Sidebar scrolling</td>
 							<td class="default">Whole sidebar</td>
 							<td>Scroll caption and comments as one, or pin the caption and scroll only the comments</td>
 						</tr>
@@ -386,7 +407,7 @@
 							<td>Image</td>
 							<td>Prefetch</td>
 							<td class="default">1 each way</td>
-							<td>How many neighbouring pages to load ahead of time: off, 1 or 3 each way, or Custom, which lets you choose 1 to 10 each way</td>
+							<td>How many neighbouring pages to load ahead of time: off, 1 or 3 each way, or Custom, which lets you choose 1 to 20 each way with a slider. At 10 or more, a note warns that it uses a lot of memory</td>
 						</tr>
 						<tr>
 							<td>Image</td>
@@ -462,13 +483,13 @@
 							<td>Viewer</td>
 							<td>Background darkness</td>
 							<td class="default">Match the theme</td>
-							<td>How dark the black layer behind the image is: match the theme (92% in dark mode, 88% in light mode) or choose 100, 90, 80, 70 or 60%. Lower values let the page behind show through</td>
+							<td>How dark the black layer behind the image is: match the theme (92% in dark mode, 88% in light mode) or, with Custom, choose from 0% to 100% in 10% steps with a slider. Lower values let the page behind show through</td>
 						</tr>
 						<tr>
 							<td>Interaction</td>
 							<td>Edge click area width</td>
 							<td class="default">25%</td>
-							<td>Width of the edges used for edge-click navigation, relative to the image area. With Custom, choose the left/right and top/bottom widths separately, from 5% to 35% in 5% steps</td>
+							<td>Width of the edges used for edge-click navigation, relative to the image area. With Custom, choose the left/right and top/bottom widths separately, from 5% to 35% in 5% steps. When only left/right or only top/bottom is in use, the width for the unused direction cannot be changed</td>
 						</tr>
 						<tr>
 							<td>Interaction</td>
@@ -517,7 +538,7 @@
 				</div>
 				<div class="card">
 					<h3>Where it runs</h3>
-					<p>User pages on <code>https://www.pixiv.net/</code>. It does nothing on any other site.</p>
+					<p>User pages, the home page (Home, Illustrations and Manga tabs) and search results (tag pages and the search screen) on <code>https://www.pixiv.net/</code>. It does nothing on any other site.</p>
 				</div>
 				<div class="card">
 					<h3>License</h3>
@@ -590,7 +611,7 @@
 				</div>
 				<div class="card">
 					<h3>What is stored</h3>
-					<p>The 21 preferences you choose, plus the pixiv display language it last saw. Both stay inside your browser and never leave it.</p>
+					<p>The 27 preferences you choose, plus the pixiv display language it last saw. Both stay inside your browser and never leave it.</p>
 				</div>
 				<div class="card">
 					<h3>Permissions</h3>
@@ -616,7 +637,7 @@
 					<li>Age-restricted works follow your pixiv account settings. The extension never works around them</li>
 					<li>A like cannot be undone. That is how pixiv works, so a misclick cannot be taken back</li>
 					<li>Posting and deleting comments behaves exactly as it does on pixiv itself. A deletion cannot be undone, so it sits behind a two-step confirmation</li>
-					<li>There is nothing here for collecting works. No downloads, no batch automation - only the work you have open and the few around it are fetched</li>
+					<li>There is nothing here for collecting works. No downloads, no batch automation - only the work you have open and the range you chose to prefetch are fetched</li>
 					<li>Changes on pixiv's side may break it at any time</li>
 				</ul>
 			</div>
