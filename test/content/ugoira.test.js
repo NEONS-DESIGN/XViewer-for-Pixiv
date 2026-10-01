@@ -1,9 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { pickZipUrl, advanceFrame, createUgoiraPlayer } from '../../src/content/viewer/ugoira.js';
+import { seekPercent } from '../../src/content/viewer/ugoira-controls.js';
 import { fakeElement, fakeDoc, find, findAll, flush } from '../helpers/dom.js';
 import { buildStoredZip, bytes, localSpan } from '../helpers/zip.js';
-import { UGOIRA_START_FRAMES } from '../../src/common/constants.js';
+import { UGOIRA_START_FRAMES, UGOIRA_PLAYBACK_RATES, DEFAULT_UGOIRA_RATE } from '../../src/common/constants.js';
 import { createStrings } from '../../src/i18n/index.js';
 
 /** 文言のカタログ (日本語)。 */
@@ -72,6 +73,26 @@ test('advanceFrame は揃っていない間、揃った最後のコマで止ま�
 	assert.equal(next.index, 1);
 	assert.equal(next.advanced, 1);
 	assert.equal(next.stalled, true);
+});
+
+test('advanceFrame は速度で待ち時間を割る', () => {
+	// 30ms のコマを 2 倍速なら 15ms で進め、0.5 倍速なら 60ms まで留まる
+	assert.equal(advanceFrame({ now: 1015, startedAt: 1000, index: 0, timings: TIMINGS, rate: 2 }).index, 1);
+	assert.equal(advanceFrame({ now: 1059, startedAt: 1000, index: 0, timings: TIMINGS, rate: 0.5 }).index, 0);
+	assert.equal(advanceFrame({ now: 1060, startedAt: 1000, index: 0, timings: TIMINGS, rate: 0.5 }).index, 1);
+});
+
+test('速度の選択肢は遅い順に並び、等速を含む', () => {
+	assert.deepEqual([...UGOIRA_PLAYBACK_RATES].sort((a, b) => a - b), [...UGOIRA_PLAYBACK_RATES]);
+	assert.ok(UGOIRA_PLAYBACK_RATES.includes(DEFAULT_UGOIRA_RATE));
+});
+
+test('seekPercent は位置を 0-100 の % にし、1 コマなら端まで塗る', () => {
+	assert.equal(seekPercent(0, 5), 0);
+	assert.equal(seekPercent(4, 5), 100);
+	assert.equal(seekPercent(2, 5), 50);
+	assert.equal(seekPercent(0, 1), 100);
+	assert.equal(seekPercent(9, 5), 100);
 });
 
 test('advanceFrame は揃っていなくても次のコマがあれば普段どおり進める', () => {
@@ -164,7 +185,7 @@ function metaResponse(body) {
  * @param {Promise<object>|null} [options.preloadedMeta] 温めておいた ugoira_meta の body
  * @returns {object} container / player / 作った Image / rAF のコールバック / 取り消した rAF の ID / 描いたコマ / zip fetch の init / releaseImages / setTimeout の記録 / getContext の引数
  */
-function build({ sizes = [10, 10, 10], fetchImpl, holdImages = false, holdTimers = false, strings = STRINGS, preloadedMeta = null } = {}) {
+function build({ sizes = [10, 10, 10], fetchImpl, holdImages = false, holdTimers = false, strings = STRINGS, preloadedMeta = null, rate, onRateChange } = {}) {
 	const doc = fakeDoc();
 	const drawn = [];
 	const contextArgs = [];
@@ -205,6 +226,8 @@ function build({ sizes = [10, 10, 10], fetchImpl, holdImages = false, holdTimers
 		strings,
 		fetchImpl: fetchImpl ?? defaultFetch,
 		preloadedMeta,
+		rate,
+		onRateChange,
 		createImage: () => {
 			const image = fakeElement('img');
 			const size = sizes[images.length] ?? 10;
@@ -387,6 +410,155 @@ test('再生ボタンは押すと止まり、もう一度押すと動く', async
 	await toggle.click();
 	assert.equal(toggle.getAttribute('aria-label'), '一時停止');
 	assert.equal(rafCallbacks.length, 2);
+	player.dispose();
+});
+
+/* --- 操作の帯 (シークバー・速度) ------------------------------------- */
+
+test('再生が始まるまで操作の帯は隠し、始まったら出す', async () => {
+	const { container, player } = build();
+	const rendering = player.render(DETAIL);
+	assert.equal(find(container, '.ugoira-controls').hidden, true);
+	await rendering;
+	const controls = find(container, '.ugoira-controls');
+	assert.equal(controls.hidden, false);
+	assert.equal(controls.getAttribute('role'), 'group');
+	// 再生ボタン・シークバー・コマ数・速度の順に並ぶ
+	assert.deepEqual(controls.children.map((child) => child.className), ['ugoira-toggle', 'ugoira-seek', 'ugoira-frame', 'ugoira-rate-wrap']);
+	player.dispose();
+});
+
+test('シークバーとコマ数は今のコマに追従する', async () => {
+	const { container, player, rafCallbacks } = build();
+	await player.render(DETAIL);
+	const seek = find(container, '.ugoira-seek');
+	assert.equal(seek.max, '2');
+	assert.equal(seek.value, '0');
+	assert.equal(find(container, '.ugoira-frame').textContent, '1 / 3');
+	assert.equal(seek.getAttribute('aria-valuetext'), '3 コマ中 1 コマ目');
+	rafCallbacks[0](1000);
+	rafCallbacks[1](1030);
+	assert.equal(seek.value, '1');
+	assert.equal(find(container, '.ugoira-frame').textContent, '2 / 3');
+	assert.equal(seek.style.getPropertyValue('--seek-played'), '50%');
+	assert.equal(seek.style.getPropertyValue('--seek-loaded'), '100%');
+	player.dispose();
+});
+
+test('シークバーを動かすとそのコマを描き、今の時刻から数え直す', async () => {
+	const { container, player, images, drawn, rafCallbacks } = build({ holdTimers: true });
+	await player.render(DETAIL);
+	rafCallbacks[0](1000);
+	const seek = find(container, '.ugoira-seek');
+	seek.value = '2';
+	await seek.dispatch('input');
+	assert.equal(drawn.at(-1), images[2]);
+	assert.equal(find(container, '.ugoira-frame').textContent, '3 / 3');
+	// 前の位置の期限で起きないよう、予約を取り消して rAF を取り直す
+	assert.equal(rafCallbacks.length, 2);
+	rafCallbacks[1](5000);
+	// 飛んだ直後の tick では進めない (5000ms 経っていても、数え始めは今)
+	assert.equal(drawn.at(-1), images[2]);
+	player.dispose();
+});
+
+test('シークバーをつかんでいる間は止め、離したら再生に戻る', async () => {
+	const { container, player } = build();
+	await player.render(DETAIL);
+	const seek = find(container, '.ugoira-seek');
+	const toggle = find(container, '.ugoira-toggle');
+	await seek.dispatch('pointerdown');
+	assert.equal(toggle.getAttribute('aria-label'), '再生', 'つかんでいる間は止まっている');
+	seek.value = '1';
+	await seek.dispatch('input');
+	await seek.dispatch('change');
+	assert.equal(toggle.getAttribute('aria-label'), '一時停止', '離したら再生に戻る');
+	player.dispose();
+});
+
+test('止めていたなら、シークバーを離しても止まったまま', async () => {
+	const { container, player } = build();
+	await player.render(DETAIL);
+	const toggle = find(container, '.ugoira-toggle');
+	await toggle.click();
+	const seek = find(container, '.ugoira-seek');
+	await seek.dispatch('pointerdown');
+	await seek.dispatch('change');
+	assert.equal(toggle.getAttribute('aria-label'), '再生');
+	player.dispose();
+});
+
+test('まだ読めていないコマへは飛ばず、読めている最後のコマで止める', async () => {
+	const stream = streamedZip(ZIP5);
+	const { container, player, images, drawn } = build({ fetchImpl: streamingFetch(stream), sizes: SIZES5 });
+	const rendering = player.render(DETAIL);
+	// 先頭 UGOIRA_START_FRAMES コマだけ届けて再生を始める
+	stream.send(0, localSpan(ENTRIES5, UGOIRA_START_FRAMES));
+	await flush();
+	const seek = find(container, '.ugoira-seek');
+	assert.equal(seek.max, String(META5.frames.length - 1), 'シークバーの長さは meta のコマ数');
+	seek.value = String(META5.frames.length - 1);
+	await seek.dispatch('input');
+	assert.equal(drawn.at(-1), images[UGOIRA_START_FRAMES - 1]);
+	assert.equal(seek.value, String(UGOIRA_START_FRAMES - 1), 'つまみも読めている最後へ戻す');
+	stream.send(localSpan(ENTRIES5, UGOIRA_START_FRAMES), ZIP5.length);
+	stream.close();
+	await rendering;
+	player.dispose();
+});
+
+test('速度のメニューで選ぶと、待ち時間を割って再生し、選んだ速度を知らせる', async () => {
+	const chosen = [];
+	const { container, player, rafCallbacks, timers } = build({ holdTimers: true, onRateChange: (rate) => chosen.push(rate) });
+	await player.render(DETAIL);
+	const rateButton = find(container, '.ugoira-rate');
+	assert.equal(rateButton.textContent, '1×');
+	assert.equal(rateButton.getAttribute('aria-label'), '再生速度: 1×');
+	await rateButton.click();
+	const menu = find(container, '.ugoira-rate-menu');
+	assert.equal(menu.hidden, false);
+	assert.equal(rateButton.getAttribute('aria-expanded'), 'true');
+	const items = findAll(container, '.ugoira-rate-item');
+	assert.deepEqual(items.map((item) => item.dataset.rate), UGOIRA_PLAYBACK_RATES.map(String));
+	assert.equal(items.find((item) => item.dataset.rate === '1').getAttribute('aria-checked'), 'true');
+	await items.find((item) => item.dataset.rate === '2').click();
+	assert.deepEqual(chosen, [2]);
+	assert.equal(menu.hidden, true, '選んだら閉じる');
+	assert.equal(rateButton.textContent, '2×');
+	assert.equal(items.find((item) => item.dataset.rate === '2').getAttribute('aria-checked'), 'true');
+	// 30ms のコマを 2 倍速: 15ms から余白 4ms を引いた 11ms 眠る
+	rafCallbacks.at(-1)(1000);
+	assert.equal(timers.at(-1).delay, 11);
+	player.dispose();
+});
+
+test('前の作品で選んだ速度で再生を始める', async () => {
+	const { container, player, rafCallbacks, timers } = build({ holdTimers: true, rate: 0.5 });
+	await player.render(DETAIL);
+	assert.equal(find(container, '.ugoira-rate').textContent, '0.5×');
+	rafCallbacks[0](1000);
+	// 30ms のコマを 0.5 倍速: 60ms から余白 4ms を引いた 56ms 眠る
+	assert.equal(timers[0].delay, 56);
+	player.dispose();
+});
+
+test('選択肢に無い速度を渡されたら等速で始める', async () => {
+	const { container, player } = build({ rate: 3 });
+	await player.render(DETAIL);
+	assert.equal(find(container, '.ugoira-rate').textContent, '1×');
+	player.dispose();
+});
+
+test('速度のメニューを開いている間は Escape と上下キーを食い止め、閉じたら本体へ渡す', async () => {
+	const { container, player } = build();
+	await player.render(DETAIL);
+	const key = (name) => ({ key: name, preventDefault() {} });
+	assert.equal(player.consumeKey(key('Escape')), false, '閉じている間は本体 (ビュワーを閉じる) に任せる');
+	await find(container, '.ugoira-rate').click();
+	assert.equal(player.consumeKey(key('ArrowDown')), true, '項目の移動に使う (作品を送らない)');
+	assert.equal(player.consumeKey(key('Escape')), true, 'メニューだけ閉じる');
+	assert.equal(find(container, '.ugoira-rate-menu').hidden, true);
+	assert.equal(player.consumeKey(key('ArrowDown')), false);
 	player.dispose();
 });
 

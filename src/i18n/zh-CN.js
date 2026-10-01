@@ -188,6 +188,23 @@ export default {
 		PAUSE: '暂停',
 		PLAY: '播放',
 		PLAY_FAILED: '无法播放动图',
+		CONTROLS: '播放控制',
+		SEEK: '播放位置',
+		RATE: '播放速度',
+		NORMAL: '标准',
+		/**
+		 * 再生速度の倍率の見出し。
+		 * @param {number} value 倍率
+		 * @returns {string} 見出し
+		 */
+		rate: (value) => `${value}×`,
+		/**
+		 * シークバーの読み上げ。今が何コマ目か。
+		 * @param {number} current 今のコマ (1 始まり)
+		 * @param {number} total 全体のコマ数
+		 * @returns {string} 読み上げの文言
+		 */
+		frame: (current, total) => `第 ${current} 帧，共 ${total} 帧`,
 	},
 	blocked: {
 		LOGIN_REQUIRED: '请登录 pixiv 后查看此作品',
@@ -222,10 +239,17 @@ export default {
 	},
 	popup: {
 		TABS_LABEL: '切换显示内容',
+		/**
+		 * 既定の選択肢の見出しに印を付ける。
+		 * @param {string} label 選択肢の見出し
+		 * @returns {string} 印を付けた見出し
+		 */
+		withDefault: (label) => `${label}（默认）`,
 		SAVE_FAILED: '无法保存。请检查浏览器的设置同步。',
 		RESET_FAILED: '无法重置。请检查浏览器的设置同步。',
 		tabs: {
 			settings: '设置',
+			advanced: '详细设置',
 			license: '许可证',
 		},
 		licenseHeadings: {
@@ -244,6 +268,7 @@ export default {
 			image: '图片',
 			userPage: '用户页面',
 			controls: '操作',
+			comments: '评论',
 		},
 		fields: {
 			enabled: {
@@ -281,6 +306,13 @@ export default {
 			prefetch: {
 				label: '预加载',
 				description: '提前加载接下来要看的图片，切换时会更快。',
+				/**
+				 * 先読みの「カスタム」の選択肢。枚数は選択肢の下に出るレンジで選ぶ。
+				 * @param {number} min 選べる最小の枚数
+				 * @param {number} max 選べる最大の枚数
+				 * @returns {{label: string, description: string}} 選択肢の文言
+				 */
+				custom: (min, max) => ({ label: '自定义', description: `从 ${min}～${max} 张中选择前后各预加载的张数。` }),
 				none: {
 					label: '不预加载',
 					description: '每次切换时才加载。可以节省流量。',
@@ -297,6 +329,73 @@ export default {
 						label: `前后各 ${count} 张`,
 						description: `提前加载前后各 ${count} 张。连续浏览时更流畅。`,
 					}),
+			},
+			prefetchCustom: {
+				label: '预加载张数',
+			},
+			sidebarWidth: {
+				label: '侧边栏宽度',
+				description: '窗口较宽时显示在右侧的侧边栏的宽度。',
+				/**
+				 * 選択肢の見出し。値から作る。
+				 * @param {number} value 選択肢の値
+				 * @returns {string} 見出し
+				 */
+				option: (value) => `${value}px`,
+			},
+			sidebarDrawerMax: {
+				label: '拉出的侧边栏宽度',
+				description: '窗口较窄（宽 900px 以下）时拉出的侧边栏相对于窗口宽度的上限。',
+				/**
+				 * 選択肢の見出し。値から作る。
+				 * @param {number} value 選択肢の値
+				 * @returns {string} 見出し
+				 */
+				option: (value) => `${value}%`,
+			},
+			backdropOpacity: {
+				label: '背景浓度',
+				description: '铺在图片后面的黑色幕布的浓度。调低后可以透过它看到后面的页面。',
+				theme: {
+					label: '跟随主题',
+					description: '深色时为 92%，浅色时为 88%。',
+				},
+				/**
+				 * 選択肢の見出し。値から作る。
+				 * @param {number} value 選択肢の値
+				 * @returns {string} 見出し
+				 */
+				option: (value) => `${value}%`,
+			},
+			navZoneSize: {
+				label: '屏幕边缘点击区域大小',
+				description: '点击屏幕边缘翻页时所用边缘的宽度（左右）和高度（上下），为相对于图片显示区域的比例。',
+				/**
+				 * 選択肢の見出し。値から作る。
+				 * @param {number} value 選択肢の値
+				 * @returns {string} 見出し
+				 */
+				option: (value) => `${value}%`,
+			},
+			zoomZoneSize: {
+				label: '原图显示的点击区域宽度',
+				description: '在原图显示画面中，点击左右边缘翻页的范围宽度。',
+				/**
+				 * 選択肢の見出し。値から作る。
+				 * @param {number} value 選択肢の値
+				 * @returns {string} 見出し
+				 */
+				option: (value) => `${value}%`,
+			},
+			commentPageSize: {
+				label: '一次读取的评论数',
+				description: '打开时和点击「浏览更多」时读取的条数。从下一个打开的作品开始生效。',
+				/**
+				 * 選択肢の見出し。値から作る。
+				 * @param {number} value 選択肢の値
+				 * @returns {string} 見出し
+				 */
+				option: (value) => `${value} 条`,
 			},
 			prefetchNeighbor: {
 				label: '预加载前后作品',
@@ -339,11 +438,11 @@ export default {
 				},
 				horizontal: {
 					label: '左右翻页',
-					description: '点击左右边缘（宽 25%）即可切换到上一页或下一页。在图片上也有效。',
+					description: '点击左右边缘即可切换到上一页或下一页。在图片上也有效。',
 				},
 				vertical: {
 					label: '上下切换作品',
-					description: '点击上下边缘（高 25%）即可切换到上一个或下一个作品。翻页请用箭头按钮。',
+					description: '点击上下边缘即可切换到上一个或下一个作品。翻页请用箭头按钮。',
 				},
 				both: {
 					label: '左右翻页・上下切换作品',

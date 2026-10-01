@@ -78,6 +78,8 @@ export function planPanes(detail, session, settings) {
  * @property {typeof createUgoiraPlayer} [createUgoiraPlayer] うごイラペインの差し替え口。テストが組み立ての順番を記録するために使う
  * @property {typeof createSidebar} [createSidebar] サイドバーの差し替え口。テストが組み立ての順番を記録するために使う
  * @property {(workId: string) => Promise<object>|null} [takeUgoiraMeta] 先に取っておいた ugoira_meta を受け取る。一度渡したら空になる。無ければ null
+ * @property {number} [ugoiraRate] うごイラを再生し始める速度 (倍率)。前の作品で選んだ速度を引き継ぐ
+ * @property {(rate: number) => void} [onUgoiraRateChange] うごイラの再生速度が選ばれたら呼ぶ
  */
 
 /**
@@ -122,7 +124,15 @@ export async function renderWork(detail, session, settings, targets) {
 	let mainDone;
 	if (plan.main === MAIN_PANE.UGOIRA) {
 		const preloadedMeta = targets.takeUgoiraMeta?.(detail.id) ?? null;
-		ugoiraPane = makeUgoiraPlayer({ doc, container: stage, settings, strings, preloadedMeta });
+		ugoiraPane = makeUgoiraPlayer({
+			doc,
+			container: stage,
+			settings,
+			strings,
+			preloadedMeta,
+			rate: targets.ugoiraRate,
+			onRateChange: targets.onUgoiraRateChange,
+		});
 		mainDone = ugoiraPane.render(detail);
 	} else {
 		// 原寸表示を開けるのは静止画だけ。うごイラ (canvas) と見られない作品には渡さない
@@ -145,6 +155,7 @@ export async function renderWork(detail, session, settings, targets) {
 				container: sidebarPane.commentsSlot(),
 				scrollTarget: sidebar,
 				strings,
+				pageSize: settings.commentPageSize,
 				onPosted: () => { sidebarPane.bumpCommentCount(1); },
 				// 削除は数え直した件数で置き換える。ルートを消すと返信も道連れになるので
 				// 手元で 1 を引くだけでは合わない。引けなかったときだけ 1 を引く
@@ -207,7 +218,8 @@ export function disposeAll() {
  * @returns {boolean} 食い止めたなら true (本体は反応してはいけない)
  */
 export function consumeKey(event) {
-	// 手前に出ているものから順に使わせる。シェアメニュー (浮いている) が先、次にコメントの入力欄
+	// 手前に出ているものから順に使わせる。浮いているメニュー (うごイラの速度・シェア) が先、次にコメントの入力欄
+	if (ugoiraPane?.consumeKey?.(event) === true) return true;
 	if (sidebarPane?.consumeKey(event) === true) return true;
 	return commentsPane?.consumeKey(event) === true;
 }

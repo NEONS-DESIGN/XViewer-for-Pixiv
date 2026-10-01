@@ -3,7 +3,24 @@
  * 保存ボタンは作らず変更のたびに書くので、書き込みは 1 項目ずつ。
  * 保存値が壊れていても既定へ倒して必ず描けるようにする。
  */
-import { SETTINGS_DEFAULTS, IMAGE_QUALITY, PREFETCH_CHOICES, GRID_TAB_SKIP, POPUP_THEMES, SIDEBAR_SCROLL, INFINITE_SCROLL, NAV_ZONES } from './constants.js';
+import {
+	SETTINGS_DEFAULTS,
+	IMAGE_QUALITY,
+	PREFETCH_CHOICES,
+	PREFETCH_CUSTOM,
+	PREFETCH_CUSTOM_RANGE,
+	GRID_TAB_SKIP,
+	POPUP_THEMES,
+	SIDEBAR_SCROLL,
+	INFINITE_SCROLL,
+	NAV_ZONES,
+	NAV_ZONE_SIZE_CHOICES,
+	ZOOM_ZONE_SIZE_CHOICES,
+	SIDEBAR_WIDTH_CHOICES,
+	SIDEBAR_DRAWER_MAX_CHOICES,
+	BACKDROP_OPACITY_CHOICES,
+	COMMENT_PAGE_SIZE_CHOICES,
+} from './constants.js';
 import { warn } from './log.js';
 import { withArea as withStorageArea } from './storage-area.js';
 
@@ -53,6 +70,18 @@ function oneOf(value, choices, fallback) {
 }
 
 /**
+ * 範囲内の整数として読む。整数でない・範囲の外なら既定へ倒す。
+ * 端へ寄せずに既定へ倒すのは、壊れた値を「最大」として扱わないため。
+ * @param {unknown} value 保存値
+ * @param {{min: number, max: number}} range 許す範囲 (両端を含む)
+ * @param {number} fallback 既定
+ * @returns {number} 丸めた値
+ */
+function intInRange(value, { min, max }, fallback) {
+	return Number.isInteger(value) && value >= min && value <= max ? value : fallback;
+}
+
+/**
  * 保存値を既定へ丸める。
  * @param {object|null} raw 保存されていた値
  * @returns {typeof SETTINGS_DEFAULTS} 丸めた設定
@@ -63,18 +92,34 @@ export function normalizeSettings(raw) {
 	return {
 		enabled: asBoolean(source.enabled, d.enabled),
 		imageQuality: oneOf(source.imageQuality, Object.values(IMAGE_QUALITY), d.imageQuality),
-		prefetch: oneOf(source.prefetch, PREFETCH_CHOICES, d.prefetch),
+		prefetch: oneOf(source.prefetch, [...PREFETCH_CHOICES, PREFETCH_CUSTOM], d.prefetch),
+		prefetchCustom: intInRange(source.prefetchCustom, PREFETCH_CUSTOM_RANGE, d.prefetchCustom),
 		prefetchNeighbor: asBoolean(source.prefetchNeighbor, d.prefetchNeighbor),
 		showSidebar: asBoolean(source.showSidebar, d.showSidebar),
 		sidebarScroll: oneOf(source.sidebarScroll, Object.values(SIDEBAR_SCROLL), d.sidebarScroll),
+		sidebarWidth: oneOf(source.sidebarWidth, SIDEBAR_WIDTH_CHOICES, d.sidebarWidth),
+		sidebarDrawerMax: oneOf(source.sidebarDrawerMax, SIDEBAR_DRAWER_MAX_CHOICES, d.sidebarDrawerMax),
+		backdropOpacity: oneOf(source.backdropOpacity, BACKDROP_OPACITY_CHOICES, d.backdropOpacity),
+		commentPageSize: oneOf(source.commentPageSize, COMMENT_PAGE_SIZE_CHOICES, d.commentPageSize),
 		closeOnBackdrop: asBoolean(source.closeOnBackdrop, d.closeOnBackdrop),
 		navZones: oneOf(source.navZones, Object.values(NAV_ZONES), d.navZones),
+		navZoneSize: oneOf(source.navZoneSize, NAV_ZONE_SIZE_CHOICES, d.navZoneSize),
 		clickZoom: asBoolean(source.clickZoom, d.clickZoom),
+		zoomZoneSize: oneOf(source.zoomZoneSize, ZOOM_ZONE_SIZE_CHOICES, d.zoomZoneSize),
 		gridTabSkip: oneOf(source.gridTabSkip, Object.values(GRID_TAB_SKIP), d.gridTabSkip),
 		hidePickup: asBoolean(source.hidePickup, d.hidePickup),
 		infiniteScroll: oneOf(source.infiniteScroll, Object.values(INFINITE_SCROLL), d.infiniteScroll),
 		popupTheme: oneOf(source.popupTheme, Object.values(POPUP_THEMES), d.popupTheme),
 	};
+}
+
+/**
+ * 実際に先読みする前後の枚数を返す。「カスタム」なら prefetchCustom の枚数を使う。
+ * @param {{prefetch: number|string, prefetchCustom: number}} settings 正規化済みの設定
+ * @returns {number} 前後に先読みする枚数 (0 以上)
+ */
+export function prefetchCount(settings) {
+	return settings.prefetch === PREFETCH_CUSTOM ? settings.prefetchCustom : settings.prefetch;
 }
 
 /**

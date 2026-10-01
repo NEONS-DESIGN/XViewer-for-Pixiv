@@ -188,6 +188,23 @@ export default {
 		PAUSE: '一時停止',
 		PLAY: '再生',
 		PLAY_FAILED: 'うごイラを再生できませんでした',
+		CONTROLS: '再生の操作',
+		SEEK: '再生位置',
+		RATE: '再生速度',
+		NORMAL: '標準',
+		/**
+		 * 再生速度の倍率の見出し。
+		 * @param {number} value 倍率
+		 * @returns {string} 見出し
+		 */
+		rate: (value) => `${value}×`,
+		/**
+		 * シークバーの読み上げ。今が何コマ目か。
+		 * @param {number} current 今のコマ (1 始まり)
+		 * @param {number} total 全体のコマ数
+		 * @returns {string} 読み上げの文言
+		 */
+		frame: (current, total) => `${total} コマ中 ${current} コマ目`,
 	},
 	blocked: {
 		LOGIN_REQUIRED: 'この作品を見るには pixiv にログインしてください',
@@ -222,10 +239,17 @@ export default {
 	},
 	popup: {
 		TABS_LABEL: '表示するものの切り替え',
+		/**
+		 * 既定の選択肢の見出しに印を付ける。
+		 * @param {string} label 選択肢の見出し
+		 * @returns {string} 印を付けた見出し
+		 */
+		withDefault: (label) => `${label} (既定)`,
 		SAVE_FAILED: '保存できませんでした。ブラウザの設定同期を確認してください。',
 		RESET_FAILED: '初期化できませんでした。ブラウザの設定同期を確認してください。',
 		tabs: {
 			settings: '設定',
+			advanced: '詳細設定',
 			license: 'ライセンス',
 		},
 		licenseHeadings: {
@@ -244,6 +268,7 @@ export default {
 			image: '画像',
 			userPage: 'ユーザーページ',
 			controls: '操作',
+			comments: 'コメント',
 		},
 		fields: {
 			enabled: {
@@ -281,6 +306,13 @@ export default {
 			prefetch: {
 				label: '先読み',
 				description: '次に見る画像を先に読み込んでおくと、切り替えが速くなります。',
+				/**
+				 * 先読みの「カスタム」の選択肢。枚数は選択肢の下に出るレンジで選ぶ。
+				 * @param {number} min 選べる最小の枚数
+				 * @param {number} max 選べる最大の枚数
+				 * @returns {{label: string, description: string}} 選択肢の文言
+				 */
+				custom: (min, max) => ({ label: 'カスタム', description: `前後に読む枚数を ${min}〜${max} 枚から選びます。` }),
 				none: {
 					label: 'しない',
 					description: '切り替えるたびに読み込みます。通信量を抑えられます。',
@@ -297,6 +329,73 @@ export default {
 						label: `前後 ${count} 枚`,
 						description: `${count} 枚先まで読み込みます。続けて見るときに滑らかです。`,
 					}),
+			},
+			prefetchCustom: {
+				label: '先読みする枚数',
+			},
+			sidebarWidth: {
+				label: 'サイドバーの幅',
+				description: '画面が広いときに右に出るサイドバーの幅です。',
+				/**
+				 * 選択肢の見出し。値から作る。
+				 * @param {number} value 選択肢の値
+				 * @returns {string} 見出し
+				 */
+				option: (value) => `${value}px`,
+			},
+			sidebarDrawerMax: {
+				label: '引き出したサイドバーの幅',
+				description: '画面が狭いとき (幅 900px 以下) に引き出したサイドバーの、画面の幅に対する上限です。',
+				/**
+				 * 選択肢の見出し。値から作る。
+				 * @param {number} value 選択肢の値
+				 * @returns {string} 見出し
+				 */
+				option: (value) => `${value}%`,
+			},
+			backdropOpacity: {
+				label: '背景の濃さ',
+				description: '画像の後ろに敷く黒い幕の濃さです。下げると後ろのページが透けて見えます。',
+				theme: {
+					label: 'テーマに合わせる',
+					description: 'ダークでは 92%、ライトでは 88% にします。',
+				},
+				/**
+				 * 選択肢の見出し。値から作る。
+				 * @param {number} value 選択肢の値
+				 * @returns {string} 見出し
+				 */
+				option: (value) => `${value}%`,
+			},
+			navZoneSize: {
+				label: '画面端のクリック領域の大きさ',
+				description: '画面端のクリックで送るときの、端の幅 (左右) と高さ (上下) です。画像を出す部分に対する割合です。',
+				/**
+				 * 選択肢の見出し。値から作る。
+				 * @param {number} value 選択肢の値
+				 * @returns {string} 見出し
+				 */
+				option: (value) => `${value}%`,
+			},
+			zoomZoneSize: {
+				label: '原寸表示のクリック領域の幅',
+				description: '原寸表示の画面で、左右の端を押してページを送る範囲の幅です。',
+				/**
+				 * 選択肢の見出し。値から作る。
+				 * @param {number} value 選択肢の値
+				 * @returns {string} 見出し
+				 */
+				option: (value) => `${value}%`,
+			},
+			commentPageSize: {
+				label: '一度に読むコメントの数',
+				description: '開いたときと「もっと見る」を押したときに読み込む件数です。次に開いた作品から変わります。',
+				/**
+				 * 選択肢の見出し。値から作る。
+				 * @param {number} value 選択肢の値
+				 * @returns {string} 見出し
+				 */
+				option: (value) => `${value} 件`,
 			},
 			prefetchNeighbor: {
 				label: '前後の作品も先読み',
@@ -339,11 +438,11 @@ export default {
 				},
 				horizontal: {
 					label: '左右でページ送り',
-					description: '左右の端 (幅 25%) を押すと前後のページへ送ります。画像の上でも効きます。',
+					description: '左右の端を押すと前後のページへ送ります。画像の上でも効きます。',
 				},
 				vertical: {
 					label: '上下で作品送り',
-					description: '上下の端 (高さ 25%) を押すと前後の作品へ移ります。ページは矢印ボタンで送ります。',
+					description: '上下の端を押すと前後の作品へ移ります。ページは矢印ボタンで送ります。',
 				},
 				both: {
 					label: '左右でページ・上下で作品',

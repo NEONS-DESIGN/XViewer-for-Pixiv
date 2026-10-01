@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderPopup, resolveTheme } from '../../src/popup/popup-ui.js';
-import { createSections } from '../../src/popup/sections.js';
-import { SETTINGS_DEFAULTS, POPUP_THEMES, PREFETCH_CHOICES } from '../../src/common/constants.js';
+import { createSections, createAdvancedSections } from '../../src/popup/sections.js';
+import { SETTINGS_DEFAULTS, POPUP_THEMES, PREFETCH_CHOICES, PREFETCH_CUSTOM, PREFETCH_CUSTOM_RANGE } from '../../src/common/constants.js';
 import { PROJECT_LICENSE, THIRD_PARTY } from '../../src/common/licenses.js';
 import { createStrings } from '../../src/i18n/index.js';
 import { SUPPORTED_LANGUAGES } from '../../src/common/language.js';
@@ -45,17 +45,21 @@ function build(overrides = {}) {
 }
 
 test('定義表のキーは popupTheme を除く全設定と 1 対 1 に対応する', () => {
-	// タイポしたキーで saveSetting が成功し、読み込み側は既定へ倒すので誰も気づけない
+	// タイポしたキーで saveSetting が成功し、読み込み側は既定へ倒すので誰も気づけない。
+	// 設定タブと詳細設定タブの両方を合わせて数える。(同じキーを両方へ置くと重複で落ちる)
 	for (const lang of SUPPORTED_LANGUAGES) {
-		const keys = createSections(createStrings(lang)).flatMap((section) => section.fields.map((field) => field.key));
+		const strings = createStrings(lang);
+		const keys = [...createSections(strings), ...createAdvancedSections(strings)]
+			.flatMap((section) => section.fields)
+			.flatMap((field) => (field.reveal ? [field.key, field.reveal.field.key] : [field.key]));
 		assert.equal(new Set(keys).size, keys.length, 'キーが重複している');
 		assert.deepEqual(new Set([...keys, 'popupTheme']), new Set(Object.keys(SETTINGS_DEFAULTS)));
 	}
 });
 
-test('先読みの選択肢は PREFETCH_CHOICES の値と並びから起こす', () => {
+test('先読みの選択肢は PREFETCH_CHOICES の値と並びから起こし、末尾にカスタムを置く', () => {
 	const field = createSections(createStrings('ja')).flatMap((section) => section.fields).find((one) => one.key === 'prefetch');
-	assert.deepEqual(field.options.map((option) => option.value), PREFETCH_CHOICES.map(String));
+	assert.deepEqual(field.options.map((option) => option.value), [...PREFETCH_CHOICES.map(String), PREFETCH_CUSTOM]);
 	for (const option of field.options) {
 		assert.ok(option.label.length > 0 && option.description.length > 0, `${option.value} の文言が無い`);
 	}
@@ -321,10 +325,10 @@ test('非公式である旨の断りを必ず出す', () => {
 
 /* --- タブ ------------------------------------------------------------- */
 
-test('タブは 設定 / ライセンス の 2 つ', () => {
+test('タブは 設定 / 詳細設定 / ライセンス の 3 つ', () => {
 	const { root } = build();
 	const tabs = collect(root, 'button').filter((button) => button.getAttribute('role') === 'tab');
-	assert.deepEqual(tabs.map((tab) => tab.textContent), ['設定', 'ライセンス']);
+	assert.deepEqual(tabs.map((tab) => tab.textContent), ['設定', '詳細設定', 'ライセンス']);
 });
 
 test('開いた直後は設定タブが選ばれている', () => {
@@ -332,6 +336,7 @@ test('開いた直後は設定タブが選ばれている', () => {
 	assert.equal(findRole(root, 'tab-settings').getAttribute('aria-selected'), 'true');
 	assert.equal(findRole(root, 'tab-license').getAttribute('aria-selected'), 'false');
 	assert.equal(findRole(root, 'panel-settings').hidden, false);
+	assert.equal(findRole(root, 'panel-advanced').hidden, true);
 	assert.equal(findRole(root, 'panel-license').hidden, true);
 });
 
@@ -346,7 +351,7 @@ test('タブを押すと選択とパネルの表示が入れ替わる', () => {
 
 test('タブは aria-controls で自分のパネルを指す', () => {
 	const { root } = build();
-	for (const id of ['settings', 'license']) {
+	for (const id of ['settings', 'advanced', 'license']) {
 		const panelId = findRole(root, `panel-${id}`).attributes.id;
 		assert.ok(panelId, `panel-${id} に id が無い`);
 		assert.equal(findRole(root, `tab-${id}`).getAttribute('aria-controls'), panelId);
@@ -357,14 +362,17 @@ test('Tab キーで止まるのは選択中のタブだけ', () => {
 	// roving tabindex。並んだタブを順に踏まずにパネル本体へ入れるようにする
 	const { root } = build();
 	assert.equal(findRole(root, 'tab-settings').getAttribute('tabindex'), '0');
+	assert.equal(findRole(root, 'tab-advanced').getAttribute('tabindex'), '-1');
 	assert.equal(findRole(root, 'tab-license').getAttribute('tabindex'), '-1');
 });
 
 test('右キーで次のタブへ移り、フォーカスも付いてくる', () => {
 	const { root } = build();
 	findRole(root, 'tabs').dispatch('keydown', { key: 'ArrowRight', preventDefault() {} });
+	assert.equal(findRole(root, 'tab-advanced').getAttribute('aria-selected'), 'true');
+	assert.equal(findRole(root, 'tab-advanced').focused, true);
+	findRole(root, 'tabs').dispatch('keydown', { key: 'ArrowRight', preventDefault() {} });
 	assert.equal(findRole(root, 'tab-license').getAttribute('aria-selected'), 'true');
-	assert.equal(findRole(root, 'tab-license').focused, true);
 });
 
 test('左キーは端で止まらず反対の端へ回る', () => {
@@ -408,17 +416,18 @@ test('currentTab は切り替えに追従する', () => {
 	assert.equal(screen.currentTab(), 'license');
 });
 
-test('パネル自身の tabindex は操作部品を持たないライセンスタブだけ', () => {
+test('パネル自身の tabindex は操作部品を持たないパネルだけ', () => {
 	// 設定タブに付けると Tab の停止が 1 つ増え、最初のスイッチへ行くのに 1 回多く押す
 	const { root } = build();
 	assert.equal(findRole(root, 'panel-license').getAttribute('tabindex'), '0');
+	assert.equal(findRole(root, 'panel-advanced').getAttribute('tabindex'), null);
 	assert.equal(findRole(root, 'panel-settings').getAttribute('tabindex'), null);
 });
 
 test('タブの選択状態はクラスではなく aria-selected だけで持つ', () => {
 	const { root } = build();
 	findRole(root, 'tab-license').dispatch('click');
-	for (const id of ['settings', 'license']) {
+	for (const id of ['settings', 'advanced', 'license']) {
 		assert.equal(findRole(root, `tab-${id}`).className, 'tab');
 	}
 });
@@ -431,6 +440,94 @@ test('タブを往復しても設定タブの状態は失われない', () => {
 	findRole(root, 'tab-settings').dispatch('click');
 	assert.ok(findRole(root, 'reset-confirmation'), '確認の行が消えている');
 	assert.equal(findRole(root, 'enabled').checked, false);
+});
+
+/* --- 詳細設定タブ ----------------------------------------------------- */
+
+test('詳細設定タブの見出しは ビュワー / 操作 / コメント の順に並ぶ', () => {
+	const { root } = build({ initialTab: 'advanced' });
+	const headings = collect(findRole(root, 'panel-advanced'), 'h2');
+	assert.deepEqual(headings.map((heading) => heading.textContent), ['ビュワー', '操作', 'コメント']);
+});
+
+test('数値の段階の選択肢は既定の値にだけ印が付く', () => {
+	const fields = createAdvancedSections(createStrings('ja')).flatMap((section) => section.fields);
+	for (const field of fields) {
+		const marked = field.options.filter((option) => option.label.endsWith('(既定)'));
+		assert.equal(marked.length, 1, `${field.key} の既定の印が 1 つではない`);
+		assert.equal(marked[0].value, String(SETTINGS_DEFAULTS[field.key]), field.key);
+	}
+});
+
+test('幕の濃さの「テーマに合わせる」は説明付きで先頭に出る', () => {
+	const field = createAdvancedSections(createStrings('ja')).flatMap((section) => section.fields).find((one) => one.key === 'backdropOpacity');
+	assert.equal(field.options[0].label, 'テーマに合わせる (既定)');
+	assert.ok(field.options[0].description.length > 0);
+});
+
+test('詳細設定の選択の変更は数値で onChange に届く', () => {
+	const { root, changes } = build({ initialTab: 'advanced' });
+	const select = findRole(root, 'sidebarWidth');
+	assert.equal(select.value, String(SETTINGS_DEFAULTS.sidebarWidth));
+	select.value = '512';
+	select.dispatch('change');
+	assert.deepEqual(changes, [{ sidebarWidth: 512 }]);
+});
+
+test('説明を持たない選択肢しかない項目は、非対応環境でも説明の行を足さない', () => {
+	const { root } = build({ rich: false });
+	assert.ok(!findRole(root, 'sidebarWidth-hint'));
+	assert.ok(findRole(root, 'prefetch-hint'), '説明のある項目には出す');
+});
+
+/* --- 先読みのカスタム ------------------------------------------------- */
+
+test('先読みのレンジはカスタムを選んでいるときだけ出る', () => {
+	const off = build({ settings: { prefetch: 1 } });
+	assert.equal(findRole(off.root, 'prefetchCustom-field').hidden, true);
+	const on = build({ settings: { prefetch: PREFETCH_CUSTOM, prefetchCustom: 6 } });
+	const range = findRole(on.root, 'prefetchCustom');
+	assert.equal(findRole(on.root, 'prefetchCustom-field').hidden, false);
+	assert.equal(range.value, '6');
+	assert.equal(range.min, String(PREFETCH_CUSTOM_RANGE.min));
+	assert.equal(range.max, String(PREFETCH_CUSTOM_RANGE.max));
+	// 今の値 (output) は for でレンジを指す
+	assert.equal(findRole(on.root, 'prefetchCustom-value').getAttribute('for'), range.attributes.id);
+});
+
+test('カスタムを選ぶと文字列のまま保存し、レンジが現れる。戻すと隠れる', () => {
+	// 数値の項目でも 'custom' を Number() すると NaN になり、次回の読み込みで既定へ落ちる
+	const { root, changes } = build({ settings: { prefetch: 1 } });
+	const select = findRole(root, 'prefetch');
+	const wrapper = findRole(root, 'prefetchCustom-field');
+	select.value = PREFETCH_CUSTOM;
+	select.dispatch('change');
+	assert.deepEqual(changes, [{ prefetch: PREFETCH_CUSTOM }]);
+	assert.equal(wrapper.hidden, false);
+	select.value = '3';
+	select.dispatch('change');
+	assert.deepEqual(changes.at(-1), { prefetch: 3 });
+	assert.equal(wrapper.hidden, true);
+});
+
+test('レンジは動かす間は表示だけを変え、離したときに数値で 1 回保存する', () => {
+	const { root, changes } = build({ settings: { prefetch: PREFETCH_CUSTOM, prefetchCustom: 2 } });
+	const range = findRole(root, 'prefetchCustom');
+	const output = findRole(root, 'prefetchCustom-value');
+	assert.equal(output.textContent, '前後 2 枚');
+	range.value = '8';
+	range.dispatch('input');
+	assert.equal(output.textContent, '前後 8 枚');
+	assert.equal(range.getAttribute('aria-valuetext'), '前後 8 枚');
+	assert.deepEqual(changes, [], '動かしている間は保存しない');
+	range.dispatch('change');
+	assert.deepEqual(changes, [{ prefetchCustom: 8 }]);
+});
+
+test('詳細設定タブの文言は全言語にある', () => {
+	for (const lang of SUPPORTED_LANGUAGES) {
+		assert.ok(createStrings(lang).popup.tabs.advanced.length > 0, `${lang} のタブ名が無い`);
+	}
 });
 
 /* --- ライセンスタブ ---------------------------------------------------- */

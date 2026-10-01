@@ -22,6 +22,8 @@ import {
 	SIDEBAR_SCROLL,
 	STATUS_KINDS,
 	INERT_SELECTOR,
+	VIEWER_CSS_SETTINGS,
+	DEFAULT_UGOIRA_RATE,
 } from '../../common/constants.js';
 import { createIcon } from '../../common/icons.js';
 import { assignImageSrc } from '../../common/image-source.js';
@@ -58,10 +60,20 @@ const TEXT_ENTRY_TAGS = Object.freeze(['TEXTAREA', 'INPUT']);
 const TEXT_ENTRY_PASSTHROUGH_KEYS = Object.freeze([KEYS.FOCUS_NEXT, KEYS.CLOSE]);
 
 /**
+ * レンジ (うごイラのシークバー) にフォーカスがあっても、本体の割り当てへ通すキー。
+ * 左右はレンジが 1 コマずつ動かすのに使い、上下は今までどおり作品の移動にする。
+ * (上下までレンジに取られると、シークバーを触った後に作品を送れなくなる)
+ */
+const RANGE_PASSTHROUGH_KEYS = Object.freeze([KEYS.PREV_WORK, KEYS.NEXT_WORK]);
+
+/**
  * 設定のうち、変わったら今開いている作品を描き直す必要があるもの。
  * closeOnBackdrop は押されたときに読むので入れない。popupTheme はビュワーに関係ない
  */
-const RERENDER_SETTING_KEYS = Object.freeze(['imageQuality', 'prefetch', 'showSidebar', 'clickZoom']);
+const RERENDER_SETTING_KEYS = Object.freeze(['imageQuality', 'prefetch', 'prefetchCustom', 'showSidebar', 'clickZoom']);
+
+/** % で持つ設定 (navZoneSize) を 0-1 の割合へ直すときの分母。 */
+const PERCENT = 100;
 
 /**
  * 作品詳細を取得するときの fetch の init。
@@ -92,6 +104,7 @@ const KEEP_OPEN_SELECTOR = [
 	'button',
 	'a',
 	'.blocked-panel',
+	'.ugoira-controls',
 	'.counter',
 	'.pane-error',
 	'.status',
@@ -158,7 +171,19 @@ function eventKeepsOpen(event, boundary) {
 }
 
 /**
- * キーが入力欄の中で押されたか。
+ * キーがレンジ (うごイラのシークバー) の上で押されたか。
+ * Shadow DOM の中の要素は event.target がホストになるため composedPath() で見る。
+ * @param {KeyboardEvent} event キー
+ * @returns {boolean} レンジの上なら true
+ */
+export function isRangeInput(event) {
+	const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+	const target = path[0];
+	return target?.tagName === 'INPUT' && target.type === 'range';
+}
+
+/**
+ * キーが入力欄の中で押されたか。レンジ (シークバー) も含む。
  *
  * ビュワーは document の捕捉フェーズで全キーを取るので、この判定が無いと
  * コメントを書いている最中の左右キーで作品が送られる。
@@ -222,6 +247,8 @@ export function createViewer(deps) {
 	let zoomLayer = null;
 	/** @type {ReturnType<typeof createNavZones>|null} 画面端のクリック領域。ホストと一緒に作る */
 	let navZones = null;
+	/** うごイラの再生速度。選ばれたら覚え、次に開くうごイラへ引き継ぐ。(ページを開いている間だけ) */
+	let ugoiraRate = DEFAULT_UGOIRA_RATE;
 	/** 開く要求の世代。await をまたいで古い応答を捨てるために使う */
 	let requestToken = 0;
 	/** @type {object|null} 最後に描いた作品詳細。設定が変わったときに通信なしで描き直すために持つ */
@@ -354,6 +381,7 @@ export function createViewer(deps) {
 		navZones = createNavZones({
 			stage,
 			getMode: () => settings.navZones,
+			getRatio: () => settings.navZoneSize / PERCENT,
 			canMovePage,
 			canMoveWork: (direction) => navigation.canMove(direction),
 			movePage,
@@ -391,6 +419,24 @@ export function createViewer(deps) {
 		host.dataset.sidebarScroll = settings.sidebarScroll === SIDEBAR_SCROLL.WHOLE
 			? SIDEBAR_SCROLL.WHOLE
 			: SIDEBAR_SCROLL.COMMENTS;
+	}
+
+	/**
+	 * 見た目の数値の設定 (サイドバーの幅・幕の濃さなど) をホストの CSS 変数へ写す。
+	 * 既定に当たる値 (skip) のときは上書きを外し、CSS 側の既定 (テーマごとの値など) に任せる。
+	 * 描き直しは要らないので、設定が変わったらその場で書き換える。
+	 * @returns {void}
+	 */
+	function applyCssSettings() {
+		if (!host?.style?.setProperty) return;
+		for (const [key, { property, unit = '', divisor = 1, skip }] of Object.entries(VIEWER_CSS_SETTINGS)) {
+			const value = settings[key];
+			if (!Number.isFinite(value) || value === skip) {
+				host.style.removeProperty(property);
+				continue;
+			}
+			host.style.setProperty(property, `${value / divisor}${unit}`);
+		}
 	}
 
 	/**
@@ -691,7 +737,10 @@ export function createViewer(deps) {
 		}
 		// 入力欄の中では移動系の割り当て (矢印キー等) を効かせない。
 		// Tab と Escape だけは TEXT_ENTRY_PASSTHROUGH_KEYS で通す
-		if (isTextEntry(event) && !TEXT_ENTRY_PASSTHROUGH_KEYS.includes(event.key)) return;
+		if (isTextEntry(event) && !TEXT_ENTRY_PASSTHROUGH_KEYS.includes(event.key)) {
+			// シークバーでも上下は作品の移動に使う。navigation がレンジの既定動作 (値の変更) を止める
+			if (!(isRangeInput(event) && RANGE_PASSTHROUGH_KEYS.includes(event.key))) return;
+		}
 		navigation.onKeyDown(event);
 	}
 
@@ -716,6 +765,8 @@ export function createViewer(deps) {
 				fetchUser: deps.fetchUser,
 				strings,
 				takeUgoiraMeta,
+				ugoiraRate,
+				onUgoiraRateChange: (rate) => { ugoiraRate = rate; },
 			});
 		} catch (error) {
 			if (token !== requestToken) return;
@@ -762,6 +813,7 @@ export function createViewer(deps) {
 		// テーマは毎回読み直す。開いたままホスト側で切り替えられても追従させる
 		applyTheme();
 		applySidebarScroll();
+		applyCssSettings();
 		if (!wasOpen) {
 			lockBody();
 			doc.addEventListener('keydown', onKeyDown, true);
@@ -890,6 +942,7 @@ export function createViewer(deps) {
 			if (!host || !workId) return;
 			// 送り方は CSS だけで切り替わる。描き直すと読んでいた位置が飛ぶので属性だけ差し替える
 			applySidebarScroll();
+			applyCssSettings();
 			applyWorkLink(workId);
 			applySidebarToggle();
 			navZones?.refresh();

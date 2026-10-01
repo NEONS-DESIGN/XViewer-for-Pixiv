@@ -7,6 +7,16 @@ import { fakeElement, flush } from '../../helpers/dom.js';
 /** ステージの矩形。幅 1000 / 高さ 800 で、左上が (100, 50) */
 const RECT = Object.freeze({ left: 100, top: 50, width: 1000, height: 800 });
 
+test('zoneAt: 割合を渡すとその幅で判定する', () => {
+	// 幅 1000 の 40% は左端から 400 (x = 500) まで
+	assert.equal(zoneAt(499, 450, RECT, NAV_ZONES.HORIZONTAL, 0.4), NAV_ZONE_KINDS.PREV_PAGE);
+	assert.equal(zoneAt(501, 450, RECT, NAV_ZONES.HORIZONTAL, 0.4), null);
+	assert.equal(zoneAt(260, 450, RECT, NAV_ZONES.HORIZONTAL, 0.15), null);
+	// 高さ 800 の 15% は下端から 120 (y = 730) まで
+	assert.equal(zoneAt(600, 731, RECT, NAV_ZONES.VERTICAL, 0.15), NAV_ZONE_KINDS.NEXT_WORK);
+	assert.equal(zoneAt(600, 729, RECT, NAV_ZONES.VERTICAL, 0.15), null);
+});
+
 test('zoneAt: 左右は幅 25% の中でページを送る', () => {
 	assert.equal(zoneAt(100, 450, RECT, NAV_ZONES.HORIZONTAL), NAV_ZONE_KINDS.PREV_PAGE);
 	assert.equal(zoneAt(349, 450, RECT, NAV_ZONES.HORIZONTAL), NAV_ZONE_KINDS.PREV_PAGE);

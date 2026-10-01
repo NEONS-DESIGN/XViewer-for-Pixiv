@@ -209,7 +209,22 @@ export const PREFETCH_CHOICES = Object.freeze([0, 1, 3]);
  */
 const DEFAULT_PREFETCH = 1;
 
-/** コメントを 1 回に読む件数。 */
+/**
+ * 先読みの選択肢のうち「カスタム」を表す値。枚数は設定 prefetchCustom が持つ。
+ * 設定 prefetch は PREFETCH_CHOICES の数値か、この文字列のどちらか。
+ */
+export const PREFETCH_CUSTOM = 'custom';
+
+/** カスタムの先読みで選べる枚数の範囲。(両端を含む) */
+export const PREFETCH_CUSTOM_RANGE = Object.freeze({ min: 1, max: 10, step: 1 });
+
+/** カスタムの先読みの既定の枚数。既存の選択肢 (1 / 3) の間に置く */
+const DEFAULT_PREFETCH_CUSTOM = 2;
+
+/** コメントを 1 回に読む件数の選択肢。昇順。pixiv が受け付ける上限は 50 */
+export const COMMENT_PAGE_SIZE_CHOICES = Object.freeze([10, 20, 30, 50]);
+
+/** コメントを 1 回に読む件数の既定値。 */
 export const COMMENT_PAGE_SIZE = 30;
 
 /** グリッドのフォーカス順を当て直す間隔 (ミリ秒)。再描画のたびに走らせないための間引き。 */
@@ -304,8 +319,60 @@ export const NAV_ZONES = Object.freeze({
 	BOTH: 'both',
 });
 
-/** クリック領域の幅 (左右) と高さ (上下)。ステージの大きさに対する割合 */
-export const NAV_ZONE_RATIO = 0.25;
+/**
+ * クリック領域の幅 (左右) と高さ (上下) の選択肢。ステージの大きさに対する % で、昇順。
+ * 左右 (または上下) の 2 つが重ならないよう 50 未満に留める。
+ */
+export const NAV_ZONE_SIZE_CHOICES = Object.freeze([15, 20, 25, 33, 40]);
+
+/** クリック領域の大きさの既定値 (%)。 */
+const DEFAULT_NAV_ZONE_SIZE = 25;
+
+/** クリック領域の幅と高さの既定の割合。(0-1) 設定を渡さないときに使う */
+export const NAV_ZONE_RATIO = DEFAULT_NAV_ZONE_SIZE / 100;
+
+/**
+ * 原寸表示の左右のクリック領域の幅の選択肢。画面の幅に対する % で、昇順。
+ * 左右の 2 つが重ならないよう 50 未満に留める。
+ */
+export const ZOOM_ZONE_SIZE_CHOICES = Object.freeze([15, 20, 25, 33, 40]);
+
+/** 原寸表示のクリック領域の幅の既定値 (%)。 */
+const DEFAULT_ZOOM_ZONE_SIZE = 25;
+
+/** サイドバーの幅の選択肢 (px)。昇順 */
+export const SIDEBAR_WIDTH_CHOICES = Object.freeze([320, 384, 448, 512]);
+
+/** サイドバーの幅の既定値 (px)。 */
+const DEFAULT_SIDEBAR_WIDTH = 384;
+
+/** 狭い画面で引き出したサイドバーの幅の上限の選択肢。画面の幅に対する % で、昇順 */
+export const SIDEBAR_DRAWER_MAX_CHOICES = Object.freeze([50, 60, 70, 80]);
+
+/** 引き出したサイドバーの幅の上限の既定値 (%)。 */
+const DEFAULT_SIDEBAR_DRAWER_MAX = 60;
+
+/**
+ * 背景の幕の不透明度で「テーマに合わせる」を表す値。
+ * このときは上書きせず、テーマごとの既定 (ダーク 92% / ライト 88%) のまま描く。
+ */
+export const BACKDROP_OPACITY_THEME = 0;
+
+/** 背景の幕の不透明度の選択肢 (%)。先頭はテーマに合わせる。以降は濃い順 */
+export const BACKDROP_OPACITY_CHOICES = Object.freeze([BACKDROP_OPACITY_THEME, 100, 90, 80, 70, 60]);
+
+/**
+ * 設定の値をビュワーの CSS 変数へ写す表。キーは設定名。
+ * unit は値の後ろに付ける単位。divisor は値を割る数。(% を 0-1 の不透明度にする等。掛け算だと 0.7000000000000001 のような誤差が出る)
+ * skip に当たる値のときは変数を上書きせず、CSS の既定に任せる。
+ * @type {Readonly<Record<string, {property: string, unit?: string, divisor?: number, skip?: number}>>}
+ */
+export const VIEWER_CSS_SETTINGS = Object.freeze({
+	sidebarWidth: Object.freeze({ property: '--sidebar-width', unit: 'px' }),
+	sidebarDrawerMax: Object.freeze({ property: '--sidebar-drawer-max', unit: '%' }),
+	backdropOpacity: Object.freeze({ property: '--backdrop-alpha', divisor: 100, skip: BACKDROP_OPACITY_THEME }),
+	zoomZoneSize: Object.freeze({ property: '--zoom-zone-width', unit: '%' }),
+});
 
 /**
  * クリック領域の種類。ステージの data-nav-zone に入れてカーソルを変える。
@@ -355,12 +422,19 @@ export const SETTINGS_DEFAULTS = Object.freeze({
 	enabled: true,
 	imageQuality: IMAGE_QUALITY.REGULAR,
 	prefetch: DEFAULT_PREFETCH,
+	prefetchCustom: DEFAULT_PREFETCH_CUSTOM,
 	prefetchNeighbor: false,
 	showSidebar: true,
 	sidebarScroll: SIDEBAR_SCROLL.WHOLE,
+	sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
+	sidebarDrawerMax: DEFAULT_SIDEBAR_DRAWER_MAX,
+	backdropOpacity: BACKDROP_OPACITY_THEME,
+	commentPageSize: COMMENT_PAGE_SIZE,
 	closeOnBackdrop: true,
 	navZones: NAV_ZONES.OFF,
+	navZoneSize: DEFAULT_NAV_ZONE_SIZE,
 	clickZoom: false,
+	zoomZoneSize: DEFAULT_ZOOM_ZONE_SIZE,
 	gridTabSkip: GRID_TAB_SKIP.NONE,
 	hidePickup: false,
 	infiniteScroll: INFINITE_SCROLL.OFF,
@@ -439,6 +513,12 @@ export const PREFETCH_RELEASE_MARGIN = 10;
 
 /** うごイラの再生開始とみなすまでに待つフレーム数。 */
 export const UGOIRA_START_FRAMES = 3;
+
+/** うごイラの再生速度の選択肢 (倍率)。遅い順。メニューはこの並びで出す */
+export const UGOIRA_PLAYBACK_RATES = Object.freeze([0.25, 0.5, 1, 1.5, 2]);
+
+/** うごイラの再生速度の既定 (等速)。UGOIRA_PLAYBACK_RATES に含まれること */
+export const DEFAULT_UGOIRA_RATE = 1;
 
 /** セッション情報の取得を待つ上限 (ミリ秒)。超えたら諦めて既定へ倒す。 */
 export const SESSION_WARMUP_TIMEOUT_MS = 2000;

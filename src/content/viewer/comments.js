@@ -160,6 +160,7 @@ export function renderStamp(doc, stampId, strings) {
  * @property {HTMLElement} container 描画先
  * @property {object} strings 文言のカタログ (src/i18n)
  * @property {HTMLElement} [scrollTarget] 「上部へ」で先頭に戻す相手 (.sidebar)。無ければボタンを出さない
+ * @property {number} [pageSize] コメントを 1 回に読む件数。無ければ COMMENT_PAGE_SIZE
  * @property {(url: string, init?: {signal?: AbortSignal}) => Promise<object>} [fetchJson] 取得の差し替え。テストから通信させないために使う
  * @property {{postComment?: Function, postStamp?: Function, deleteComment?: Function}} [actions] 更新系の差し替え。テストから通信させないために使う
  * @property {() => void} [onPosted] 投稿できたときに 1 回呼ぶ。コメント件数の +1 に使う
@@ -176,6 +177,7 @@ export function createComments(deps) {
 	// コメント主のリンクは pixiv 本体のページを指すので、今の表示言語の接頭辞 (/en) を付ける
 	const localePrefix = deps.localePrefix ?? currentLocalePrefix(doc);
 	const scrollTarget = deps.scrollTarget ?? null;
+	const pageSize = deps.pageSize ?? COMMENT_PAGE_SIZE;
 	const fetchJson = deps.fetchJson ?? ((url, init = {}) => getJson(url, init));
 	const api = { postComment, postStamp, deleteComment, ...deps.actions };
 	/** roots / replies の取得を中断するためのもの。load() の冒頭で前の分を中断して作り直す */
@@ -878,7 +880,7 @@ export function createComments(deps) {
 		const focused = button !== null && isFocused(doc, button);
 		if (button) button.disabled = true;
 		try {
-			const body = await fetchJson(commentRootsUrl(requestedWorkId, offset, COMMENT_PAGE_SIZE, strings.lang), { signal: aborter.signal });
+			const body = await fetchJson(commentRootsUrl(requestedWorkId, offset, pageSize, strings.lang), { signal: aborter.signal });
 			// 待っている間に破棄されたか、別の作品へ移ったか、描き直されていたら捨てる
 			if (workId !== requestedWorkId || !list || list !== requestedList) return;
 			const comments = (body?.comments ?? []).map((raw) => normalizeComment(raw, strings));

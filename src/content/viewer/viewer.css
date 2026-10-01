@@ -77,23 +77,36 @@
 	   太さ (--scrollbar-size) と色は tokens.css */
 	--scrollbar-inset: 5px;
 
-	/* 画像の後ろに敷く幕。pixiv 本体より濃くして画像に集中させる */
-	--backdrop: rgba(0, 0, 0, 0.92);
+	/* 画像の後ろに敷く幕。pixiv 本体より濃くして画像に集中させる。
+	   濃さ (--backdrop-alpha) は設定 backdropOpacity がホストの style で上書きする。
+	   --backdrop はホストで値が決まるので、上書きもホストへ書く (子の要素へ書いても効かない) */
+	--backdrop-alpha: 0.92;
+	--backdrop: rgba(0, 0, 0, var(--backdrop-alpha));
 	/* 原寸表示の幕。こちらは不透明。--backdrop (92%) を使うと背後のサイドバーの文字が
 	   読めてしまい、画像だけを見るための画面にならない。
 	   ライトでも暗いままにするのは --backdrop と同じ理由 (画像の見え方を安定させる) */
 	--zoom-backdrop: #000000;
 	/* 浮いている部品 (シェアメニュー) の影。ライトでは薄くしないと白地の上で重い */
 	--menu-shadow: 0 8px 24px rgba(0, 0, 0, 0.36);
-	/* サイドバーの幅。X.com のメディアモーダルに近い比率 */
+	/* サイドバーの幅。X.com のメディアモーダルに近い比率。設定 sidebarWidth が上書きする */
 	--sidebar-width: 384px;
-	/* 狭い画面で引き出したサイドバーの幅の上限。画像側に最低 4 割を残す */
+	/* 狭い画面で引き出したサイドバーの幅の上限。既定は画像側に 4 割を残す。設定 sidebarDrawerMax が上書きする */
 	--sidebar-drawer-max: 60%;
+	/* 原寸表示の左右のクリック領域の幅。pixiv 本体は上下 (前 20% / 次 40%) だが、この拡張では左右に置く。
+	   前後で同じ幅にして、どちらの端も同じ押し心地にする。設定 zoomZoneSize が上書きする。
+	   上書きがホストの style に入るので、.zoom ではなくここで既定を持つ */
+	--zoom-zone-width: 25%;
+	/* うごイラのシークバーの軌道。読み込み済み (--seek-buffer) とまだの分 (--seek-rest) */
+	--seek-buffer: rgba(255, 255, 255, 0.4);
+	--seek-rest: rgba(255, 255, 255, 0.16);
 	/* 操作部品の高さ */
 	--control-height: 30px;
 	/* ページ・作品を送るクリック領域のカーソル。(原寸表示と画面端のクリック領域で共有)
 	   pixiv の .cur は拡張から使えないので同じ形を SVG で持つ。
 	   白い画像の上でも消えないよう、黒い縁取りの上に白い矢印を重ねる */
+	/* 端に着いて今は送れないクリック領域のカーソル。押しても何も起きない (閉じもしない) ことを示し、
+	   押すと閉じる余白 (既定のカーソル) と見分けられるようにする。(画面端のクリック領域と原寸表示で共有) */
+	--cursor-blocked: not-allowed;
 	--cursor-prev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M18 4 L8 14 L18 24' fill='none' stroke='%23000' stroke-opacity='.5' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M18 4 L8 14 L18 24' fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 14 14;
 	--cursor-next: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M10 4 L20 14 L10 24' fill='none' stroke='%23000' stroke-opacity='.5' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M10 4 L20 14 L10 24' fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 14 14;
 	--cursor-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M4 18 L14 8 L24 18' fill='none' stroke='%23000' stroke-opacity='.5' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M4 18 L14 8 L24 18' fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 14 14;
@@ -121,7 +134,9 @@
 	--follow-on-bg: rgba(0, 0, 0, 0.04);
 	--follow-on-bg-hover: rgba(0, 0, 0, 0.0784);
 	/* 幕はライトでも暗いままにする。画像の見え方を安定させるため */
-	--backdrop: rgba(0, 0, 0, 0.88);
+	--backdrop-alpha: 0.88;
+	--seek-buffer: rgba(0, 0, 0, 0.32);
+	--seek-rest: rgba(0, 0, 0, 0.1);
 	--menu-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
 	--field-bg: rgba(0, 0, 0, 0.04);
 	--field-bg-hover: rgba(0, 0, 0, 0.08);
@@ -445,10 +460,10 @@
 	cursor: var(--cursor-down), pointer;
 }
 
-/* 端に着いて今は送れない領域。押せそうに見せない */
+/* 端に着いて今は送れない領域。押しても閉じないので、余白 (既定のカーソル) とは違う見た目にする */
 .stage[data-nav-zone='idle'],
 .stage[data-nav-zone='idle'] * {
-	cursor: default;
+	cursor: var(--cursor-blocked);
 }
 
 /*
@@ -456,10 +471,6 @@
  * 画像は縮めずに置き、はみ出す分はこの層自身をスクロールさせる。(pixiv 本体と同じ)
  */
 .zoom {
-	/* 左右のクリック領域の幅。pixiv 本体は上下 (前 20% / 次 40%) だが、この拡張では左右に置く。
-	   前後で同じ幅にして、どちらの端も同じ押し心地にする */
-	--zoom-zone-width: 25%;
-
 	position: absolute;
 	inset: 0;
 	/* 閉じるボタン (z-index: 1) とサイドバーより上。overlay の中だけの順序 */
@@ -511,9 +522,9 @@
 	cursor: var(--cursor-next), pointer;
 }
 
-/* 端では押せない。カーソルも矢印に変えない (押せそうに見せない) */
+/* 端では押せない。押しても原寸表示から戻らないので、画像の上 (zoom-out) とは違う見た目にする */
 .zoom-zone:disabled {
-	cursor: default;
+	cursor: var(--cursor-blocked);
 }
 
 /*
@@ -1707,11 +1718,161 @@ a.comment-name:hover {
 	object-fit: contain;
 }
 
-.ugoira-toggle {
+/* 操作の帯 (ugoira-controls.js)。下端の中央に重ね、再生 / シークバー / コマ数 / 速度を 1 行に並べる。
+   幅は画像に合わせず固定の上限で持つ。(縦長の作品でもシークバーが短くなりすぎない) */
+.ugoira-controls {
 	position: absolute;
-	left: 12px;
+	left: 50%;
 	bottom: 12px;
+	transform: translateX(-50%);
+	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: min(560px, calc(100% - 24px));
+	padding: 4px 6px 4px 4px;
+	border: 1px solid var(--control-border);
+	border-radius: 999px;
+	background: var(--control-bg);
+	color: var(--fg);
+}
+
+/* .ugoira-controls の display はクラス指定なので、UA の [hidden] に勝ってしまう */
+.ugoira-controls[hidden] {
+	display: none;
+}
+
+/* シークバー。つまみと軌道を自前で描き、再生済み (--seek-played) と読み込み済み (--seek-loaded) を塗り分ける */
+.ugoira-seek {
+	--seek-played: 0%;
+	--seek-loaded: 0%;
+	flex: 1 1 auto;
+	min-width: 0;
+	height: 24px;
+	margin: 0;
+	background: transparent;
+	cursor: pointer;
+	appearance: none;
+}
+
+.ugoira-seek::-webkit-slider-runnable-track {
+	height: 4px;
+	border-radius: 2px;
+	background: linear-gradient(to right,
+		var(--accent) var(--seek-played),
+		var(--seek-buffer) var(--seek-played) var(--seek-loaded),
+		var(--seek-rest) var(--seek-loaded));
+}
+
+.ugoira-seek::-moz-range-track {
+	height: 4px;
+	border-radius: 2px;
+	background: linear-gradient(to right,
+		var(--accent) var(--seek-played),
+		var(--seek-buffer) var(--seek-played) var(--seek-loaded),
+		var(--seek-rest) var(--seek-loaded));
+}
+
+.ugoira-seek::-webkit-slider-thumb {
+	width: 14px;
+	height: 14px;
+	/* 軌道 (4px) の中央に置く */
+	margin-top: -5px;
+	border: 0;
+	border-radius: 50%;
+	background: var(--accent);
+	appearance: none;
+}
+
+.ugoira-seek::-moz-range-thumb {
+	width: 14px;
+	height: 14px;
+	border: 0;
+	border-radius: 50%;
+	background: var(--accent);
+}
+
+/* コマ数。桁が変わっても帯の中の並びが揺れないよう、数字の幅を揃える */
+.ugoira-frame {
+	flex: 0 0 auto;
+	color: var(--muted);
+	font-size: 12px;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.ugoira-rate-wrap {
+	position: relative;
+	flex: 0 0 auto;
+}
+
+.ugoira-rate {
+	min-width: 48px;
+	height: 32px;
+	padding: 0 10px;
+	border: 0;
+	border-radius: 999px;
+	background: transparent;
+	color: var(--fg);
+	font: inherit;
+	font-size: 13px;
+	font-variant-numeric: tabular-nums;
+	cursor: pointer;
+}
+
+.ugoira-rate:hover { background: var(--hover); }
+
+/* 上向きに開く。下は画面の端なので、下に開くと切れる */
+.ugoira-rate-menu {
+	position: absolute;
+	right: 0;
+	bottom: calc(100% + 8px);
+	box-sizing: border-box;
+	min-width: 120px;
+	padding: 6px 0;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	background: var(--surface);
+	box-shadow: var(--menu-shadow);
+}
+
+.ugoira-rate-item {
+	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	width: 100%;
+	padding: 6px 12px;
+	border: 0;
+	background: transparent;
+	color: var(--fg);
+	font: inherit;
+	font-size: 13px;
+	font-variant-numeric: tabular-nums;
+	text-align: left;
+	cursor: pointer;
+}
+
+.ugoira-rate-item:hover { background: var(--hover); }
+/* 項目の縁が隣と接しているので、輪郭は内側に出す (外側だと隣の項目に重なる) */
+.ugoira-rate-item:focus-visible { outline-offset: -2px; }
+
+/* 選んでいる速度。色だけに頼らず太さでも示す */
+.ugoira-rate-item[aria-checked='true'] {
+	color: var(--accent);
+	font-weight: 600;
+}
+
+.ugoira-rate-normal {
+	color: var(--muted);
+	font-size: 12px;
+	font-weight: 400;
+}
+
+.ugoira-toggle {
 	display: inline-flex;
+	flex: 0 0 auto;
 	align-items: center;
 	justify-content: center;
 	width: 40px;

@@ -9,7 +9,7 @@ import { NAV_ZONES, NAV_ZONE_RATIO, NAV_ZONE_KINDS } from '../../common/constant
 import { warn } from '../../common/log.js';
 
 /** 領域の中でも領域より優先する部品。押せば今までどおりその部品が動く */
-const PASS_THROUGH_SELECTOR = 'button, a, input, textarea, select, .blocked-panel';
+const PASS_THROUGH_SELECTOR = 'button, a, input, textarea, select, .blocked-panel, .ugoira-controls';
 
 /**
  * 端に着いて今は送れない領域に付ける data-nav-zone の値。
@@ -31,9 +31,10 @@ const ZONE_ACTIONS = Object.freeze({
  * @param {number} y 画面上の Y 座標 (clientY)
  * @param {{left: number, top: number, width: number, height: number}|null} rect ステージの矩形
  * @param {string} mode 設定 navZones の値
+ * @param {number} [ratio] 領域の幅と高さ。ステージの大きさに対する割合 (0-0.5)
  * @returns {string|null} NAV_ZONE_KINDS の値。どこにも入らなければ null
  */
-export function zoneAt(x, y, rect, mode) {
+export function zoneAt(x, y, rect, mode, ratio = NAV_ZONE_RATIO) {
 	if (!rect || !(rect.width > 0) || !(rect.height > 0)) return null;
 	if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
 	const rx = (x - rect.left) / rect.width;
@@ -42,12 +43,12 @@ export function zoneAt(x, y, rect, mode) {
 	const horizontal = mode === NAV_ZONES.HORIZONTAL || mode === NAV_ZONES.BOTH;
 	const vertical = mode === NAV_ZONES.VERTICAL || mode === NAV_ZONES.BOTH;
 	if (horizontal) {
-		if (rx < NAV_ZONE_RATIO) return NAV_ZONE_KINDS.PREV_PAGE;
-		if (rx > 1 - NAV_ZONE_RATIO) return NAV_ZONE_KINDS.NEXT_PAGE;
+		if (rx < ratio) return NAV_ZONE_KINDS.PREV_PAGE;
+		if (rx > 1 - ratio) return NAV_ZONE_KINDS.NEXT_PAGE;
 	}
 	if (vertical) {
-		if (ry < NAV_ZONE_RATIO) return NAV_ZONE_KINDS.PREV_WORK;
-		if (ry > 1 - NAV_ZONE_RATIO) return NAV_ZONE_KINDS.NEXT_WORK;
+		if (ry < ratio) return NAV_ZONE_KINDS.PREV_WORK;
+		if (ry > 1 - ratio) return NAV_ZONE_KINDS.NEXT_WORK;
 	}
 	return null;
 }
@@ -77,6 +78,7 @@ function passesThrough(event, boundary) {
  * @typedef {object} NavZonesDeps
  * @property {HTMLElement} stage 判定の基準にするステージ。サイドバーは含まない
  * @property {() => string} getMode 今の設定 navZones を返す
+ * @property {() => number} [getRatio] 今の領域の大きさ (0-0.5) を返す。無ければ既定の割合
  * @property {(direction: number) => boolean} canMovePage その向きへページを送れるか
  * @property {(direction: number) => boolean} canMoveWork その向きへ作品を送れるか
  * @property {(direction: number) => void} movePage ページを送る
@@ -122,7 +124,7 @@ export function createNavZones(deps) {
 		const mode = deps.getMode();
 		// オフのときは測らない。(ポインタが動くたびにレイアウトを読ませない)
 		if (passed || mode === NAV_ZONES.OFF || typeof stage.getBoundingClientRect !== 'function') return null;
-		const kind = zoneAt(x, y, stage.getBoundingClientRect(), mode);
+		const kind = zoneAt(x, y, stage.getBoundingClientRect(), mode, deps.getRatio?.() ?? NAV_ZONE_RATIO);
 		if (!kind) return null;
 		const state = stateOf(kind);
 		if (state === 'none') return null;
