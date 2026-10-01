@@ -8,6 +8,7 @@ import {
 	PREFETCH_CHOICES,
 	PREFETCH_CUSTOM,
 	PREFETCH_CUSTOM_RANGE,
+	PREFETCH_CUSTOM_WARN_AT,
 	GRID_TAB_SKIP,
 	SIDEBAR_SCROLL,
 	INFINITE_SCROLL,
@@ -90,6 +91,8 @@ function prefetchField(strings) {
 				max,
 				step,
 				format: (count) => f.prefetch.some(count).label,
+				warnAt: PREFETCH_CUSTOM_WARN_AT,
+				warning: f.prefetchCustom.warning,
 			}),
 		}),
 	});
@@ -163,6 +166,7 @@ export function createAdvancedSections(strings) {
  * kind が 'toggle' ならスイッチ、'choice' なら選択肢。
  * choice は reveal ({when, field}) を持てる。選んだ値が when のときだけ、選択肢の下に field を出す。
  * field の kind は 'range' (min / max / step と、値の読み方 format を持つ)。
+ * warnAt と warning を持つ range は、値が warnAt 以上のとき値を警告の色にし、下に warning を出す。
  * choice の値は select の都合で文字列にしてある。保存時の型は SETTINGS_DEFAULTS の既定値の型から
  * 描画側が導く (数値の項目なら Number() へ戻す) ので、ここに型の印は持たない。
  * @param {object} strings 文言のカタログ
@@ -180,6 +184,13 @@ export function createSections(strings) {
 					label: f.enabled.label,
 					description: f.enabled.description,
 				}),
+				// ビュワーを使う画面。「ビュワーを使う」がオフのときはどれも効かない
+				...['viewerOnUser', 'viewerOnHome', 'viewerOnSearch'].map((key) => Object.freeze({
+					kind: 'toggle',
+					key,
+					label: f[key].label,
+					description: f[key].description,
+				})),
 				Object.freeze({
 					kind: 'toggle',
 					key: 'showSidebar',

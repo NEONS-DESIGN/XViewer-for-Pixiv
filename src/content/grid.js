@@ -5,7 +5,7 @@
  * 付け直しが必要になるが、document で拾えば再描画の影響を受けない。
  * pixiv の CSS クラス名はビルドごとに変わるため、掴んでよいのは href だけ。
  */
-import { ARTWORK_LINK_SELECTOR, CARD_SELECTOR } from '../common/constants.js';
+import { ARTWORK_LINK_SELECTOR, CARD_SELECTOR, CARD_LINK_SELECTOR } from '../common/constants.js';
 import { warn } from '../common/log.js';
 import { PIXIV_ORIGIN } from '../pixiv/endpoints.js';
 import { parseArtworkPath } from './page.js';
@@ -20,6 +20,9 @@ const NON_GRID_CONTAINER_SELECTOR = 'section';
 
 /** Node.DOCUMENT_NODE。collectWorkIds が document を渡されたかを見る */
 const DOCUMENT_NODE_TYPE = 9;
+
+/** 作品リンクの末尾のページ番号 (#2 など)。ホームのフィードは画像ごとに 1 始まりの番号を付ける */
+const PAGE_HASH_PATTERN = /^#(\d+)$/;
 
 /**
  * 押し始めの合図を拾わない入力の種類。
@@ -41,6 +44,50 @@ export function workIdFromLink(href, origin) {
 	} catch {
 		return null;
 	}
+}
+
+/**
+ * リンクの href の末尾のページ番号 (#n、1 始まり) を 0 始まりのページ番号にする。
+ * 番号が無い・読めないときは 0 (1 枚目)。
+ * @param {string|null} href リンクの href
+ * @param {string} origin 相対 URL を解決するための基準
+ * @returns {number} 0 始まりのページ番号
+ */
+export function startPageFromLink(href, origin) {
+	if (!href) return 0;
+	try {
+		const matched = PAGE_HASH_PATTERN.exec(new URL(href, origin).hash);
+		const page = matched ? Number(matched[1]) : 1;
+		return Number.isSafeInteger(page) && page > 1 ? page - 1 : 0;
+	} catch {
+		return 0;
+	}
+}
+
+/**
+ * 押したカードが属する欄の作品 ID を DOM 順に集める。
+ * リンクから祖先を上り、作品カードのリンク (CARD_LINK_SELECTOR) が 2 作品以上入る最初の箱を欄とみなす。
+ * ホームの横送り・グリッド・フィード、検索の結果はそれぞれ別の箱なので、欄をまたがない。
+ * 1 作品しか見つからなければ、押した作品だけの並びを返す。
+ * @param {Element} link 押された作品リンク
+ * @param {string} origin 相対 URL を解決するための基準
+ * @returns {string[]} 作品 ID の配列
+ */
+export function collectGroupIds(link, origin) {
+	const own = workIdFromLink(link?.getAttribute?.('href') ?? null, origin);
+	for (let node = link?.parentElement ?? null; node; node = node.parentElement) {
+		const ids = [];
+		const seen = new Set();
+		for (const card of node.querySelectorAll(CARD_LINK_SELECTOR)) {
+			const id = workIdFromLink(card.getAttribute('href'), origin);
+			if (id && !seen.has(id)) {
+				seen.add(id);
+				ids.push(id);
+			}
+		}
+		if (ids.length >= 2) return ids;
+	}
+	return own ? [own] : [];
 }
 
 /**
@@ -88,18 +135,22 @@ export function collectWorkIds(root, origin) {
 }
 
 /**
- * 作品を開く操作として拾ってよい押し方か。拾えるなら作品 ID を返す。
+ * 作品を開く操作として拾ってよい押し方か。拾えるなら作品 ID と押されたリンクを返す。
  * 修飾キー付きの操作と中クリックは拾わない。(新しいタブで開きたい操作を邪魔しないため)
- * 拾うのはカード (li) の中の作品リンクだけ。ヘッダの通知などに出る作品リンクは本体に任せる。
+ * 拾うのは作品カードのリンクだけ。カード (li) の中か、カードの計測用ラベル (CARD_LINK_SELECTOR) を持つもの。
+ * 検索のカードは li ではないのでラベルで見分ける。タグの見出し画像のようなラベルの無いリンクは本体に任せる。
  * @param {MouseEvent|PointerEvent} event 押された合図
  * @param {string} origin 相対 URL を解決するための基準
- * @returns {string|null} 作品 ID。拾わないなら null
+ * @returns {{workId: string, link: Element}|null} 拾わないなら null
  */
-function openableWorkId(event, origin) {
+function openableLink(event, origin) {
 	if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return null;
 	const link = event.target?.closest?.(ARTWORK_LINK_SELECTOR);
-	if (!link || !link.closest?.(CARD_SELECTOR)) return null;
-	return workIdFromLink(link.getAttribute('href'), origin);
+	if (!link) return null;
+	const isCard = Boolean(link.closest?.(CARD_SELECTOR)) || link.matches?.(CARD_LINK_SELECTOR) === true;
+	if (!isCard) return null;
+	const workId = workIdFromLink(link.getAttribute('href'), origin);
+	return workId ? { workId, link } : null;
 }
 
 /**
@@ -109,7 +160,8 @@ function openableWorkId(event, origin) {
  * 押し始めたあと選択やドラッグで取り消されたときは `pointercancel` / `dragstart` で
  * `deps.onPressCancel` を呼ぶ。
  * @param {Document} doc 対象のドキュメント
- * @param {(workId: string) => void} onOpen 作品リンクが押されたときに呼ばれる
+ * @param {(workId: string, opened: {link: Element, startPage: number}) => void} onOpen 作品リンクが押されたときに呼ばれる。
+ *   押されたリンクと、リンクが指すページ (#n。0 始まり) も渡す
  * @param {{origin?: string, onPress?: (workId: string) => void, onPressCancel?: () => void}} [deps] テスト用の依存と押し始めの合図
  * @returns {{dispose: () => void}} 購読の解除
  */
@@ -122,11 +174,11 @@ export function attachGridListener(doc, onOpen, deps = {}) {
 	 * @returns {void}
 	 */
 	const clickListener = (event) => {
-		const workId = openableWorkId(event, origin);
-		if (!workId) return;
+		const opened = openableLink(event, origin);
+		if (!opened) return;
 		event.preventDefault();
 		event.stopPropagation();
-		onOpen(workId);
+		onOpen(opened.workId, { link: opened.link, startPage: startPageFromLink(opened.link.getAttribute('href'), origin) });
 	};
 
 	// capture 段階で拾い、pixiv 本体のハンドラより先に止める
@@ -147,8 +199,8 @@ export function attachGridListener(doc, onOpen, deps = {}) {
 		 */
 		pressListener = (event) => {
 			if (event.pointerType === PRESS_IGNORED_POINTER_TYPE) return;
-			const workId = openableWorkId(event, origin);
-			if (workId) deps.onPress(workId);
+			const opened = openableLink(event, origin);
+			if (opened) deps.onPress(opened.workId);
 		};
 		/**
 		 * 押し始めが選択やドラッグで取り消されたことを onPressCancel へ伝える。

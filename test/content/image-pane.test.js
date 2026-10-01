@@ -642,3 +642,27 @@ test('canMove は 1 枚だけの作品ではどちらにも送れない', async 
 	assert.equal(pane.canMove(1), false);
 	assert.equal(pane.canMove(-1), false);
 });
+
+test('startPage を渡すと、/pages が届いた時点でそのページへ移る', async () => {
+	// ホームのフィードで 3 枚目の画像を押したとき (#3) に、3 ページ目から開く
+	let respond;
+	const fetchImpl = () => new Promise((resolve) => { respond = resolve; });
+	const { container, pane } = build({ fetchImpl });
+	const rendering = pane.render(DETAIL, { startPage: 2 });
+	// /pages が届くまでは手元にある 1 枚目を出す
+	assert.equal(find(container, '.counter').textContent, '1/3');
+	respond({ ok: true, status: 200, text: async () => JSON.stringify({ error: false, body: PAGES }) });
+	await rendering;
+	assert.equal(find(container, '.counter').textContent, '3/3');
+	assert.equal(find(container, 'img').src, cdn('r2'));
+});
+
+test('startPage が枚数を超えていたら最後のページに留め、1 枚の作品では無視する', async () => {
+	const fetchImpl = async () => ({ ok: true, status: 200, text: async () => JSON.stringify({ error: false, body: PAGES }) });
+	const { container, pane } = build({ fetchImpl });
+	await pane.render(DETAIL, { startPage: 9 });
+	assert.equal(find(container, '.counter').textContent, '3/3');
+	const single = build({ fetchImpl });
+	await single.pane.render({ ...DETAIL, pageCount: 1 }, { startPage: 2 });
+	assert.equal(find(single.container, '.counter').textContent, '1/1');
+});

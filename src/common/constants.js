@@ -46,6 +46,21 @@ export const ARTWORK_LINK_SELECTOR = ARTWORK_LINK_SELECTORS.join(',');
 /** カードのサムネリンク。pixiv の計測用属性で、クラス名より寿命が長い。 */
 export const THUMB_LINK_SELECTOR = 'a[data-ga4-label="thumbnail_link"]';
 
+/**
+ * 作品カードのリンクに付く計測用ラベル。サムネとタイトルの 2 本。
+ * ユーザーページ・ホーム (横送り・グリッド・フィード)・検索のどれでも付いている。
+ * 検索のカードは li ではなく div なので、カードかどうかはこのラベルで見分ける。
+ */
+export const CARD_LINK_LABELS = Object.freeze(['thumbnail_link', 'title_link']);
+
+/**
+ * 作品カードのリンクを拾うセレクタ。作品リンクのセレクタ 1 本ずつにラベルを付けてから結合する。
+ * (カンマで結合したものの後ろへ継ぎ足すと、末尾の 1 本にしか掛からない)
+ */
+export const CARD_LINK_SELECTOR = ARTWORK_LINK_SELECTORS
+	.flatMap((link) => CARD_LINK_LABELS.map((label) => `${link}[data-ga4-label="${label}"]`))
+	.join(',');
+
 /** カードのブックマークボタンの入れ物。 */
 export const BOOKMARK_BUTTON_SELECTOR = '[data-ga4-label="bookmark_button"]';
 
@@ -119,6 +134,31 @@ export const USER_WORKS_CATEGORY_PATTERN = /^\/users\/\d+\/(illustrations|manga)
  * 「ピックアップ」欄が出るのはここだけで、/users/{id}/artworks などには出ない。
  */
 export const PROFILE_HOME_PATH_PATTERN = /^\/users\/\d+\/?$/;
+
+/**
+ * pixiv のホームのパス。ホーム / イラスト / マンガの 3 タブ。(小説のタブには作品カードが無いので外す)
+ */
+export const HOME_PATH_PATTERN = /^\/(?:illustration|manga)?\/?$/;
+
+/**
+ * 検索 (タグ) のパス。/tags/{タグ} のトップと、すべて / イラスト / マンガのタブ。
+ * 小説のタブ (/tags/{タグ}/novels) は外す。タグは encodeURIComponent された 1 区切り。
+ */
+export const SEARCH_PATH_PATTERN = /^\/tags\/[^/]+(?:\/(?:artworks|illustrations|manga))?\/?$/;
+
+/** ビュワーを動かすページの種類。 */
+export const PAGE_KINDS = Object.freeze({
+	USER: 'user',
+	HOME: 'home',
+	SEARCH: 'search',
+});
+
+/** ページの種類ごとに、ビュワーを使うかを持つ設定のキー。 */
+export const VIEWER_PAGE_SETTING = Object.freeze({
+	[PAGE_KINDS.USER]: 'viewerOnUser',
+	[PAGE_KINDS.HOME]: 'viewerOnHome',
+	[PAGE_KINDS.SEARCH]: 'viewerOnSearch',
+});
 
 /**
  * 作品グリッドのタブ (イラスト・マンガ・すべて) のパス。
@@ -216,7 +256,10 @@ const DEFAULT_PREFETCH = 1;
 export const PREFETCH_CUSTOM = 'custom';
 
 /** カスタムの先読みで選べる枚数の範囲。(両端を含む) */
-export const PREFETCH_CUSTOM_RANGE = Object.freeze({ min: 1, max: 10, step: 1 });
+export const PREFETCH_CUSTOM_RANGE = Object.freeze({ min: 1, max: 20, step: 1 });
+
+/** カスタムの先読みでこの枚数以上を選んだら、メモリを圧迫する旨の警告を出す。 */
+export const PREFETCH_CUSTOM_WARN_AT = 10;
 
 /** カスタムの先読みの既定の枚数。既存の選択肢 (1 / 3) の間に置く */
 const DEFAULT_PREFETCH_CUSTOM = 2;
@@ -420,6 +463,9 @@ export const THEME_TOGGLE = Object.freeze({
 /** 設定の既定値。保存値が壊れていたらここへ倒す。 */
 export const SETTINGS_DEFAULTS = Object.freeze({
 	enabled: true,
+	viewerOnUser: true,
+	viewerOnHome: true,
+	viewerOnSearch: true,
 	imageQuality: IMAGE_QUALITY.REGULAR,
 	prefetch: DEFAULT_PREFETCH,
 	prefetchCustom: DEFAULT_PREFETCH_CUSTOM,

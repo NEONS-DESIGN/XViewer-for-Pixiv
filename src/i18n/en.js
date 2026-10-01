@@ -245,6 +245,18 @@ export default {
 				label: 'Use the viewer',
 				description: 'Turn this off to return to pixiv’s standard behavior.',
 			},
+			viewerOnUser: {
+				label: 'Use on user pages',
+				description: 'Show the viewer when you open a work from a creator\'s works list.',
+			},
+			viewerOnHome: {
+				label: 'Use on the home page',
+				description: 'Show the viewer for works on pixiv\'s home (Home / Illustrations / Manga tabs).',
+			},
+			viewerOnSearch: {
+				label: 'Use on search results',
+				description: 'Show the viewer when you open a work from tag search results.',
+			},
 			showSidebar: {
 				label: 'Show the sidebar',
 				description: 'Shows the caption, tags, like count, and comments beside the image. When off, a link to the artwork page appears next to the close button.',
@@ -302,6 +314,7 @@ export default {
 			},
 			prefetchCustom: {
 				label: 'Images to prefetch',
+				warning: 'Prefetching many images uses a lot of memory.',
 			},
 			sidebarWidth: {
 				label: 'Sidebar width',

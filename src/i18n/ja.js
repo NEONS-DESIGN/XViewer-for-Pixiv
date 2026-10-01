@@ -275,6 +275,18 @@ export default {
 				label: 'ビュワーを使う',
 				description: 'オフにすると pixiv 標準の動作に戻ります。',
 			},
+			viewerOnUser: {
+				label: 'ユーザーページで使う',
+				description: '作者のページの作品一覧から開いたときにビュワーを出します。',
+			},
+			viewerOnHome: {
+				label: 'ホームで使う',
+				description: 'pixiv のホーム (ホーム / イラスト / マンガ) の作品から開いたときにビュワーを出します。',
+			},
+			viewerOnSearch: {
+				label: '検索結果で使う',
+				description: 'タグ検索の結果から開いたときにビュワーを出します。',
+			},
 			showSidebar: {
 				label: 'サイドバーを表示する',
 				description: '投稿文・タグ・いいね数・コメントを画像の横に出します。オフにすると、作品ページへのリンクを閉じるボタンの横に出します。',
@@ -332,6 +344,7 @@ export default {
 			},
 			prefetchCustom: {
 				label: '先読みする枚数',
+				warning: '多く先読みを行うとメモリを圧迫します。',
 			},
 			sidebarWidth: {
 				label: 'サイドバーの幅',

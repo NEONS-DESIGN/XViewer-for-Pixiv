@@ -275,6 +275,18 @@ export default {
 				label: '使用查看器',
 				description: '关闭后将恢复 pixiv 的默认行为。',
 			},
+			viewerOnUser: {
+				label: '在用户页面使用',
+				description: '从作者页面的作品列表打开时显示查看器。',
+			},
+			viewerOnHome: {
+				label: '在首页使用',
+				description: '从 pixiv 首页（首页 / 插画 / 漫画）的作品打开时显示查看器。',
+			},
+			viewerOnSearch: {
+				label: '在搜索结果中使用',
+				description: '从标签搜索结果打开时显示查看器。',
+			},
 			showSidebar: {
 				label: '显示侧边栏',
 				description: '在图片旁显示作品说明、标签、点赞数和评论。关闭后，会在关闭按钮旁显示作品页面的链接。',
@@ -332,6 +344,7 @@ export default {
 			},
 			prefetchCustom: {
 				label: '预加载张数',
+				warning: '预加载过多会占用大量内存。',
 			},
 			sidebarWidth: {
 				label: '侧边栏宽度',

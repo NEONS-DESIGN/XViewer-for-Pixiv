@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { workIdFromLink, collectWorkIds, attachGridListener, findGridList } from '../../src/content/grid.js';
-import { CARD_SELECTOR } from '../../src/common/constants.js';
+import { workIdFromLink, collectWorkIds, attachGridListener, collectGroupIds, startPageFromLink, findGridList } from '../../src/content/grid.js';
+import { CARD_SELECTOR, CARD_LINK_SELECTOR } from '../../src/common/constants.js';
 import { el, makeCard, makeGrid } from '../helpers/card.js';
 
 /**
@@ -146,10 +146,12 @@ function fakeDoc() {
  * @returns {object} event の代わり
  */
 function fakeClick(href, overrides = {}) {
-	const { inCard = true, ...rest } = overrides;
+	const { inCard = true, labeled = false, ...rest } = overrides;
 	const link = href === null ? null : {
 		getAttribute: () => href,
 		closest: (selector) => (selector === CARD_SELECTOR && inCard ? { tag: CARD_SELECTOR } : null),
+		// 検索のカードは li ではないが、カードの計測用ラベルを持つ
+		matches: (selector) => selector === CARD_LINK_SELECTOR && labeled,
 	};
 	const event = {
 		button: 0,
@@ -316,4 +318,89 @@ test('dispose で pointerdown 系のリスナーも外れる', () => {
 	assert.equal(doc.listenerCount(), 4);
 	handle.dispose();
 	assert.equal(doc.listenerCount(), 0);
+});
+
+/* --- ホームと検索 (li ではないカード) ------------------------------- */
+
+test('attachGridListener は li ではないカード (検索) の作品リンクも、ラベルがあれば横取りする', () => {
+	const doc = fakeDoc();
+	const opened = [];
+	attachGridListener(doc, (id, info) => opened.push([id, info.startPage]), { origin: ORIGIN });
+	const event = fakeClick('/artworks/150329976', { inCard: false, labeled: true });
+	doc.dispatch('click', event);
+	assert.deepEqual(opened, [['150329976', 0]]);
+	assert.equal(event.defaultPrevented, true);
+});
+
+test('attachGridListener はラベルも li も無い作品リンク (タグの見出し画像など) を横取りしない', () => {
+	const doc = fakeDoc();
+	const opened = [];
+	attachGridListener(doc, (id) => opened.push(id), { origin: ORIGIN });
+	const event = fakeClick('/artworks/31241515', { inCard: false, labeled: false });
+	doc.dispatch('click', event);
+	assert.deepEqual(opened, []);
+	assert.equal(event.defaultPrevented, false);
+});
+
+test('attachGridListener は押されたリンクと、#n が指すページ (0 始まり) を渡す', () => {
+	// ホームのフィードは画像ごとに #1, #2 ... (1 始まり) を付ける
+	const doc = fakeDoc();
+	const opened = [];
+	attachGridListener(doc, (id, info) => opened.push([id, info.startPage, Boolean(info.link)]), { origin: ORIGIN });
+	doc.dispatch('click', fakeClick('/artworks/150251822#3', { inCard: false, labeled: true }));
+	assert.deepEqual(opened, [['150251822', 2, true]]);
+});
+
+test('startPageFromLink は #n を 0 始まりにし、無い・読めない・1 のときは 0', () => {
+	assert.equal(startPageFromLink('/artworks/1#2', ORIGIN), 1);
+	assert.equal(startPageFromLink('/artworks/1#1', ORIGIN), 0);
+	assert.equal(startPageFromLink('/artworks/1', ORIGIN), 0);
+	assert.equal(startPageFromLink('/artworks/1#comments', ORIGIN), 0);
+	assert.equal(startPageFromLink('/artworks/1#0', ORIGIN), 0);
+	assert.equal(startPageFromLink(null, ORIGIN), 0);
+});
+
+/**
+ * 祖先をたどれる入れ子の箱を作る。各箱は自分の中にある作品カードのリンクを返す。
+ * @param {string[][]} levels 内側から外側へ、その箱の中にあるリンクの href
+ * @returns {object} 一番内側のリンク
+ */
+function nestedLink(levels) {
+	let parent = null;
+	const boxes = [];
+	for (let i = levels.length - 1; i >= 0; i -= 1) {
+		const hrefs = levels[i];
+		const box = {
+			parentElement: parent,
+			querySelectorAll: (selector) => (selector === CARD_LINK_SELECTOR ? hrefs.map((href) => ({ getAttribute: () => href })) : []),
+		};
+		boxes.unshift(box);
+		parent = box;
+	}
+	return { getAttribute: () => levels[0][0], parentElement: boxes[0] };
+}
+
+test('collectGroupIds は 2 作品以上が入る最初の箱 (押したカードの欄) の作品を DOM 順に集める', () => {
+	const link = nestedLink([
+		// カードの中: 同じ作品のサムネとタイトル
+		['/artworks/2', '/artworks/2'],
+		// 欄 (横送りの ul など)
+		['/artworks/1', '/artworks/1', '/artworks/2', '/artworks/2', '/artworks/3'],
+		// ページ全体 (別の欄の作品も入る)
+		['/artworks/1', '/artworks/2', '/artworks/3', '/artworks/9'],
+	]);
+	assert.deepEqual(collectGroupIds(link, ORIGIN), ['1', '2', '3']);
+});
+
+test('collectGroupIds はフィードの #n 付きリンクも同じ作品として数える', () => {
+	const link = nestedLink([
+		['/artworks/5#1', '/artworks/5#2', '/artworks/5'],
+		['/artworks/5#1', '/artworks/5#2', '/artworks/5', '/artworks/6#1', '/artworks/6'],
+	]);
+	assert.deepEqual(collectGroupIds(link, ORIGIN), ['5', '6']);
+});
+
+test('collectGroupIds は他の作品が見つからなければ押した作品だけを返す', () => {
+	const link = nestedLink([['/artworks/7'], ['/artworks/7']]);
+	assert.deepEqual(collectGroupIds(link, ORIGIN), ['7']);
 });

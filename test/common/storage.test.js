@@ -13,6 +13,7 @@ import {
 	PREFETCH_CHOICES,
 	PREFETCH_CUSTOM,
 	PREFETCH_CUSTOM_RANGE,
+	PREFETCH_CUSTOM_WARN_AT,
 	IMAGE_QUALITY,
 	NAV_ZONES,
 	NAV_ZONE_SIZE_CHOICES,
@@ -51,6 +52,21 @@ test('normalizeSettings は先読みの「カスタム」を通し、枚数は�
 	for (const broken of [min - 1, max + 1, 2.5, '5', null]) {
 		assert.equal(normalizeSettings({ prefetchCustom: broken }).prefetchCustom, SETTINGS_DEFAULTS.prefetchCustom, String(broken));
 	}
+});
+
+test('ビュワーを使う画面の設定は既定でどれもオン、真偽値だけを通す', () => {
+	for (const key of ['viewerOnUser', 'viewerOnHome', 'viewerOnSearch']) {
+		assert.equal(SETTINGS_DEFAULTS[key], true, key);
+		assert.equal(normalizeSettings({ [key]: false })[key], false, key);
+		assert.equal(normalizeSettings({ [key]: 'no' })[key], true, key);
+	}
+});
+
+test('カスタムの先読みは 20 枚まで選べ、警告の枚数は範囲の中にある', () => {
+	assert.equal(PREFETCH_CUSTOM_RANGE.max, 20);
+	assert.equal(normalizeSettings({ prefetchCustom: 20 }).prefetchCustom, 20);
+	assert.equal(normalizeSettings({ prefetchCustom: 21 }).prefetchCustom, SETTINGS_DEFAULTS.prefetchCustom);
+	assert.ok(PREFETCH_CUSTOM_WARN_AT > PREFETCH_CUSTOM_RANGE.min && PREFETCH_CUSTOM_WARN_AT <= PREFETCH_CUSTOM_RANGE.max);
 });
 
 test('カスタムの先読みの既定の枚数は範囲の中にある', () => {
@@ -102,6 +118,9 @@ test('normalizeSettings は画面端のクリック領域を選択肢の値だ�
 test('normalizeSettings は正しい値をそのまま通す', () => {
 	const input = {
 		enabled: false,
+		viewerOnUser: false,
+		viewerOnHome: false,
+		viewerOnSearch: false,
 		imageQuality: IMAGE_QUALITY.ORIGINAL,
 		prefetch: PREFETCH_CUSTOM,
 		prefetchCustom: 7,

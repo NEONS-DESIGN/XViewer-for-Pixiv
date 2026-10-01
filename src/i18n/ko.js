@@ -277,6 +277,18 @@ export default {
 				label: '뷰어 사용',
 				description: '끄면 pixiv 기본 동작으로 돌아갑니다.',
 			},
+			viewerOnUser: {
+				label: '사용자 페이지에서 사용',
+				description: '작가 페이지의 작품 목록에서 열 때 뷰어를 표시합니다.',
+			},
+			viewerOnHome: {
+				label: '홈에서 사용',
+				description: 'pixiv 홈 (홈 / 일러스트 / 만화) 의 작품에서 열 때 뷰어를 표시합니다.',
+			},
+			viewerOnSearch: {
+				label: '검색 결과에서 사용',
+				description: '태그 검색 결과에서 열 때 뷰어를 표시합니다.',
+			},
 			showSidebar: {
 				label: '사이드바 표시',
 				description: '작품 설명·태그·좋아요 수·댓글을 이미지 옆에 표시합니다. 끄면 닫기 버튼 옆에 작품 페이지 링크를 표시합니다.',
@@ -334,6 +346,7 @@ export default {
 			},
 			prefetchCustom: {
 				label: '미리 불러올 장수',
+				warning: '많이 미리 불러오면 메모리를 압박합니다.',
 			},
 			sidebarWidth: {
 				label: '사이드바 너비',
