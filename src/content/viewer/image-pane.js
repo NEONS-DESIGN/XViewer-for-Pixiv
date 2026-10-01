@@ -11,6 +11,7 @@ import { createIcon } from '../../common/icons.js';
 import { assignImageSrc } from '../../common/image-source.js';
 import { IMAGE_QUALITY, PREFETCH_RELEASE_MARGIN } from '../../common/constants.js';
 import { warn } from '../../common/log.js';
+import { prefetchCount } from '../../common/storage.js';
 
 /**
  * 矢印ボタンの向きごとの見た目。ラベルは文言カタログ (strings.imagePane) から引くため、
@@ -266,7 +267,7 @@ export function createImagePane(deps) {
 	 * @returns {void}
 	 */
 	function prefetch() {
-		const count = deps.settings.prefetch;
+		const count = prefetchCount(deps.settings);
 		for (const target of prefetchTargets(index, total, count, lastDirection)) {
 			if (prefetched.has(target)) continue;
 			const url = urls[target];

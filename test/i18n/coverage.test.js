@@ -11,7 +11,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStrings } from '../../src/i18n/index.js';
 import { SUPPORTED_LANGUAGES } from '../../src/common/language.js';
-import { createSections } from '../../src/popup/sections.js';
+import { createSections, createAdvancedSections } from '../../src/popup/sections.js';
 import { THEME_TOGGLE } from '../../src/common/constants.js';
 import { THIRD_PARTY } from '../../src/common/licenses.js';
 import { SENTINEL_TEXT_KEYS } from '../../src/content/infinite.js';
@@ -36,10 +36,13 @@ function assertSameKeySet(actual, expected, label) {
 	);
 }
 
-test('createSections の全 field の key が strings.popup.fields のキーと一致する', () => {
+test('定義表の全 field の key が strings.popup.fields のキーと一致する', () => {
+	// 設定タブ・詳細設定タブの両方と、選択肢の下に出す項目 (reveal) まで数える
 	for (const lang of SUPPORTED_LANGUAGES) {
 		const strings = createStrings(lang);
-		const fieldKeys = createSections(strings).flatMap((section) => section.fields.map((field) => field.key));
+		const fieldKeys = [...createSections(strings), ...createAdvancedSections(strings)]
+			.flatMap((section) => section.fields)
+			.flatMap((field) => (field.reveal ? [field.key, field.reveal.field.key] : [field.key]));
 		assertSameKeySet(fieldKeys, Object.keys(strings.popup.fields), `[${lang}] popup.fields`);
 	}
 });

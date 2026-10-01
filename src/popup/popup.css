@@ -137,6 +137,54 @@ h1 {
 
 .field.choice .description { margin-bottom: 3px; }
 
+/* 選択肢の下に出すレンジ (先読みのカスタムの枚数)。親の選択肢に属することが分かるよう、
+   左に線を引いて字下げする */
+.field.range {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin-top: 8px;
+	padding-left: 10px;
+	border-left: 2px solid var(--divider);
+}
+
+/* .field.range の display はクラス指定なので、UA の [hidden] に勝ってしまう */
+.field.range[hidden] {
+	display: none;
+}
+
+/* 見出しと今の値を左右に並べる */
+.range-head {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+}
+
+/* 今の値。動かしている最中に読めるよう、見出しより強くする */
+.range-value {
+	color: var(--fg);
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+
+.field.range input[type='range'] {
+	width: 100%;
+	/* つまみが 16px 前後なので、押せる高さをセレクトに近づける */
+	height: 24px;
+	margin: 0;
+	accent-color: var(--accent);
+	cursor: pointer;
+}
+
+/* 両端の値。つまみの下に小さく添える */
+.range-scale {
+	display: flex;
+	justify-content: space-between;
+	color: var(--muted);
+	font-size: 11px;
+	line-height: 1.2;
+}
+
 /* 保存の失敗など。読み上げには role="alert" で届く。
    やり直せる失敗なので --danger は使わない。(--danger は取り消せない操作専用) */
 .notice {
@@ -225,7 +273,7 @@ input[type='checkbox']:checked::after {
 
 /* すべての操作部品に同じ輪郭を出す。1 規則にまとめて出方を 1 種類に保つ。
    offset は外側 (+2px)。内側にすると 16px のスイッチでは輪郭が本体に埋もれる */
-:is(button, select, input[type='checkbox'], .panel, .license a):focus-visible {
+:is(button, select, input[type='checkbox'], input[type='range'], .panel, .license a):focus-visible {
 	outline: var(--focus-ring);
 	outline-offset: 2px;
 }

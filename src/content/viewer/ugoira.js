@@ -11,16 +11,10 @@
 import { getJson } from '../../pixiv/client.js';
 import { ugoiraMetaUrl, safeCdnUrl } from '../../pixiv/endpoints.js';
 import { parseStoredZip, createStoredZipReader } from '../../pixiv/ugoira-zip.js';
-import { createIcon } from '../../common/icons.js';
 import { assignImageSrc } from '../../common/image-source.js';
-import { IMAGE_QUALITY, UGOIRA_START_FRAMES } from '../../common/constants.js';
+import { IMAGE_QUALITY, UGOIRA_START_FRAMES, UGOIRA_PLAYBACK_RATES, DEFAULT_UGOIRA_RATE } from '../../common/constants.js';
 import { warn } from '../../common/log.js';
-
-/** 再生ボタンの表示。キーは今の再生状態、値は「押すと何になるか」。アイコンは言語に依らない。 */
-const TOGGLE = Object.freeze({
-	PLAYING: Object.freeze({ icon: 'pause', labelKey: 'PAUSE' }),
-	PAUSED: Object.freeze({ icon: 'play', labelKey: 'PLAY' }),
-});
+import { createUgoiraControls } from './ugoira-controls.js';
 
 /** 開発者向けの失敗理由。画面には出さず warn に渡す。 */
 const REASONS = Object.freeze({
@@ -79,17 +73,18 @@ export function pickZipUrl(meta, quality) {
  * @param {number} state.index 今のフレーム番号
  * @param {Array<{delay: number}>} state.timings 各フレームの待ち時間 (再生できる分)
  * @param {boolean} [state.complete] 全コマが揃っているか。省くと揃っている扱い
+ * @param {number} [state.rate] 再生速度 (倍率)。各コマの待ち時間をこれで割る。省くと等速
  * @returns {{index: number, startedAt: number, advanced: number, stalled: boolean}} 次のフレーム番号・開始時刻・進めたコマ数・次のコマ待ちか
  */
-export function advanceFrame({ now, startedAt, index, timings, complete = true }) {
+export function advanceFrame({ now, startedAt, index, timings, complete = true, rate = DEFAULT_UGOIRA_RATE }) {
 	let elapsed = now - startedAt;
 	let nextIndex = index;
 	let advanced = 0;
-	while (elapsed >= timings[nextIndex].delay) {
+	while (elapsed >= timings[nextIndex].delay / rate) {
 		if (!complete && nextIndex === timings.length - 1) {
 			return { index: nextIndex, startedAt: now - elapsed, advanced, stalled: true };
 		}
-		elapsed -= timings[nextIndex].delay;
+		elapsed -= timings[nextIndex].delay / rate;
 		nextIndex = (nextIndex + 1) % timings.length;
 		advanced += 1;
 		if (elapsed > MAX_CATCHUP_MS) {
@@ -108,6 +103,8 @@ export function advanceFrame({ now, startedAt, index, timings, complete = true }
  * @property {object} strings 文言のカタログ (src/i18n)
  * @property {typeof fetch} [fetchImpl] 通信 (meta と zip) の差し替え。テストから pixiv を叩かないために使う
  * @property {Promise<object>|null} [preloadedMeta] 先に取っておいた ugoira_meta の body。拒否されていたら取り直す
+ * @property {number} [rate] 最初の再生速度 (倍率)。UGOIRA_PLAYBACK_RATES に無ければ等速
+ * @property {(rate: number) => void} [onRateChange] 再生速度が選ばれたら呼ぶ。次に開く作品へ引き継ぐために使う
  * @property {() => HTMLImageElement} [createImage] フレーム用 Image の差し替え。Node には Image が無い
  * @property {(callback: FrameRequestCallback) => number} [requestAnimationFrame] コマ送りの差し替え
  * @property {(id: number) => void} [cancelAnimationFrame] コマ送りの停止の差し替え
@@ -118,7 +115,7 @@ export function advanceFrame({ now, startedAt, index, timings, complete = true }
 /**
  * うごイラ再生器を作る。
  * @param {UgoiraDeps} deps 依存
- * @returns {{render: (detail: object) => Promise<void>, dispose: () => void}}
+ * @returns {{render: (detail: object) => Promise<void>, consumeKey: (event: KeyboardEvent) => boolean, dispose: () => void}}
  */
 export function createUgoiraPlayer(deps) {
 	const { doc, container, strings } = deps;
@@ -157,8 +154,14 @@ export function createUgoiraPlayer(deps) {
 	let context = null;
 	/** @type {HTMLImageElement|null} 再生が始まるまで出しておく静止画 */
 	let poster = null;
-	/** @type {HTMLButtonElement|null} 再生ボタン */
-	let toggle = null;
+	/** @type {ReturnType<typeof createUgoiraControls>|null} 操作の帯 (再生ボタン・シークバー・速度) */
+	let controls = null;
+	/** 再生速度 (倍率) */
+	let rate = UGOIRA_PLAYBACK_RATES.includes(deps.rate) ? deps.rate : DEFAULT_UGOIRA_RATE;
+	/** シークバーをつかむ前に再生していたか。離したら戻す */
+	let resumeAfterSeek = false;
+	/** meta にあるコマの数。読み込みの途中でもシークバーの長さはこれで決める */
+	let totalFrames = 0;
 	/** requestAnimationFrame の ID */
 	let rafId = 0;
 	/** 次のコマまで眠るタイマの ID */
@@ -211,7 +214,7 @@ export function createUgoiraPlayer(deps) {
 	 */
 	function scheduleNext(now) {
 		const current = playable[frameIndex];
-		const wait = Math.max(0, current.delay - (now - frameStartedAt) - TIMER_SLACK_MS);
+		const wait = Math.max(0, current.delay / rate - (now - frameStartedAt) - TIMER_SLACK_MS);
 		timerId = later(() => {
 			timerId = 0;
 			if (!playing || disposed) return;
@@ -231,9 +234,9 @@ export function createUgoiraPlayer(deps) {
 		if (resuming) {
 			// 待っていた間の時間は繰り越さず、届いた今から次のコマを数える
 			resuming = false;
-			frameStartedAt = now - playable[frameIndex].delay;
+			frameStartedAt = now - playable[frameIndex].delay / rate;
 		}
-		const next = advanceFrame({ now, startedAt: frameStartedAt, index: frameIndex, timings: playable, complete });
+		const next = advanceFrame({ now, startedAt: frameStartedAt, index: frameIndex, timings: playable, complete, rate });
 		frameIndex = next.index;
 		frameStartedAt = next.startedAt;
 		if (next.advanced > 0) draw();
@@ -252,6 +255,60 @@ export function createUgoiraPlayer(deps) {
 		const frame = playable[frameIndex];
 		if (!context || !frame) return;
 		context.drawImage(frame.image, 0, 0, canvas.width, canvas.height);
+		controls?.setFrame(frameIndex, seekLength());
+	}
+
+	/**
+	 * シークバーの長さ (全体のコマ数)。揃うまでは meta の数、揃ったら壊れたコマを除いた数。
+	 * @returns {number} コマ数
+	 */
+	function seekLength() {
+		return complete ? playable.length : Math.max(totalFrames, playable.length);
+	}
+
+	/**
+	 * 予約しているタイマと requestAnimationFrame を取り消し、再生中なら今の時刻から数え直す。
+	 * 位置を飛ばしたときに使う。(前の位置の期限で起きると、飛んだ先のコマを一瞬で送ってしまう)
+	 * @returns {void}
+	 */
+	function restartClock() {
+		if (timerId) cancelLater(timerId);
+		timerId = 0;
+		if (rafId) caf(rafId);
+		rafId = 0;
+		stalled = false;
+		resuming = false;
+		frameStartedAt = 0;
+		if (playing) rafId = raf(tick);
+	}
+
+	/**
+	 * 指定のコマへ飛ぶ。まだ読めていないコマへは飛ばず、読めている最後のコマで止める。
+	 * @param {number} index 飛び先のコマ番号 (0 始まり)
+	 * @returns {void}
+	 */
+	function seekTo(index) {
+		if (!started || playable.length === 0 || !Number.isFinite(index)) return;
+		frameIndex = Math.min(Math.max(0, Math.trunc(index)), playable.length - 1);
+		draw();
+		restartClock();
+	}
+
+	/**
+	 * 再生速度を変える。今のコマの経過は持ち越し、次の期限から新しい速度で数える。
+	 * @param {number} next 再生速度 (倍率)
+	 * @returns {void}
+	 */
+	function setRate(next) {
+		if (!UGOIRA_PLAYBACK_RATES.includes(next) || next === rate) return;
+		rate = next;
+		deps.onRateChange?.(next);
+		// 眠っているタイマは前の速度の期限で起きるので、今の時刻から測り直す
+		if (playing && timerId) {
+			cancelLater(timerId);
+			timerId = 0;
+			rafId = raf(tick);
+		}
 	}
 
 	/**
@@ -265,6 +322,7 @@ export function createUgoiraPlayer(deps) {
 		resuming = false;
 		frameStartedAt = 0;
 		rafId = raf(tick);
+		controls?.setPlaying(true);
 	}
 
 	/**
@@ -279,6 +337,7 @@ export function createUgoiraPlayer(deps) {
 		timerId = 0;
 		if (rafId) caf(rafId);
 		rafId = 0;
+		controls?.setPlaying(false);
 	}
 
 	/**
@@ -322,7 +381,7 @@ export function createUgoiraPlayer(deps) {
 		context = canvas.getContext('2d', mimeType === DEFAULT_FRAME_MIME ? { alpha: false } : undefined);
 		canvas.hidden = false;
 		poster.hidden = true;
-		toggle.hidden = false;
+		controls.element.hidden = false;
 		frameIndex = 0;
 		draw();
 		play();
@@ -343,6 +402,10 @@ export function createUgoiraPlayer(deps) {
 		const nowComplete = scannedFrames === frames.length;
 		const grew = playable.length > before || (nowComplete && !complete);
 		complete = nowComplete;
+		if (grew) {
+			controls?.setLoaded(playable.length, seekLength());
+			if (started) controls?.setFrame(frameIndex, seekLength());
+		}
 		if (!started) {
 			// 壊れたコマがあって UGOIRA_START_FRAMES に届かなくても、揃ったら残りで始める
 			if (playable.length > 0 && (playable.length >= UGOIRA_START_FRAMES || complete)) startPlayback();
@@ -479,31 +542,30 @@ export function createUgoiraPlayer(deps) {
 			canvas.setAttribute('aria-label', detail.title);
 			canvas.hidden = true;
 
-			const button = doc.createElement('button');
-			toggle = button;
-			button.type = 'button';
-			button.className = 'ugoira-toggle';
-			/**
-			 * ボタンの見た目を再生状態に合わせる。ボタンは「押すと何になるか」を示す。
-			 * @param {boolean} isPlaying 再生中か
-			 * @returns {void}
-			 */
-			const setToggle = (isPlaying) => {
-				const next = isPlaying ? TOGGLE.PLAYING : TOGGLE.PAUSED;
-				const label = strings.ugoira[next.labelKey];
-				button.setAttribute('aria-label', label);
-				button.title = label;
-				button.replaceChildren(createIcon(doc, next.icon));
-			};
-			setToggle(true);
-			button.hidden = true;
-			button.addEventListener('click', () => {
-				if (playing) pause();
-				else play();
-				setToggle(playing);
+			// 再生が始まるまでは隠す。静止画の間に押せる操作は無い
+			controls = createUgoiraControls({
+				doc,
+				strings,
+				rate,
+				onToggle: () => {
+					if (playing) pause();
+					else play();
+				},
+				onSeekStart: () => {
+					// つかんでいる間は止める。動かすとつまみが指の下から逃げる
+					resumeAfterSeek = playing;
+					if (playing) pause();
+				},
+				onSeek: seekTo,
+				onSeekEnd: () => {
+					if (resumeAfterSeek) play();
+					resumeAfterSeek = false;
+				},
+				onRate: setRate,
 			});
+			controls.element.hidden = true;
 
-			wrapper.append(poster, canvas, button);
+			wrapper.append(poster, canvas, controls.element);
 			container.appendChild(wrapper);
 
 			try {
@@ -516,6 +578,7 @@ export function createUgoiraPlayer(deps) {
 				const metaFrames = Array.isArray(meta.frames) ? meta.frames : [];
 				// 並び順は meta が持つので、zip の並びには頼らない
 				frames = new Array(metaFrames.length).fill(undefined);
+				totalFrames = metaFrames.length;
 				claimed = new Array(metaFrames.length).fill(false);
 				indexByName = new Map(metaFrames.map((frame, at) => [frame.file, at]));
 				mimeType = meta.mime_type ?? DEFAULT_FRAME_MIME;
@@ -550,6 +613,15 @@ export function createUgoiraPlayer(deps) {
 		},
 
 		/**
+		 * キーを食い止める。速度のメニューを開いているときだけ。(Escape で閉じる・上下で項目を移る)
+		 * @param {KeyboardEvent} event キー
+		 * @returns {boolean} 食い止めたなら true
+		 */
+		consumeKey(event) {
+			return controls?.consumeKey(event) === true;
+		},
+
+		/**
 		 * 資源を解放する。Blob URL を revoke しないとメモリが残る。
 		 * @returns {void}
 		 */
@@ -570,7 +642,8 @@ export function createUgoiraPlayer(deps) {
 			canvas = null;
 			context = null;
 			poster = null;
-			toggle = null;
+			controls?.dispose();
+			controls = null;
 			// 読み込み中の Image を待っている render を終わらせる
 			notifyIdle();
 		},

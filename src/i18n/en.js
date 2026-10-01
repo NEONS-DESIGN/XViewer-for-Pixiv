@@ -158,6 +158,23 @@ export default {
 		PAUSE: 'Pause',
 		PLAY: 'Play',
 		PLAY_FAILED: 'Could not play this ugoira',
+		CONTROLS: 'Playback controls',
+		SEEK: 'Playback position',
+		RATE: 'Playback speed',
+		NORMAL: 'Normal',
+		/**
+		 * 再生速度の倍率の見出し。
+		 * @param {number} value 倍率
+		 * @returns {string} 見出し
+		 */
+		rate: (value) => `${value}×`,
+		/**
+		 * シークバーの読み上げ。今が何コマ目か。
+		 * @param {number} current 今のコマ (1 始まり)
+		 * @param {number} total 全体のコマ数
+		 * @returns {string} 読み上げの文言
+		 */
+		frame: (current, total) => `Frame ${current} of ${total}`,
 	},
 	blocked: {
 		LOGIN_REQUIRED: 'Log in to pixiv to view this artwork',
@@ -192,10 +209,17 @@ export default {
 	},
 	popup: {
 		TABS_LABEL: 'Switch what is shown',
+		/**
+		 * 既定の選択肢の見出しに印を付ける。
+		 * @param {string} label 選択肢の見出し
+		 * @returns {string} 印を付けた見出し
+		 */
+		withDefault: (label) => `${label} (default)`,
 		SAVE_FAILED: 'Could not save. Check your browser’s settings sync.',
 		RESET_FAILED: 'Could not reset. Check your browser’s settings sync.',
 		tabs: {
 			settings: 'Settings',
+			advanced: 'Advanced',
 			license: 'Licenses',
 		},
 		licenseHeadings: {
@@ -214,6 +238,7 @@ export default {
 			image: 'Images',
 			userPage: 'User pages',
 			controls: 'Controls',
+			comments: 'Comments',
 		},
 		fields: {
 			enabled: {
@@ -251,6 +276,13 @@ export default {
 			prefetch: {
 				label: 'Prefetch',
 				description: 'Loading upcoming images ahead of time makes switching faster.',
+				/**
+				 * 先読みの「カスタム」の選択肢。枚数は選択肢の下に出るレンジで選ぶ。
+				 * @param {number} min 選べる最小の枚数
+				 * @param {number} max 選べる最大の枚数
+				 * @returns {{label: string, description: string}} 選択肢の文言
+				 */
+				custom: (min, max) => ({ label: 'Custom', description: `Choose how many images to prefetch each way, from ${min} to ${max}.` }),
 				none: {
 					label: 'Off',
 					description: 'Loads on every switch. Uses less data.',
@@ -267,6 +299,73 @@ export default {
 						label: `${count} images each way`,
 						description: `Loads ${count} images ahead. Smoother when browsing continuously.`,
 					}),
+			},
+			prefetchCustom: {
+				label: 'Images to prefetch',
+			},
+			sidebarWidth: {
+				label: 'Sidebar width',
+				description: 'Width of the sidebar shown on the right when the window is wide.',
+				/**
+				 * 選択肢の見出し。値から作る。
+				 * @param {number} value 選択肢の値
+				 * @returns {string} 見出し
+				 */
+				option: (value) => `${value}px`,
+			},
+			sidebarDrawerMax: {
+				label: 'Pulled-out sidebar width',
+				description: 'Maximum width, relative to the window, of the sidebar you pull out when the window is narrow (900px wide or less).',
+				/**
+				 * 選択肢の見出し。値から作る。
+				 * @param {number} value 選択肢の値
+				 * @returns {string} 見出し
+				 */
+				option: (value) => `${value}%`,
+			},
+			backdropOpacity: {
+				label: 'Background darkness',
+				description: 'How dark the black layer behind the image is. Lower values let the page behind show through.',
+				theme: {
+					label: 'Match the theme',
+					description: '92% in dark mode, 88% in light mode.',
+				},
+				/**
+				 * 選択肢の見出し。値から作る。
+				 * @param {number} value 選択肢の値
+				 * @returns {string} 見出し
+				 */
+				option: (value) => `${value}%`,
+			},
+			navZoneSize: {
+				label: 'Edge click area size',
+				description: 'Width (left and right) and height (top and bottom) of the edges used for edge-click navigation, relative to the image area.',
+				/**
+				 * 選択肢の見出し。値から作る。
+				 * @param {number} value 選択肢の値
+				 * @returns {string} 見出し
+				 */
+				option: (value) => `${value}%`,
+			},
+			zoomZoneSize: {
+				label: 'Actual-size click area width',
+				description: 'Width of the left and right edges you click to turn pages in actual-size view.',
+				/**
+				 * 選択肢の見出し。値から作る。
+				 * @param {number} value 選択肢の値
+				 * @returns {string} 見出し
+				 */
+				option: (value) => `${value}%`,
+			},
+			commentPageSize: {
+				label: 'Comments loaded at once',
+				description: 'Number of comments loaded when a work opens and when you press "Show more". Applies from the next work you open.',
+				/**
+				 * 選択肢の見出し。値から作る。
+				 * @param {number} value 選択肢の値
+				 * @returns {string} 見出し
+				 */
+				option: (value) => `${value} comments`,
 			},
 			prefetchNeighbor: {
 				label: 'Also preload the adjacent work',
@@ -309,11 +408,11 @@ export default {
 				},
 				horizontal: {
 					label: 'Left/right: pages',
-					description: 'Click the left or right edge (25% wide) to go to the previous or next page. Works on top of the image too.',
+					description: 'Click the left or right edge to go to the previous or next page. Works on top of the image too.',
 				},
 				vertical: {
 					label: 'Top/bottom: works',
-					description: 'Click the top or bottom edge (25% high) to go to the previous or next work. Turn pages with the arrow buttons.',
+					description: 'Click the top or bottom edge to go to the previous or next work. Turn pages with the arrow buttons.',
 				},
 				both: {
 					label: 'Left/right: pages, top/bottom: works',

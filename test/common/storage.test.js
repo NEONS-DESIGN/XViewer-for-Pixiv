@@ -1,10 +1,28 @@
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeSettings, loadSettings, saveSetting, resetSettings, watchSettings } from '../../src/common/storage.js';
+import { normalizeSettings, loadSettings, saveSetting, resetSettings, watchSettings, prefetchCount } from '../../src/common/storage.js';
 import { LOG_PREFIX } from '../../src/common/log.js';
 import { fakeArea } from '../helpers/storage.js';
 import { flush } from '../helpers/dom.js';
-import { SETTINGS_DEFAULTS, GRID_TAB_SKIP, POPUP_THEMES, SIDEBAR_SCROLL, INFINITE_SCROLL, PREFETCH_CHOICES, IMAGE_QUALITY, NAV_ZONES } from '../../src/common/constants.js';
+import {
+	SETTINGS_DEFAULTS,
+	GRID_TAB_SKIP,
+	POPUP_THEMES,
+	SIDEBAR_SCROLL,
+	INFINITE_SCROLL,
+	PREFETCH_CHOICES,
+	PREFETCH_CUSTOM,
+	PREFETCH_CUSTOM_RANGE,
+	IMAGE_QUALITY,
+	NAV_ZONES,
+	NAV_ZONE_SIZE_CHOICES,
+	ZOOM_ZONE_SIZE_CHOICES,
+	SIDEBAR_WIDTH_CHOICES,
+	SIDEBAR_DRAWER_MAX_CHOICES,
+	BACKDROP_OPACITY_CHOICES,
+	BACKDROP_OPACITY_THEME,
+	COMMENT_PAGE_SIZE_CHOICES,
+} from '../../src/common/constants.js';
 
 test('normalizeSettings は空の入力を既定へ倒す', () => {
 	assert.deepEqual(normalizeSettings({}), SETTINGS_DEFAULTS);
@@ -23,6 +41,56 @@ test('既定値は「初めて入れた人がそのまま使える」側に寄�
 	assert.ok(PREFETCH_CHOICES.includes(SETTINGS_DEFAULTS.prefetch), '既定が選択肢に無い');
 });
 
+test('normalizeSettings は先読みの「カスタム」を通し、枚数は範囲内の整数だけ通す', () => {
+	assert.equal(normalizeSettings({ prefetch: PREFETCH_CUSTOM }).prefetch, PREFETCH_CUSTOM);
+	assert.equal(normalizeSettings({ prefetch: 'other' }).prefetch, SETTINGS_DEFAULTS.prefetch);
+	const { min, max } = PREFETCH_CUSTOM_RANGE;
+	assert.equal(normalizeSettings({ prefetchCustom: min }).prefetchCustom, min);
+	assert.equal(normalizeSettings({ prefetchCustom: max }).prefetchCustom, max);
+	// 範囲の外・小数・文字列は端へ寄せず既定へ倒す (壊れた値を最大として扱わない)
+	for (const broken of [min - 1, max + 1, 2.5, '5', null]) {
+		assert.equal(normalizeSettings({ prefetchCustom: broken }).prefetchCustom, SETTINGS_DEFAULTS.prefetchCustom, String(broken));
+	}
+});
+
+test('カスタムの先読みの既定の枚数は範囲の中にある', () => {
+	const { min, max } = PREFETCH_CUSTOM_RANGE;
+	assert.ok(SETTINGS_DEFAULTS.prefetchCustom >= min && SETTINGS_DEFAULTS.prefetchCustom <= max);
+});
+
+test('prefetchCount はカスタムのときだけ prefetchCustom の枚数を返す', () => {
+	assert.equal(prefetchCount({ prefetch: 3, prefetchCustom: 7 }), 3);
+	assert.equal(prefetchCount({ prefetch: 0, prefetchCustom: 7 }), 0);
+	assert.equal(prefetchCount({ prefetch: PREFETCH_CUSTOM, prefetchCustom: 7 }), 7);
+});
+
+test('数値の段階の設定は選択肢の値だけ通し、既定は選択肢に含まれる', () => {
+	const table = {
+		sidebarWidth: SIDEBAR_WIDTH_CHOICES,
+		sidebarDrawerMax: SIDEBAR_DRAWER_MAX_CHOICES,
+		backdropOpacity: BACKDROP_OPACITY_CHOICES,
+		commentPageSize: COMMENT_PAGE_SIZE_CHOICES,
+		navZoneSize: NAV_ZONE_SIZE_CHOICES,
+		zoomZoneSize: ZOOM_ZONE_SIZE_CHOICES,
+	};
+	for (const [key, choices] of Object.entries(table)) {
+		assert.ok(choices.includes(SETTINGS_DEFAULTS[key]), `${key} の既定が選択肢に無い`);
+		for (const value of choices) assert.equal(normalizeSettings({ [key]: value })[key], value, key);
+		// 文字列の数字も選択肢に無い値も既定へ倒す
+		for (const broken of [String(choices[0]), 9999, null]) {
+			assert.equal(normalizeSettings({ [key]: broken })[key], SETTINGS_DEFAULTS[key], `${key}: ${broken}`);
+		}
+	}
+});
+
+test('クリック領域の大きさは左右 (上下) が重ならない 50% 未満に留める', () => {
+	for (const value of [...NAV_ZONE_SIZE_CHOICES, ...ZOOM_ZONE_SIZE_CHOICES]) assert.ok(value > 0 && value < 50, String(value));
+});
+
+test('幕の濃さの既定はテーマに合わせる (上書きしない)', () => {
+	assert.equal(SETTINGS_DEFAULTS.backdropOpacity, BACKDROP_OPACITY_THEME);
+});
+
 test('normalizeSettings は画面端のクリック領域を選択肢の値だけ通す', () => {
 	for (const mode of Object.values(NAV_ZONES)) {
 		assert.equal(normalizeSettings({ navZones: mode }).navZones, mode);
@@ -35,13 +103,20 @@ test('normalizeSettings は正しい値をそのまま通す', () => {
 	const input = {
 		enabled: false,
 		imageQuality: IMAGE_QUALITY.ORIGINAL,
-		prefetch: 1,
+		prefetch: PREFETCH_CUSTOM,
+		prefetchCustom: 7,
 		prefetchNeighbor: true,
 		showSidebar: false,
 		sidebarScroll: SIDEBAR_SCROLL.WHOLE,
+		sidebarWidth: 512,
+		sidebarDrawerMax: 80,
+		backdropOpacity: 70,
+		commentPageSize: 50,
 		closeOnBackdrop: false,
 		navZones: NAV_ZONES.BOTH,
+		navZoneSize: 40,
 		clickZoom: true,
+		zoomZoneSize: 15,
 		gridTabSkip: GRID_TAB_SKIP.TITLE,
 		hidePickup: true,
 		infiniteScroll: INFINITE_SCROLL.ON_REACH,

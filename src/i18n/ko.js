@@ -190,6 +190,23 @@ export default {
 		PAUSE: '일시 정지',
 		PLAY: '재생',
 		PLAY_FAILED: '움짤을 재생하지 못했습니다',
+		CONTROLS: '재생 조작',
+		SEEK: '재생 위치',
+		RATE: '재생 속도',
+		NORMAL: '표준',
+		/**
+		 * 再生速度の倍率の見出し。
+		 * @param {number} value 倍率
+		 * @returns {string} 見出し
+		 */
+		rate: (value) => `${value}×`,
+		/**
+		 * シークバーの読み上げ。今が何コマ目か。
+		 * @param {number} current 今のコマ (1 始まり)
+		 * @param {number} total 全体のコマ数
+		 * @returns {string} 読み上げの文言
+		 */
+		frame: (current, total) => `${total}프레임 중 ${current}번째`,
 	},
 	blocked: {
 		LOGIN_REQUIRED: '이 작품을 보려면 pixiv에 로그인해 주세요',
@@ -224,10 +241,17 @@ export default {
 	},
 	popup: {
 		TABS_LABEL: '표시할 내용 전환',
+		/**
+		 * 既定の選択肢の見出しに印を付ける。
+		 * @param {string} label 選択肢の見出し
+		 * @returns {string} 印を付けた見出し
+		 */
+		withDefault: (label) => `${label} (기본값)`,
 		SAVE_FAILED: '저장하지 못했습니다. 브라우저의 설정 동기화를 확인해 주세요.',
 		RESET_FAILED: '초기화하지 못했습니다. 브라우저의 설정 동기화를 확인해 주세요.',
 		tabs: {
 			settings: '설정',
+			advanced: '상세 설정',
 			license: '라이선스',
 		},
 		licenseHeadings: {
@@ -246,6 +270,7 @@ export default {
 			image: '이미지',
 			userPage: '유저 페이지',
 			controls: '조작',
+			comments: '댓글',
 		},
 		fields: {
 			enabled: {
@@ -283,6 +308,13 @@ export default {
 			prefetch: {
 				label: '미리 불러오기',
 				description: '다음에 볼 이미지를 미리 불러와 두면 전환이 빨라집니다.',
+				/**
+				 * 先読みの「カスタム」の選択肢。枚数は選択肢の下に出るレンジで選ぶ。
+				 * @param {number} min 選べる最小の枚数
+				 * @param {number} max 選べる最大の枚数
+				 * @returns {{label: string, description: string}} 選択肢の文言
+				 */
+				custom: (min, max) => ({ label: '사용자 지정', description: `앞뒤로 미리 불러올 장수를 ${min}~${max}장 중에서 고릅니다.` }),
 				none: {
 					label: '사용 안 함',
 					description: '전환할 때마다 불러옵니다. 데이터 사용량을 줄일 수 있습니다.',
@@ -299,6 +331,73 @@ export default {
 						label: `앞뒤 ${count}장`,
 						description: `앞뒤로 ${count}장까지 미리 불러옵니다. 연달아 볼 때 매끄럽습니다.`,
 					}),
+			},
+			prefetchCustom: {
+				label: '미리 불러올 장수',
+			},
+			sidebarWidth: {
+				label: '사이드바 너비',
+				description: '화면이 넓을 때 오른쪽에 표시되는 사이드바의 너비입니다.',
+				/**
+				 * 選択肢の見出し。値から作る。
+				 * @param {number} value 選択肢の値
+				 * @returns {string} 見出し
+				 */
+				option: (value) => `${value}px`,
+			},
+			sidebarDrawerMax: {
+				label: '꺼낸 사이드바 너비',
+				description: '화면이 좁을 때 (너비 900px 이하) 꺼낸 사이드바의, 화면 너비에 대한 상한입니다.',
+				/**
+				 * 選択肢の見出し。値から作る。
+				 * @param {number} value 選択肢の値
+				 * @returns {string} 見出し
+				 */
+				option: (value) => `${value}%`,
+			},
+			backdropOpacity: {
+				label: '배경 농도',
+				description: '이미지 뒤에 까는 검은 막의 농도입니다. 낮추면 뒤의 페이지가 비쳐 보입니다.',
+				theme: {
+					label: '테마에 맞추기',
+					description: '다크에서는 92%, 라이트에서는 88%로 합니다.',
+				},
+				/**
+				 * 選択肢の見出し。値から作る。
+				 * @param {number} value 選択肢の値
+				 * @returns {string} 見出し
+				 */
+				option: (value) => `${value}%`,
+			},
+			navZoneSize: {
+				label: '화면 가장자리 클릭 영역 크기',
+				description: '화면 가장자리 클릭으로 넘길 때 쓰는 가장자리의 너비 (좌우) 와 높이 (상하) 입니다. 이미지를 표시하는 부분에 대한 비율입니다.',
+				/**
+				 * 選択肢の見出し。値から作る。
+				 * @param {number} value 選択肢の値
+				 * @returns {string} 見出し
+				 */
+				option: (value) => `${value}%`,
+			},
+			zoomZoneSize: {
+				label: '원본 크기 보기의 클릭 영역 너비',
+				description: '원본 크기 보기 화면에서 좌우 가장자리를 눌러 페이지를 넘기는 범위의 너비입니다.',
+				/**
+				 * 選択肢の見出し。値から作る。
+				 * @param {number} value 選択肢の値
+				 * @returns {string} 見出し
+				 */
+				option: (value) => `${value}%`,
+			},
+			commentPageSize: {
+				label: '한 번에 불러올 댓글 수',
+				description: '열었을 때와 「더보기」를 눌렀을 때 불러오는 개수입니다. 다음에 여는 작품부터 바뀝니다.',
+				/**
+				 * 選択肢の見出し。値から作る。
+				 * @param {number} value 選択肢の値
+				 * @returns {string} 見出し
+				 */
+				option: (value) => `${value}개`,
 			},
 			prefetchNeighbor: {
 				label: '앞뒤 작품도 미리 불러오기',
@@ -341,11 +440,11 @@ export default {
 				},
 				horizontal: {
 					label: '좌우로 페이지 넘기기',
-					description: '좌우 가장자리 (너비 25%)를 누르면 이전·다음 페이지로 넘깁니다. 이미지 위에서도 작동합니다.',
+					description: '좌우 가장자리를 누르면 이전·다음 페이지로 넘깁니다. 이미지 위에서도 작동합니다.',
 				},
 				vertical: {
 					label: '상하로 작품 넘기기',
-					description: '상하 가장자리 (높이 25%)를 누르면 이전·다음 작품으로 이동합니다. 페이지는 화살표 버튼으로 넘깁니다.',
+					description: '상하 가장자리를 누르면 이전·다음 작품으로 이동합니다. 페이지는 화살표 버튼으로 넘깁니다.',
 				},
 				both: {
 					label: '좌우는 페이지, 상하는 작품',

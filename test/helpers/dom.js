@@ -230,7 +230,13 @@ export function fakeElement(tag) {
 		attributes,
 		dataset: createDataset(attributes),
 		listeners: {},
-		style: {},
+		// CSS 変数の読み書き (setProperty / removeProperty) だけを真似る。値は values に溜める
+		style: {
+			values: {},
+			setProperty(name, value) { this.values[name] = value; },
+			removeProperty(name) { delete this.values[name]; },
+			getPropertyValue(name) { return this.values[name] ?? ''; },
+		},
 		innerHTML: '',
 		className: '',
 		src: '',

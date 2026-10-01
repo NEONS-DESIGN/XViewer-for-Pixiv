@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { register } from 'node:module';
 import { clearSessionCache } from '../../../src/content/session.js';
-import { KEYS, LOADING_STATUS_DELAY_MS } from '../../../src/common/constants.js';
+import { KEYS, LOADING_STATUS_DELAY_MS, BACKDROP_OPACITY_THEME } from '../../../src/common/constants.js';
 import { createStrings } from '../../../src/i18n/index.js';
 import { PixivError, PIXIV_ERROR_KINDS } from '../../../src/pixiv/errors.js';
 import { fakeElement, fakeDoc as fakeDocBase, find, findAll, flush, iconName } from '../../helpers/dom.js';
@@ -17,7 +17,7 @@ export async function load(url, context, next) {
 	return next(url, context);
 }
 `)}`);
-const { createViewer, isTextEntry } = await import('../../../src/content/viewer/viewer.js');
+const { createViewer, isTextEntry, isRangeInput } = await import('../../../src/content/viewer/viewer.js');
 
 /** 実際の CDN と同じ形の URL。safeCdnUrl の関門を通す必要がある。 */
 const REGULAR_URL = 'https://i.pximg.net/img-master/img/2026/09/10/00/00/00/x_p0_master1200.jpg';
@@ -563,6 +563,21 @@ test('描画に効く設定が変わったら通信せずに描き直す', async
 	assert.equal(findAll(stage(), '.frame').length, 1);
 });
 
+test('見た目の数値の設定はホストの CSS 変数へ写し、既定に当たる値は上書きを外す', async () => {
+	const { viewer, doc } = setup({ settings: settings({ sidebarWidth: 512, sidebarDrawerMax: 70, backdropOpacity: 70, zoomZoneSize: 40 }) });
+	await viewer.open('1');
+	const style = doc.body.children[0].style;
+	assert.equal(style.getPropertyValue('--sidebar-width'), '512px');
+	assert.equal(style.getPropertyValue('--backdrop-alpha'), '0.7');
+	assert.equal(style.getPropertyValue('--zoom-zone-width'), '40%');
+	assert.equal(style.getPropertyValue('--sidebar-drawer-max'), '70%');
+	// テーマに合わせる (0) へ戻したら上書きを外し、テーマごとの既定に任せる。描き直しは要らない
+	viewer.setSettings(settings({ sidebarWidth: 384, backdropOpacity: BACKDROP_OPACITY_THEME }));
+	assert.equal(style.getPropertyValue('--sidebar-width'), '384px');
+	assert.equal(style.getPropertyValue('--backdrop-alpha'), '');
+	viewer.dispose();
+});
+
 test('描画に効かない設定の変更では描き直さない', async () => {
 	const { viewer, stage } = setup();
 	await viewer.open('1');
@@ -630,6 +645,8 @@ test('入力欄の中のキーはビュワーの割り当てに使わない', ()
 	assert.equal(isTextEntry({ composedPath: () => [{ tagName: 'INPUT' }] }), true);
 	assert.equal(isTextEntry({ composedPath: () => [{ tagName: 'BUTTON' }] }), false);
 	assert.equal(isTextEntry({ composedPath: () => [] }), false);
+	// うごイラのシークバー (レンジ) も入力欄として扱う。左右キーで 1 コマずつ動かすため
+	assert.equal(isTextEntry({ composedPath: () => [{ tagName: 'INPUT', type: 'range' }] }), true);
 	assert.equal(isTextEntry({}), false);
 });
 
@@ -1224,4 +1241,12 @@ test('引き出したままサイドバーの設定を切ると引き出した�
 	viewer.setSettings(settings({ showSidebar: true }));
 	await flush();
 	assert.equal(drawerOpen(shadow()), true);
+});
+
+test('isRangeInput はレンジ (シークバー) の上で押されたキーだけを見分ける', () => {
+	// レンジの上でも上下キーは作品の移動へ回す。見分けられないとシークバーを触った後に作品を送れない
+	assert.equal(isRangeInput({ composedPath: () => [{ tagName: 'INPUT', type: 'range' }] }), true);
+	assert.equal(isRangeInput({ composedPath: () => [{ tagName: 'INPUT', type: 'text' }] }), false);
+	assert.equal(isRangeInput({ composedPath: () => [{ tagName: 'TEXTAREA' }] }), false);
+	assert.equal(isRangeInput({ composedPath: () => [] }), false);
 });

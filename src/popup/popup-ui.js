@@ -12,10 +12,13 @@ import { renderConfirmRow } from '../common/confirm-row.js';
 import { POPUP_THEMES, THEME_TOGGLE, SETTINGS_DEFAULTS } from '../common/constants.js';
 import { createDescription } from './description.js';
 import { renderLicensePanel, renderBriefDisclaimer } from './license-panel.js';
-import { TITLE, createTabs, createResetField, createSections } from './sections.js';
+import { TITLE, createTabs, createResetField, createSections, createAdvancedSections } from './sections.js';
 
 /** OS の配色を尋ねるメディアクエリ。 */
 const LIGHT_QUERY = '(prefers-color-scheme: light)';
+
+/** 数値として保存してよい select の値。(「カスタム」のような文字列の選択肢は文字列のまま残す) */
+const NUMERIC_VALUE_PATTERN = /^-?\d+(?:\.\d+)?$/;
 
 /**
  * 保存値と OS の設定から、実際に描く配色を決める。
@@ -158,13 +161,89 @@ function createChoiceOption(doc, option, rich) {
 	const label = doc.createElement('span');
 	label.dataset.role = 'option-label';
 	label.textContent = option.label;
+	element.append(label);
 
-	const hint = doc.createElement('small');
-	hint.dataset.role = 'option-hint';
-	hint.textContent = option.description;
-
-	element.append(label, hint);
+	// 説明を持たない選択肢 (数値の段階など) は見出しだけにする。空の行を残さない
+	if (option.description) {
+		const hint = doc.createElement('small');
+		hint.dataset.role = 'option-hint';
+		hint.textContent = option.description;
+		element.append(hint);
+	}
 	return element;
+}
+
+/**
+ * レンジ (スライダー) の項目を組み立てる。今の値は見出しの右に format で読んで出す。
+ * 動かしている間は表示だけを追従させ、保存は離したとき (change) に 1 回だけ行う。
+ * (input のたびに書くと sync 領域の書き込み回数の上限に当たる)
+ * @param {Document} doc 対象のドキュメント
+ * @param {object} field 項目の定義 (kind: 'range')
+ * @param {object} settings 現在の設定
+ * @param {(patch: object) => void} onChange 変更時の処理
+ * @returns {HTMLElement} 項目
+ */
+function renderRange(doc, field, settings, onChange) {
+	const wrapper = doc.createElement('div');
+	wrapper.className = 'field range';
+	// 出し入れする単位。親の選択肢から hidden を付け外しする
+	wrapper.dataset.role = `${field.key}-field`;
+
+	const head = doc.createElement('div');
+	head.className = 'range-head';
+
+	const labelId = `${field.key}-label`;
+	const label = doc.createElement('span');
+	label.className = 'label';
+	label.setAttribute('id', labelId);
+	label.textContent = field.label;
+
+	const output = doc.createElement('output');
+	output.className = 'range-value';
+	output.dataset.role = `${field.key}-value`;
+
+	const input = doc.createElement('input');
+	input.type = 'range';
+	input.min = String(field.min);
+	input.max = String(field.max);
+	input.step = String(field.step);
+	input.dataset.role = field.key;
+	const inputId = `${field.key}-input`;
+	input.setAttribute('id', inputId);
+	input.setAttribute('aria-labelledby', labelId);
+	const saved = settings[field.key];
+	input.value = String(Number.isFinite(saved) ? saved : SETTINGS_DEFAULTS[field.key]);
+	// 今の値がどの入力の結果かを結び付ける
+	output.setAttribute('for', inputId);
+
+	/**
+	 * 今の値の読みを見出しの右と読み上げへ写す。
+	 * @returns {void}
+	 */
+	function showValue() {
+		const text = field.format(Number(input.value));
+		output.textContent = text;
+		// 読み上げは数字だけでなく単位まで読ませる
+		input.setAttribute('aria-valuetext', text);
+	}
+
+	input.addEventListener('input', showValue);
+	input.addEventListener('change', () => onChange({ [field.key]: Number(input.value) }));
+	showValue();
+
+	// 端の値を両脇に添え、選べる範囲を見せる
+	const scale = doc.createElement('div');
+	scale.className = 'range-scale';
+	scale.setAttribute('aria-hidden', 'true');
+	const low = doc.createElement('span');
+	low.textContent = String(field.min);
+	const high = doc.createElement('span');
+	high.textContent = String(field.max);
+	scale.append(low, high);
+
+	head.append(label, output);
+	wrapper.append(head, input, scale);
+	return wrapper;
 }
 
 /**
@@ -180,8 +259,10 @@ function renderChoice(doc, field, settings, onChange, rich) {
 	const values = field.options.map((option) => option.value);
 	const saved = String(settings[field.key]);
 	const current = values.includes(saved) ? saved : String(SETTINGS_DEFAULTS[field.key]);
-	// select の値は常に文字列。保存の型は既定値の型から導く
+	// select の値は常に文字列。保存の型は既定値の型から導く。
+	// 数値の項目でも、数字でない選択肢 (カスタム) は文字列のまま保存する
 	const numeric = typeof SETTINGS_DEFAULTS[field.key] === 'number';
+	const toSaved = (value) => (numeric && NUMERIC_VALUE_PATTERN.test(value) ? Number(value) : value);
 
 	const wrapper = doc.createElement('div');
 	wrapper.className = 'field choice';
@@ -212,8 +293,22 @@ function renderChoice(doc, field, settings, onChange, rich) {
 
 	// 非対応環境では、選んでいる選択肢の説明を select の下に出し、選び直しに追従させる。
 	// 対応環境では選択肢の中に説明があるので、外には出さない。(出すと同じ文が二度出る)
+	// 説明を持つ選択肢が 1 つも無い項目 (数値の段階) では出さない
 	const hintId = `${field.key}-hint`;
-	const hint = rich ? null : createDescription(doc, '', hintId);
+	const hasHints = field.options.some((option) => option.description);
+	const hint = rich || !hasHints ? null : createDescription(doc, '', hintId);
+
+	// 特定の値を選んだときだけ下に出す項目 (先読みのカスタムの枚数など)
+	const reveal = field.reveal ? renderRange(doc, field.reveal.field, settings, onChange) : null;
+
+	/**
+	 * 選んでいる値に合わせて、下に出す項目を出し入れする。
+	 * @param {string} value 選ばれている値
+	 * @returns {void}
+	 */
+	function showReveal(value) {
+		if (reveal) reveal.hidden = value !== field.reveal.when;
+	}
 
 	/**
 	 * 選んでいる項目の説明を出す。
@@ -226,8 +321,9 @@ function renderChoice(doc, field, settings, onChange, rich) {
 	}
 
 	select.addEventListener('change', () => {
-		onChange({ [field.key]: numeric ? Number(select.value) : select.value });
+		onChange({ [field.key]: toSaved(select.value) });
 		showHint(select.value);
+		showReveal(select.value);
 	});
 
 	wrapper.append(title, lead, select);
@@ -238,25 +334,27 @@ function renderChoice(doc, field, settings, onChange, rich) {
 	} else {
 		select.setAttribute('aria-describedby', descriptionId(field.key));
 	}
+	if (reveal) {
+		showReveal(current);
+		wrapper.append(reveal);
+	}
 	return wrapper;
 }
 
 /**
- * 設定タブの中身を組み立てる。
+ * 定義表の見出しごとに項目を並べ、パネルへ足す。
  * @param {Document} doc 対象のドキュメント
+ * @param {HTMLElement} panel 足し先
+ * @param {readonly object[]} sections 見出しごとの項目 (createSections / createAdvancedSections の戻り値)
  * @param {object} settings 現在の設定 (正規化済み)
  * @param {(patch: object) => void} onChange 設定を変えたときの処理
- * @param {() => void} onReset 初期化を確定したときの処理
- * @param {object} strings 文言のカタログ
- * @returns {HTMLElement} パネル
+ * @returns {void}
  */
-function renderSettingsPanel(doc, settings, onChange, onReset, strings) {
-	const panel = doc.createElement('div');
-	panel.className = 'panel settings';
+function appendSections(doc, panel, sections, settings, onChange) {
 	// 判定の結果は環境で決まり項目ごとに変わらないので 1 回だけ尋ねる
 	const rich = supportsRichOptions(doc.defaultView);
 
-	for (const { heading, fields } of createSections(strings)) {
+	for (const { heading, fields } of sections) {
 		const section = doc.createElement('section');
 		section.className = 'section';
 
@@ -271,11 +369,41 @@ function renderSettingsPanel(doc, settings, onChange, onReset, strings) {
 		}
 		panel.append(section);
 	}
+}
+
+/**
+ * 設定タブの中身を組み立てる。
+ * @param {Document} doc 対象のドキュメント
+ * @param {object} settings 現在の設定 (正規化済み)
+ * @param {(patch: object) => void} onChange 設定を変えたときの処理
+ * @param {() => void} onReset 初期化を確定したときの処理
+ * @param {object} strings 文言のカタログ
+ * @returns {HTMLElement} パネル
+ */
+function renderSettingsPanel(doc, settings, onChange, onReset, strings) {
+	const panel = doc.createElement('div');
+	panel.className = 'panel settings';
+	appendSections(doc, panel, createSections(strings), settings, onChange);
 
 	const reset = renderConfirmRow(doc, createResetField(strings), onReset);
 	// 設定項目との区切り。置き場所に依る見た目なので、汎用の確認の行ではなくここで付ける
 	reset.classList.add('reset');
 	panel.append(reset, renderBriefDisclaimer(doc, strings));
+	return panel;
+}
+
+/**
+ * 詳細設定タブの中身を組み立てる。
+ * @param {Document} doc 対象のドキュメント
+ * @param {object} settings 現在の設定 (正規化済み)
+ * @param {(patch: object) => void} onChange 設定を変えたときの処理
+ * @param {object} strings 文言のカタログ
+ * @returns {HTMLElement} パネル
+ */
+function renderAdvancedPanel(doc, settings, onChange, strings) {
+	const panel = doc.createElement('div');
+	panel.className = 'panel advanced';
+	appendSections(doc, panel, createAdvancedSections(strings), settings, onChange);
 	return panel;
 }
 
@@ -311,6 +439,7 @@ export function renderPopup({ doc, root, settings, strings, onChange, onReset, n
 
 	const panels = {
 		settings: renderSettingsPanel(doc, settings, onChange, onReset, strings),
+		advanced: renderAdvancedPanel(doc, settings, onChange, strings),
 		license: renderLicensePanel(doc, strings),
 	};
 	const entries = createTabs(strings).map(({ id, label }) => ({ id, label, panel: panels[id] }));
