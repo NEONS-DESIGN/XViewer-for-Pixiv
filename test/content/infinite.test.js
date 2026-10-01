@@ -428,6 +428,17 @@ test('先読みモードは組み立ての直後に空き時間で 1 ページ�
 	assert.deepEqual(loaded, [2], '1 ページ目の次を先読みしていない');
 });
 
+test('空き時間が回る前に読み切っていたら先読みしない', async () => {
+	// 1 ページしか無い作者で、空き時間より先に sentinel が見えて読み切った場合
+	const idle = [];
+	const { loaded, observer } = setup({ mode: INFINITE_SCROLL.PREFETCH, pages: 1, deps: { runWhenIdle: (fn) => idle.push(fn) } });
+	await observer.trigger();
+	assert.equal(idle.length, 1);
+	idle[0]();
+	await tick();
+	assert.deepEqual(loaded, [], '読み切った後に先読みしている');
+});
+
 test('onReach では組み立ての直後に先読みしない', () => {
 	const idle = [];
 	setup({ mode: INFINITE_SCROLL.ON_REACH, deps: { runWhenIdle: (fn) => idle.push(fn) } });

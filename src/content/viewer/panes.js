@@ -21,6 +21,17 @@ export const MAIN_PANE = Object.freeze({
 	BLOCKED: 'blocked',
 });
 
+/**
+ * 主役のペインが作るときに読む設定。どれかが変わったら主役だけ作り直す。
+ * うごイラは zip の画質だけを読む。(関係の無い設定で作り直すと、再生が頭に戻って全コマを展開し直すことになる)
+ * ブロック表示は設定を読まない
+ */
+export const MAIN_PANE_SETTING_KEYS = Object.freeze({
+	[MAIN_PANE.IMAGE]: Object.freeze(['imageQuality', 'prefetch', 'prefetchCustom', 'clickZoom']),
+	[MAIN_PANE.UGOIRA]: Object.freeze(['imageQuality']),
+	[MAIN_PANE.BLOCKED]: Object.freeze([]),
+});
+
 /** @type {ReturnType<typeof createImagePane>|null} */
 let imagePane = null;
 /** @type {ReturnType<typeof createUgoiraPlayer>|null} */
@@ -77,11 +88,40 @@ export function planPanes(detail, session, settings) {
  * @property {typeof createImagePane} [createImagePane] 画像ペインの差し替え口。テストが組み立ての順番を記録するために使う
  * @property {typeof createUgoiraPlayer} [createUgoiraPlayer] うごイラペインの差し替え口。テストが組み立ての順番を記録するために使う
  * @property {typeof createSidebar} [createSidebar] サイドバーの差し替え口。テストが組み立ての順番を記録するために使う
- * @property {(workId: string) => Promise<object>|null} [takeUgoiraMeta] 先に取っておいた ugoira_meta を受け取る。一度渡したら空になる。無ければ null
  * @property {number} [startPage] 最初に出すページ (0 始まり)。複数枚の画像の作品だけに効く
  * @property {number} [ugoiraRate] うごイラを再生し始める速度 (倍率)。前の作品で選んだ速度を引き継ぐ
  * @property {(rate: number) => void} [onUgoiraRateChange] うごイラの再生速度が選ばれたら呼ぶ
  */
+
+/**
+ * 主役 (画像 / うごイラ) を作り、描き始める。待たずに Promise を返す。
+ * 同期部分 (1 枚目の src の代入、うごイラの poster) は返る前に走る。
+ * ペインはモジュール変数へ入れてから render() を呼ぶ。render() が失敗しても disposeAll() で片付けられる
+ * @param {PanePlan} plan 何を出すか (main は image か ugoira)
+ * @param {object} detail 正規化した作品詳細
+ * @param {object} settings 設定
+ * @param {RenderTargets} targets 描画先
+ * @returns {Promise<void>} 主役の描画の完了
+ */
+function startMain(plan, detail, settings, targets) {
+	const { doc, stage, strings } = targets;
+	if (plan.main === MAIN_PANE.UGOIRA) {
+		const makeUgoiraPlayer = targets.createUgoiraPlayer ?? createUgoiraPlayer;
+		ugoiraPane = makeUgoiraPlayer({
+			doc,
+			container: stage,
+			settings,
+			strings,
+			rate: targets.ugoiraRate,
+			onRateChange: targets.onUgoiraRateChange,
+		});
+		return ugoiraPane.render(detail);
+	}
+	// 原寸表示を開けるのは静止画だけ。うごイラ (canvas) と見られない作品には渡さない
+	const makeImagePane = targets.createImagePane ?? createImagePane;
+	imagePane = makeImagePane({ doc, container: stage, settings, zoom: targets.zoom, strings });
+	return imagePane.render(detail, { startPage: targets.startPage ?? 0 });
+}
 
 /**
  * 判断に従ってペインを組み立てる。
@@ -100,8 +140,6 @@ export function planPanes(detail, session, settings) {
  */
 export async function renderWork(detail, session, settings, targets) {
 	const { doc, stage, sidebar, strings } = targets;
-	const makeImagePane = targets.createImagePane ?? createImagePane;
-	const makeUgoiraPlayer = targets.createUgoiraPlayer ?? createUgoiraPlayer;
 	const makeSidebar = targets.createSidebar ?? createSidebar;
 	const plan = planPanes(detail, session, settings);
 
@@ -122,47 +160,33 @@ export async function renderWork(detail, session, settings, targets) {
 
 	// 主役の読み込みをまず始める。同期部分で 1 枚目の src を代入するところまでは
 	// サイドバーより先に走らせ、画面に絵が出るまでの体感を縮める
-	let mainDone;
-	if (plan.main === MAIN_PANE.UGOIRA) {
-		const preloadedMeta = targets.takeUgoiraMeta?.(detail.id) ?? null;
-		ugoiraPane = makeUgoiraPlayer({
-			doc,
-			container: stage,
-			settings,
-			strings,
-			preloadedMeta,
-			rate: targets.ugoiraRate,
-			onRateChange: targets.onUgoiraRateChange,
-		});
-		mainDone = ugoiraPane.render(detail);
-	} else {
-		// 原寸表示を開けるのは静止画だけ。うごイラ (canvas) と見られない作品には渡さない
-		imagePane = makeImagePane({ doc, container: stage, settings, zoom: targets.zoom, strings });
-		mainDone = imagePane.render(detail, { startPage: targets.startPage ?? 0 });
-	}
+	const mainDone = startMain(plan, detail, settings, targets);
 
 	// サイドバーの中身 (本文・コメント・アクション) は主役の取得を待たずに組み立てる。
 	// コメントとアクションはサイドバーの中に入るので (plan.comments / plan.actions は
 	// plan.sidebar を含意する)、この 1 ブロックで済ませる
 	if (plan.sidebar) {
-		sidebarPane = makeSidebar({ doc, container: sidebar, fetchUser: targets.fetchUser, strings });
-		sidebarPane.render(detail);
+		// 件数の書き換え先は、この作品のサイドバーに固定する。
+		// モジュール変数を呼ばれた時点で読むと、別の作品へ移った後の通知が新しいサイドバーへ届く
+		const ownSidebar = makeSidebar({ doc, container: sidebar, fetchUser: targets.fetchUser, strings });
+		sidebarPane = ownSidebar;
+		ownSidebar.render(detail);
 
 		if (plan.comments) {
 			// 「上部へ」はサイドバーそのものを先頭へ戻す。区画の中からは届かないので渡す。
 			// 投稿できたらサイドバーのコメント件数を手元で +1 する (再取得はしない)
 			commentsPane = createComments({
 				doc,
-				container: sidebarPane.commentsSlot(),
+				container: ownSidebar.commentsSlot(),
 				scrollTarget: sidebar,
 				strings,
 				pageSize: settings.commentPageSize,
-				onPosted: () => { sidebarPane.bumpCommentCount(1); },
+				onPosted: () => { ownSidebar.bumpCommentCount(1); },
 				// 削除は数え直した件数で置き換える。ルートを消すと返信も道連れになるので
 				// 手元で 1 を引くだけでは合わない。引けなかったときだけ 1 を引く
 				onDeleted: (count) => {
-					if (count === null) sidebarPane.bumpCommentCount(-1);
-					else sidebarPane.setCommentCount(count);
+					if (count === null) ownSidebar.bumpCommentCount(-1);
+					else ownSidebar.setCommentCount(count);
 				},
 			});
 			void commentsPane.load(detail);
@@ -173,8 +197,8 @@ export async function renderWork(detail, session, settings, targets) {
 			// fetchUser はサイドバーと同じ差し替え口。渡さないとテストでも /ajax/user を叩きに行く
 			actionsPane = createActionsBar({
 				doc,
-				container: sidebarPane.countsSlot(),
-				followContainer: sidebarPane.followSlot(),
+				container: ownSidebar.countsSlot(),
+				followContainer: ownSidebar.followSlot(),
 				fetchUser: targets.fetchUser,
 				strings,
 			});
@@ -242,4 +266,34 @@ export function movePage(direction) {
  */
 export function canMovePage(direction) {
 	return imagePane?.canMove(direction) === true;
+}
+
+/**
+ * 今の画像のページ番号。画像ペインが無ければ (うごイラ・ブロック表示・読み込み中) null。
+ * @returns {number|null} ページ番号 (0 始まり)
+ */
+export function currentPage() {
+	return imagePane ? imagePane.pageIndex() : null;
+}
+
+/**
+ * 設定が変わったときに、主役 (画像 / うごイラ) だけを作り直す。
+ * サイドバー・コメント・アクションは触らない。(取り直さず、読んでいた位置も保つ)
+ * 主役がその設定を読んでいなければ何もしない。
+ * @param {object} detail 正規化した作品詳細 (今描いているもの)
+ * @param {{isLoggedIn: boolean, self: object|null}} session セッション
+ * @param {object} settings 新しい設定
+ * @param {RenderTargets} targets 描画先。startPage に今のページを入れて渡す
+ * @param {string[]} changedKeys 変わった設定のキー
+ * @returns {{rebuilt: boolean, done: Promise<void>}} 作り直したかと、主役の描画の完了
+ */
+export function rerenderMain(detail, session, settings, targets, changedKeys) {
+	const plan = planPanes(detail, session, settings);
+	const keys = MAIN_PANE_SETTING_KEYS[plan.main];
+	if (!changedKeys.some((key) => keys.includes(key))) return { rebuilt: false, done: Promise.resolve() };
+	imagePane?.dispose();
+	imagePane = null;
+	ugoiraPane?.dispose();
+	ugoiraPane = null;
+	return { rebuilt: true, done: startMain(plan, detail, settings, targets) };
 }

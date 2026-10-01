@@ -6,10 +6,10 @@
  * 先頭の数コマが読めた時点で再生を始め、残りは届いた順に足していく。
  * フレームは ImageBitmap で持たず、Blob URL + Image にしてデコードはブラウザへ任せる。
  * (全フレームを ImageBitmap で持つとメモリを大きく食う)
- * Blob URL は閉じるときに必ず revoke する。
+ * Blob URL は Image が読み終えたら revoke する。読み込み中に閉じたら閉じるときに revoke する。
  */
-import { getJson } from '../../pixiv/client.js';
-import { ugoiraMetaUrl, safeCdnUrl } from '../../pixiv/endpoints.js';
+import { safeCdnUrl } from '../../pixiv/endpoints.js';
+import { fetchUgoiraMeta } from '../../pixiv/illust-assets.js';
 import { parseStoredZip, createStoredZipReader } from '../../pixiv/ugoira-zip.js';
 import { assignImageSrc } from '../../common/image-source.js';
 import { IMAGE_QUALITY, UGOIRA_START_FRAMES, UGOIRA_PLAYBACK_RATES, DEFAULT_UGOIRA_RATE } from '../../common/constants.js';
@@ -60,6 +60,22 @@ export function pickZipUrl(meta, quality) {
 }
 
 /**
+ * canvas の画素の寸法を決める。コマが静止画 (poster) より小さければ、静止画の幅まで縦横比を保って広げる。
+ * canvas の表示寸法は画素の寸法で決まるので、再生が始まった瞬間に絵が縮まないようにするため。
+ * 縦横比のずれがコマの縮小の丸め (コマの 1px 分) に収まるなら静止画の高さに揃える。(1px でも絵が動いて見える)
+ * コマのほうが大きい (原寸の zip) ときはコマの寸法のままにして解像度を落とさない。
+ * @param {{width: number, height: number}} frame 最初のコマの寸法
+ * @param {{width: number, height: number}|null} poster 読めている静止画の寸法。読めていなければ null
+ * @returns {{width: number, height: number}} canvas の width / height
+ */
+export function canvasSize(frame, poster) {
+	if (!poster || !(poster.width > frame.width)) return { width: frame.width, height: frame.height };
+	const scale = poster.width / frame.width;
+	const height = frame.height * scale;
+	return { width: poster.width, height: Math.abs(height - poster.height) <= scale ? poster.height : Math.round(height) };
+}
+
+/**
  * 今のフレームの開始時刻を進め、何コマ進めるかを決める。
  *
  * 開始時刻は「前のフレームの開始 + delay」で繰り越す。requestAnimationFrame の
@@ -101,8 +117,8 @@ export function advanceFrame({ now, startedAt, index, timings, complete = true, 
  * @property {HTMLElement} container 描画先 (.stage)
  * @property {object} settings 設定
  * @property {object} strings 文言のカタログ (src/i18n)
- * @property {typeof fetch} [fetchImpl] 通信 (meta と zip) の差し替え。テストから pixiv を叩かないために使う
- * @property {Promise<object>|null} [preloadedMeta] 先に取っておいた ugoira_meta の body。拒否されていたら取り直す
+ * @property {typeof fetch} [fetchImpl] zip の通信の差し替え。テストから pixiv を叩かないために使う
+ * @property {(url: string, deps?: object, init?: RequestInit) => Promise<unknown>} [getJsonImpl] ugoira_meta の取得の差し替え。client.js の getJson と同じ形
  * @property {number} [rate] 最初の再生速度 (倍率)。UGOIRA_PLAYBACK_RATES に無ければ等速
  * @property {(rate: number) => void} [onRateChange] 再生速度が選ばれたら呼ぶ。次に開く作品へ引き継ぐために使う
  * @property {() => HTMLImageElement} [createImage] フレーム用 Image の差し替え。Node には Image が無い
@@ -126,8 +142,8 @@ export function createUgoiraPlayer(deps) {
 	const later = deps.setTimeout ?? ((callback, delay) => setTimeout(callback, delay));
 	const cancelLater = deps.clearTimeout ?? ((id) => clearTimeout(id));
 
-	/** @type {string[]} 作った Blob URL。dispose で必ず revoke する */
-	let objectUrls = [];
+	/** @type {Set<string>} 読み込み中の Image に渡した Blob URL。読み終えたら外して revoke し、残りは dispose で revoke する */
+	let objectUrls = new Set();
 	/** @type {Array<{image: HTMLImageElement, delay: number}|typeof BROKEN|undefined>} meta の順の各コマ。undefined は未着 */
 	let frames = [];
 	/** @type {Map<string, number>} zip のファイル名 → frames の添字 */
@@ -186,25 +202,17 @@ export function createUgoiraPlayer(deps) {
 	let root = null;
 	/** 再生中の作品 ID。失敗の記録に添える */
 	let workId = '';
-	/** meta と zip の取得を途中で止めるためのもの。dispose で abort する */
+	/** zip の取得を途中で止めるためのもの。dispose で abort する */
 	const aborter = new AbortController();
 
 	/**
-	 * ugoira_meta を得る。先に取っておいたものがあればそれを使い、
-	 * 無いか失敗していたらここで取り直す。(先取りの失敗だけでは再生を諦めない)
+	 * ugoira_meta を得る。同じ作品の分は覚えたもの (前後の作品の先読みで温めた分を含む) を使う。
+	 * 覚えた Promise は共有なので止めない。dispose の後に届いた結果は呼び出し側が disposed で捨てる。
 	 * @param {string} workId 作品 ID
 	 * @returns {Promise<object>} ugoira_meta の body
 	 */
-	async function loadMeta(workId) {
-		if (deps.preloadedMeta) {
-			try {
-				return await deps.preloadedMeta;
-			} catch {
-				// 取り直しに進む
-			}
-		}
-		// meta の要求も dispose で止める。(zip と同じ signal)
-		return getJson(ugoiraMetaUrl(workId, strings.lang), { fetchImpl, signal: aborter.signal });
+	function loadMeta(workId) {
+		return fetchUgoiraMeta(workId, strings.lang, deps.getJsonImpl ? { getJsonImpl: deps.getJsonImpl } : {});
 	}
 
 	/**
@@ -254,6 +262,8 @@ export function createUgoiraPlayer(deps) {
 	function draw() {
 		const frame = playable[frameIndex];
 		if (!context || !frame) return;
+		// 透過のある形式は前のコマを消さないと重なって透ける
+		if (mimeType !== DEFAULT_FRAME_MIME) context.clearRect(0, 0, canvas.width, canvas.height);
 		context.drawImage(frame.image, 0, 0, canvas.width, canvas.height);
 		controls?.setFrame(frameIndex, seekLength());
 	}
@@ -357,26 +367,32 @@ export function createUgoiraPlayer(deps) {
 	}
 
 	/**
-	 * 再生できないことを伝える。以後に届いたコマでは再生を始めない。
+	 * 再生できないことを伝える。以後に届いたコマでは再生を始めず、残りの受信も止める。
 	 * @param {unknown} error 理由
 	 * @returns {void}
 	 */
 	function fail(error) {
 		failed = true;
+		aborter.abort();
 		// 静止画は出ているので、動かないことだけを伝える
 		showPaneError(strings.ugoira.PLAY_FAILED);
 		warn('failed to play ugoira', workId, error);
 	}
 
 	/**
-	 * canvas を出して再生を始める。寸法は最初に再生できるコマで決める。
+	 * canvas を出して再生を始める。寸法は最初に再生できるコマと、出ている静止画で決める。
 	 * @returns {void}
 	 */
 	function startPlayback() {
 		started = true;
 		const first = playable[0].image;
-		canvas.width = first.naturalWidth;
-		canvas.height = first.naturalHeight;
+		const posterShown = poster.naturalWidth > 0 && poster.naturalHeight > 0;
+		const size = canvasSize(
+			{ width: first.naturalWidth, height: first.naturalHeight },
+			posterShown ? { width: poster.naturalWidth, height: poster.naturalHeight } : null,
+		);
+		canvas.width = size.width;
+		canvas.height = size.height;
 		// JPEG は透過しないので、透過を切って合成の手間を省く
 		context = canvas.getContext('2d', mimeType === DEFAULT_FRAME_MIME ? { alpha: false } : undefined);
 		canvas.hidden = false;
@@ -452,19 +468,21 @@ export function createUgoiraPlayer(deps) {
 		claimedCount += 1;
 		const delay = metaFrames[at].delay > 0 ? metaFrames[at].delay : FALLBACK_DELAY;
 		const url = URL.createObjectURL(new Blob(entry.parts, { type: mimeType }));
-		objectUrls.push(url);
+		objectUrls.add(url);
 		pendingLoads += 1;
 		const image = createImage();
 		let settled = false;
 		/**
 		 * 読めたか失敗したかを記録する。デコードに失敗したコマは naturalWidth が 0 になり、
 		 * drawImage に渡すと例外で tick が止まるので、印を付けて待ち時間ごと飛ばす。
+		 * 読み終えた Image は中身を自分で持つので、Blob URL はここで手放す。
 		 * @returns {void}
 		 */
 		const settle = () => {
 			if (settled) return;
 			settled = true;
 			pendingLoads -= 1;
+			if (objectUrls.delete(url)) URL.revokeObjectURL(url);
 			if (!disposed) {
 				frames[at] = image.naturalWidth && image.naturalHeight ? { image, delay } : BROKEN;
 				try {
@@ -497,7 +515,7 @@ export function createUgoiraPlayer(deps) {
 			const zipReader = createStoredZipReader();
 			for (;;) {
 				const { done, value } = await reader.read();
-				if (done || disposed) return;
+				if (done || disposed || failed) return;
 				for (const entry of zipReader.push(value)) onEntry(entry);
 				if (zipReader.ended()) {
 					// 残りは中央ディレクトリだけなので受け取らない
@@ -590,8 +608,11 @@ export function createUgoiraPlayer(deps) {
 				try {
 					await readFrames(response, (entry) => addFrame(entry, metaFrames));
 				} catch (error) {
-					// 再生が始まっていれば、届いた分で繰り返す
-					if (disposed || !started) throw error;
+					// 失敗を出した後の abort は伝え直さない
+					if (disposed || failed) return;
+					// 読めない形式ならエントリを返していないので、待たずに失敗にする
+					if (!started && error?.message === REASONS.UNSUPPORTED_ZIP) throw error;
+					// 再生の前でも後でも、届いた分で 1 コマでも再生できるなら再生する
 					warn('ugoira zip stopped midway', detail.id, error);
 				}
 				await waitForLoads();
@@ -622,7 +643,7 @@ export function createUgoiraPlayer(deps) {
 		},
 
 		/**
-		 * 資源を解放する。Blob URL を revoke しないとメモリが残る。
+		 * 資源を解放する。読み込み中の Image に渡した Blob URL は、revoke しないとメモリが残る。
 		 * @returns {void}
 		 */
 		dispose() {
@@ -634,7 +655,7 @@ export function createUgoiraPlayer(deps) {
 			root = null;
 			pause();
 			for (const url of objectUrls) URL.revokeObjectURL(url);
-			objectUrls = [];
+			objectUrls = new Set();
 			frames = [];
 			claimed = [];
 			indexByName = new Map();

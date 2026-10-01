@@ -4,12 +4,12 @@
 
 # XViewer for Pixiv
 
-**A browser extension that adds an X.com-style image viewer to pixiv user pages**
+**A browser extension that adds an X.com-style image viewer to pixiv user pages, the home page, and search results**
 
 [![version](https://img.shields.io/github/package-json/v/NEONS-DESIGN/XViewer-for-Pixiv?color=0096fa)](package.json)
 [![license](https://img.shields.io/github/license/NEONS-DESIGN/XViewer-for-Pixiv?color=0096fa)](LICENSE)
 ![manifest](https://img.shields.io/badge/manifest-v3-0096fa)
-![tests](https://img.shields.io/badge/tests-1058%20passing-0096fa)
+![tests](https://img.shields.io/badge/tests-passing-0096fa)
 
 **[Website](https://xviewer.neonsdesign.com/en/)** ・
 [Privacy policy](https://xviewer.neonsdesign.com/en/privacy.html) ・
@@ -38,7 +38,7 @@
 
 ## What this is
 
-Click an artwork on a pixiv user page and **a modal opens right there, without navigating away.**
+Click an artwork on a pixiv user page, the home page or search results and **a modal opens right there, without navigating away.**
 Paging through multi-image works, ugoira playback, reading the caption and comments, and liking,
 bookmarking, following and posting comments all happen inside the modal. Close it and you are back
 on the grid, at the scroll position you left.
@@ -51,11 +51,11 @@ on the grid, at the scroll position you left.
 
 | | |
 | --- | --- |
-| **Opens in place** | The viewer takes over the grid click and renders without navigating. The URL still changes to `/artworks/{id}`, so reloading and sharing both work |
+| **Opens in place** | The viewer takes over the grid click and renders without navigating. Besides the artwork list on user pages, artworks on the home page and in search results (tag pages and the search screen) open this way too. The URL still changes to `/artworks/{id}`, so reloading and sharing both work |
 | **Multi-image works** | `←` `→` and the on-screen arrows page through the work. With the setting on, clicking the left or right edge of the screen does too. Neighbouring images are prefetched, so switching is immediate |
-| **Work to work** | `↑` `↓` move to the previous or next work in the grid. With the setting on, clicking the top or bottom edge of the screen does too. Reach the end and the next page is loaded for you. On the illustration and manga tabs, only works of that kind are visited |
+| **Work to work** | `↑` `↓` move to the previous or next work in the grid. With the setting on, clicking the top or bottom edge of the screen does too. On user pages, reaching the end loads the next page for you, and on the illustration and manga tabs only works of that kind are visited. On the home page and in search results, you move within the section of the work you clicked |
 | **Ugoira** | The zip is decoded into frames and played in the viewer, with pause and resume |
-| **Full size** | Click the image to open it at its original resolution, filling the screen. (The same way pixiv's own artwork page looks) Page through with the screen edges or `←` `→` (off by default) |
+| **Actual size** | Click the image to open it at its original resolution, filling the screen. (The same way pixiv's own artwork page looks) Page through with the screen edges or `←` `→` (off by default) |
 
 ### Sidebar
 
@@ -78,14 +78,14 @@ The caption, tags, post date, counters and comments sit beside the image in a si
 | --- | --- |
 | **Infinite scroll** | The paginator (1 2 3 …) on illustration and manga listings can be replaced with continuous loading. The `?p=` in the URL follows whatever is on screen, so a reload brings you back to roughly the same place (off by default) |
 | **Hide the pickup section** | Hides the "pickup" block on a profile home so the listing is the first thing you see (off by default) |
-| **Tidier tab order** | The bookmark button and the title on grid cards can be taken out of the focus order (pixiv's own order by default) |
+| **Tidier tab order** | The bookmark button and the title can be taken out of the focus order in artwork lists (user pages, the home page and search results). Artist links stay (pixiv's own order by default) |
 
 ### Elsewhere
 
 | | |
 | --- | --- |
 | **Theme** | The viewer follows pixiv's own dark / light setting. The settings popup can be switched by hand |
-| **Fine-grained settings** | Viewer, image, user page and interaction settings let you tune image quality, prefetch, how the sidebar appears, infinite scroll and more |
+| **Fine-grained settings** | The Settings tab (viewer, images, user pages, controls) and the Advanced tab (viewer, controls, comments) let you tune where the viewer is used, image quality, prefetch, how the sidebar appears and how wide it is, background darkness, infinite scroll and more |
 | **Accessibility** | A focus trap, `role="dialog"`, and a tidier tab order on the grid. Opening and closing works entirely from the keyboard |
 
 ## Requirements
@@ -147,40 +147,59 @@ Select `dist/`, not `src/`. Only the build output runs.
 
 ## Using it
 
-Open a pixiv **user page** (`https://www.pixiv.net/users/{id}` and its tabs) and click an artwork.
+Open a pixiv **user page** (`https://www.pixiv.net/users/{id}` and its tabs), the **home page** (Home / Illustrations / Manga) or **search results** (tag pages and the search screen), and click an artwork.
 
 ### Keyboard
 
 | Key | Action |
 | --- | --- |
-| `←` `→` | Page through the current work (the same at full size) |
+| `←` `→` | Page through the current work (the same at actual size) |
 | `↑` `↓` | Previous or next work |
 | `Ctrl` + `Enter` | Send from the comment box. (`Cmd` + `Enter` on Mac) `Enter` is a line break |
-| `Esc` | Closes the frontmost thing first. (emoji panel → full size or the share menu → the viewer) It will not close the viewer while a draft is unsent |
+| `Esc` | Closes the frontmost thing first. (emoji panel → actual size or the share menu → the viewer) It will not close the viewer while a draft is unsent |
 | `Tab` | Move focus inside the modal (it never leaves) |
 
 While you are writing a comment, `←` `→` `↑` `↓` move the caret. (The work stays put)
 
 ### Settings
 
-Open the popup from the toolbar icon. The settings below are grouped into viewer, image, user page
-and interaction, so you can tune each part to suit you. The "license" tab carries the disclaimer and the notices for the
-bundled third-party assets.
+Open the popup from the toolbar icon. It has a Settings tab and an Advanced tab, and the settings below
+are grouped so you can tune each part to suit you. Settings marked `↳` belong to the one above them.
+A setting cannot be changed while the setting it depends on is off. (Everything to do with the viewer while
+"Use the viewer" is off, the sidebar widths and the number of comments while "Show the sidebar" is off, the edge
+click area width while "Click the edges to navigate" is Off, and the actual-size click area width while "Click to
+view at actual size" is off) The Licenses tab carries the disclaimer and the notices for the bundled third-party assets.
+
+**Settings tab**
 
 | Group | Setting | Default | Effect |
 | --- | --- | --- | --- |
-| Viewer | Use the viewer | On | Turn it off and pixiv behaves exactly as it did before |
+| Viewer | Use the viewer | On | Turn it off and pixiv behaves exactly as it did before. Hide the Pickup section, Infinite scroll and Tab movement in the grid keep working even when it is off |
+| Viewer | ↳ Use on user pages | On | Shows the viewer when you open an artwork from a user page's artwork list |
+| Viewer | ↳ Use on the home page | On | Shows the viewer for artworks on pixiv's home (Home / Illustrations / Manga tabs) |
+| Viewer | ↳ Use on search results | On | Shows the viewer when you open an artwork from search results (tag pages and the search screen) |
 | Viewer | Show the sidebar | On | Puts the caption, tags, like count and comments beside the image. When off, a link to the artwork page appears next to the close button. On narrow screens, open it with the button at the top right |
-| Viewer | Sidebar scrolling | Scroll the whole sidebar | Scroll caption and comments as one, or pin the caption and scroll only the comments |
-| Image | Resolution | Regular (1200px on the long edge) | Original is sharper but slower to load |
-| Image | Prefetch | 1 each way | How many neighbouring pages to load ahead of time (none / 1 each way / 3 each way) |
-| Image | Also preload the adjacent work | Off | After a work finishes showing, loads just one work `↑` `↓` may move to next. Moving is faster, but data is used even if you close without moving |
-| Image | Click to view full size | Off | Clicking the image opens it at its original resolution, filling the screen. It loads the original regardless of the resolution setting above |
-| User page | Hide the pickup section | Off | Hides the "pickup" block on a profile home |
-| User page | Infinite scroll | Off | Load when you reach the bottom, or always keep one page ahead |
-| Interaction | Close on backdrop click | On | Whether clicking outside the image closes the viewer |
-| Interaction | Click the edges to navigate | Off | The left and right edges of the screen turn pages, the top and bottom edges switch works. Choose left/right only, top/bottom only, or both. The cursor turns into an arrow over them |
-| Interaction | Grid tab order | Keep all stops | Whether Tab skips the bookmark button and the title on grid cards |
+| Viewer | ↳ Sidebar scrolling | Scroll the whole sidebar | Scroll caption and comments as one, or pin the caption and scroll only the comments |
+| Images | Image resolution | Standard (1200px long edge) | Original is sharper but heavier to load |
+| Images | Prefetch | 1 image each way | How many neighbouring pages to load ahead of time: Off, 1 or 3 images each way, or Custom, which lets you choose 1 to 20 each way (at 10 or more, a note warns that it uses a lot of memory) |
+| Images | Also prefetch the adjacent artwork | Off | After an artwork finishes showing, prefetches just one artwork `↑` `↓` may move to next. Moving is faster, but data is used even if you close without moving |
+| Images | Click to view at actual size | Off | Clicking the image opens it at actual size, filling the screen. It loads the original regardless of the resolution setting above |
+| User pages | Hide the Pickup section | Off | Hides the "Pickup" section on a profile home |
+| User pages | Infinite scroll | Off | Load when you reach the bottom, or always keep one page ahead |
+| Controls | Click the background to close | On | Whether clicking outside the image closes the viewer |
+| Controls | Click the edges to navigate | Off | The left and right edges of the screen turn pages, the top and bottom edges switch artworks. Choose left/right only, top/bottom only, or both. Edges you cannot move past show a not-allowed cursor, so they are easy to tell from the empty area that closes the viewer |
+| Controls | Tab movement in the grid | Do not skip | Whether Tab skips the bookmark button and the title in artwork lists (user pages, the home page and search results). Artist links are not skipped |
+
+**Advanced tab**
+
+| Group | Setting | Default | Effect |
+| --- | --- | --- | --- |
+| Viewer | Sidebar width | 384px | Width of the sidebar shown on the right when the window is wide. Choose 320, 384, 448 or 512px |
+| Viewer | Pulled-out sidebar width | 60% | Maximum width, relative to the window, of the sidebar you pull out when the window is narrow (900px wide or less). Choose 50, 60, 70 or 80% |
+| Viewer | Background darkness | Match the theme | How dark the black layer behind the image is: match the theme (92% in dark mode, 88% in light mode) or, with Custom, choose from 0% to 100% in 10% steps. Lower values let the page behind show through |
+| Controls | Edge click area width | 25% | Width of the edges used for edge-click navigation, relative to the image area. With Custom, choose the left/right and top/bottom widths separately, from 5% to 35% in 5% steps |
+| Controls | Actual-size click area width | 25% | Width of the left and right edges used to turn pages in actual-size view. With Custom, choose from 5% to 35% in 5% steps |
+| Comments | Comments loaded at once | 30 comments | Number of comments loaded when an artwork opens and when you press "Show more". Choose 10, 20, 30 or 50. Applies from the next artwork you open |
 
 The settings popup can be switched between dark and light from the icon in its top right. It follows
 the OS setting until you switch it, and stays on your choice from then on. ("Reset settings" returns
@@ -202,7 +221,7 @@ own setting.
   you move down, never fetching works in bulk
 - **Changes on pixiv's side may break it at any time.** pixiv and its related services may revise,
   change or discontinue features and content without notice
-- It does not start on `/artworks/{id}` opened directly, nor on search results, rankings or tag pages
+- It does not start on `/artworks/{id}` opened directly, nor on rankings or the list of works from users you follow
 
 These follow the "Guidelines for registered trademarks &gt; Use in applications and services" section of
 the [pixiv Inc. Terms of Service](https://policies.pixiv.net/).
@@ -219,7 +238,7 @@ If you prefer GitHub, [Issues](https://github.com/NEONS-DESIGN/XViewer-for-Pixiv
 | `npm run build` | Builds `dist/` for Chromium browsers and `dist-firefox/` for Firefox |
 | `npm run build:chrome` / `npm run build:firefox` | Builds only one of them |
 | `npm run watch` | Build in watch mode |
-| `npm test` | Runs the tests with `node --test` (1124 tests) |
+| `npm test` | Runs the tests with `node --test` |
 | `npm run build:icons` | Regenerates the extension icon PNGs (the output is committed) |
 | `npm run build:symbols` | Regenerates the UI icon shape data (the output is committed) |
 | `npm run build:site-images` | Exports the website images (WebP, plus JPEG for OGP) (the output is committed. The source PNGs are not in the repository, so it will not run on a fresh clone) |

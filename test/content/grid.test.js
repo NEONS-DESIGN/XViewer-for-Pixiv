@@ -93,6 +93,13 @@ test('作品リンクから ID を取り出す', () => {
 	assert.equal(workIdFromLink('https://www.pixiv.net/artworks/149425016', ORIGIN), '149425016');
 });
 
+test('パスだけの作品リンクはクエリとハッシュを除いて読む', () => {
+	// ホームのフィードは画像ごとに #n を付ける
+	assert.equal(workIdFromLink('/artworks/149425016#2', ORIGIN), '149425016');
+	assert.equal(workIdFromLink('/artworks/149425016?foo=1', ORIGIN), '149425016');
+	assert.equal(workIdFromLink('/en/artworks/149425016#1', ORIGIN), '149425016');
+});
+
 test('タグ絞り込みリンクは作品リンクとして扱わない', () => {
 	assert.equal(workIdFromLink('/users/54734418/artworks/オリジナル', ORIGIN), null);
 });

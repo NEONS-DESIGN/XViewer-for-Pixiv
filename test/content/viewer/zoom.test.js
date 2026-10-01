@@ -124,6 +124,43 @@ test('閉じたらフォーカスを呼び出し元へ返す', async () => {
 	assert.equal(restored, 1);
 });
 
+test('押す・Escape・上下キーで閉じたら onClose を呼び、外から close() したときは呼ばない', async () => {
+	const { container, zoom } = build();
+	let closed = 0;
+	const onClose = () => { closed += 1; };
+	zoom.open(pages({ onClose }));
+	await find(container, '.zoom').click();
+	zoom.open(pages({ onClose }));
+	zoom.consumeKey({ key: KEYS.CLOSE });
+	zoom.open(pages({ onClose }));
+	zoom.consumeKey({ key: KEYS.NEXT_WORK });
+	assert.equal(closed, 3);
+	// 作品の移動や描き直しで閉じるときは、渡し元のペインも捨てられるので知らせない
+	zoom.open(pages({ onClose }));
+	zoom.close();
+	assert.equal(closed, 3);
+});
+
+test('updatePages は開いたまま並びを差し替え、画像は読み直さない', () => {
+	const { container, zoom } = build();
+	zoom.open(pages({ urls: [URLS[0]] }));
+	const image = find(container, '.zoom-image');
+	assert.equal(find(container, '.zoom-zone-next').hidden, true);
+	zoom.updatePages({ urls: URLS });
+	assert.equal(find(container, '.zoom-counter').textContent, '1/3');
+	assert.equal(find(container, '.zoom-zone-next').hidden, false);
+	assert.equal(find(container, '.zoom-zone-next').disabled, false);
+	assert.equal(image.src, URLS[0]);
+	// 差し替えた並びで送れる
+	zoom.consumeKey({ key: KEYS.NEXT_PAGE });
+	assert.equal(image.src, URLS[1]);
+	// 閉じた後と空の並びでは何もしない
+	zoom.updatePages({ urls: [] });
+	assert.equal(find(container, '.zoom-counter').textContent, '2/3');
+	zoom.close();
+	assert.doesNotThrow(() => zoom.updatePages({ urls: URLS }));
+});
+
 test('Escape は原寸表示だけを閉じる', () => {
 	const { zoom } = build();
 	zoom.open(pages());

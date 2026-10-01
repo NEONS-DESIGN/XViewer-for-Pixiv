@@ -137,6 +137,36 @@ test('開き直すと同じパネルを使い回す', () => {
 	assert.equal(one.slot.children.length, 1);
 });
 
+test('開き直しやタブの往復で項目を作り直さない', async () => {
+	// 項目は入力欄に依存しないので、タブごとに 1 度だけ組み立てる
+	const one = build();
+	let panel = open(one);
+	const firstEmoji = findAll(panel, '.comment-picker-item')[0];
+	one.picker.close();
+	panel = open(one);
+	assert.equal(findAll(panel, '.comment-picker-item')[0], firstEmoji);
+
+	const tabs = findAll(panel, '.comment-picker-tab');
+	await tabs[1].click();
+	const firstStamp = findAll(panel, '.comment-picker-item')[0];
+	await tabs[0].click();
+	assert.equal(findAll(panel, '.comment-picker-item')[0], firstEmoji);
+	assert.equal(findAll(panel, '.comment-picker-item').length, 38);
+	await tabs[1].click();
+	assert.equal(findAll(panel, '.comment-picker-item')[0], firstStamp);
+});
+
+test('使い回した項目も、選ばれたときは今開いている欄の受け口へ返す', async () => {
+	const one = build();
+	open(one);
+	one.picker.close();
+	const received = [];
+	one.picker.open(one.slot, { onEmoji: (name) => received.push(name), onStamp: () => {} });
+	await findAll(find(one.slot, '.comment-picker'), '.comment-picker-item')[0].click();
+	assert.deepEqual(received, ['normal']);
+	assert.deepEqual(one.opened.emoji, []);
+});
+
 /**
  * 位置を測れるピッカーを作る。
  * パネル以外を測ることは無いので、作る要素すべてに同じ値を返させる。

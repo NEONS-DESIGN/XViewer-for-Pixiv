@@ -77,3 +77,39 @@ test('drop は中身を止めて空にする', () => {
 	assert.equal(slot.peekId(), null);
 	assert.equal(slot.peekPromise(), null);
 });
+
+test('peekId は寿命が切れた中身の ID を返さない', () => {
+	// 切れた中身は開いても使われない。同じ ID だからと温め直しを止めない
+	let t = 0;
+	const slot = createPrefetchSlot({ ttlMs: 100, now: () => t });
+	slot.put('1', () => new Promise(() => {}));
+	assert.equal(slot.peekId(), '1');
+	t = 100;
+	assert.equal(slot.peekId(), null);
+	let calls = 0;
+	slot.put('1', () => { calls += 1; return new Promise(() => {}); });
+	assert.equal(calls, 1, '切れていれば入れ直す');
+	assert.equal(slot.peekId(), '1');
+});
+
+test('中身が失敗したら自分で空にし、同じ ID を入れ直せば取り直す', async () => {
+	const slot = createPrefetchSlot({ ttlMs: 100, now: () => 0 });
+	let calls = 0;
+	slot.put('1', () => { calls += 1; return Promise.reject(new Error('offline')); });
+	await new Promise((resolve) => setImmediate(resolve));
+	assert.equal(slot.peekId(), null);
+	assert.equal(slot.takeEntry('1'), null, '失敗した中身を開くときに渡さない');
+	slot.put('1', () => { calls += 1; return new Promise(() => {}); });
+	assert.equal(calls, 2);
+});
+
+test('失敗したのが前の中身なら、差し替えた後の中身は消さない', async () => {
+	const slot = createPrefetchSlot({ ttlMs: 100, now: () => 0 });
+	let fail;
+	slot.put('1', () => new Promise((_, reject) => { fail = reject; }));
+	const next = new Promise(() => {});
+	slot.put('2', () => next);
+	fail(new Error('aborted'));
+	await new Promise((resolve) => setImmediate(resolve));
+	assert.equal(slot.peekPromise(), next);
+});

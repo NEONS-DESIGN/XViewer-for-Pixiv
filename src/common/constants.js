@@ -43,26 +43,49 @@ export const ARTWORK_LINK_SELECTORS = Object.freeze(
  */
 export const ARTWORK_LINK_SELECTOR = ARTWORK_LINK_SELECTORS.join(',');
 
-/** カードのサムネリンク。pixiv の計測用属性で、クラス名より寿命が長い。 */
-export const THUMB_LINK_SELECTOR = 'a[data-ga4-label="thumbnail_link"]';
+/** pixiv の計測用ラベルの属性名。クラス名より寿命が長いので、カードの部品はこれで見分ける。 */
+export const GA4_LABEL_ATTR = 'data-ga4-label';
+
+/** 作品カードのサムネのリンクに付く計測用ラベル。 */
+export const THUMB_LINK_LABEL = 'thumbnail_link';
+
+/** 作品カードのタイトルのリンクに付く計測用ラベル。 */
+export const TITLE_LINK_LABEL = 'title_link';
+
+/** カードのブックマークボタンの入れ物に付く計測用ラベル。 */
+const BOOKMARK_BUTTON_LABEL = 'bookmark_button';
+
+/** カードのサムネリンク。 */
+export const THUMB_LINK_SELECTOR = `a[${GA4_LABEL_ATTR}="${THUMB_LINK_LABEL}"]`;
 
 /**
  * 作品カードのリンクに付く計測用ラベル。サムネとタイトルの 2 本。
  * ユーザーページ・ホーム (横送り・グリッド・フィード)・検索のどれでも付いている。
  * 検索のカードは li ではなく div なので、カードかどうかはこのラベルで見分ける。
  */
-export const CARD_LINK_LABELS = Object.freeze(['thumbnail_link', 'title_link']);
+const CARD_LINK_LABELS = Object.freeze([THUMB_LINK_LABEL, TITLE_LINK_LABEL]);
 
 /**
  * 作品カードのリンクを拾うセレクタ。作品リンクのセレクタ 1 本ずつにラベルを付けてから結合する。
  * (カンマで結合したものの後ろへ継ぎ足すと、末尾の 1 本にしか掛からない)
  */
 export const CARD_LINK_SELECTOR = ARTWORK_LINK_SELECTORS
-	.flatMap((link) => CARD_LINK_LABELS.map((label) => `${link}[data-ga4-label="${label}"]`))
+	.flatMap((link) => CARD_LINK_LABELS.map((label) => `${link}[${GA4_LABEL_ATTR}="${label}"]`))
 	.join(',');
 
 /** カードのブックマークボタンの入れ物。 */
-export const BOOKMARK_BUTTON_SELECTOR = '[data-ga4-label="bookmark_button"]';
+export const BOOKMARK_BUTTON_SELECTOR = `[${GA4_LABEL_ATTR}="${BOOKMARK_BUTTON_LABEL}"]`;
+
+/**
+ * li ではない作品カード (検索の結果・ホームのフィードの投稿) の入れ物が持つ計測用の種別。
+ * 属性 data-ga4-entity-id の値が `{種別}/{作品 ID}` の形になる。作者の欄は `user/{id}` なので含めない
+ */
+const WORK_ENTITY_KINDS = Object.freeze(['illust', 'manga']);
+
+/** li ではない作品カードの入れ物を拾うセレクタ。作品の種別と ID を計測用属性に持つ要素。 */
+export const ENTITY_CARD_SELECTOR = WORK_ENTITY_KINDS
+	.map((kind) => `[data-ga4-entity-id^="${kind}/"]`)
+	.join(',');
 
 /** ブックマーク済みのハートの色。未ブックマーク側はテーマで変わるので雛形から採る。 */
 export const BOOKMARKED_FILL = '#ff4060';
@@ -247,7 +270,7 @@ export const PREFETCH_CHOICES = Object.freeze([0, 1, 3]);
  * 先読みの既定値。前後 1 枚。
  * 切り替えの速さより、端末と回線への負担の少なさを既定に置く。
  * (高解像度の作品を 3 枚先まで取ると、送るだけで通信量が膨らむ)
- * PREFETCH_CHOICES に含まれることは storage.test.js が見張る。
+ * PREFETCH_CHOICES のどれかであること。
  */
 const DEFAULT_PREFETCH = 1;
 
@@ -273,7 +296,10 @@ const DEFAULT_PREFETCH_CUSTOM = 2;
 export const COMMENT_PAGE_SIZE_CHOICES = Object.freeze([10, 20, 30, 50]);
 
 /** コメントを 1 回に読む件数の既定値。 */
-export const COMMENT_PAGE_SIZE = 30;
+export const DEFAULT_COMMENT_PAGE_SIZE = 30;
+
+/** リンクにしてよいユーザー ID の形。数字だけ。 */
+export const USER_ID_PATTERN = /^\d+$/;
 
 /** グリッドのフォーカス順を当て直す間隔 (ミリ秒)。再描画のたびに走らせないための間引き。 */
 export const TAB_SKIP_REFRESH_MS = 200;
@@ -510,7 +536,7 @@ export const SETTINGS_DEFAULTS = Object.freeze({
 	sidebarDrawerMax: DEFAULT_SIDEBAR_DRAWER_MAX,
 	backdropMode: BACKDROP_MODES.THEME,
 	backdropOpacity: DEFAULT_BACKDROP_OPACITY,
-	commentPageSize: COMMENT_PAGE_SIZE,
+	commentPageSize: DEFAULT_COMMENT_PAGE_SIZE,
 	closeOnBackdrop: true,
 	navZones: NAV_ZONES.OFF,
 	navZoneMode: SETTING_MODES.DEFAULT,

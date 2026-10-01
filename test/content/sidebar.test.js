@@ -265,6 +265,21 @@ test('取得を待っている間に描き直したら、前の作者のアイ�
 	assert.equal(avatarOf(container).src, '');
 });
 
+test('数字でない作者 ID はリンクにせず、アイコンも引かない', async () => {
+	// パスや URL に埋めると同じオリジンの別のページを指しうる
+	const asked = [];
+	const { container, sidebar } = build({ fetchUser: async (userId) => { asked.push(userId); return {}; } });
+	sidebar.render({ ...DETAIL, userId: '1/../../logout.php' });
+	await flush();
+	const author = container.children[0].children[0].children[0];
+	assert.equal(author.className, 'author');
+	assert.equal(author.tag, 'span');
+	assert.equal(author.href, '');
+	assert.deepEqual(asked, []);
+	// 名前は読めるまま
+	assert.equal(find(author, '.author-name').textContent, DETAIL.userName);
+});
+
 test('取得に失敗してもサイドバーは壊れない', async () => {
 	const { container, sidebar } = build({ fetchUser: async () => { throw new Error('落ちた'); } });
 	sidebar.render(DETAIL);

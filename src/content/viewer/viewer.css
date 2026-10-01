@@ -69,8 +69,8 @@
 	/* サイドバーの文字色の青。投稿文とタグのリンクに加えて、
 	   地を持たない文字だけの導線 (作品ページを開く・シェア・上部へ・返信) もこれで塗る。
 	   値は X.com のリンク色で、テーマで変えない。
-	   --accent が残るのは「状態」を示すところだけ = いいね済み (--like)・
-	   フォロー中の枠 (.action.is-on)・カウンタの済み表示。色が状態の合図になっている */
+	   --accent は状態 (いいね済み・選んでいる速度・うごイラの再生済みの位置) とフォーカスの輪郭に使う。
+	   例外はブロック表示の案内のリンク (.blocked-link) で、サイドバーの外なので --accent のまま */
 	--side-link: #1d9bf0;
 	/* サイドバーのスクロールバーだけ、画面の端から空ける隙間。
 	   窓の縁に貼り付いて見えないようにするためのもの。(コメント一覧側には使わない)
@@ -86,8 +86,9 @@
 	   読めてしまい、画像だけを見るための画面にならない。
 	   ライトでも暗いままにするのは --backdrop と同じ理由 (画像の見え方を安定させる) */
 	--zoom-backdrop: #000000;
-	/* 浮いている部品 (シェアメニュー) の影。ライトでは薄くしないと白地の上で重い */
-	--menu-shadow: 0 8px 24px rgba(0, 0, 0, 0.36);
+	/* 浮いている部品 (シェアメニュー・速度のメニュー・絵文字のパネル) の影。
+	   色は通知と同じ --notice-shadow で、テーマごとの濃さもそちらが持つ */
+	--menu-shadow: 0 8px 24px var(--notice-shadow);
 	/* サイドバーの幅。X.com のメディアモーダルに近い比率。設定 sidebarWidth が上書きする */
 	--sidebar-width: 384px;
 	/* 狭い画面で引き出したサイドバーの幅の上限。既定は画像側に 4 割を残す。設定 sidebarDrawerMax が上書きする */
@@ -101,12 +102,12 @@
 	--seek-rest: rgba(255, 255, 255, 0.16);
 	/* 操作部品の高さ */
 	--control-height: 30px;
-	/* ページ・作品を送るクリック領域のカーソル。(原寸表示と画面端のクリック領域で共有)
-	   pixiv の .cur は拡張から使えないので同じ形を SVG で持つ。
-	   白い画像の上でも消えないよう、黒い縁取りの上に白い矢印を重ねる */
 	/* 端に着いて今は送れないクリック領域のカーソル。押しても何も起きない (閉じもしない) ことを示し、
 	   押すと閉じる余白 (既定のカーソル) と見分けられるようにする。(画面端のクリック領域と原寸表示で共有) */
 	--cursor-blocked: not-allowed;
+	/* ページ・作品を送るクリック領域のカーソル。(原寸表示と画面端のクリック領域で共有)
+	   pixiv の .cur は拡張から使えないので同じ形を SVG で持つ。
+	   白い画像の上でも消えないよう、黒い縁取りの上に白い矢印を重ねる */
 	--cursor-prev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M18 4 L8 14 L18 24' fill='none' stroke='%23000' stroke-opacity='.5' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M18 4 L8 14 L18 24' fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 14 14;
 	--cursor-next: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M10 4 L20 14 L10 24' fill='none' stroke='%23000' stroke-opacity='.5' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M10 4 L20 14 L10 24' fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 14 14;
 	--cursor-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M4 18 L14 8 L24 18' fill='none' stroke='%23000' stroke-opacity='.5' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M4 18 L14 8 L24 18' fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 14 14;
@@ -114,6 +115,8 @@
 	/* コメントの入力欄の地。pixiv 本体の入力欄と同じ濃さ */
 	--field-bg: rgba(255, 255, 255, 0.12);
 	--field-bg-hover: rgba(255, 255, 255, 0.16);
+	/* 原寸表示の矢印の影。白い画像の上でも沈まないように縁を付ける。原寸表示は両テーマとも暗い幕なので差し替えない */
+	--zoom-arrow-shadow: rgba(0, 0, 0, 0.6);
 
 	/* Shadow DOM はフォントを継承しない。書体 (font-family) は tokens.css の :host が明示する。
 	   文字の大きさと色はここで決める */
@@ -137,7 +140,6 @@
 	--backdrop-alpha: 0.88;
 	--seek-buffer: rgba(0, 0, 0, 0.32);
 	--seek-rest: rgba(0, 0, 0, 0.1);
-	--menu-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
 	--field-bg: rgba(0, 0, 0, 0.04);
 	--field-bg-hover: rgba(0, 0, 0, 0.08);
 }
@@ -194,8 +196,8 @@
 	/* この中の文字だけ pixiv の作品ページと同じ階調にする (--side-*)。
 	   ここは継承で決まる文字 (タイトル・コメント本文・カウンタの数値) の分。
 	   色を明示している規則は個別に --side-fg / --side-sub を引く。
-	   --accent は差し替えない。リンクと地を持たない文字だけの導線は --side-link で、
-	   --accent が残るのは状態を示すところ (いいね済み・フォロー中) だけ */
+	   --accent は差し替えない。(--like と --focus-ring が参照している)
+	   リンクと地を持たない文字だけの導線は --side-link */
 	color: var(--side-fg);
 	/* --sidebar-width を見た目の幅そのものにする。
 	   境界線と、スクロールバーを内側へ寄せる帯を内訳に含めるため */
@@ -228,6 +230,41 @@
 	padding: 16px 16px 0;
 }
 
+/* 40px の丸いボタン。(閉じる・サイドバーの引き出し・左右の矢印・うごイラの再生)
+   画像の上に重なるので、地と枠でボタンだと分かるようにする。位置はそれぞれの規則が持つ */
+.close,
+.sidebar-toggle,
+.arrow,
+.ugoira-toggle {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 40px;
+	height: 40px;
+	padding: 0;
+	border: 1px solid var(--control-border);
+	border-radius: 50%;
+	background: var(--control-bg);
+	color: var(--fg);
+	cursor: pointer;
+}
+
+.close:hover,
+.sidebar-toggle:hover,
+.ugoira-toggle:hover,
+.arrow:hover:not(:disabled) {
+	background: var(--control-hover);
+}
+
+/* createIcon が返す svg は寸法を持たない。受け皿で必ず大きさを決める */
+.close svg,
+.sidebar-toggle svg,
+.arrow svg,
+.ugoira-toggle svg {
+	width: 24px;
+	height: 24px;
+}
+
 /* 主役のペイン (.frame / .ugoira / .blocked) は position: relative でステージ一杯に
    広がり、DOM 順でも後ろにある。重ね順を上げないとペインが上に乗り、
    押せるのはペインの外へはみ出た数 px だけになる (左上に当たり判定がずれて見える) */
@@ -236,28 +273,6 @@
 	top: 12px;
 	left: 12px;
 	z-index: 1;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 40px;
-	height: 40px;
-	padding: 0;
-	/* 画像の上に重なるので、背景と枠でボタンだと分かるようにする。左右の矢印と同じ形 */
-	border: 1px solid var(--control-border);
-	border-radius: 50%;
-	background: var(--control-bg);
-	color: var(--fg);
-	cursor: pointer;
-}
-
-.close:hover {
-	background: var(--control-hover);
-}
-
-/* createIcon が返す svg は寸法を持たない。受け皿で必ず大きさを決める */
-.close svg {
-	width: 24px;
-	height: 24px;
 }
 
 /* 作品ページへのリンク。閉じるボタンの右に、同じ高さ・同じ地の角丸で並べる。
@@ -335,25 +350,6 @@
 		right: 12px;
 		z-index: 1;
 		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 40px;
-		height: 40px;
-		padding: 0;
-		border: 1px solid var(--control-border);
-		border-radius: 50%;
-		background: var(--control-bg);
-		color: var(--fg);
-		cursor: pointer;
-	}
-
-	.sidebar-toggle:hover {
-		background: var(--control-hover);
-	}
-
-	.sidebar-toggle svg {
-		width: 24px;
-		height: 24px;
 	}
 
 	/* ページの枚数はボタンの左へずらし、縦はボタンの中心にそろえる。
@@ -386,21 +382,6 @@
 	position: absolute;
 	top: 50%;
 	transform: translateY(-50%);
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 40px;
-	height: 40px;
-	padding: 0;
-	border: 1px solid var(--control-border);
-	border-radius: 50%;
-	background: var(--control-bg);
-	color: var(--fg);
-	cursor: pointer;
-}
-
-.arrow:hover:not(:disabled) {
-	background: var(--control-hover);
 }
 
 /* 端に来たことを形で示す。押せないボタンを消すと位置が動いて目が迷う */
@@ -409,24 +390,24 @@
 	cursor: default;
 }
 
-.arrow svg {
-	width: 24px;
-	height: 24px;
-}
-
 .arrow-prev { left: 8px; }
 .arrow-next { right: 8px; }
 
-.counter {
-	position: absolute;
-	right: 12px;
-	top: 12px;
+/* ページ番号の札。ステージ (.counter) と原寸表示 (.zoom-counter) で同じ形 */
+.counter,
+.zoom-counter {
 	margin: 0;
 	padding: 2px 8px;
 	border-radius: 10px;
 	background: var(--surface);
 	color: var(--muted);
 	font-size: 12px;
+}
+
+.counter {
+	position: absolute;
+	right: 12px;
+	top: 12px;
 }
 
 /* 画像を押すと原寸表示に入れることを、カーソルで示す (設定がオンのときだけ付く class)。
@@ -536,8 +517,7 @@
 	height: 48px;
 	opacity: 0;
 	transition: opacity 120ms ease;
-	/* 白い画像の上でも沈まないように、影で縁を付ける */
-	filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.6));
+	filter: drop-shadow(0 0 3px var(--zoom-arrow-shadow));
 }
 
 .zoom-zone:hover:not(:disabled) svg {
@@ -549,12 +529,6 @@
 	position: fixed;
 	right: 12px;
 	top: 12px;
-	margin: 0;
-	padding: 2px 8px;
-	border-radius: 10px;
-	background: var(--surface);
-	color: var(--muted);
-	font-size: 12px;
 }
 
 /*
@@ -564,11 +538,6 @@
  */
 .zoom > .notice-area {
 	position: fixed;
-}
-
-/* うごイラの失敗表示は再生ボタンと同じ下端に並ぶので、ボタンの上へ逃がす */
-.ugoira > .pane-error {
-	bottom: 64px;
 }
 
 /* ペイン内のエラー行。画像を消さずに下へ重ねて出す */
@@ -616,8 +585,7 @@
 	object-fit: cover;
 }
 
-/* 取得前・取得失敗のアバター。(sidebar.js の createAvatar)
-   コメント一覧の投稿者アイコンも同じ仕組みに寄せられるよう、両方に当てておく */
+/* 取得前・取得失敗のアバター。(avatar.js の createAvatar) 作者とコメントの投稿者の両方が使う */
 .author-avatar.is-pending,
 .comment-avatar.is-pending {
 	visibility: hidden;
@@ -729,11 +697,8 @@
    数字は情報なので薄くしない。押せないことは色と cursor で示す */
 .count-action:disabled { cursor: default; }
 
-/* 済みの状態。塗りつぶしではなく色だけで示す */
-.count-action.is-on,
-.count-action.is-on:hover:not(:disabled) { color: var(--accent); }
-
-/* いいねとブックマークは色で見分ける。
+/* 済みの状態は塗りつぶしではなく色だけで示す。
+   いいねとブックマークは色で見分ける。
    上の .count-action:hover が指す --side-fg (ダークでは白に近い灰) だと 2 つの操作が同じ見た目になり、
    どちらを押そうとしているのか手元で分からない。
    ホバーと「済み」に同じ色を当てるのは、ホバーを結果の予告にするため。
@@ -1208,12 +1173,8 @@ a.comment-name:hover {
 /* コメントの入力欄。作品へのコメントと返信で同じ形を使う。
    配色と寸法は pixiv 本体の /artworks/ に寄せつつ、色はトークンで持つ
    (直値で焼き付けるとテーマ切替に追従しない) */
-/* 入力欄一式は border-box で組む。Shadow DOM にはホストページの reset が届かず、
-   この CSS も全体には box-sizing を敷いていないので、既定の content-box のままだと
-   width と padding が足し算になり、入力欄 (width: 100%) が入れ物からはみ出す。
-   全体に敷かないのは、.close / .arrow / .ugoira-toggle / .action の外寸が 2px 縮み、
-   .comment-picker には絵文字 8 列が入らなくなるため。
-   子孫まで当てておけば、後からこの中に部品を足しても同じ罠を踏まない */
+/* 入力欄一式は border-box で組む。content-box のままだと入力欄 (width: 100%) が入れ物からはみ出す。
+   後からこの中に足す部品も同じになるよう子孫まで当てる。(全体には敷かない) */
 .comment-form,
 .comment-form * {
 	box-sizing: border-box;
@@ -1599,9 +1560,6 @@ a.comment-name:hover {
 	height: 16px;
 }
 
-/* 有効になっている操作。塗りつぶしではなく色だけで示す */
-.action.is-on { color: var(--accent); border-color: var(--accent); }
-
 /* フォローだけは pixiv 本体と同じく塗りつぶす。作者行で最初に目に入る操作にする。
    地は本体の色をそのまま使う。ホバーも本体と同じ色を持っているので filter で作らない */
 .action-follow {
@@ -1703,6 +1661,18 @@ a.comment-name:hover {
 }
 
 .ugoira {
+	/* 操作の帯の幅の上限 */
+	--ugoira-controls-max: 560px;
+	/* 操作の帯の、ペインの下端からの距離 */
+	--ugoira-controls-bottom: 12px;
+	/* 操作の帯の外寸の高さ。再生ボタン 40px + 上下の余白 4px ずつ + 枠 1px ずつ。
+	   帯の中身の寸法を変えたらここも直す (失敗表示の位置がこれで決まる) */
+	--ugoira-controls-height: 50px;
+	/* 操作の帯と、その上に出す失敗表示の間 */
+	--ugoira-error-gap: 8px;
+	/* 速度のボタンの高さ */
+	--ugoira-rate-height: 32px;
+
 	position: relative;
 	display: flex;
 	align-items: center;
@@ -1723,13 +1693,13 @@ a.comment-name:hover {
 .ugoira-controls {
 	position: absolute;
 	left: 50%;
-	bottom: 12px;
+	bottom: var(--ugoira-controls-bottom);
 	transform: translateX(-50%);
 	box-sizing: border-box;
 	display: flex;
 	align-items: center;
 	gap: 10px;
-	width: min(560px, calc(100% - 24px));
+	width: min(var(--ugoira-controls-max), calc(100% - 24px));
 	padding: 4px 6px 4px 4px;
 	border: 1px solid var(--control-border);
 	border-radius: 999px;
@@ -1737,9 +1707,10 @@ a.comment-name:hover {
 	color: var(--fg);
 }
 
-/* .ugoira-controls の display はクラス指定なので、UA の [hidden] に勝ってしまう */
-.ugoira-controls[hidden] {
-	display: none;
+/* 失敗表示は下端に出るので、操作の帯が出ている間だけ帯の上へ逃がす。
+   失敗のほとんどは再生前 (帯が hidden) で、そのときは下端のまま */
+.ugoira-controls:not([hidden]) ~ .pane-error {
+	bottom: calc(var(--ugoira-controls-bottom) + var(--ugoira-controls-height) + var(--ugoira-error-gap));
 }
 
 /* シークバー。つまみと軌道を自前で描き、再生済み (--seek-played) と読み込み済み (--seek-loaded) を塗り分ける */
@@ -1808,7 +1779,7 @@ a.comment-name:hover {
 
 .ugoira-rate {
 	min-width: 48px;
-	height: 32px;
+	height: var(--ugoira-rate-height);
 	padding: 0 10px;
 	border: 0;
 	border-radius: 999px;
@@ -1870,23 +1841,7 @@ a.comment-name:hover {
 	font-weight: 400;
 }
 
+/* 形は閉じるボタンと同じ 40px の円。帯の中で縮ませない */
 .ugoira-toggle {
-	display: inline-flex;
 	flex: 0 0 auto;
-	align-items: center;
-	justify-content: center;
-	width: 40px;
-	height: 40px;
-	padding: 0;
-	border: 1px solid var(--control-border);
-	border-radius: 50%;
-	background: var(--control-bg);
-	color: var(--fg);
-	cursor: pointer;
-}
-
-.ugoira-toggle:hover { background: var(--control-hover); }
-.ugoira-toggle svg {
-	width: 24px;
-	height: 24px;
 }

@@ -76,7 +76,7 @@ test('返信の URL は page 始まりで組み立てる', () => {
 });
 
 test('ユーザーまわりの URL を組み立てる', () => {
-	assert.equal(userUrl('54734418'), '/ajax/user/54734418?full=1&lang=ja');
+	assert.equal(userUrl('54734418'), '/ajax/user/54734418?lang=ja');
 	assert.equal(userProfileAllUrl('54734418'), '/ajax/user/54734418/profile/all?lang=ja');
 });
 

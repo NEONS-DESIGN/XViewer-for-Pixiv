@@ -56,7 +56,8 @@ test('normalizeDetail は詳細をまとめ、いいね済みとブックマー�
 	assert.equal(detail.bookmarkId, '38764402172');
 	assert.deepEqual(detail.tags, ['オリジナル', '狛神みこと']);
 	assert.equal(detail.urls.original, 'https://i.pximg.net/img-original/o.png');
-	assert.equal(detail.thumbUrl, 'https://i.pximg.net/c/250x250/img-master/t.jpg');
+	assert.equal(detail.urls.thumb, 'https://i.pximg.net/c/250x250/img-master/t.jpg');
+	assert.equal('thumbUrl' in detail, false);
 	assert.equal(detail.commentOff, false);
 	assert.equal(detail.width, 2177);
 	assert.equal(detail.height, 3031);
@@ -140,7 +141,6 @@ test('normalizeDetail は CDN 以外の urls を落とす', () => {
 		},
 	});
 	assert.deepEqual(Object.keys(detail.urls), ['original']);
-	assert.equal(detail.thumbUrl, null);
 });
 
 test('isOwnWork は作者 ID と自分の ID を比べる', () => {
@@ -162,4 +162,15 @@ test('isOwnWork は判定できないときは false に倒す', () => {
 	assert.equal(isOwnWork({ userId: '16343044' }, { id: null }), false);
 	assert.equal(isOwnWork({ userId: null }, { id: '16343044' }), false);
 	assert.equal(isOwnWork(null, { id: '16343044' }), false);
+});
+
+test('normalizeDetail は pageCount を 1 以上の整数に倒し、欠けた title を空文字にする', () => {
+	// pageCount が欠けると分母が NaN になり、単ページの作品でも全ページの取得へ進む
+	const base = { illustId: '1', illustType: 0, xRestrict: 0, userId: '2', userName: 'y', urls: {} };
+	assert.equal(normalizeDetail(base).pageCount, 1);
+	assert.equal(normalizeDetail({ ...base, pageCount: 0 }).pageCount, 1);
+	assert.equal(normalizeDetail({ ...base, pageCount: 'x' }).pageCount, 1);
+	assert.equal(normalizeDetail({ ...base, pageCount: '3' }).pageCount, 3);
+	assert.equal(normalizeDetail({ ...base, pageCount: 2.7 }).pageCount, 2);
+	assert.equal(normalizeDetail(base).title, '');
 });

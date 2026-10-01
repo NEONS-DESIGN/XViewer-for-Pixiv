@@ -50,7 +50,7 @@ export default {
 		WORK_PAGE_TITLE: '在新分頁中開啟作品頁面',
 		SIDEBAR_OPEN: '開啟側邊欄',
 		SIDEBAR_CLOSE: '關閉側邊欄',
-		LOADING: '載入中...',
+		LOADING: '載入中…',
 		LOAD_FAILED: '無法載入作品',
 		NOT_FOUND: '找不到此作品。可能已被刪除或設為不公開',
 		NETWORK_FAILED: '通訊失敗。請確認網路連線後重新開啟',
@@ -168,7 +168,6 @@ export default {
 		PICK: '表情符號與貼圖',
 		STAMP_ALT: '貼圖',
 		STAMP_CLEAR: '取消選擇的貼圖',
-		FAILED: '無法發表評論',
 	},
 	commentPicker: {
 		EMOJI: '表情符號',
@@ -292,7 +291,7 @@ export default {
 			},
 			viewerOnUser: {
 				label: '在使用者頁面使用',
-				description: '從作者頁面的作品列表開啟時顯示檢視器。',
+				description: '從使用者頁面的作品列表開啟時顯示檢視器。',
 			},
 			viewerOnHome: {
 				label: '在首頁使用',
@@ -300,7 +299,7 @@ export default {
 			},
 			viewerOnSearch: {
 				label: '在搜尋結果中使用',
-				description: '從標籤搜尋結果開啟時顯示檢視器。',
+				description: '從搜尋結果（標籤頁面與搜尋頁面）開啟時顯示檢視器。',
 			},
 			showSidebar: {
 				label: '顯示側邊欄',
@@ -354,7 +353,7 @@ export default {
 					? { label: '前後 1 張', description: '只預先載入相鄰的 1 張。' }
 					: {
 						label: `前後 ${count} 張`,
-						description: `預先載入到往後第 ${count} 張為止。連續瀏覽時更流暢。`,
+						description: `預先載入前後各 ${count} 張。連續瀏覽時更流暢。`,
 					}),
 			},
 			prefetchCustom: {
@@ -406,8 +405,8 @@ export default {
 				option: (value) => `${value}%`,
 			},
 			navZoneMode: {
-				label: '螢幕邊緣點擊區域寬度',
-				description: '點擊螢幕邊緣翻頁時所用邊緣的寬度，為相對於圖片顯示區域的比例。選擇自訂時，可分別設定左右邊緣與上下邊緣。',
+				label: '畫面邊緣點擊區域寬度',
+				description: '點擊畫面邊緣翻頁時所用邊緣的寬度，為相對於圖片顯示區域的比例。選擇自訂時，可分別設定左右邊緣與上下邊緣。',
 				/**
 				 * 「カスタム」の選択肢。値は選択肢の下に出るレンジで選ぶ。
 				 * @param {number} min 選べる最小の値 (%)
@@ -436,7 +435,7 @@ export default {
 			},
 			zoomZoneMode: {
 				label: '原尺寸顯示的點擊區域寬度',
-				description: '在原尺寸顯示畫面中，點擊左右邊緣翻頁的範圍寬度。',
+				description: '在原尺寸顯示畫面中，用於翻頁的左右邊緣寬度。',
 				/**
 				 * 「カスタム」の選択肢。値は選択肢の下に出るレンジで選ぶ。
 				 * @param {number} min 選べる最小の値 (%)
@@ -521,7 +520,7 @@ export default {
 				description: '按 Tab 移到下一個作品時的跳過方式。',
 				both: {
 					label: '跳過收藏與標題',
-					description: '每張卡片會依序經過「縮圖 → 收藏 → 標題」3 個位置。跳過後按 1 次 Tab 即可移到下一個作品，跳過的操作可在檢視器中進行。',
+					description: '使用者頁面的卡片會依序經過「縮圖 → 收藏 → 標題」3 個位置。跳過後按 1 次 Tab 即可移到下一個作品。在首頁與搜尋結果中，不會跳過作者的連結。',
 				},
 				title: {
 					label: '只跳過標題',

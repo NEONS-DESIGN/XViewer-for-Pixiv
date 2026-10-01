@@ -51,7 +51,7 @@ export default {
 		WORK_PAGE_TITLE: '在新标签页中打开作品页面',
 		SIDEBAR_OPEN: '打开侧边栏',
 		SIDEBAR_CLOSE: '关闭侧边栏',
-		LOADING: '加载中...',
+		LOADING: '加载中…',
 		LOAD_FAILED: '无法加载作品',
 		NOT_FOUND: '找不到该作品。可能已被删除或设为非公开',
 		NETWORK_FAILED: '通信失败。请检查网络连接后重新打开',
@@ -124,7 +124,7 @@ export default {
 		 * @param {string} formattedCount 桁区切り済みの件数
 		 * @returns {string} 読み上げ名
 		 */
-		countLabel: (label, formattedCount) => `${label}：${formattedCount}`,
+		countLabel: (label, formattedCount) => `${label} ${formattedCount}`,
 	},
 	comments: {
 		HEADING: '评论',
@@ -169,7 +169,6 @@ export default {
 		PICK: '表情和贴图',
 		STAMP_ALT: '贴图',
 		STAMP_CLEAR: '取消所选的贴图',
-		FAILED: '无法发表评论',
 	},
 	commentPicker: {
 		EMOJI: '表情',
@@ -220,8 +219,8 @@ export default {
 		DONE: '已显示全部作品',
 	},
 	theme: {
-		TO_LIGHT: '切换到日间模式',
-		TO_DARK: '切换到夜间模式',
+		TO_LIGHT: '切换到浅色模式',
+		TO_DARK: '切换到深色模式',
 	},
 	licenses: {
 		disclaimer: {
@@ -293,7 +292,7 @@ export default {
 			},
 			viewerOnUser: {
 				label: '在用户页面使用',
-				description: '从作者页面的作品列表打开时显示查看器。',
+				description: '从用户页面的作品列表打开时显示查看器。',
 			},
 			viewerOnHome: {
 				label: '在首页使用',
@@ -301,7 +300,7 @@ export default {
 			},
 			viewerOnSearch: {
 				label: '在搜索结果中使用',
-				description: '从标签搜索结果打开时显示查看器。',
+				description: '从搜索结果（标签页面和搜索页面）打开时显示查看器。',
 			},
 			showSidebar: {
 				label: '显示侧边栏',
@@ -407,8 +406,8 @@ export default {
 				option: (value) => `${value}%`,
 			},
 			navZoneMode: {
-				label: '屏幕边缘点击区域宽度',
-				description: '点击屏幕边缘翻页时所用边缘的宽度，为相对于图片显示区域的比例。选择自定义时，可分别设置左右边缘和上下边缘。',
+				label: '画面边缘点击区域宽度',
+				description: '点击画面边缘翻页时所用边缘的宽度，为相对于图片显示区域的比例。选择自定义时，可分别设置左右边缘和上下边缘。',
 				/**
 				 * 「カスタム」の選択肢。値は選択肢の下に出るレンジで選ぶ。
 				 * @param {number} min 選べる最小の値 (%)
@@ -437,7 +436,7 @@ export default {
 			},
 			zoomZoneMode: {
 				label: '原图显示的点击区域宽度',
-				description: '在原图显示画面中，点击左右边缘翻页的范围宽度。',
+				description: '在原图显示画面中，用于翻页的左右边缘的宽度。',
 				/**
 				 * 「カスタム」の選択肢。値は選択肢の下に出るレンジで選ぶ。
 				 * @param {number} min 選べる最小の値 (%)
@@ -457,7 +456,7 @@ export default {
 			},
 			commentPageSize: {
 				label: '一次读取的评论数',
-				description: '打开时和点击「浏览更多」时读取的条数。从下一个打开的作品开始生效。',
+				description: '打开时和点击“浏览更多”时读取的条数。从下一个打开的作品开始生效。',
 				/**
 				 * 選択肢の見出し。値から作る。
 				 * @param {number} value 選択肢の値
@@ -522,7 +521,7 @@ export default {
 				description: '按 Tab 移到下一个作品时的跳过方式。',
 				both: {
 					label: '跳过收藏和标题',
-					description: '每张卡片会依次经过“缩略图 → 收藏 → 标题”这 3 个位置。跳过后按一次 Tab 即可移到下一个作品，被跳过的操作可以在查看器中完成。',
+					description: '用户页面的卡片会依次经过“缩略图 → 收藏 → 标题”这 3 个位置。跳过后按一次 Tab 即可移到下一个作品。在首页和搜索结果中，不会跳过作者的链接。',
 				},
 				title: {
 					label: '仅跳过标题',

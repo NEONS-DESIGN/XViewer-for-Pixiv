@@ -142,6 +142,8 @@ let observedPath = null;
 let checkTimer = 0;
 /** 遷移通知から無限スクロールの追従までの遅延タイマ ID。0 なら動いていない */
 let infiniteSyncTimer = 0;
+/** 監視を外したとき、モーダルを閉じる popstate を待ってから継ぎ足しを撤去する購読を張っているか */
+let awaitingCloseForDispose = false;
 
 /**
  * 作品が開かれたときの処理。
@@ -270,7 +272,6 @@ function stop() {
 	activeKind = null;
 	gridListener?.dispose();
 	gridListener = null;
-	// 外したフォーカス順は必ず戻す。戻さないと pixiv 標準の Tab が壊れたままになる
 	router?.dispose();
 	router = null;
 	viewer?.dispose();
@@ -359,6 +360,18 @@ function isGridDetached() {
 }
 
 /**
+ * 無限スクロールを使っておらず、何も張っていないか。
+ * 設定がオフか対象外のページで、継ぎ足しも張りかけのキーも無ければ、
+ * URL が変わらない限り syncInfinite() を走らせても判断は前回と同じになる。
+ * @returns {boolean} 合わせ直す必要が無ければ true
+ */
+function isInfiniteIdle() {
+	if (infinite || infiniteKey !== null) return false;
+	const wanted = settings?.infiniteScroll ?? INFINITE_SCROLL.OFF;
+	return wanted === INFINITE_SCROLL.OFF || !isInfiniteScrollTarget(location.pathname);
+}
+
+/**
  * ul にある画像の数。張れなかった ul が描き進んだかを見る手掛かり。(infiniteListImages)
  * @param {Element} ul グリッドの ul
  * @returns {number} img の数。数えられなければ -1
@@ -402,12 +415,8 @@ function isOnAttachedGrid() {
  * @returns {void}
  */
 function disposeInfinite() {
-	// 撤去するとグリッドには pixiv が並べたぶんしか残らない。URL の ?p= もそこへ戻し、
-	// 「自分が書いた値」の記憶も揃える。URL・グリッド・記憶の 3 つを常に一致させるのが狙いで、
-	// ずれたままだと「戻ったつもりでページャを踏んだ番号」を自分の書き込みと取り違える。
-	// 張っていたグリッドをまだ見ているときだけ書く。既に別のページへ移っていたら、
-	// 今の URL は別のグリッドのものなので触らない。
-	// writePageParam() も同じ判定で守っているので、infiniteKey を消す前に書く
+	// 撤去後のグリッドは pixiv が並べたぶんだけになるので、?p= も基準ページへ戻す。
+	// 張っていたグリッドを見ているときだけ書く。判定が infiniteKey を見るので、消す前に書く
 	if (isOnAttachedGrid()) writePageParam(infiniteBasePage);
 	infinite?.dispose();
 	infinite = null;
@@ -446,10 +455,8 @@ function syncInfinite() {
 
 /**
  * 遷移の通知を受けてから、少し待って無限スクロールを合わせる。
- * inject.js の通知は pixiv の pushState の中で同期に届くので、その場で合わせると
- * React がまだ前のグリッドを描いている時点で雛形の採取 (強制スタイル計算) と sentinel の
- * 挿入が走る。pixiv のルーター呼び出しの中で重い DOM 走査をしないよう、間隔を置く。
- * 待っている間に届いた通知は 1 回にまとめる。
+ * 通知の時点では React がまだ前のページを描いているので、描き替わるのを待つ。
+ * 待っている間に届いた通知は 1 回にまとめる。(最初の通知から LOCATION_CHECK_DELAY_MS 後に走る)
  * @returns {void}
  */
 function scheduleInfiniteSync() {
@@ -484,8 +491,8 @@ function syncInfiniteOnce() {
 		attachedKey: infiniteKey,
 		active,
 		detached: isGridDetached(),
-		// 張れていないときだけ DOM を見る。張れているうちは querySelector も走らせない
-		listChanged: infiniteKey !== null && !active && hasGridChanged(),
+		// 同じグリッドで張れていないときだけ DOM を見る。張れているうちは querySelector も走らせない
+		listChanged: infiniteKey !== null && infiniteKey === key && !active && hasGridChanged(),
 		param: parsePageParam(location.search),
 		ownPage: infiniteOwnPage,
 		basePage: infiniteBasePage,
@@ -627,10 +634,7 @@ function startNavigationWatch() {
 	};
 	const onPopState = () => {
 		observedPath = location.pathname;
-		// Next.js の popstate 処理は非同期で、この時点の DOM は戻る前のページのまま。
-		// 同期で合わせると前のページの ul (例: ブックマーク) に別のキーで継ぎ足しを張ってしまう。
-		// pushState と同じく React の描画が済むのを待つ。張ったままのグリッドへ戻った場合の
-		// ?p= の揃え直しは、遅延後の syncInfinite() が RESTORE_PARAM / REATTACH で行う
+		// この時点の DOM は戻る前のページのまま。無限スクロールの追従は描き替わるのを待つ
 		handleLocationChange({ deferInfinite: true });
 	};
 	window.addEventListener(NAV_EVENTS.NAVIGATE, onNavigate);
@@ -648,11 +652,10 @@ function startNavigationWatch() {
 				handleLocationChange();
 				return;
 			}
-			// URL は変わっていないが、ページを直接開いたときは content script のほうが
-			// React の描画より早く、継ぎ足す先の ul がここで初めて現れる。
-			// この経路が無いと、直接開いたページで無限スクロールが始まらない。
-			// (URL が変わらないので handleLocationChange() が来ない)
-			// グリッドを描き直されて張り先が外れたときも、ここで張り直す。
+			// 遷移の通知から遅らせた追従が控えている間は合わせない。(前のページの ul に張ってしまう)
+			// 無限スクロールを使っていなければ、URL が変わらない限り合わせ直すものは無い
+			if (infiniteSyncTimer || isInfiniteIdle()) return;
+			// 直接開いたページで ul が現れたときと、描き直されて張り先が外れたときに張る。
 			// 張れているうちは何もしないので、費用は間隔ごとに判定 1 回で済む
 			if (!infinite?.isActive() || isGridDetached()) syncInfinite();
 		}, LOCATION_CHECK_DELAY_MS);
@@ -684,7 +687,20 @@ function stopNavigationWatch() {
 	// 素通りするので、ここで解体しないと継ぎ足したカードがページに残ってしまう。
 	// グリッドについての記憶は残す。監視していない間に描き直されても、
 	// 最後に見た ul が外れていることで次に張るときに気付ける
-	disposeInfinite();
+	if (isViewingOwnWork()) {
+		// 閉じるための history.back() がまだ届いていない。URL が作品ページのままだと
+		// ?p= を基準ページへ書き戻せないので、一覧へ戻ってから撤去する。
+		// 待つ間に監視を張り直されたら、継ぎ足しはそちらが引き継ぐ。待ちは 1 本だけ張る
+		if (!awaitingCloseForDispose) {
+			awaitingCloseForDispose = true;
+			window.addEventListener('popstate', () => {
+				awaitingCloseForDispose = false;
+				if (!navigationWatch) disposeInfinite();
+			}, { once: true });
+		}
+	} else {
+		disposeInfinite();
+	}
 	if (!navigationWatch) return;
 	navigationWatch.dispose();
 	navigationWatch = null;

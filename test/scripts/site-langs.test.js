@@ -7,6 +7,7 @@ import {
 	renderPage,
 	renderSitemap,
 	syncSiteLanguages,
+	localDate,
 } from '../../scripts/site-langs.mjs';
 
 const [JA, EN, KO] = SITE_LANGUAGES;
@@ -68,6 +69,18 @@ test('renderSitemap は全ページを並べ、既存の lastmod を引き継ぐ
 	assert.equal(xml.match(/<url>/g).length, SITE_LANGUAGES.length * 2);
 	assert.match(xml, /<loc>https:\/\/xviewer\.neonsdesign\.com\/<\/loc>\n\t\t<lastmod>2026-01-01<\/lastmod>/);
 	assert.match(xml, /<loc>https:\/\/xviewer\.neonsdesign\.com\/zh-tw\/privacy\.html<\/loc>\n\t\t<lastmod>2026-09-28<\/lastmod>/);
+});
+
+test('localDate は手元の日付を 0 埋めの YYYY-MM-DD にする', () => {
+	// 月と日は 1 桁でも 2 桁にする
+	assert.equal(localDate(new Date(2026, 0, 5, 12, 0)), '2026-01-05');
+	assert.equal(localDate(new Date(2026, 11, 31, 12, 0)), '2026-12-31');
+});
+
+test('localDate は UTC ではなく手元の時刻の日付を返す', () => {
+	// 手元の 0 時台は UTC だと前日になる地域 (日本など) があるが、手元の日付を返す
+	const midnight = new Date(2026, 9, 2, 0, 30);
+	assert.equal(localDate(midnight), '2026-10-02');
 });
 
 test('site/ の全ページと sitemap.xml は言語の表と揃っている', async () => {

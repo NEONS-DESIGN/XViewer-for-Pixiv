@@ -1,10 +1,16 @@
-import { test } from 'node:test';
+import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { pickPageUrls, pickPageSizes, prefetchTargets, releaseTargets, createImagePane } from '../../src/content/viewer/image-pane.js';
-import { fakeElement, fakeDoc, find, findAll } from '../helpers/dom.js';
+import { fakeElement, fakeDoc, find, findAll, flush } from '../helpers/dom.js';
 import { fakeFetch, fakeApiFetch } from '../helpers/pixiv.js';
 import { createStrings } from '../../src/i18n/index.js';
 import { PREFETCH_RELEASE_MARGIN, IMAGE_QUALITY } from '../../src/common/constants.js';
+import { getJson } from '../../src/pixiv/client.js';
+import { clearIllustAssetCache } from '../../src/pixiv/illust-assets.js';
+
+// /pages は作品単位で覚えて共有する。テストの間で覚えた応答を持ち越さない。
+// 共有の取得を通るので fetch は render() の同期部分では呼ばれない。応答を返す前に flush() で待つ
+beforeEach(() => { clearIllustAssetCache(); });
 
 /** 実際の CDN と同じ形の URL を作る。安全側の関門を通す必要があるため。 */
 const cdn = (name) => `https://i.pximg.net/img-master/img/2026/09/10/00/00/00/${name}.jpg`;
@@ -113,7 +119,7 @@ function fakeZoom() {
 /**
  * 画像ペインを組み立てる。
  * @param {object} [options] 差し替え
- * @param {Function} [options.fetchImpl] 通信の代わり
+ * @param {Function} [options.fetchImpl] 通信の代わり (fetch の形)。getJson を通して /pages の取得に使う
  * @param {number} [options.prefetch] 先読みの枚数
  * @param {boolean} [options.clickZoom] クリックで原寸表示するか
  * @param {string} [options.imageQuality] 表示解像度の設定
@@ -129,7 +135,7 @@ function build({ fetchImpl, prefetch = 0, clickZoom = false, imageQuality = IMAG
 		container,
 		settings: { imageQuality, prefetch, clickZoom },
 		zoom,
-		fetchImpl,
+		getJsonImpl: fetchImpl ? (url) => getJson(url, { fetchImpl }) : undefined,
 		strings,
 		createImage: () => {
 			const img = fakeElement('img');
@@ -173,6 +179,7 @@ test('分母と矢印は detail.pageCount で先に出る', async () => {
 	assert.equal(find(container, '.arrow-prev').hidden, false);
 	assert.equal(find(container, '.arrow-next').hidden, false);
 	assert.equal(find(container, '.arrow-next').disabled, false);
+	await flush();
 	respond({ ok: true, status: 200, text: async () => JSON.stringify({ error: false, body: PAGES }) });
 	await rendering;
 });
@@ -186,6 +193,7 @@ test('/pages の前に押された → は届いた時点で反映される', as
 	// 実ページがまだ 1 枚しか無いので、行き先だけ覚えて表示は動かさない
 	assert.equal(find(container, '.counter').textContent, '1/3');
 	assert.equal(find(container, 'img').src, cdn('r0'));
+	await flush();
 	respond({ ok: true, status: 200, text: async () => JSON.stringify({ error: false, body: PAGES }) });
 	await rendering;
 	assert.equal(find(container, '.counter').textContent, '2/3');
@@ -201,6 +209,7 @@ test('/pages の前に → → と押すと、届いた時点で 3 ページ目�
 	pane.next();
 	// 分母を超える分は捨てる
 	pane.next();
+	await flush();
 	respond({ ok: true, status: 200, text: async () => JSON.stringify({ error: false, body: PAGES }) });
 	await rendering;
 	assert.equal(find(container, '.counter').textContent, '3/3');
@@ -214,6 +223,7 @@ test('/pages の前に → ← と押すと、届いた時点で 1 ページ目�
 	const rendering = pane.render(DETAIL);
 	pane.next();
 	pane.prev();
+	await flush();
 	respond({ ok: true, status: 200, text: async () => JSON.stringify({ error: false, body: PAGES }) });
 	await rendering;
 	assert.equal(find(container, '.counter').textContent, '1/3');
@@ -262,6 +272,7 @@ test('dispose した後に /pages が届いても DOM を触らない', async ()
 	pane.dispose();
 	assert.equal(container.children.length, 0);
 	// 応答は client.js が text() で読む形にする。(json() だけだと network 失敗の経路に落ちて成功経路を通らない)
+	await flush();
 	respond({ ok: true, status: 200, text: async () => JSON.stringify({ error: false, body: PAGES }) });
 	await rendering;
 	// 捨てた枠は書き換えない。分母は破棄前に detail.pageCount で先に出ていた値のまま
@@ -276,28 +287,38 @@ test('dispose した後に /pages が失敗してもエラーを出さない', a
 	const rendering = pane.render(DETAIL);
 	const frame = find(container, '.frame');
 	pane.dispose();
+	await flush();
 	reject(new TypeError('Failed to fetch'));
 	await rendering;
 	assert.equal(find(frame, '.pane-error'), null);
 });
 
-test('dispose すると /pages の取得の signal を中断する', () => {
-	let capturedInit;
-	const fetchImpl = (url, init) => { capturedInit = init; return new Promise(() => {}); };
-	const { pane } = build({ fetchImpl });
-	void pane.render(DETAIL);
+test('dispose した後に届いた /pages は使わない', async () => {
+	// /pages の取得は共有するので中断しない。捨てた後に届いた結果で描かない
+	let respond;
+	const fetchImpl = () => new Promise((resolve) => { respond = resolve; });
+	const { container, pane } = build({ fetchImpl });
+	const rendering = pane.render(DETAIL);
+	const frame = find(container, '.frame');
+	const counter = find(frame, '.counter');
 	pane.dispose();
-	assert.equal(capturedInit.signal.aborted, true);
+	await flush();
+	respond({ ok: true, status: 200, text: async () => JSON.stringify({ error: false, body: PAGES }) });
+	await rendering;
+	assert.equal(counter.textContent, '1/3');
+	assert.equal(find(frame, '.pane-error'), null);
 });
 
-test('中断による失敗ではエラー行を出さない', async () => {
-	// fetch が中断されたときの例外 (DOMException 相当)。client.js が PixivError(ABORTED) に揃える
-	const abortError = new Error('aborted');
-	abortError.name = 'AbortError';
-	const { impl } = fakeFetch({ throws: abortError });
-	const { container, pane } = build({ fetchImpl: impl });
-	await pane.render(DETAIL);
-	assert.equal(find(container, '.pane-error'), null);
+test('同じ作品をもう一度描くときは /pages を取り直さない', async () => {
+	// 作品を行き来したり、設定で描き直したりしたとき
+	const { impl, calls } = fakeApiFetch(PAGES);
+	const first = build({ fetchImpl: impl });
+	await first.pane.render(DETAIL);
+	first.pane.dispose();
+	const second = build({ fetchImpl: impl });
+	await second.pane.render(DETAIL);
+	assert.equal(calls.length, 1);
+	assert.equal(find(second.container, '.counter').textContent, '1/3');
 });
 
 test('/pages が届いても 1 枚目の src を書き直さない', async () => {
@@ -376,6 +397,7 @@ test('1 枚目が /pages より先に失敗しても、届いた後に先読み�
 	await image.dispatch('error');
 	// /pages がまだ届いていないので先読み先の URL が無い
 	assert.equal(created.length, 0);
+	await flush();
 	respond({ ok: true, status: 200, text: async () => JSON.stringify({ error: false, body: PAGES }) });
 	await rendering;
 	assert.deepEqual(created.map((img) => img.src), [cdn('r1')]);
@@ -509,9 +531,86 @@ test('原寸表示でページを送るとペインも追従する', async () =>
 	await pane.render(DETAIL);
 	await find(container, 'img').dispatch('click', {});
 	zoom.opened[0].onIndexChange(2);
-	// 閉じたときに同じページが出ていないと、見ていた場所を見失う
-	assert.equal(find(container, 'img').src, cdn('r2'));
+	// 開いている間は番号とカウンタだけ合わせ、見えていない img は読み込まない
 	assert.equal(find(container, '.counter').textContent, '3/3');
+	assert.equal(find(container, 'img').src, cdn('r0'));
+	// 閉じたときに同じページが出ていないと、見ていた場所を見失う
+	zoom.opened[0].onClose();
+	assert.equal(find(container, 'img').src, cdn('r2'));
+});
+
+test('原寸表示を開いている間は先読みも始めない', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { container, pane, zoom, created } = build({ fetchImpl: impl, clickZoom: true, prefetch: 1 });
+	await pane.render(DETAIL);
+	await find(container, 'img').dispatch('click', {});
+	const image = find(container, 'img');
+	image.complete = true;
+	image.naturalWidth = 1;
+	await image.dispatch('load');
+	zoom.opened[0].onIndexChange(1);
+	assert.equal(created.length, 0, '開く前の読み終わり待ちも外している');
+	zoom.opened[0].onClose();
+	image.complete = true;
+	await image.dispatch('load');
+	assert.deepEqual(created.map((img) => img.src).sort(), [cdn('r0'), cdn('r2')]);
+});
+
+test('原寸表示で送った後の仮表示は、そのページを出していない img の URL を返さない', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { container, pane, zoom } = build({ fetchImpl: impl, clickZoom: true });
+	await pane.render(DETAIL);
+	const image = find(container, 'img');
+	image.complete = true;
+	image.naturalWidth = 1;
+	await image.dispatch('load');
+	await image.dispatch('click', {});
+	zoom.opened[0].onIndexChange(1);
+	// img は 1 枚目のまま。1 枚目の URL を 2 ページ目の仮表示に使わない
+	assert.equal(zoom.opened[0].placeholderAt(1), null);
+	assert.equal(zoom.opened[0].placeholderAt(0), cdn('r0'));
+});
+
+test('/pages が届く前に開いた原寸表示へ、届いた並びを渡す', async () => {
+	let respond;
+	const fetchImpl = () => new Promise((resolve) => { respond = resolve; });
+	const updated = [];
+	const zoom = { ...fakeZoom(), isOpen: () => true, updatePages: (pages) => { updated.push(pages); } };
+	zoom.open = (pages) => { zoom.opened.push(pages); };
+	const { container, pane } = build({ fetchImpl, clickZoom: true, zoom });
+	const rendering = pane.render(DETAIL);
+	await find(container, 'img').dispatch('click', {});
+	await flush();
+	respond({ ok: true, status: 200, text: async () => JSON.stringify({ error: false, body: PAGES }) });
+	await rendering;
+	assert.equal(updated.length, 1);
+	assert.deepEqual(updated[0].urls, [cdn('o0'), cdn('o1'), cdn('o2')]);
+	assert.equal(updated[0].sizes.length, 3);
+});
+
+test('原寸表示が開かなかったときは今までどおり描く', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const zoom = { ...fakeZoom(), isOpen: () => false };
+	zoom.open = (pages) => { zoom.opened.push(pages); };
+	const { container, pane } = build({ fetchImpl: impl, clickZoom: true, zoom });
+	await pane.render(DETAIL);
+	await find(container, 'img').dispatch('click', {});
+	pane.next();
+	assert.equal(find(container, 'img').src, cdn('r1'));
+});
+
+test('pageIndex は今のページを返し、/pages 待ちなら覚えた行き先を返す', async () => {
+	let respond;
+	const fetchImpl = () => new Promise((resolve) => { respond = resolve; });
+	const { pane } = build({ fetchImpl });
+	const rendering = pane.render(DETAIL);
+	pane.next();
+	assert.equal(pane.pageIndex(), 1);
+	await flush();
+	respond({ ok: true, status: 200, text: async () => JSON.stringify({ error: false, body: PAGES }) });
+	await rendering;
+	pane.next();
+	assert.equal(pane.pageIndex(), 2);
 });
 
 test('/pages 前は詳細の width/height を仮表示の実寸として渡す', async () => {
@@ -522,6 +621,7 @@ test('/pages 前は詳細の width/height を仮表示の実寸として渡す',
 	await find(container, 'img').dispatch('click', {});
 	assert.deepEqual(zoom.opened[0].sizes, [{ width: 2177, height: 3031 }]);
 	assert.equal(typeof zoom.opened[0].placeholderAt, 'function');
+	await flush();
 	respond({ ok: true, status: 200, text: async () => JSON.stringify({ error: false, body: PAGES }) });
 	await rendering;
 });
@@ -573,8 +673,9 @@ test('原寸内でページを戻すと、以後の先読みは戻った向き�
 	pane.next();
 	await find(container, 'img').dispatch('click', {});
 	created.length = 0;
-	// 原寸内で 3 -> 1 へ戻る
+	// 原寸内で 3 -> 1 へ戻って閉じる
 	zoom.opened[0].onIndexChange(1);
+	zoom.opened[0].onClose();
 	const image = find(container, 'img');
 	image.complete = true;
 	image.naturalWidth = 1;
@@ -591,6 +692,7 @@ test('/pages 待ちの間に原寸表示を開くと、待っていた行き先�
 	// /pages 待ちなので、この矢印は pendingIndex にだけ覚える
 	pane.next();
 	await find(container, 'img').dispatch('click', {});
+	await flush();
 	respond({ ok: true, status: 200, text: async () => JSON.stringify({ error: false, body: PAGES }) });
 	await rendering;
 	// 原寸表示を開いたことで pendingIndex を捨てているので、1 枚目のまま
@@ -631,6 +733,7 @@ test('canMove は /pages 待ちに覚えた行き先を起点にする', async (
 	pane.next();
 	pane.next();
 	assert.equal(pane.canMove(1), false);
+	await flush();
 	respond({ ok: true, status: 200, text: async () => JSON.stringify({ error: false, body: PAGES }) });
 	await rendering;
 });
@@ -651,6 +754,7 @@ test('startPage を渡すと、/pages が届いた時点でそのページへ移
 	const rendering = pane.render(DETAIL, { startPage: 2 });
 	// /pages が届くまでは手元にある 1 枚目を出す
 	assert.equal(find(container, '.counter').textContent, '1/3');
+	await flush();
 	respond({ ok: true, status: 200, text: async () => JSON.stringify({ error: false, body: PAGES }) });
 	await rendering;
 	assert.equal(find(container, '.counter').textContent, '3/3');

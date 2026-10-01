@@ -69,6 +69,12 @@ export function createCommentPicker(deps) {
 	let opener = null;
 	/** @type {HTMLElement|null} 今差し込んでいる先。どの入力欄で開いているかの判断に使う */
 	let currentSlot = null;
+	/**
+	 * タブごとに組み立てた項目。中身は入力欄に依存しない (選ばれたときの受け口は押された時点で handlers から引く) ので、
+	 * 一度作ったら開き直し・タブの切り替えで使い回す
+	 * @type {Map<string, HTMLButtonElement[]>}
+	 */
+	const builtItems = new Map();
 
 	/**
 	 * 項目を 1 つ作る。
@@ -99,27 +105,34 @@ export function createCommentPicker(deps) {
 	}
 
 	/**
-	 * 今のタブの中身を並べ直す。
-	 * @returns {void}
+	 * タブ 1 枚分の項目を組み立てる。
+	 * @param {string} key タブの種別 (TABS の key)
+	 * @returns {HTMLButtonElement[]} 項目
 	 */
-	function renderGrid() {
-		grid.textContent = '';
-		grid.dataset.tab = current;
-		if (current === 'emoji') {
-			for (const [name, id] of Object.entries(PIXIV_EMOJI)) {
-				grid.appendChild(createItem('is-emoji', `(${name})`, emojiUrl(id), `(${name})`, () => {
-					handlers?.onEmoji(name);
-					close();
-				}));
-			}
-			return;
-		}
-		for (const id of stampIds()) {
-			grid.appendChild(createItem('is-stamp', `${strings.commentPicker.STAMP} ${id}`, stampUrl(id), id, () => {
-				handlers?.onStamp(id);
+	function buildItems(key) {
+		if (key === 'emoji') {
+			return Object.entries(PIXIV_EMOJI).map(([name, id]) => createItem('is-emoji', `(${name})`, emojiUrl(id), `(${name})`, () => {
+				handlers?.onEmoji(name);
 				close();
 			}));
 		}
+		return stampIds().map((id) => createItem('is-stamp', `${strings.commentPicker.STAMP} ${id}`, stampUrl(id), id, () => {
+			handlers?.onStamp(id);
+			close();
+		}));
+	}
+
+	/**
+	 * 今のタブの中身を並べる。既に今のタブを並べていれば何もしない。
+	 * 項目はタブごとに 1 度だけ作り、2 回目からは作ったものを差し直す
+	 * @returns {void}
+	 */
+	function renderGrid() {
+		if (grid.dataset.tab === current) return;
+		if (!builtItems.has(current)) builtItems.set(current, buildItems(current));
+		grid.textContent = '';
+		grid.dataset.tab = current;
+		grid.append(...builtItems.get(current));
 	}
 
 	/**
@@ -344,6 +357,7 @@ export function createCommentPicker(deps) {
 			panel = null;
 			grid = null;
 			tabs = [];
+			builtItems.clear();
 		},
 	};
 }

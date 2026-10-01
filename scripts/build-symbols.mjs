@@ -22,7 +22,6 @@ const ICON_SOURCES = {
 	openInNew: 'open_in_new-fill',
 	error: 'error-fill',
 	info: 'info-fill',
-	refresh: 'refresh-fill',
 	share: 'share-fill',
 	link: 'link-fill',
 	expandMore: 'keyboard_arrow_down-fill',
@@ -73,9 +72,15 @@ const BRAND_SOURCE_DIR = 'node_modules/@fortawesome/fontawesome-free/svgs/brands
 /** 生成先。 */
 const OUTPUT_PATH = 'src/common/icon-shapes.js';
 
+/** Font Awesome Free の package.json。出典の見出しに版を書くために読む。 */
+const BRAND_PACKAGE_JSON = 'node_modules/@fortawesome/fontawesome-free/package.json';
+
+/** 生成物の改行。リポジトリの作業ツリーの改行 (CRLF) に揃える。 */
+const OUTPUT_EOL = '\r\n';
+
 /**
  * SVG の中のコメント。Font Awesome は各ファイルの先頭に帰属のコメントを持つ。
- * 帰属は HEADER と NOTICE に書いてあるので、図形データには残さない。
+ * 帰属は生成物の先頭のコメント (header) と NOTICE に書いてあるので、図形データには残さない。
  * (残すと parseSvgElements が要素の並びとして読めずに止まる)
  */
 const SVG_COMMENT_PATTERN = /<!--[\s\S]*?-->/g;
@@ -157,34 +162,69 @@ function deepFreeze(value) {
 }
 `;
 
-/** 生成物の先頭に付ける注意書きと出典。 */
-const HEADER = `/**
- * 生成物。手で編集しない。scripts/build-symbols.mjs で作り直す。
- * 図形の出典:
- * - Material Symbols (Rounded, weight 400, FILL 1) / Apache-2.0
- *   https://github.com/google/material-design-icons
- * - Font Awesome Free 7 の brands (brandX / brandFacebook / brandMastodon) / CC BY 4.0
- *   https://fontawesome.com/license/free
- * ただし CUSTOM_SHAPES にある図形 (like) だけは自前で描いたもの。
+/**
+ * 生成物の先頭に付ける注意書きと出典。名前と版は表とパッケージから組むので、図形を足し引きしても古くならない。
+ * @param {string} brandVersion Font Awesome Free の版
+ * @returns {string} 先頭のコメント
  */
-`;
+function header(brandVersion) {
+	const brandMajor = brandVersion.split('.')[0];
+	return [
+		'/**',
+		' * 生成物。手で編集しない。scripts/build-symbols.mjs で作り直す。',
+		' * 図形の出典:',
+		' * - Material Symbols (Rounded, weight 400, FILL 1) / Apache-2.0',
+		' *   https://github.com/google/material-design-icons',
+		` * - Font Awesome Free ${brandMajor} の brands (${Object.keys(BRAND_SOURCES).join(' / ')}) / CC BY 4.0`,
+		' *   https://fontawesome.com/license/free',
+		` * ただし CUSTOM_SHAPES にある図形 (${Object.keys(CUSTOM_SHAPES).join(' / ')}) だけは自前で描いたもの。`,
+		' */',
+		'',
+	].join('\n');
+}
+
+/**
+ * 名前ごとの図形の表を 1 つにまとめる。
+ * @param {Array<Record<string, object>>} groups 原本ごとの表 (Material Symbols / Font Awesome / 自前)
+ * @returns {Record<string, object>} まとめた表
+ * @throws {Error} 同じ名前が 2 つの表にあるとき (黙って片方を捨てない)
+ */
+function mergeShapes(groups) {
+	const merged = {};
+	for (const group of groups) {
+		for (const [name, shape] of Object.entries(group)) {
+			if (Object.hasOwn(merged, name)) throw new Error(`図形の名前 ${name} が重なっています`);
+			merged[name] = shape;
+		}
+	}
+	return merged;
+}
+
+/**
+ * Font Awesome Free の版を読む。
+ * @returns {Promise<string>} 版 ("7.3.1" など)
+ * @throws {Error} package.json が読めないとき
+ */
+async function readBrandVersion() {
+	try {
+		return JSON.parse(await readFile(BRAND_PACKAGE_JSON, 'utf8')).version;
+	} catch (error) {
+		throw new Error(`${BRAND_PACKAGE_JSON} を読めません (npm install 済みか): ${error.message}`);
+	}
+}
 
 /**
  * icon-shapes.js を生成する。
  * @returns {Promise<number>} 生成した図形の数
  */
 async function build() {
-	const shapes = {
-		...(await loadShapes(ICON_SOURCES, SOURCE_DIR)),
-		...(await loadShapes(BRAND_SOURCES, BRAND_SOURCE_DIR)),
-		// 自前の図形は最後に混ぜる。同じ名前があれば自前を優先する
-		...loadCustomShapes(),
-	};
-	await writeFile(
-		OUTPUT_PATH,
-		`${HEADER}\n${DEEP_FREEZE_SOURCE}\nexport const ICON_SHAPES = deepFreeze(${JSON.stringify(shapes, null, '\t')});\n`,
-		'utf8',
-	);
+	const shapes = mergeShapes([
+		await loadShapes(ICON_SOURCES, SOURCE_DIR),
+		await loadShapes(BRAND_SOURCES, BRAND_SOURCE_DIR),
+		loadCustomShapes(),
+	]);
+	const source = `${header(await readBrandVersion())}\n${DEEP_FREEZE_SOURCE}\nexport const ICON_SHAPES = deepFreeze(${JSON.stringify(shapes, null, '\t')});\n`;
+	await writeFile(OUTPUT_PATH, source.replace(/\r?\n/g, OUTPUT_EOL), 'utf8');
 	return Object.keys(shapes).length;
 }
 

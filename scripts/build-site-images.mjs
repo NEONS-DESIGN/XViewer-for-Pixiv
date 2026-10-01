@@ -5,9 +5,7 @@
  * 元素材は store/sources/ にある。(Git 管理外のため、手元に無いと止まる)
  * JPEG を経由すると圧縮が二重に掛かるので、必ず可逆の PNG から直接書き出すこと。
  *
- * 1 枚ごとに可逆 WebP と非可逆 WebP の両方を作り、小さいほうを採る。
- * UI の寄り (ポップアップ・入力欄) は可逆のほうが小さくなり、
- * 作品画像が大きく写るビューポート全体は非可逆のほうが小さくなる。
+ * 1 枚ごとに可逆 WebP と非可逆 WebP の両方を作り、小さいほうを採る。(LOSSLESS_TOLERANCE までは可逆を優先する)
  */
 import sharp from 'sharp';
 import { mkdir, stat, writeFile } from 'node:fs/promises';
@@ -20,7 +18,7 @@ const OUT_DIR = 'site/assets/img';
 
 /**
  * 非可逆 WebP の設定。
- * - quality 90: 文字の輪郭に崩れが出ない下限
+ * - quality 90: 画面写真の文字の輪郭を崩さない画質
  * - smartSubsample: 色差を間引くときの滲みを抑える。(青いリンク文字の縁が濁るのを防ぐ)
  * - effort 6: 最も時間を掛けて小さくする
  */

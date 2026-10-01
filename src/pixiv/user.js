@@ -1,5 +1,5 @@
 /**
- * ユーザー情報 (/ajax/user/{id}?full=1) の取得をまとめる。
+ * ユーザー情報 (/ajax/user/{id}) の取得をまとめる。
  *
  * この応答はサイドバー (作者アイコン) と actions-bar (フォロー状態) の両方が要る。
  * ユーザーページでは作者が変わらないので、作品を送るたびに取り直さない。
@@ -13,7 +13,7 @@ import { createPromiseCache } from './promise-cache.js';
 /**
  * 覚えておく作者の上限。
  * ブックマーク一覧のように他人の作品が並ぶページを長く流し見すると作者の数だけ増えるので、
- * 古いものから捨てて定常に保つ。
+ * 長く使われていないものから捨てて定常に保つ。
  * pages.js の PROFILE_CACHE_LIMIT (profile/all の ID 一覧) とは別物。
  */
 const USER_PROFILE_CACHE_LIMIT = 100;
@@ -25,7 +25,7 @@ const USER_PROFILE_CACHE_LIMIT = 100;
 
 /**
  * ユーザー ID → 取得中または取得済みの Promise。
- * Promise のまま覚え、失敗は覚えず、上限を超えたら最古から捨てる。
+ * Promise のまま覚え、失敗は覚えず、上限を超えたら最も長く使われていないものから捨てる。
  * キーは userId だけで lang を含まない。表示言語の切り替えはページ全体のリロードを伴い、
  * このキャッシュごと消える前提に乗っている。同じページで lang が変わるならキーの見直しが要る。
  */
@@ -37,7 +37,7 @@ const cache = createPromiseCache(USER_PROFILE_CACHE_LIMIT);
  * @param {string} userId ユーザー ID
  * @param {string} lang 言語コード (strings.lang)
  * @param {UserDeps} [deps] テスト用の依存
- * @returns {Promise<object>} /ajax/user/{id}?full=1 の body
+ * @returns {Promise<object>} /ajax/user/{id} の body
  */
 export function fetchUserProfile(userId, lang, deps = {}) {
 	const getJsonImpl = deps.getJsonImpl ?? getJson;

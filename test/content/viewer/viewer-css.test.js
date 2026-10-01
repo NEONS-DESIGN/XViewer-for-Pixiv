@@ -76,9 +76,23 @@ test('端に着いて送れない領域は、押すと閉じる余白と違う�
 	assert.ok(!block(viewer, '.stage').includes('cursor:'), '余白は既定のカーソル (指定なし) のまま');
 });
 
-test('うごイラの操作の帯は hidden で消える', () => {
-	// display: flex をクラスで書いているので、[hidden] を足さないと再生前から帯が見えてしまう
-	assert.ok(block(viewer, '.ugoira-controls[hidden]').includes('display: none'));
+test('hidden は共通の 1 本で、display をクラスで書いた部品 (うごイラの操作の帯など) にも勝つ', () => {
+	// Shadow DOM には UA の [hidden] が効かないうえ、display: flex をクラスで書くと隠れない。
+	// 部品ごとに [hidden] を足す書き方にすると、足し忘れた部品だけ再生前から見えてしまう
+	assert.ok(block(viewer, '[hidden]').includes('display: none !important'));
+	assert.ok(!/\.[\w-]+\[hidden\]\s*\{/.test(viewer), '部品ごとの [hidden] の規則を書かない');
+});
+
+test('うごイラの失敗表示は、操作の帯が出ているときだけ帯の上へ逃がす', () => {
+	// 失敗のほとんどは再生前 (帯が hidden)。帯が無いのに浮かせると、下に何も無いのに文言だけ浮く
+	const body = block(viewer, '.ugoira-controls:not([hidden]) ~ .pane-error');
+	assert.ok(body.includes('var(--ugoira-controls-height)'));
+	assert.throws(() => block(viewer, '.ugoira > .pane-error'), '帯の有無を見ずに上げる規則を残さない');
+});
+
+test('浮いている部品の影の色は通知と同じトークンから引く', () => {
+	assert.equal(variable(block(viewer, ':host'), '--menu-shadow'), '0 8px 24px var(--notice-shadow)');
+	assert.equal(variable(block(viewer, ":host([data-theme='light'])"), '--menu-shadow'), undefined, 'ライトの濃さは --notice-shadow が持つ');
 });
 
 test('シークバーの軌道は再生済み・読み込み済み・未読を変数で塗り分ける', () => {

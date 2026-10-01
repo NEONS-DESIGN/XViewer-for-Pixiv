@@ -24,6 +24,9 @@ const DOCUMENT_NODE_TYPE = 9;
 /** 作品リンクの末尾のページ番号 (#2 など)。ホームのフィードは画像ごとに 1 始まりの番号を付ける */
 const PAGE_HASH_PATTERN = /^#(\d+)$/;
 
+/** パスの終わり (クエリかハッシュの始まり)。 */
+const PATH_END_PATTERN = /[?#]/;
+
 /**
  * 押し始めの合図を拾わない入力の種類。
  * 指のスクロールはカードの上から始まることが多く、そのたびに詳細を取りに行かないため。
@@ -39,6 +42,10 @@ const PRESS_IGNORED_POINTER_TYPE = 'touch';
  */
 export function workIdFromLink(href, origin) {
 	if (!href) return null;
+	// pixiv の作品リンクはパスだけ。並びを集めるときに数千本を読むので、URL を組まずに読む
+	if (href.startsWith('/') && !href.startsWith('//')) {
+		return parseArtworkPath(href.split(PATH_END_PATTERN, 1)[0]);
+	}
 	try {
 		return parseArtworkPath(new URL(href, origin).pathname);
 	} catch {

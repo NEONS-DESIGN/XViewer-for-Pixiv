@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { planSkipTargets, attachTabSkip, stripTabSkipMarks } from '../../src/content/tab-skip.js';
+import { planSkipTargets, planLabeledSkipTargets, attachTabSkip, stripTabSkipMarks } from '../../src/content/tab-skip.js';
 import {
 	GRID_TAB_SKIP, TAB_SKIP_MARK_ATTR, TAB_SKIP_LABEL_ATTR, ARTWORK_LINK_SELECTOR, THUMB_LINK_SELECTOR, CARD_BUTTON_SELECTOR,
 } from '../../src/common/constants.js';
@@ -200,6 +200,34 @@ test('img が無いサムネイル (未読込) にも作品名を補う', () => 
 	assert.equal(cards[0].thumb.getAttribute('aria-label'), '作品7');
 });
 
+test('補った後で img が読み込まれて alt が付いたら、補った読み上げ名を外す', () => {
+	// 補ったままだと aria-label が alt より優先され、タグと作者名が読み上げから落ちる
+	const cards = [makeCard('7', { loaded: false })];
+	const { deps, trigger } = fakeObserverDeps();
+	attachTabSkip(fakeDoc(cards), GRID_TAB_SKIP.BOTH, deps);
+	assert.equal(cards[0].thumb.getAttribute('aria-label'), '作品7');
+	// pixiv は figure を img に差し替える。通知に来るのはリンクの中の img だけ
+	const figure = cards[0].thumb.querySelector('figure');
+	const img = figure.parent.appendChild(el('img', { alt: '#タグ 作品7 - 作者のイラスト' }));
+	figure.remove();
+	trigger(img);
+	assert.equal(cards[0].thumb.getAttribute('aria-label'), null);
+	assert.equal(cards[0].thumb.hasAttribute(TAB_SKIP_LABEL_ATTR), false);
+	// タイトルは外したまま
+	assert.equal(cards[0].title.getAttribute('tabindex'), '-1');
+});
+
+test('img が読み込まれても alt が空なら、補った読み上げ名を残す', () => {
+	const cards = [makeCard('7', { loaded: false })];
+	const { deps, trigger } = fakeObserverDeps();
+	attachTabSkip(fakeDoc(cards), GRID_TAB_SKIP.BOTH, deps);
+	const figure = cards[0].thumb.querySelector('figure');
+	const img = figure.parent.appendChild(el('img', { alt: '' }));
+	figure.remove();
+	trigger(img);
+	assert.equal(cards[0].thumb.getAttribute('aria-label'), '作品7');
+});
+
 test('サムネイルの img に alt があれば aria-label を足さない', () => {
 	// pixiv の alt は「#タグ タイトル - 作者のイラスト」で作品名を含む。
 	// aria-label を足すと alt 由来の名前を上書きし、タグと作者名が読み上げから消える
@@ -384,4 +412,84 @@ test('none では body を見張らず、title に変えたら見張り始め、
 	assert.equal(observed.length, 1);
 	handle.setMode(GRID_TAB_SKIP.NONE);
 	assert.ok(disconnected >= 1);
+});
+
+/**
+ * 検索の結果のカードを組む。li ではなく、作品の ID を計測用属性に持つ div。
+ * サムネ → ブックマーク → タイトル → 作者のリンク の並び
+ * @param {string} id 作品 ID
+ * @param {{alt?: string}} [options] サムネの img の alt
+ * @returns {{card: object, thumb: object, button: object, title: object, author: object}}
+ */
+function makeSearchCard(id, options = {}) {
+	const card = el('div', { 'data-ga4-label': 'thumbnail', 'data-ga4-entity-id': `illust/${id}` });
+	const thumb = card.appendChild(el('a', { href: `/artworks/${id}`, 'data-ga4-label': 'thumbnail_link' }));
+	thumb.appendChild(el('img', { alt: options.alt ?? `作品${id}` }));
+	const button = card.appendChild(el('div', { 'data-ga4-label': 'bookmark_button' })).appendChild(el('button'));
+	const title = card.appendChild(el('a', { href: `/artworks/${id}`, 'data-ga4-label': 'title_link' }));
+	title.textContent = `作品${id}`;
+	const author = card.appendChild(el('a', { href: '/users/9' }));
+	return { card, thumb, button, title, author };
+}
+
+/**
+ * ホームのフィードの投稿を組む。画像ごとにサムネのリンクを持ち、共有などのボタンも並ぶ。
+ * @param {string} id 作品 ID
+ * @returns {{card: object, thumbs: object[], share: object, button: object, title: object}}
+ */
+function makeFeedPost(id) {
+	const card = el('div', { 'data-ga4-label': 'work_content', 'data-ga4-entity-id': `manga/${id}` });
+	card.appendChild(el('a', { href: '/users/9', 'data-ga4-label': 'user_name_link' }));
+	const share = card.appendChild(el('button', { 'data-ga4-label': 'share_button' }));
+	const thumbs = [1, 2].map((page) => {
+		const link = card.appendChild(el('a', { href: `/artworks/${id}#${page}`, 'data-ga4-label': 'thumbnail_link' }));
+		link.appendChild(el('img', { alt: `作品${id}` }));
+		return link;
+	});
+	const title = card.appendChild(el('a', { href: `/artworks/${id}`, 'data-ga4-label': 'title_link' }));
+	const button = card.appendChild(el('div', { 'data-ga4-label': 'bookmark_button' })).appendChild(el('button'));
+	return { card, thumbs, share, button, title };
+}
+
+/**
+ * li を持たないページの document の代わり。
+ * @param {object[]} nodes 並べる要素
+ * @returns {object} doc の代わり
+ */
+function flatDoc(nodes) {
+	const doc = el('#document');
+	const body = doc.appendChild(el('div'));
+	for (const node of nodes) body.appendChild(node);
+	doc.body = body;
+	return doc;
+}
+
+test('検索の結果のカード (li ではない) でもタイトルとブックマークを外す', () => {
+	const search = makeSearchCard('5');
+	const { deps } = fakeObserverDeps();
+	attachTabSkip(flatDoc([search.card]), GRID_TAB_SKIP.BOTH, deps);
+	assert.equal(search.title.getAttribute('tabindex'), '-1');
+	assert.equal(search.button.getAttribute('tabindex'), '-1');
+	assert.equal(search.thumb.getAttribute('tabindex'), null, 'サムネイルを外してはいけない');
+	assert.equal(search.author.getAttribute('tabindex'), null, '作品リンクでないものには触らない');
+});
+
+test('フィードの投稿では 2 枚目以降のサムネや共有ボタンを外さない', () => {
+	const post = makeFeedPost('7');
+	const targets = planLabeledSkipTargets(post.card, GRID_TAB_SKIP.BOTH);
+	assert.deepEqual(targets, [post.title, post.button]);
+	assert.deepEqual(planLabeledSkipTargets(post.card, GRID_TAB_SKIP.TITLE), [post.title]);
+	assert.deepEqual(planLabeledSkipTargets(post.card, GRID_TAB_SKIP.NONE), []);
+	assert.equal(targets.includes(post.share), false);
+	assert.equal(post.thumbs.some((thumb) => targets.includes(thumb)), false);
+});
+
+test('li ではないカードでも、サムネに名前が無ければタイトルを読み上げ名に補う', () => {
+	const search = makeSearchCard('5', { alt: '' });
+	const { deps } = fakeObserverDeps();
+	const handle = attachTabSkip(flatDoc([search.card]), GRID_TAB_SKIP.TITLE, deps);
+	assert.equal(search.thumb.getAttribute('aria-label'), '作品5');
+	handle.dispose();
+	assert.equal(search.thumb.getAttribute('aria-label'), null);
+	assert.equal(search.title.getAttribute('tabindex'), null);
 });

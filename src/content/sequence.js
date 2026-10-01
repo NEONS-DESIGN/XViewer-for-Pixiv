@@ -10,6 +10,15 @@
 import { loadAllWorkIds } from '../pixiv/pages.js';
 
 /**
+ * profile/all の ID 配列から作った並び。
+ * loadAllWorkIds() は同じ作者・種別なら同じ凍結配列を返すので、配列そのものをキーにして使い回す。
+ * 並びは数千件の Map を組むので、グリッドから開き直して端で広げるたびに作り直さない。
+ * 配列が要らなくなれば (作者の索引を捨てれば) 並びも一緒に解放される
+ * @type {WeakMap<ReadonlyArray<string>, Sequence>}
+ */
+const allWorksSequences = new WeakMap();
+
+/**
  * @typedef {object} Sequence
  * @property {string[]} ids 並び
  * @property {(id: string) => string|null} next 次の ID。端なら null
@@ -70,7 +79,12 @@ export async function extendWithAllWorks(fallback, userId, category, lang, deps 
 	try {
 		const ids = await loadAllWorkIds(userId, category, lang, deps);
 		if (ids.length === 0) return fallback;
-		return createSequence(ids);
+		const known = allWorksSequences.get(ids);
+		if (known) return known;
+		const sequence = createSequence(ids);
+		// 凍結していない配列 (テストの差し替えなど) は中身が変わりうるので覚えない
+		if (Object.isFrozen(ids)) allWorksSequences.set(ids, sequence);
+		return sequence;
 	} catch {
 		// 端で止まるだけで、閲覧そのものは続けられる
 		return fallback;

@@ -3,10 +3,10 @@
  *
  * ページ一覧は /pages から取る。ここが 404 のときは表示できない作品なので、
  * 呼び出し側が可視判定で先に弾いている前提。
+ * /pages の取得は作品単位で覚えて共有する (pixiv/illust-assets.js) ので中断しない。破棄した後に届いた結果は捨てる。
  */
-import { getJson } from '../../pixiv/client.js';
-import { PIXIV_ERROR_KINDS } from '../../pixiv/errors.js';
-import { illustPagesUrl, safeCdnUrl } from '../../pixiv/endpoints.js';
+import { fetchIllustPages } from '../../pixiv/illust-assets.js';
+import { safeCdnUrl } from '../../pixiv/endpoints.js';
 import { createIcon } from '../../common/icons.js';
 import { assignImageSrc } from '../../common/image-source.js';
 import { IMAGE_QUALITY, PREFETCH_RELEASE_MARGIN } from '../../common/constants.js';
@@ -115,8 +115,9 @@ function clamp(value, min, max) {
  * @property {Document} doc
  * @property {HTMLElement} container 描画先 (.stage)
  * @property {object} settings 設定
- * @property {{open: (pages: object) => void}} [zoom] 原寸表示のレイヤ (zoom.js)。設定がオンのときだけ使う
- * @property {typeof fetch} [fetchImpl] 通信の差し替え。テストから pixiv を叩かないために使う
+ * @property {{open: (pages: object) => void, isOpen?: () => boolean, updatePages?: (pages: object) => void}} [zoom]
+ *   原寸表示のレイヤ (zoom.js)。設定がオンのときだけ使う
+ * @property {(url: string, deps?: object, init?: RequestInit) => Promise<unknown>} [getJsonImpl] /pages の取得の差し替え。テストから pixiv を叩かないために使う
  * @property {() => HTMLImageElement} [createImage] 先読み用 Image の差し替え。Node には Image が無い
  * @property {object} strings 文言のカタログ (src/i18n)
  */
@@ -124,12 +125,11 @@ function clamp(value, min, max) {
 /**
  * 画像ペインを作る。
  * @param {ImagePaneDeps} deps 依存
- * @returns {{render: (detail: object) => Promise<void>, next: () => void, prev: () => void,
- *   canMove: (offset: number) => boolean, loadedUrlAt: (index: number) => string | null, dispose: () => void}}
+ * @returns {{render: (detail: object, options?: {startPage?: number}) => Promise<void>, next: () => void, prev: () => void,
+ *   canMove: (offset: number) => boolean, pageIndex: () => number, loadedUrlAt: (index: number) => string | null, dispose: () => void}}
  */
 export function createImagePane(deps) {
 	const { doc, container, strings } = deps;
-	const fetchImpl = deps.fetchImpl;
 	const createImage = deps.createImage ?? (() => new Image());
 
 	/** @type {string[]} 表示するページの URL */
@@ -164,8 +164,6 @@ export function createImagePane(deps) {
 	 * 参照を持っておかないと解放されて意味がなくなり、作り直すとページ送りのたびに無駄が出る
 	 */
 	const prefetched = new Map();
-	/** /pages の取得を中断するためのもの。dispose() で abort する */
-	const aborter = new AbortController();
 	/** @type {HTMLImageElement|null} */
 	let image = null;
 	/** 今 img に入れている URL。同じ値を書き直して再デコードさせないために覚える */
@@ -189,6 +187,11 @@ export function createImagePane(deps) {
 	let prefetchReadyHandler = null;
 	/** 破棄済みか。応答を待っている間に捨てられたときに DOM を触らないようにする */
 	let disposed = false;
+	/**
+	 * 原寸表示を開いているか。開いている間は番号とカウンタだけ合わせ、
+	 * 見えていない img の読み込みと先読みはしない。(原寸の読み込みと帯域を取り合わない)
+	 */
+	let zoomShowing = false;
 
 	/**
 	 * 矢印ボタンを作る。
@@ -286,6 +289,7 @@ export function createImagePane(deps) {
 
 	/**
 	 * 今のページを描く。
+	 * 原寸表示を開いている間はカウンタと矢印だけ合わせ、画像の差し替えと先読みは閉じたときに回す。
 	 * @returns {void}
 	 */
 	function paint() {
@@ -293,7 +297,7 @@ export function createImagePane(deps) {
 		const next = urls[index] ?? '';
 		// 同じ URL を書き直すと img が読み込みをやり直す。/pages が届いたときの 1 枚目がこれに当たる。
 		// エラー行も、ページが変わったときだけ消す (1 枚目の失敗の理由を /pages の到着で消さない)
-		if (next !== shownUrl) {
+		if (!zoomShowing && next !== shownUrl) {
 			shownUrl = next;
 			frame?.querySelector('.pane-error')?.remove();
 			assignImageSrc(image, next);
@@ -308,20 +312,21 @@ export function createImagePane(deps) {
 			nextButton.hidden = single;
 			nextButton.disabled = index === total - 1;
 		}
-		schedulePrefetch();
+		if (!zoomShowing) schedulePrefetch();
 	}
 
 	/**
 	 * 指定したページの、読み込みを起こさずに手元にある URL を返す。
-	 * 表示中のページは img が読み終えていれば、そうでなければ先読みの Image が
+	 * img がそのページを出していて読み終えていれば、そうでなければ先読みの Image が
 	 * 読み終えていればその URL。無ければ null。(原寸表示の仮表示に使う)
+	 * 原寸表示の中で送った後は index と img の中身がずれるので、番号ではなく URL で突き合わせる
 	 * @param {number} i ページ番号
 	 * @returns {string|null} 読み終えている URL。無ければ null
 	 */
 	function loadedUrlAt(i) {
-		if (i === index) {
-			return image && image.complete && image.naturalWidth > 0 ? shownUrl : null;
-		}
+		const url = urls[i];
+		if (!url) return null;
+		if (image && shownUrl === url && image.complete && image.naturalWidth > 0) return url;
 		const img = prefetched.get(i);
 		return img && img.complete && img.naturalWidth > 0 ? img.src : null;
 	}
@@ -331,16 +336,18 @@ export function createImagePane(deps) {
 	 * 開いた先でページを送られたら、こちらの表示も合わせる。
 	 * (閉じたときに違うページが出ていると、見ていた場所を見失う)
 	 * 解像度の設定が原寸でなければ、手元にある読み込み済みの標準画質と実寸を仮表示用として渡す。
-	 * 設定が原寸のときは表示中の画像が既に原寸なので、仮表示用の情報 (placeholderAt / sizes) は渡さない
+	 * 設定が原寸のときは表示中の画像が既に原寸なので、仮表示用の情報 (placeholderAt / sizes) は渡さない。
+	 * 開いている間は画像の差し替えと先読みを止め、利用者の操作で閉じたときにまとめて描く
 	 * @param {string} alt 画像の代替文言 (作品名)
 	 * @returns {void}
 	 */
 	function openZoom(alt) {
+		if (!deps.zoom) return;
 		// /pages 待ちの行き先は、原寸表示を開いた時点の index を基準にする。
 		// 残したまま /pages が届くと、原寸表示で見ている場所と違うページへ飛ぶ
 		pendingIndex = null;
 		const showPlaceholder = deps.settings.imageQuality !== IMAGE_QUALITY.ORIGINAL;
-		deps.zoom?.open({
+		deps.zoom.open({
 			urls: originalUrls,
 			index,
 			alt,
@@ -352,7 +359,16 @@ export function createImagePane(deps) {
 				index = next;
 				paint();
 			},
+			onClose: () => {
+				if (!zoomShowing) return;
+				zoomShowing = false;
+				paint();
+			},
 		});
+		// 1 枚目の URL が空なら原寸表示は開かない。そのときは今までどおり描き続ける
+		zoomShowing = deps.zoom.isOpen?.() ?? true;
+		// 表示中の画像の読み終わりを待っている先読みも、閉じるまで始めない
+		if (zoomShowing) clearPrefetchReadyHandler();
 	}
 
 	/**
@@ -430,7 +446,7 @@ export function createImagePane(deps) {
 			if (detail.pageCount <= 1) return;
 
 			try {
-				const pages = await getJson(illustPagesUrl(detail.id, strings.lang), { fetchImpl, signal: aborter.signal });
+				const pages = await fetchIllustPages(detail.id, strings.lang, { getJsonImpl: deps.getJsonImpl });
 				if (disposed) return;
 				const next = pickPageUrls(pages, deps.settings.imageQuality);
 				// body が配列でない応答をそのまま採ると、出ていた 1 枚目が消えて「1/0」になる。
@@ -444,9 +460,14 @@ export function createImagePane(deps) {
 				index = clamp(pendingIndex ?? index, 0, urls.length - 1);
 				pendingIndex = null;
 				paint();
+				// 開いた後に届いた分は原寸表示にも渡す。渡さないと閉じるまで 2 枚目以降へ送れない
+				if (zoomShowing) {
+					const showPlaceholder = deps.settings.imageQuality !== IMAGE_QUALITY.ORIGINAL;
+					deps.zoom?.updatePages?.({ urls: originalUrls, sizes: showPlaceholder ? pageSizes : undefined });
+				}
 			} catch (error) {
-				// disposed の判定だけで中断による失敗も黙る。念のため種別でも確かめる
-				if (disposed || error?.kind === PIXIV_ERROR_KINDS.ABORTED) return;
+				// 捨てた後に届いた失敗は出さない
+				if (disposed) return;
 				// 実際に採れたのは 1 枚だけなので、先出ししていた分母を戻す (矢印が消える)
 				total = urls.length;
 				pendingIndex = null;
@@ -471,10 +492,17 @@ export function createImagePane(deps) {
 			return next >= 0 && next < total;
 		},
 
+		/**
+		 * 今のページ番号。/pages 待ちに覚えた行き先があればそちらを返す。(描き直しで同じページから開き直すため)
+		 * @returns {number} ページ番号 (0 始まり)
+		 */
+		pageIndex() {
+			return pendingIndex ?? index;
+		},
+
 		loadedUrlAt,
 
 		dispose() {
-			aborter.abort();
 			disposed = true;
 			// 破棄したあとに古い画像の error が発火して、
 			// 新しく描いた画面にエラーを出すのを防ぐ

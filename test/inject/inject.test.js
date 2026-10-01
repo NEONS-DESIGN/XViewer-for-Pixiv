@@ -157,6 +157,21 @@ test('プロトタイプのメソッドを包んでいたら、unhook は own pr
 	assert.equal(page.window[NAV_HOOK_FLAG], undefined);
 });
 
+test('後から別のスクリプトが包んでいたら、unhook はその包みを消さずに通知だけ止める', () => {
+	const ours = globalThis.history.pushState;
+	const theirs = function theirs(...args) { return ours.apply(this, args); };
+	globalThis.history.pushState = theirs;
+	page.window.dispatchEvent(new CustomEvent(NAV_EVENTS.UNHOOK));
+	assert.equal(globalThis.history.pushState, theirs, '他のスクリプトの包みを消している');
+	// 包んでいない replaceState は元へ戻る
+	assert.equal(globalThis.history.replaceState, page.originals.replaceState);
+	assert.equal(globalThis.history.pushState({}, '', '/users/7'), 'push-result');
+	assert.equal(page.calls.at(-1), 'pushState:/users/7');
+	assert.equal(navigateCount, 0, '外した後も通知している');
+	// 次のテストのために、元の history の状態へ戻す
+	globalThis.history.pushState = page.originals.pushState;
+});
+
 test('URL の差し替えの依頼は、今の state を保ったまま元の replaceState で書く', () => {
 	// isolated world からは history.state を正しく読めないので、page world で読んで書き戻す。
 	// 包みを通さないのは、自分の書き込みを pixiv の遷移として知らせないため

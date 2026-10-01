@@ -1,6 +1,6 @@
 /**
- * ビルドがそのままコピーする静的ファイルの表。
- * 副作用を持たせない。(build.mjs と test/common/licenses.test.js / test/popup/popup-css.test.js が読む)
+ * ビルドが出力先へ置く静的ファイルの表。(.css は build.mjs が圧縮してから書き、ほかはそのままコピーする)
+ * テストからも読むので副作用を持たせない。
  *
  * 出力先はブラウザごとに分かれる。(scripts/browsers.mjs) コピーする中身は同じで、置き場所だけが違う。
  */
@@ -19,7 +19,7 @@ export const FIREFOX_OUT_DIR = 'dist-firefox';
 export const MANIFEST_LOCALES = Object.freeze(['ja', 'en', 'ko', 'zh_CN', 'zh_TW']);
 
 /**
- * そのままコピーする静的ファイルの表を作る。[コピー元, コピー先] の順。
+ * 出力先へ置く静的ファイルの表を作る。[コピー元, コピー先] の順。
  * アイコンは build-icons.mjs が作った生成物で、サイズの出どころは ICON_OUTPUTS 1 か所。
  * manifest は version を差し込むのでここには入れない。(build.mjs の writeManifest)
  * @param {string} outDir 出力先

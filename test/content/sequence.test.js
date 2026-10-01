@@ -81,3 +81,16 @@ test('extendWithAllWorks は失敗したら元の列を返す', async () => {
 	const sequence = await extendWithAllWorks(original, '1', null, 'ja', { getJsonImpl: fakeGet });
 	assert.deepEqual(sequence.ids, ['3', '2']);
 });
+
+test('extendWithAllWorks は同じ作者の全作品の並びを使い回す', async () => {
+	// 並びは数千件の Map を組むので、グリッドから開き直して端で広げるたびに作り直さない
+	const fakeGet = async () => ({ illusts: { '100': null, '300': null }, manga: {} });
+	const first = await extendWithAllWorks(createSequence(['300']), '1', null, 'ja', { getJsonImpl: fakeGet });
+	const second = await extendWithAllWorks(createSequence(['100']), '1', null, 'ja', { getJsonImpl: fakeGet });
+	assert.equal(second, first);
+	// 作者の索引を捨てたら作り直す
+	clearPageSourceCache();
+	const third = await extendWithAllWorks(createSequence(['300']), '1', null, 'ja', { getJsonImpl: fakeGet });
+	assert.notEqual(third, first);
+	assert.deepEqual(third.ids, ['300', '100']);
+});

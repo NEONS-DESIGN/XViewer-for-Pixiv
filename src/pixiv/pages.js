@@ -9,6 +9,7 @@
 import { getJson } from './client.js';
 import { userProfileAllUrl, userProfileIllustsUrl } from './endpoints.js';
 import { createPromiseCache } from './promise-cache.js';
+import { PixivError, PIXIV_ERROR_KINDS } from './errors.js';
 import { WORK_CATEGORY, WORKS_PER_PAGE } from '../common/constants.js';
 
 /** 覚えておく作者の数。他人のページを渡り歩いても際限なく増やさない。 */
@@ -16,7 +17,7 @@ const PROFILE_CACHE_LIMIT = 20;
 
 /**
  * profile/all の応答から組んだ、種別ごとの数値降順 ID の索引 (凍結済み) を覚える。キーはユーザー ID。
- * Promise のまま覚え、失敗は覚えず、上限を超えたら最古から捨てる。
+ * Promise のまま覚え、失敗は覚えず、上限を超えたら最も長く使われていないものから捨てる。
  * 1 つの索引が全種別 (と両方を繋いだ並び) を持つので、種別ではキーを分けない。
  */
 const profileCache = createPromiseCache(PROFILE_CACHE_LIMIT);
@@ -71,15 +72,20 @@ function sortedIndex(body) {
 function loadProfileAll(userId, lang, get) {
 	return profileCache.get(userId) ?? profileCache.remember(userId, async () => {
 		const body = await get(userProfileAllUrl(userId, lang));
+		// 空の索引を成功として覚えると、ページを開いている間ずっとその作者の並びが空になる
+		if (!body || typeof body !== 'object') {
+			throw new PixivError(PIXIV_ERROR_KINDS.PARSE, `profile/all の body がオブジェクトではありません: ${userId}`);
+		}
 		return sortedIndex(body);
 	});
 }
 
 /**
  * 作者の全作品 ID を数値降順で取る。
- * 返す配列は凍結済みで、呼び出し側は書き換えない。同じ userId・lang なら同じ配列を返す。
+ * 返す配列は凍結済みで、呼び出し側は書き換えない。同じ userId なら同じ配列を返す。
+ * (lang はキャッシュのキーに含めない。ID の並びは言語に依らない)
  * @param {string} userId ユーザー ID
- * @param {string|null} category 絞り込む種別 (WORK_CATEGORY)。null なら両方
+ * @param {string|null} category 絞り込む種別 (WORK_CATEGORY)。null か知らない値なら両方
  * @param {string} lang 言語コード (strings.lang)
  * @param {{getJsonImpl?: Function}} [deps] テスト用の依存
  * @returns {Promise<ReadonlyArray<string>>} ID の並び
@@ -87,13 +93,13 @@ function loadProfileAll(userId, lang, get) {
 export async function loadAllWorkIds(userId, category, lang, deps = {}) {
 	const get = deps.getJsonImpl ?? getJson;
 	const index = await loadProfileAll(userId, lang, get);
-	return index[category ?? ALL_CATEGORIES_KEY];
+	return index[category ?? ALL_CATEGORIES_KEY] ?? index[ALL_CATEGORIES_KEY];
 }
 
 /**
  * 1 ページぶんの作品を供給する口を作る。
  * @param {string} userId ユーザー ID
- * @param {string|null} category 絞り込む種別 (WORK_CATEGORY)。null なら両方
+ * @param {string|null} category 絞り込む種別 (WORK_CATEGORY)。null か知らない値なら両方
  * @param {string} lang 言語コード (strings.lang)
  * @param {{getJsonImpl?: Function}} [deps] テスト用の依存
  * @returns {{pageCount: () => Promise<number>, loadPage: (page: number, options?: {signal?: AbortSignal}) => Promise<object[]>}} ページ供給

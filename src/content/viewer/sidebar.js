@@ -8,6 +8,7 @@
 import { createIcon } from '../../common/icons.js';
 import { formatCount } from '../../common/format.js';
 import { warn } from '../../common/log.js';
+import { USER_ID_PATTERN } from '../../common/constants.js';
 import { currentLocalePrefix } from '../../common/locale.js';
 import { PIXIV_ORIGIN, artworkPath, userPath, tagWorksPath } from '../../pixiv/endpoints.js';
 import { createAvatar, showAvatar } from './avatar.js';
@@ -179,6 +180,7 @@ export function commentToNodes(doc, html) {
  * @typedef {object} SidebarDeps
  * @property {Document} doc
  * @property {HTMLElement} container 描画先 (.sidebar)
+ * @property {string} [localePrefix] 作者・作品・タグへのリンクに付ける表示言語の接頭辞 (`/en` か空文字)。無ければ currentLocalePrefix(doc)
  * @property {(userId: string, lang: string) => Promise<object>} [fetchUser] ユーザー情報の取得。既定は共有キャッシュ付きの取得
  * @property {object} strings 文言のカタログ (src/i18n)
  */
@@ -246,6 +248,31 @@ export function createSidebar(deps) {
 	}
 
 	/**
+	 * 作者のアイコンを引いて、取れたら入れる。
+	 * 取れなくても名前とリンクは出ている。失敗は枠だけ残して黙って続ける。
+	 * @param {string} userId 作者の ID
+	 * @param {HTMLImageElement} avatar 入れ先
+	 * @returns {void}
+	 */
+	function loadAuthorIcon(userId, avatar) {
+		const mine = generation;
+		// fetchUser が同期で投げることもあるので、ここで Promise に揃える
+		let pending;
+		try {
+			pending = Promise.resolve(fetchUser(userId, strings.lang));
+		} catch (error) {
+			pending = Promise.reject(error);
+		}
+		pending
+			.then((user) => {
+				// 待っている間に別の作品へ移っていたら、前の作者の顔を入れない
+				if (mine !== generation) return;
+				showAvatar(avatar, user?.image);
+			})
+			.catch((error) => { warn('failed to load author icon', userId, error); });
+	}
+
+	/**
 	 * 作者行を作る。アイコン・名前・ユーザー ID を 1 つのリンクにまとめる。
 	 *
 	 * アイコンの URL は作品詳細に無いので /ajax/user/{id} を別に引く。
@@ -257,9 +284,11 @@ export function createSidebar(deps) {
 		const row = doc.createElement('div');
 		row.className = 'author-row';
 
-		const author = doc.createElement('a');
+		// 数字でない ID はパスに埋めると別のページを指しうるので、リンクにせず文字だけ出す
+		const linkable = USER_ID_PATTERN.test(detail.userId);
+		const author = doc.createElement(linkable ? 'a' : 'span');
 		author.className = 'author';
-		author.href = userPath(detail.userId, localePrefix);
+		if (linkable) author.href = userPath(detail.userId, localePrefix);
 
 		// 取れるまでは枠だけ。読み込めなかったときと同じ見え方にしておく
 		const avatar = createAvatar(doc, 'author-avatar');
@@ -276,22 +305,8 @@ export function createSidebar(deps) {
 		identity.append(name, userId);
 		author.appendChild(identity);
 
-		const mine = generation;
-		// 取れなくても名前とリンクは出ている。失敗は枠だけ残して黙って続ける。
-		// fetchUser が同期で投げることもあるので、ここで Promise に揃える
-		let pending;
-		try {
-			pending = Promise.resolve(fetchUser(detail.userId, strings.lang));
-		} catch (error) {
-			pending = Promise.reject(error);
-		}
-		pending
-			.then((user) => {
-				// 待っている間に別の作品へ移っていたら、前の作者の顔を入れない
-				if (mine !== generation) return;
-				showAvatar(avatar, user?.image);
-			})
-			.catch((error) => { warn('failed to load author icon', detail.userId, error); });
+		// 形の違う ID は /ajax/user の URL にも埋めない。アイコンは枠だけにする
+		if (linkable) loadAuthorIcon(detail.userId, avatar);
 
 		follow = doc.createElement('div');
 		follow.className = 'follow-slot';

@@ -29,6 +29,14 @@ function notify() {
 }
 
 /**
+ * @typedef {object} HookFlag window 上のフラグ。退避した元のメソッドと、自分が入れた包み
+ * @property {Function} pushState 包む前の pushState
+ * @property {Function} replaceState 包む前の replaceState
+ * @property {{active: boolean, patched: Record<string, Function>}} hook 包みの状態。
+ *   active が偽の包みは通知せず、元のメソッドを呼ぶだけになる
+ */
+
+/**
  * history を包む。既に包まれていたら何もしない。(二重注入のガード)
  * 退避した元のメソッドは window 上のフラグに持たせ、
  * 同じスクリプトが 2 回走っても書き戻す先を見失わないようにする。
@@ -36,18 +44,22 @@ function notify() {
  */
 function hook() {
 	if (window[NAV_HOOK_FLAG]) return;
-	const originals = {};
+	const state = { active: true, patched: {} };
+	/** @type {HookFlag} */
+	const flag = { hook: state };
 	for (const method of PATCHED_METHODS) {
 		const original = history[method];
-		originals[method] = original;
-		history[method] = function patched(...args) {
+		flag[method] = original;
+		const patched = function patched(...args) {
 			// 戻り値も this もそのまま通し、完全に透過にする
 			const result = original.apply(this, args);
-			notify();
+			if (state.active) notify();
 			return result;
 		};
+		state.patched[method] = patched;
+		history[method] = patched;
 	}
-	window[NAV_HOOK_FLAG] = originals;
+	window[NAV_HOOK_FLAG] = flag;
 }
 
 /**
@@ -55,15 +67,22 @@ function hook() {
  * 設定でオフにしたときに「pixiv 標準の動作に戻ります」を字義どおり成立させるため。
  * 退避した値が History.prototype のものなら own property を消して戻す。
  * 代入で戻すと動作は同じでも own property として残り、完全に元へ戻らない。
+ *
+ * 自分の後に別のスクリプトが包み直していたら、そのメソッドは触らない。外すとその包みごと消えるため。
+ * 残った自分の包みは active を偽にして、通知しない素通しにする。
  * @returns {void}
  */
 function unhook() {
-	const originals = window[NAV_HOOK_FLAG];
-	if (!originals) return;
+	/** @type {HookFlag|undefined} */
+	const flag = window[NAV_HOOK_FLAG];
+	if (!flag) return;
+	const state = flag.hook;
+	if (state) state.active = false;
 	const proto = Object.getPrototypeOf(history);
 	for (const method of PATCHED_METHODS) {
-		const original = originals[method];
+		const original = flag[method];
 		if (typeof original !== 'function') continue;
+		if (state && history[method] !== state.patched[method]) continue;
 		if (proto && proto[method] === original) delete history[method];
 		else history[method] = original;
 	}

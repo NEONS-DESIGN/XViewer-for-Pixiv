@@ -20,7 +20,7 @@ const SUBMIT_KEY = 'Enter';
  * @param {Document} deps.doc document
  * @param {string} deps.placeholder 空のときに出す文言
  * @param {string|null} [deps.avatarUrl] 左に出すアバター。省略すると出さない
- * @param {object} [deps.picker] 絵文字とスタンプのピッカー (comment-picker.js の形。`open` / `close` / `isOpen` / `isOpenIn`)。省略すると選ぶボタンを出さない
+ * @param {object} [deps.picker] 絵文字とスタンプのピッカー (comment-picker.js の形。`open` / `close` / `isOpenIn`)。省略すると選ぶボタンを出さない
  * @param {(value: {text: string, stampId: string|null}) => Promise<void>} deps.onSubmit 送信
  * @param {(error: unknown) => string} [deps.errorMessage] 失敗時の文言。省略すると既定の文言
  * @param {object} deps.strings 文言のカタログ (src/i18n)
@@ -29,7 +29,7 @@ const SUBMIT_KEY = 'Enter';
 export function createCommentForm(deps) {
 	const { doc, placeholder, onSubmit, strings } = deps;
 	const picker = deps.picker ?? null;
-	const errorMessage = deps.errorMessage ?? (() => strings.commentForm.FAILED);
+	const errorMessage = deps.errorMessage ?? (() => strings.comments.POST_FAILED);
 
 	/** @type {string|null} 選んでいるスタンプ。選んでいる間は本文を送らない */
 	let stampId = null;
@@ -266,7 +266,8 @@ export function createCommentForm(deps) {
 		pick.setAttribute('aria-label', strings.commentForm.PICK);
 		pick.appendChild(createIcon(doc, 'mood'));
 		pick.addEventListener('click', () => {
-			if (picker.isOpen()) {
+			// 閉じるのは自分の欄で開いているときだけ。別の欄で開いていれば open() がそちらを閉じてこちらへ移す
+			if (picker.isOpenIn(element)) {
 				picker.close();
 				return;
 			}

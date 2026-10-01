@@ -71,7 +71,13 @@ export function renderConfirmRow(doc, spec, onConfirm) {
 		confirm.className = 'danger';
 		confirm.textContent = spec.confirm;
 		confirm.dataset.role = `${spec.role}-confirm`;
-		confirm.addEventListener('click', () => onConfirm());
+		// 確定は 1 つの行につき 1 回だけ。素早く 2 回押されても、取り返しの付かない操作を 2 回走らせない
+		let confirmed = false;
+		confirm.addEventListener('click', () => {
+			if (confirmed) return;
+			confirmed = true;
+			onConfirm();
+		});
 
 		row.addEventListener('keydown', (event) => {
 			if (event.key !== KEYS.CLOSE) return;

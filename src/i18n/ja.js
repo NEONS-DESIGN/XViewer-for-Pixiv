@@ -1,12 +1,9 @@
 /**
- * 日本語の文言カタログ。
+ * 日本語の文言カタログ。他の言語のカタログはこれと同じ形を持つ。
  *
  * **ここは文言だけを持つ。** 構造・キー・URL・アイコン名は言語に依らないので元の場所に残す。
  * (SECTIONS の並び、THEME_TOGGLE の next/icon、THIRD_PARTY の name/url など)
- * 両方をここへ写すと、en.js にも同じ構造が写経され、片方だけ直す事故が起きる。
- *
- * en.js と形を必ず揃える。ずれは test/i18n/catalog.test.js が落とす。
- * 引数を取る文言は関数にする。英語は語順も複数形も違うので、外からテンプレートを埋める形では破綻する。
+ * 引数を取る文言は関数にする。
  */
 import { DISPLAY_TIME_ZONE } from '../common/constants.js';
 
@@ -51,7 +48,7 @@ export default {
 		WORK_PAGE_TITLE: '作品ページを新しいタブで開く',
 		SIDEBAR_OPEN: 'サイドバーを開く',
 		SIDEBAR_CLOSE: 'サイドバーを閉じる',
-		LOADING: '読み込み中...',
+		LOADING: '読み込み中…',
 		LOAD_FAILED: '作品を読み込めませんでした',
 		NOT_FOUND: '作品が見つかりませんでした。削除されたか、非公開になった可能性があります',
 		NETWORK_FAILED: '通信に失敗しました。接続を確かめてから開き直してください',
@@ -169,7 +166,6 @@ export default {
 		PICK: '絵文字とスタンプ',
 		STAMP_ALT: 'スタンプ',
 		STAMP_CLEAR: '選んだスタンプを取り消す',
-		FAILED: 'コメントを投稿できませんでした',
 	},
 	commentPicker: {
 		EMOJI: '絵文字',
@@ -293,7 +289,7 @@ export default {
 			},
 			viewerOnUser: {
 				label: 'ユーザーページで使う',
-				description: '作者のページの作品一覧から開いたときにビュワーを出します。',
+				description: 'ユーザーページの作品一覧から開いたときにビュワーを出します。',
 			},
 			viewerOnHome: {
 				label: 'ホームで使う',
@@ -301,7 +297,7 @@ export default {
 			},
 			viewerOnSearch: {
 				label: '検索結果で使う',
-				description: 'タグ検索の結果から開いたときにビュワーを出します。',
+				description: '検索結果 (タグのページと検索画面) から開いたときにビュワーを出します。',
 			},
 			showSidebar: {
 				label: 'サイドバーを表示する',
@@ -316,7 +312,7 @@ export default {
 				},
 				whole: {
 					label: 'サイドバーごと送る',
-					description: '投稿文からコメントまでを 1 つにつなげて送ります。主文が長い作品でも、そのまま読み進めてコメントまで辿り着けます。',
+					description: '投稿文からコメントまでを 1 つにつなげて送ります。投稿文が長い作品でも、そのまま読み進めてコメントまで辿り着けます。',
 				},
 			},
 			imageQuality: {
@@ -355,7 +351,7 @@ export default {
 					? { label: '前後 1 枚', description: '隣の 1 枚だけ先に読み込みます。' }
 					: {
 						label: `前後 ${count} 枚`,
-						description: `${count} 枚先まで読み込みます。続けて見るときに滑らかです。`,
+						description: `前後 ${count} 枚ずつ先に読み込みます。続けて見るときに滑らかです。`,
 					}),
 			},
 			prefetchCustom: {
@@ -437,7 +433,7 @@ export default {
 			},
 			zoomZoneMode: {
 				label: '原寸表示のクリック領域の幅',
-				description: '原寸表示の画面で、左右の端を押してページを送る範囲の幅です。',
+				description: '原寸表示の画面で、ページ送りに使う左右の端の幅です。',
 				/**
 				 * 「カスタム」の選択肢。値は選択肢の下に出るレンジで選ぶ。
 				 * @param {number} min 選べる最小の値 (%)
@@ -522,7 +518,7 @@ export default {
 				description: 'Tab で次の作品へ移るときの飛ばし方です。',
 				both: {
 					label: 'ブックマークとタイトルを飛ばす',
-					description: 'カードは「サムネ → ブックマーク → タイトル」の 3 つを順に辿ります。飛ばすと Tab 1 回で次の作品へ移れ、飛ばした操作はビュワーの中で行えます。',
+					description: 'ユーザーページのカードは「サムネイル → ブックマーク → タイトル」の 3 つを順に辿ります。飛ばすと Tab 1 回で次の作品へ移れます。ホームと検索では、作者のリンクは飛ばしません。',
 				},
 				title: {
 					label: 'タイトルだけ飛ばす',
