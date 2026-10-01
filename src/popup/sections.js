@@ -154,18 +154,20 @@ function prefetchField(strings) {
 		]),
 		reveal: Object.freeze({
 			when: PREFETCH_CUSTOM,
-			field: Object.freeze({
-				kind: 'range',
-				key: 'prefetchCustom',
-				label: f.prefetchCustom.label,
-				min,
-				max,
-				step,
-				format: (count) => f.prefetch.some(count).label,
-				scale: rangeTicks(min, max, PREFETCH_CUSTOM_SCALE_STEP),
-				warnAt: PREFETCH_CUSTOM_WARN_AT,
-				warning: f.prefetchCustom.warning,
-			}),
+			fields: Object.freeze([
+				Object.freeze({
+					kind: 'range',
+					key: 'prefetchCustom',
+					label: f.prefetchCustom.label,
+					min,
+					max,
+					step,
+					format: (count) => f.prefetch.some(count).label,
+					scale: rangeTicks(min, max, PREFETCH_CUSTOM_SCALE_STEP),
+					warnAt: PREFETCH_CUSTOM_WARN_AT,
+					warning: f.prefetchCustom.warning,
+				}),
+			]),
 		}),
 	});
 }
@@ -198,10 +200,12 @@ function numberChoiceField(key, values, strings, special = {}, requires = undefi
 
 /**
  * 「既定のまま / カスタム」から選び、カスタムのときだけ下にレンジを出す項目を組み立てる。
- * (背景の濃さ・クリック領域の大きさ) 先読みのカスタムと同じ形。
+ * (背景の濃さ・クリック領域の幅) 先読みのカスタムと同じ形。
+ * レンジは valueKeys の順に並べる。(画面端のクリック領域は左右と上下の 2 本)
  * @param {object} spec 項目の中身
  * @param {string} spec.modeKey モードの設定キー
- * @param {string} spec.valueKey レンジの値の設定キー
+ * @param {readonly (string|{key: string, requires?: object})[]} spec.valueKeys レンジの値の設定キー。
+ *   requires を添えると、そのレンジだけに効く条件 (requirement の戻り値) を親の条件に足す
  * @param {{value: string, label: string, description: string}} spec.defaultOption 既定の側の選択肢 (見出しには既定の印を付ける)
  * @param {string} spec.customValue カスタムを表すモードの値
  * @param {{min: number, max: number, step: number}} spec.range レンジの範囲
@@ -210,10 +214,9 @@ function numberChoiceField(key, values, strings, special = {}, requires = undefi
  * @param {object} [requires] 親の項目の条件 (requirement の戻り値)
  * @returns {object} 項目の定義
  */
-function modeRangeField({ modeKey, valueKey, defaultOption, customValue, range, scaleStep }, strings, requires) {
+function modeRangeField({ modeKey, valueKeys, defaultOption, customValue, range, scaleStep }, strings, requires) {
 	const f = strings.popup.fields;
 	const { min, max, step } = range;
-	const percent = (value) => f[valueKey].option(value);
 	return Object.freeze({
 		kind: 'choice',
 		key: modeKey,
@@ -226,17 +229,22 @@ function modeRangeField({ modeKey, valueKey, defaultOption, customValue, range, 
 		]),
 		reveal: Object.freeze({
 			when: customValue,
-			field: Object.freeze({
-				kind: 'range',
-				key: valueKey,
-				label: f[valueKey].label,
-				min,
-				max,
-				step,
-				format: percent,
-				scale: rangeTicks(min, max, scaleStep),
-				scaleFormat: percent,
-			}),
+			fields: Object.freeze(valueKeys.map((entry) => {
+				const { key, requires: own } = typeof entry === 'string' ? { key: entry } : entry;
+				const percent = (value) => f[key].option(value);
+				return Object.freeze({
+					kind: 'range',
+					key,
+					label: f[key].label,
+					requires: own,
+					min,
+					max,
+					step,
+					format: percent,
+					scale: rangeTicks(min, max, scaleStep),
+					scaleFormat: percent,
+				});
+			})),
 		}),
 	});
 }
@@ -261,7 +269,7 @@ export function createAdvancedSections(strings) {
 				numberChoiceField('sidebarDrawerMax', SIDEBAR_DRAWER_MAX_CHOICES, strings, {}, needsSidebar),
 				modeRangeField({
 					modeKey: 'backdropMode',
-					valueKey: 'backdropOpacity',
+					valueKeys: ['backdropOpacity'],
 					defaultOption: { value: BACKDROP_MODES.THEME, ...f.backdropMode.theme },
 					customValue: BACKDROP_MODES.CUSTOM,
 					range: BACKDROP_OPACITY_RANGE,
@@ -274,7 +282,11 @@ export function createAdvancedSections(strings) {
 			fields: Object.freeze([
 				modeRangeField({
 					modeKey: 'navZoneMode',
-					valueKey: 'navZoneSize',
+					// 片方の向きだけで送るときは、使わない向きの幅を非活性にする
+					valueKeys: [
+						{ key: 'navZoneSize', requires: requirement('navZones', strings, { value: NAV_ZONES.VERTICAL, label: f.navZones.vertical.label }) },
+						{ key: 'navZoneSizeVertical', requires: requirement('navZones', strings, { value: NAV_ZONES.HORIZONTAL, label: f.navZones.horizontal.label }) },
+					],
 					defaultOption: { value: SETTING_MODES.DEFAULT, label: f.navZoneSize.option(DEFAULT_NAV_ZONE_SIZE), description: '' },
 					customValue: SETTING_MODES.CUSTOM,
 					range: ZONE_SIZE_RANGE,
@@ -282,7 +294,7 @@ export function createAdvancedSections(strings) {
 				}, strings, requirement('navZones', strings, { value: NAV_ZONES.OFF, label: f.navZones.off.label })),
 				modeRangeField({
 					modeKey: 'zoomZoneMode',
-					valueKey: 'zoomZoneSize',
+					valueKeys: ['zoomZoneSize'],
 					defaultOption: { value: SETTING_MODES.DEFAULT, label: f.zoomZoneSize.option(DEFAULT_ZOOM_ZONE_SIZE), description: '' },
 					customValue: SETTING_MODES.CUSTOM,
 					range: ZONE_SIZE_RANGE,
@@ -306,12 +318,13 @@ export function createAdvancedSections(strings) {
  * キーは SETTINGS_DEFAULTS と 1 対 1 に対応させる。(test/popup/popup-ui.test.js が見張る)
  *
  * kind が 'toggle' ならスイッチ、'choice' なら選択肢。
- * choice は reveal ({when, field}) を持てる。選んだ値が when のときだけ、選択肢の下に field を出す。
- * field の kind は 'range' (min / max / step と、値の読み方 format、目盛り scale (と目盛りの読み方 scaleFormat) を持つ)。
+ * choice は reveal ({when, fields}) を持てる。選んだ値が when のときだけ、選択肢の下に fields を順に出す。
+ * fields の各項目の kind は 'range' (min / max / step と、値の読み方 format、目盛り scale (と目盛りの読み方 scaleFormat) を持つ)。
  * どの項目も children (子の項目の配列) を持てる。子は親の下に字下げして常に出す。
  * requires ({key, off?, message} の配列) を持つ項目は、親の条件を 1 つでも満たさない間は非活性になり、押すと満たしていない最初の条件の message を出す。
  * 「ビュワーを使う」の条件は requireViewer が VIEWER_INDEPENDENT_KEYS 以外の全項目へ足す。
- * (子は親を requires に持つ。別のタブの親を持つ項目もある) reveal の field は親の choice の requires に従う。
+ * (子は親を requires に持つ。別のタブの親を持つ項目もある) reveal の各項目は親の choice の requires に従い、
+ * 自分の requires (1 つ) を持てばそれを後ろに足す。
  * warnAt と warning を持つ range は、値が warnAt 以上のとき値を警告の色にし、下に warning を出す。
  * choice の値は select の都合で文字列にしてある。保存時の型は SETTINGS_DEFAULTS の既定値の型から
  * 描画側が導く (数値の項目なら Number() へ戻す) ので、ここに型の印は持たない。

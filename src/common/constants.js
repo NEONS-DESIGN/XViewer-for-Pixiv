@@ -377,19 +377,25 @@ export const SETTING_MODES = Object.freeze({
 });
 
 /**
- * クリック領域の大きさをカスタムで選べる範囲 (%)。画面端のクリック領域と原寸表示のクリック領域で共有する。
+ * クリック領域の幅をカスタムで選べる範囲 (%)。画面端のクリック領域と原寸表示のクリック領域で共有する。
  * 左右 (または上下) の 2 つが重ならないよう 50 未満に留める。
  */
 export const ZONE_SIZE_RANGE = Object.freeze({ min: 5, max: 35, step: 5 });
 
-/** クリック領域のレンジの下に添える目盛りの間隔 (%)。 */
+/** クリック領域の幅のレンジの下に添える目盛りの間隔 (%)。 */
 export const ZONE_SIZE_SCALE_STEP = 5;
 
-/** クリック領域の大きさの既定値 (%)。 */
+/** 画面端のクリック領域の幅の既定値 (%)。左右と上下で共通 */
 export const DEFAULT_NAV_ZONE_SIZE = 25;
 
-/** クリック領域の幅と高さの既定の割合。(0-1) カスタムでないときと、設定を渡さないときに使う */
-export const NAV_ZONE_RATIO = DEFAULT_NAV_ZONE_SIZE / 100;
+/**
+ * 画面端のクリック領域の既定の幅の割合。(0-1) カスタムでないときと、設定を渡さないときに使う。
+ * horizontal は左右の端の幅 (ステージの幅に対する割合)、vertical は上下の端の幅 (ステージの高さに対する割合)
+ */
+export const NAV_ZONE_RATIOS = Object.freeze({
+	horizontal: DEFAULT_NAV_ZONE_SIZE / 100,
+	vertical: DEFAULT_NAV_ZONE_SIZE / 100,
+});
 
 /** 原寸表示のクリック領域の幅の既定値 (%)。CSS の --zoom-zone-width の既定と同じ値 */
 export const DEFAULT_ZOOM_ZONE_SIZE = 25;
@@ -509,6 +515,7 @@ export const SETTINGS_DEFAULTS = Object.freeze({
 	navZones: NAV_ZONES.OFF,
 	navZoneMode: SETTING_MODES.DEFAULT,
 	navZoneSize: DEFAULT_NAV_ZONE_SIZE,
+	navZoneSizeVertical: DEFAULT_NAV_ZONE_SIZE,
 	clickZoom: false,
 	zoomZoneMode: SETTING_MODES.DEFAULT,
 	zoomZoneSize: DEFAULT_ZOOM_ZONE_SIZE,

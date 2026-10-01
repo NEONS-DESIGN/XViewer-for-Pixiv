@@ -407,18 +407,27 @@ export default {
 				option: (value) => `${value}%`,
 			},
 			navZoneMode: {
-				label: '画面端のクリック領域の大きさ',
-				description: '画面端のクリックで送るときの、端の幅 (左右) と高さ (上下) です。画像を出す部分に対する割合です。',
+				label: '画面端のクリック領域の幅',
+				description: '画面端のクリックで送るときの、端の幅です。画像を出す部分に対する割合で、カスタムでは左右の端と上下の端で別々に選べます。',
 				/**
 				 * 「カスタム」の選択肢。値は選択肢の下に出るレンジで選ぶ。
 				 * @param {number} min 選べる最小の値 (%)
 				 * @param {number} max 選べる最大の値 (%)
 				 * @returns {{label: string, description: string}} 選択肢の文言
 				 */
-				custom: (min, max) => ({ label: 'カスタム', description: `大きさを ${min}〜${max}% から選びます。` }),
+				custom: (min, max) => ({ label: 'カスタム', description: `左右と上下の幅を、それぞれ ${min}〜${max}% から選びます。` }),
 			},
 			navZoneSize: {
-				label: '大きさ',
+				label: '左右の幅',
+				/**
+				 * 値の読み方。レンジの今の値・目盛り・既定の選択肢の見出しに使う。
+				 * @param {number} value 値 (%)
+				 * @returns {string} 読み
+				 */
+				option: (value) => `${value}%`,
+			},
+			navZoneSizeVertical: {
+				label: '上下の幅',
 				/**
 				 * 値の読み方。レンジの今の値・目盛り・既定の選択肢の見出しに使う。
 				 * @param {number} value 値 (%)

@@ -29,7 +29,7 @@ import { createIcon } from '../../common/icons.js';
 import { assignImageSrc } from '../../common/image-source.js';
 import { currentLocalePrefix } from '../../common/locale.js';
 import { warn } from '../../common/log.js';
-import { navZoneSizeOf } from '../../common/storage.js';
+import { navZoneSizesOf } from '../../common/storage.js';
 import { getJson, FRESH_FETCH_INIT } from '../../pixiv/client.js';
 import { clearUserCache } from '../../pixiv/user.js';
 import { PIXIV_ERROR_KINDS } from '../../pixiv/errors.js';
@@ -73,7 +73,7 @@ const RANGE_PASSTHROUGH_KEYS = Object.freeze([KEYS.PREV_WORK, KEYS.NEXT_WORK]);
  */
 const RERENDER_SETTING_KEYS = Object.freeze(['imageQuality', 'prefetch', 'prefetchCustom', 'showSidebar', 'clickZoom']);
 
-/** % で持つ設定 (画面端のクリック領域の大きさ) を 0-1 の割合へ直すときの分母。 */
+/** % で持つ設定 (画面端のクリック領域の幅) を 0-1 の割合へ直すときの分母。 */
 const PERCENT = 100;
 
 /**
@@ -382,7 +382,10 @@ export function createViewer(deps) {
 		navZones = createNavZones({
 			stage,
 			getMode: () => settings.navZones,
-			getRatio: () => navZoneSizeOf(settings) / PERCENT,
+			getRatios: () => {
+				const { horizontal, vertical } = navZoneSizesOf(settings);
+				return { horizontal: horizontal / PERCENT, vertical: vertical / PERCENT };
+			},
 			canMovePage,
 			canMoveWork: (direction) => navigation.canMove(direction),
 			movePage,

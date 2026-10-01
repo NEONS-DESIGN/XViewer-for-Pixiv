@@ -1,6 +1,6 @@
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeSettings, loadSettings, saveSetting, resetSettings, watchSettings, prefetchCount, navZoneSizeOf } from '../../src/common/storage.js';
+import { normalizeSettings, loadSettings, saveSetting, resetSettings, watchSettings, prefetchCount, navZoneSizesOf } from '../../src/common/storage.js';
 import { LOG_PREFIX } from '../../src/common/log.js';
 import { fakeArea } from '../helpers/storage.js';
 import { flush } from '../helpers/dom.js';
@@ -96,10 +96,10 @@ test('数値の段階の設定は選択肢の値だけ通し、既定は選択�
 	}
 });
 
-test('クリック領域の大きさは 5% から 35% を 5% 刻みで選べ、左右 (上下) が重ならない 50% 未満に留める', () => {
+test('クリック領域の幅は 5% から 35% を 5% 刻みで選べ、左右 (上下) が重ならない 50% 未満に留める', () => {
 	assert.deepEqual({ ...ZONE_SIZE_RANGE }, { min: 5, max: 35, step: 5 });
 	assert.ok(ZONE_SIZE_RANGE.max < 50);
-	for (const key of ['navZoneSize', 'zoomZoneSize']) {
+	for (const key of ['navZoneSize', 'navZoneSizeVertical', 'zoomZoneSize']) {
 		assert.equal(normalizeSettings({ [key]: 5 })[key], 5);
 		assert.equal(normalizeSettings({ [key]: 35 })[key], 35);
 		// 範囲の外は端へ、刻みの間は近い刻みへ寄せる。(前の版の 33% / 40% を引き継ぐ)
@@ -134,10 +134,21 @@ test('前の版 (モードを持たず数値だけ) の保存値を、カスタ�
 	assert.equal(fromCustom.zoomZoneSize, 15);
 });
 
-test('navZoneSizeOf はカスタムのときだけ navZoneSize を使い、それ以外は既定の 25%', () => {
-	assert.equal(navZoneSizeOf({ navZoneMode: SETTING_MODES.CUSTOM, navZoneSize: 10 }), 10);
-	assert.equal(navZoneSizeOf({ navZoneMode: SETTING_MODES.DEFAULT, navZoneSize: 10 }), 25);
-	assert.equal(navZoneSizeOf({}), 25);
+test('前の版 (左右と上下で共通の幅) の保存値を、上下の幅にも引き継ぐ', () => {
+	const legacy = normalizeSettings({ navZoneMode: SETTING_MODES.CUSTOM, navZoneSize: 10 });
+	assert.equal(legacy.navZoneSize, 10);
+	assert.equal(legacy.navZoneSizeVertical, 10);
+	const separate = normalizeSettings({ navZoneMode: SETTING_MODES.CUSTOM, navZoneSize: 10, navZoneSizeVertical: 30 });
+	assert.equal(separate.navZoneSizeVertical, 30);
+	assert.equal(normalizeSettings({}).navZoneSizeVertical, SETTINGS_DEFAULTS.navZoneSizeVertical);
+	// モードを持たない保存値は、どちらかが既定と違えばカスタムとみなす
+	assert.equal(normalizeSettings({ navZoneSize: 25, navZoneSizeVertical: 10 }).navZoneMode, SETTING_MODES.CUSTOM);
+});
+
+test('navZoneSizesOf はカスタムのときだけ左右と上下の幅を使い、それ以外は既定の 25%', () => {
+	assert.deepEqual(navZoneSizesOf({ navZoneMode: SETTING_MODES.CUSTOM, navZoneSize: 10, navZoneSizeVertical: 30 }), { horizontal: 10, vertical: 30 });
+	assert.deepEqual(navZoneSizesOf({ navZoneMode: SETTING_MODES.DEFAULT, navZoneSize: 10, navZoneSizeVertical: 30 }), { horizontal: 25, vertical: 25 });
+	assert.deepEqual(navZoneSizesOf({}), { horizontal: 25, vertical: 25 });
 });
 
 test('normalizeSettings は画面端のクリック領域を選択肢の値だけ通す', () => {
@@ -169,6 +180,7 @@ test('normalizeSettings は正しい値をそのまま通す', () => {
 		navZones: NAV_ZONES.BOTH,
 		navZoneMode: SETTING_MODES.CUSTOM,
 		navZoneSize: 35,
+		navZoneSizeVertical: 10,
 		clickZoom: true,
 		zoomZoneMode: SETTING_MODES.CUSTOM,
 		zoomZoneSize: 5,
