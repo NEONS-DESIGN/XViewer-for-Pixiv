@@ -29,7 +29,7 @@ test('normalizeDetail は詳細をまとめ、いいね済みとブックマー�
 		xRestrict: 0,
 		aiType: 1,
 		userId: '54734418',
-		userName: 'Pt',
+		userName: 'しろ',
 		createDate: '2026-09-08T08:45:00+00:00',
 		likeCount: 2299,
 		bookmarkCount: 2740,
