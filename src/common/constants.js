@@ -141,10 +141,12 @@ export const PROFILE_HOME_PATH_PATTERN = /^\/users\/\d+\/?$/;
 export const HOME_PATH_PATTERN = /^\/(?:illustration|manga)?\/?$/;
 
 /**
- * 検索 (タグ) のパス。/tags/{タグ} のトップと、すべて / イラスト / マンガのタブ。
- * 小説のタブ (/tags/{タグ}/novels) は外す。タグは encodeURIComponent された 1 区切り。
+ * 検索のパス。2 つの形がある。
+ * - タグのページ: /tags/{タグ} のトップと、すべて / イラスト / マンガのタブ。(小説のタブ /tags/{タグ}/novels は外す)
+ * - 検索の画面: /search (語句と種類はクエリ ?q=…&type=… が持つ)
+ * タグは encodeURIComponent された 1 区切り。
  */
-export const SEARCH_PATH_PATTERN = /^\/tags\/[^/]+(?:\/(?:artworks|illustrations|manga))?\/?$/;
+export const SEARCH_PATH_PATTERN = /^\/(?:tags\/[^/]+(?:\/(?:artworks|illustrations|manga))?|search)\/?$/;
 
 /** ビュワーを動かすページの種類。 */
 export const PAGE_KINDS = Object.freeze({
