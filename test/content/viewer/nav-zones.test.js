@@ -9,12 +9,24 @@ const RECT = Object.freeze({ left: 100, top: 50, width: 1000, height: 800 });
 
 test('zoneAt: 割合を渡すとその幅で判定する', () => {
 	// 幅 1000 の 40% は左端から 400 (x = 500) まで
-	assert.equal(zoneAt(499, 450, RECT, NAV_ZONES.HORIZONTAL, 0.4), NAV_ZONE_KINDS.PREV_PAGE);
-	assert.equal(zoneAt(501, 450, RECT, NAV_ZONES.HORIZONTAL, 0.4), null);
-	assert.equal(zoneAt(260, 450, RECT, NAV_ZONES.HORIZONTAL, 0.15), null);
+	assert.equal(zoneAt(499, 450, RECT, NAV_ZONES.HORIZONTAL, { horizontal: 0.4, vertical: 0.4 }), NAV_ZONE_KINDS.PREV_PAGE);
+	assert.equal(zoneAt(501, 450, RECT, NAV_ZONES.HORIZONTAL, { horizontal: 0.4, vertical: 0.4 }), null);
+	assert.equal(zoneAt(260, 450, RECT, NAV_ZONES.HORIZONTAL, { horizontal: 0.15, vertical: 0.15 }), null);
 	// 高さ 800 の 15% は下端から 120 (y = 730) まで
-	assert.equal(zoneAt(600, 731, RECT, NAV_ZONES.VERTICAL, 0.15), NAV_ZONE_KINDS.NEXT_WORK);
-	assert.equal(zoneAt(600, 729, RECT, NAV_ZONES.VERTICAL, 0.15), null);
+	assert.equal(zoneAt(600, 731, RECT, NAV_ZONES.VERTICAL, { horizontal: 0.15, vertical: 0.15 }), NAV_ZONE_KINDS.NEXT_WORK);
+	assert.equal(zoneAt(600, 729, RECT, NAV_ZONES.VERTICAL, { horizontal: 0.15, vertical: 0.15 }), null);
+});
+
+test('zoneAt: 左右と上下は別々の幅で判定する', () => {
+	const ratios = { horizontal: 0.1, vertical: 0.3 };
+	// 左右は幅 1000 の 10% (x < 200)、上下は高さ 800 の 30% (y < 290 と y > 610)
+	assert.equal(zoneAt(199, 450, RECT, NAV_ZONES.BOTH, ratios), NAV_ZONE_KINDS.PREV_PAGE);
+	assert.equal(zoneAt(201, 450, RECT, NAV_ZONES.BOTH, ratios), null);
+	assert.equal(zoneAt(600, 289, RECT, NAV_ZONES.BOTH, ratios), NAV_ZONE_KINDS.PREV_WORK);
+	assert.equal(zoneAt(600, 291, RECT, NAV_ZONES.BOTH, ratios), null);
+	assert.equal(zoneAt(600, 611, RECT, NAV_ZONES.BOTH, ratios), NAV_ZONE_KINDS.NEXT_WORK);
+	// 四隅は左右を優先する
+	assert.equal(zoneAt(150, 100, RECT, NAV_ZONES.BOTH, ratios), NAV_ZONE_KINDS.PREV_PAGE);
 });
 
 test('zoneAt: 左右は幅 25% の中でページを送る', () => {

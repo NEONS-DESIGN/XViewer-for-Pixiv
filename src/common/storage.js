@@ -143,8 +143,11 @@ export function normalizeSettings(raw) {
 		closeOnBackdrop: asBoolean(source.closeOnBackdrop, d.closeOnBackdrop),
 		navZones: oneOf(source.navZones, Object.values(NAV_ZONES), d.navZones),
 		navZoneMode: readMode(source.navZoneMode, Object.values(SETTING_MODES), SETTING_MODES.CUSTOM,
-			typeof source.navZoneSize === 'number' && source.navZoneSize !== DEFAULT_NAV_ZONE_SIZE, d.navZoneMode),
+			[source.navZoneSize, source.navZoneSizeVertical].some((size) => typeof size === 'number' && size !== DEFAULT_NAV_ZONE_SIZE),
+			d.navZoneMode),
 		navZoneSize: snapToRange(source.navZoneSize, ZONE_SIZE_RANGE, d.navZoneSize),
+		// 前の版は左右と上下を navZoneSize 1 つで持っていた。上下が無ければ左右と同じ幅を引き継ぐ
+		navZoneSizeVertical: snapToRange(source.navZoneSizeVertical ?? source.navZoneSize, ZONE_SIZE_RANGE, d.navZoneSizeVertical),
 		clickZoom: asBoolean(source.clickZoom, d.clickZoom),
 		zoomZoneMode: readMode(source.zoomZoneMode, Object.values(SETTING_MODES), SETTING_MODES.CUSTOM,
 			typeof source.zoomZoneSize === 'number' && source.zoomZoneSize !== d.zoomZoneSize, d.zoomZoneMode),
@@ -166,14 +169,14 @@ export function prefetchCount(settings) {
 }
 
 /**
- * 実際に使う画面端のクリック領域の大きさ (%) を返す。カスタムのときだけ navZoneSize を使う。
- * @param {{navZoneMode?: string, navZoneSize?: number}} settings 正規化済みの設定
- * @returns {number} 大きさ (%)
+ * 実際に使う画面端のクリック領域の幅 (%) を返す。カスタムのときだけ設定の値を使い、それ以外は既定の幅。
+ * @param {{navZoneMode?: string, navZoneSize?: number, navZoneSizeVertical?: number}} settings 正規化済みの設定
+ * @returns {{horizontal: number, vertical: number}} 左右の端の幅と上下の端の幅 (%)
  */
-export function navZoneSizeOf(settings) {
-	return settings.navZoneMode === SETTING_MODES.CUSTOM && Number.isFinite(settings.navZoneSize)
-		? settings.navZoneSize
-		: DEFAULT_NAV_ZONE_SIZE;
+export function navZoneSizesOf(settings) {
+	const custom = settings.navZoneMode === SETTING_MODES.CUSTOM;
+	const pick = (value) => (custom && Number.isFinite(value) ? value : DEFAULT_NAV_ZONE_SIZE);
+	return { horizontal: pick(settings.navZoneSize), vertical: pick(settings.navZoneSizeVertical) };
 }
 
 /**

@@ -406,18 +406,27 @@ export default {
 				option: (value) => `${value}%`,
 			},
 			navZoneMode: {
-				label: '螢幕邊緣點擊區域大小',
-				description: '點擊螢幕邊緣翻頁時所用邊緣的寬度（左右）與高度（上下），為相對於圖片顯示區域的比例。',
+				label: '螢幕邊緣點擊區域寬度',
+				description: '點擊螢幕邊緣翻頁時所用邊緣的寬度，為相對於圖片顯示區域的比例。選擇自訂時，可分別設定左右邊緣與上下邊緣。',
 				/**
 				 * 「カスタム」の選択肢。値は選択肢の下に出るレンジで選ぶ。
 				 * @param {number} min 選べる最小の値 (%)
 				 * @param {number} max 選べる最大の値 (%)
 				 * @returns {{label: string, description: string}} 選択肢の文言
 				 */
-				custom: (min, max) => ({ label: '自訂', description: `從 ${min}～${max}% 中選擇大小。` }),
+				custom: (min, max) => ({ label: '自訂', description: `分別從 ${min}～${max}% 中選擇左右與上下的寬度。` }),
 			},
 			navZoneSize: {
-				label: '大小',
+				label: '左右寬度',
+				/**
+				 * 値の読み方。レンジの今の値・目盛り・既定の選択肢の見出しに使う。
+				 * @param {number} value 値 (%)
+				 * @returns {string} 読み
+				 */
+				option: (value) => `${value}%`,
+			},
+			navZoneSizeVertical: {
+				label: '上下寬度',
 				/**
 				 * 値の読み方。レンジの今の値・目盛り・既定の選択肢の見出しに使う。
 				 * @param {number} value 値 (%)

@@ -407,8 +407,10 @@ function renderChoice(ctx, field) {
 	// 警告の行は選択肢のすぐ下に出す。(下に出すレンジより上)
 	const lock = lockIfDependent(ctx, field.requires, { wrapper, control: select, kind: 'choice', key: field.key });
 
-	// 特定の値を選んだときだけ下に出す項目 (先読みのカスタムの枚数など)。親の条件はレンジにも効かせる
-	const reveal = field.reveal ? renderRange(ctx, field.reveal.field, field.requires) : null;
+	// 特定の値を選んだときだけ下に出す項目 (先読みのカスタムの枚数など)。親の条件はレンジにも効かせ、
+	// レンジ自身の条件 (画面端のクリック領域の使わない向きなど) はその後ろに足す
+	const reveals = (field.reveal?.fields ?? []).map((one) => renderRange(ctx, one,
+		[...(field.requires ?? []), ...(one.requires ? [one.requires] : [])]));
 
 	/**
 	 * 選んでいる値に合わせて、下に出す項目を出し入れする。
@@ -416,7 +418,7 @@ function renderChoice(ctx, field) {
 	 * @returns {void}
 	 */
 	function showReveal(value) {
-		if (reveal) reveal.hidden = value !== field.reveal.when;
+		for (const reveal of reveals) reveal.hidden = value !== field.reveal.when;
 	}
 
 	select.addEventListener('change', () => {
@@ -426,9 +428,9 @@ function renderChoice(ctx, field) {
 		showReveal(select.value);
 	});
 
-	if (reveal) {
+	if (reveals.length > 0) {
 		showReveal(current);
-		wrapper.append(reveal);
+		wrapper.append(...reveals);
 	}
 	appendChildren(ctx, wrapper, field.children);
 	return wrapper;

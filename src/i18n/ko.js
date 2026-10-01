@@ -409,18 +409,27 @@ export default {
 				option: (value) => `${value}%`,
 			},
 			navZoneMode: {
-				label: '화면 가장자리 클릭 영역 크기',
-				description: '화면 가장자리 클릭으로 넘길 때 쓰는 가장자리의 너비 (좌우) 와 높이 (상하) 입니다. 이미지를 표시하는 부분에 대한 비율입니다.',
+				label: '화면 가장자리 클릭 영역 너비',
+				description: '화면 가장자리 클릭으로 넘길 때 쓰는 가장자리의 너비입니다. 이미지를 표시하는 부분에 대한 비율이며, 사용자 지정에서는 좌우 가장자리와 상하 가장자리를 따로 고를 수 있습니다.',
 				/**
 				 * 「カスタム」の選択肢。値は選択肢の下に出るレンジで選ぶ。
 				 * @param {number} min 選べる最小の値 (%)
 				 * @param {number} max 選べる最大の値 (%)
 				 * @returns {{label: string, description: string}} 選択肢の文言
 				 */
-				custom: (min, max) => ({ label: '사용자 지정', description: `크기를 ${min}~${max}% 중에서 고릅니다.` }),
+				custom: (min, max) => ({ label: '사용자 지정', description: `좌우와 상하의 너비를 각각 ${min}~${max}% 중에서 고릅니다.` }),
 			},
 			navZoneSize: {
-				label: '크기',
+				label: '좌우 너비',
+				/**
+				 * 値の読み方。レンジの今の値・目盛り・既定の選択肢の見出しに使う。
+				 * @param {number} value 値 (%)
+				 * @returns {string} 読み
+				 */
+				option: (value) => `${value}%`,
+			},
+			navZoneSizeVertical: {
+				label: '상하 너비',
 				/**
 				 * 値の読み方。レンジの今の値・目盛り・既定の選択肢の見出しに使う。
 				 * @param {number} value 値 (%)

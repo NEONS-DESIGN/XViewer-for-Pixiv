@@ -377,18 +377,27 @@ export default {
 				option: (value) => `${value}%`,
 			},
 			navZoneMode: {
-				label: 'Edge click area size',
-				description: 'Width (left and right) and height (top and bottom) of the edges used for edge-click navigation, relative to the image area.',
+				label: 'Edge click area width',
+				description: 'Width of the edges used for edge-click navigation, relative to the image area. With Custom, you can set the left/right edges and the top/bottom edges separately.',
 				/**
 				 * 「カスタム」の選択肢。値は選択肢の下に出るレンジで選ぶ。
 				 * @param {number} min 選べる最小の値 (%)
 				 * @param {number} max 選べる最大の値 (%)
 				 * @returns {{label: string, description: string}} 選択肢の文言
 				 */
-				custom: (min, max) => ({ label: 'Custom', description: `Choose the size from ${min}% to ${max}%.` }),
+				custom: (min, max) => ({ label: 'Custom', description: `Choose the left/right and top/bottom widths separately, from ${min}% to ${max}%.` }),
 			},
 			navZoneSize: {
-				label: 'Size',
+				label: 'Left/right width',
+				/**
+				 * 値の読み方。レンジの今の値・目盛り・既定の選択肢の見出しに使う。
+				 * @param {number} value 値 (%)
+				 * @returns {string} 読み
+				 */
+				option: (value) => `${value}%`,
+			},
+			navZoneSizeVertical: {
+				label: 'Top/bottom width',
 				/**
 				 * 値の読み方。レンジの今の値・目盛り・既定の選択肢の見出しに使う。
 				 * @param {number} value 値 (%)

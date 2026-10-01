@@ -6,7 +6,7 @@ import { SETTINGS_DEFAULTS, POPUP_THEMES, PREFETCH_CHOICES, PREFETCH_CUSTOM, PRE
 import { PROJECT_LICENSE, THIRD_PARTY } from '../../src/common/licenses.js';
 import { createStrings } from '../../src/i18n/index.js';
 import { SUPPORTED_LANGUAGES } from '../../src/common/language.js';
-import { fakeElement, findRole, iconName } from '../helpers/dom.js';
+import { fakeElement, find, findRole, iconName } from '../helpers/dom.js';
 import { fakePopupDoc } from '../helpers/popup.js';
 
 /**
@@ -52,7 +52,7 @@ test('定義表のキーは popupTheme を除く全設定と 1 対 1 に対応�
 		const keys = [...createSections(strings), ...createAdvancedSections(strings)]
 			.flatMap((section) => section.fields)
 			.flatMap(function walk(field) {
-				return [field.key, ...(field.reveal ? [field.reveal.field.key] : []), ...(field.children ?? []).flatMap(walk)];
+				return [field.key, ...(field.reveal?.fields ?? []).map((one) => one.key), ...(field.children ?? []).flatMap(walk)];
 			});
 		assert.equal(new Set(keys).size, keys.length, 'キーが重複している');
 		assert.deepEqual(new Set([...keys, 'popupTheme']), new Set(Object.keys(SETTINGS_DEFAULTS)));
@@ -479,12 +479,16 @@ test('背景の濃さとクリック領域は「既定 / カスタム」から�
 	const backdrop = fields.find((one) => one.key === 'backdropMode');
 	assert.deepEqual(backdrop.options.map((option) => option.label), ['テーマに合わせる (既定)', 'カスタム']);
 	assert.ok(backdrop.options[0].description.length > 0);
-	assert.deepEqual([backdrop.reveal.field.min, backdrop.reveal.field.max, backdrop.reveal.field.step], [0, 100, 10]);
-	for (const key of ['navZoneMode', 'zoomZoneMode']) {
+	assert.deepEqual(backdrop.reveal.fields.map((one) => [one.min, one.max, one.step]), [[0, 100, 10]]);
+	const zoneRanges = { navZoneMode: ['navZoneSize', 'navZoneSizeVertical'], zoomZoneMode: ['zoomZoneSize'] };
+	for (const [key, rangeKeys] of Object.entries(zoneRanges)) {
 		const field = fields.find((one) => one.key === key);
 		assert.deepEqual(field.options.map((option) => option.label), ['25% (既定)', 'カスタム'], key);
-		assert.deepEqual([field.reveal.field.min, field.reveal.field.max, field.reveal.field.step], [5, 35, 5], key);
-		assert.deepEqual([...field.reveal.field.scale], [5, 10, 15, 20, 25, 30, 35], key);
+		assert.deepEqual(field.reveal.fields.map((one) => one.key), rangeKeys, key);
+		for (const range of field.reveal.fields) {
+			assert.deepEqual([range.min, range.max, range.step], [5, 35, 5], range.key);
+			assert.deepEqual([...range.scale], [5, 10, 15, 20, 25, 30, 35], range.key);
+		}
 	}
 	const { root } = build({ settings: { backdropMode: 'theme' } });
 	const field = findRole(root, 'backdropOpacity-field');
@@ -764,7 +768,7 @@ test('「サイドバーを表示する」がオフならサイドバーのス�
 
 test('画面端のクリック領域は「使わない」のとき、原寸表示のクリック領域は「クリックで原寸表示」がオフのとき非活性 (レンジも)', () => {
 	const { root } = build({ settings: { navZones: 'off', navZoneMode: 'custom', clickZoom: false, zoomZoneMode: 'custom' } });
-	for (const key of ['navZoneMode', 'navZoneSize', 'zoomZoneMode', 'zoomZoneSize']) {
+	for (const key of ['navZoneMode', 'navZoneSize', 'navZoneSizeVertical', 'zoomZoneMode', 'zoomZoneSize']) {
 		assert.equal(findRole(root, key).getAttribute('aria-disabled'), 'true', key);
 	}
 	findRole(root, 'navZoneSize').dispatch('pointerdown', { preventDefault() {} });
@@ -777,6 +781,39 @@ test('画面端のクリック領域は「使わない」のとき、原寸表�
 	navZones.dispatch('change');
 	assert.equal(findRole(root, 'navZoneMode').getAttribute('aria-disabled'), null);
 	assert.equal(findRole(root, 'navZoneSize').getAttribute('aria-disabled'), null);
+});
+
+test('画面端のクリック領域の幅は、左右と上下のレンジを別々に出し、使わない向きのレンジだけ非活性にする', () => {
+	const { root, changes } = build({ settings: { navZones: 'horizontal', navZoneMode: 'custom', navZoneSize: 10, navZoneSizeVertical: 30 } });
+	assert.equal(find(findRole(root, 'navZoneSize-field'), '.label').textContent, '左右の幅');
+	assert.equal(find(findRole(root, 'navZoneSizeVertical-field'), '.label').textContent, '上下の幅');
+	assert.equal(findRole(root, 'navZoneSize').value, '10');
+	assert.equal(findRole(root, 'navZoneSizeVertical').value, '30');
+	// 左右だけで送るときは上下の幅を使わない
+	assert.equal(findRole(root, 'navZoneSize').getAttribute('aria-disabled'), null);
+	assert.equal(findRole(root, 'navZoneSizeVertical').getAttribute('aria-disabled'), 'true');
+	findRole(root, 'navZoneSizeVertical').dispatch('pointerdown', { preventDefault() {} });
+	assert.equal(findRole(root, 'navZoneSizeVertical-lock').textContent, '「画面端のクリックで送る」で「左右でページ送り」以外を選んでください。');
+	const navZones = findRole(root, 'navZones');
+	navZones.value = 'vertical';
+	navZones.dispatch('change');
+	assert.equal(findRole(root, 'navZoneSize').getAttribute('aria-disabled'), 'true');
+	assert.equal(findRole(root, 'navZoneSizeVertical').getAttribute('aria-disabled'), null);
+	navZones.value = 'both';
+	navZones.dispatch('change');
+	assert.equal(findRole(root, 'navZoneSize').getAttribute('aria-disabled'), null);
+	assert.equal(findRole(root, 'navZoneSizeVertical').getAttribute('aria-disabled'), null);
+	// 2 本はそれぞれの設定キーへ保存する
+	const vertical = findRole(root, 'navZoneSizeVertical');
+	vertical.value = '15';
+	vertical.dispatch('change');
+	assert.deepEqual(changes.at(-1), { navZoneSizeVertical: 15 });
+	// カスタムでないときはどちらも隠す
+	const mode = findRole(root, 'navZoneMode');
+	mode.value = 'default';
+	mode.dispatch('change');
+	assert.equal(findRole(root, 'navZoneSize-field').hidden, true);
+	assert.equal(findRole(root, 'navZoneSizeVertical-field').hidden, true);
 });
 
 test('非活性でも Tab キーは止めない (フォーカスで移れる)', () => {
