@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#14161c" media="(prefers-color-scheme: dark)">
 <title>XViewer for Pixiv - 为 pixiv 添加 X 风格图片查看器的浏览器扩展程序</title>
-<meta name="description" content="在 pixiv 的用户页面点击作品后，无需跳转页面，就会在当前页面打开弹窗。多张图片的切换、动图的播放、作品说明和评论的阅读乃至发表，都能在弹窗中完成。这是一款非官方的浏览器扩展程序，支持 Chrome / Edge / Firefox。">
+<meta name="description" content="在 pixiv 的用户页面、首页和搜索结果中点击作品后，无需跳转页面，就会在当前页面打开弹窗。多张图片的切换、动图的播放、作品说明和评论的阅读乃至发表，都能在弹窗中完成。这是一款非官方的浏览器扩展程序，支持 Chrome / Edge / Firefox。">
 <!-- lang:head -->
 <link rel="canonical" href="https://xviewer.neonsdesign.com/zh-cn/">
 <link rel="alternate" hreflang="ja" href="https://xviewer.neonsdesign.com/">
@@ -23,7 +23,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="XViewer for Pixiv">
 <meta property="og:title" content="XViewer for Pixiv">
-<meta property="og:description" content="一款浏览器扩展程序，为 pixiv 用户页面添加接近 X.com 媒体浏览体验的图片查看器。支持 Chrome / Edge / Firefox。">
+<meta property="og:description" content="一款浏览器扩展程序，为 pixiv 的用户页面、首页和搜索结果添加接近 X.com 媒体浏览体验的图片查看器。支持 Chrome / Edge / Firefox。">
 <meta property="og:url" content="https://xviewer.neonsdesign.com/zh-cn/">
 <meta property="og:image" content="https://xviewer.neonsdesign.com/assets/img/og-viewer-en.jpg">
 <meta property="og:image:type" content="image/jpeg">
@@ -56,7 +56,7 @@
 			"url": "https://xviewer.neonsdesign.com/zh-cn/",
 			"name": "XViewer for Pixiv",
 			"inLanguage": "zh-CN",
-			"description": "介绍一款浏览器扩展程序的网站。该扩展程序为 pixiv 用户页面添加接近 X.com 媒体浏览体验的图片查看器。"
+			"description": "介绍一款浏览器扩展程序的网站。该扩展程序为 pixiv 的用户页面、首页和搜索结果添加接近 X.com 媒体浏览体验的图片查看器。"
 		},
 		{
 			"@type": "SoftwareApplication",
@@ -66,7 +66,7 @@
 			"operatingSystem": "Windows, macOS, Linux, ChromeOS",
 			"softwareRequirements": "Chrome 120 及以上版本的 Chromium 内核浏览器（Chrome / Brave / Edge），或 Firefox 140 及以上版本（桌面版）",
 			"inLanguage": "zh-CN",
-			"description": "一款非官方的浏览器扩展程序。在 pixiv 的用户页面点击作品后，无需跳转页面，就会在当前页面打开弹窗。多张图片的切换、动图的播放、作品说明和评论的阅读乃至发表，都能在弹窗中完成。",
+			"description": "一款非官方的浏览器扩展程序。在 pixiv 的用户页面、首页和搜索结果中点击作品后，无需跳转页面，就会在当前页面打开弹窗。多张图片的切换、动图的播放、作品说明和评论的阅读乃至发表，都能在弹窗中完成。",
 			"isAccessibleForFree": true,
 			"license": "https://opensource.org/licenses/MIT",
 			"sameAs": "https://github.com/NEONS-DESIGN/XViewer-for-Pixiv",
@@ -82,12 +82,13 @@
 				"https://xviewer.neonsdesign.com/assets/img/shot-popup-en.webp"
 			],
 			"featureList": [
-				"无需跳转页面，在弹窗中打开作品",
+				"无需跳转页面，在弹窗中打开用户页面、首页和搜索结果中的作品",
 				"用键盘切换多张图片的作品",
 				"播放动图",
 				"在侧边栏中显示作品说明、标签、计数和评论",
 				"点赞、收藏、关注和发表评论",
-				"用户页面的无限滚动"
+				"用户页面的无限滚动",
+				"细致设置使用查看器的页面、背景浓度和点击区域宽度"
 			]
 		}
 	]
@@ -163,7 +164,7 @@
 			<p class="eyebrow">支持 Chrome / Brave / Edge / Firefox</p>
 			<h1>像浏览 <span class="brand-x">X</span> 一样，浏览 <span class="brand-pixiv">pixiv</span>。</h1>
 			<p class="lede">
-				在用户页面点击作品后，无需跳转页面，就会在当前页面打开弹窗。
+				在用户页面、首页和搜索结果中点击作品后，无需跳转页面，就会在当前页面打开弹窗。
 				多张图片的切换、动图的播放、作品说明和评论的阅读，乃至点赞、收藏、关注和发表评论，
 				全都能在弹窗中完成。
 				关闭后，即可回到原来网格中的原有滚动位置。
@@ -204,7 +205,7 @@
 			<div class="card-grid">
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-open"></use></svg></span>在弹窗中打开</h3>
-					<p>接管网格中的点击，不跳转页面直接显示。URL 会替换为作品页面的地址，因此也可以刷新和分享。</p>
+					<p>接管网格中的点击，不跳转页面直接显示。除了用户页面的作品列表，也能从首页和搜索结果中的作品打开。URL 会替换为作品页面的地址，因此也可以刷新和分享。</p>
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-next"></use></svg></span>切换多张图片</h3>
@@ -212,7 +213,7 @@
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-scroll"></use></svg></span>一个接一个看作品</h3>
-					<p>用上下方向键移到网格中的上一个或下一个作品。开启设置后，点击画面上下边缘也能切换。到达末尾时会自动加载下一页的内容。在插画和漫画标签页中，只会依次浏览该类别的作品。</p>
+					<p>用上下方向键移到网格中的上一个或下一个作品。开启设置后，点击画面上下边缘也能切换。在用户页面中，到达末尾时会自动加载下一页的内容；在插画和漫画标签页中，只会依次浏览该类别的作品。在首页和搜索结果中，会在所点击作品所在的栏目内切换。</p>
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-play"></use></svg></span>播放动图</h3>
@@ -236,7 +237,7 @@
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-tune"></use></svg></span>细致调整</h3>
-					<p>在设置页面的「详细设置」标签页中，可以按档位选择侧边栏宽度、背景浓度、屏幕边缘点击区域宽度和一次读取的评论数。预加载也可以在前后各 1～10 张的范围内指定。</p>
+					<p>在设置页面的「详细设置」标签页中，可以按档位选择侧边栏宽度和一次读取的评论数，并用滑块选择背景浓度和点击区域宽度。屏幕边缘点击区域可以分别指定左右和上下，预加载也可以在前后各 1～20 张的范围内选择。</p>
 				</div>
 			</div>
 		</div>
@@ -318,9 +319,11 @@
 					</p>
 					<ul class="feature-list">
 						<li>可以根据网络状况和喜好，选择图片分辨率和预加载的张数</li>
+						<li>可以分别选择在用户页面、首页和搜索结果中是否使用查看器</li>
 						<li>侧边栏的显示方式、滚动方式，乃至点击背景是否关闭、点击画面边缘是否翻页都可以更改</li>
-						<li>在「详细设置」标签页中，还能按档位选择侧边栏宽度、背景浓度、点击区域宽度和一次读取的评论数</li>
-						<li>关闭查看器本身，即可恢复 pixiv 的默认行为</li>
+						<li>在「详细设置」标签页中，还能按档位选择侧边栏宽度和一次读取的评论数，并用滑块细致地选择背景浓度和点击区域宽度</li>
+						<li>相关的项目按父子关系归在一起，父项目关闭期间无法操作子项目。需要开启哪个项目，会当场给出提示</li>
+						<li>关闭查看器本身，即可恢复 pixiv 的默认行为（隐藏精选栏、无限滚动和网格中的 Tab 键导航仍可照常使用）</li>
 					</ul>
 				</div>
 				<!-- 設定ポップアップの上半分と下半分を一定時間ごとに重ねて切り替える (site.js)。JS が無ければ上半分のまま -->
@@ -345,7 +348,7 @@
 		<div class="wrap">
 			<div class="section-head">
 				<h2>可以设置的内容</h2>
-				<p>所有设置都可以在工具栏的弹窗中更改。常用项目在「设置」标签页中，侧边栏宽度、点击区域宽度等细致调整则集中在「详细设置」标签页中。设置保存在浏览器的同步存储中，不会发送到外部。</p>
+				<p>所有设置都可以在工具栏的弹窗中更改。常用项目在「设置」标签页中，侧边栏宽度、点击区域宽度等细致调整则集中在「详细设置」标签页中。相关的项目按父子关系归在一起，父项目关闭期间无法操作子项目（即下表中缩进的项目。「详细设置」标签页中的项目，也会随侧边栏的显示、点击画面边缘翻页等相关项目而定）。设置保存在浏览器的同步存储中，不会发送到外部。</p>
 			</div>
 			<div class="table-scroll">
 				<table>
@@ -362,7 +365,25 @@
 							<td>查看器</td>
 							<td>使用查看器</td>
 							<td class="default">开</td>
-							<td>关闭后将恢复 pixiv 的默认行为</td>
+							<td>关闭后将恢复 pixiv 的默认行为。即使关闭，隐藏精选栏、无限滚动和网格中的 Tab 键导航仍然有效</td>
+						</tr>
+						<tr>
+							<td>查看器</td>
+							<td class="child">在用户页面使用</td>
+							<td class="default">开</td>
+							<td>从作者页面的作品列表打开时显示查看器</td>
+						</tr>
+						<tr>
+							<td>查看器</td>
+							<td class="child">在首页使用</td>
+							<td class="default">开</td>
+							<td>从 pixiv 首页（首页 / 插画 / 漫画）的作品打开时显示查看器</td>
+						</tr>
+						<tr>
+							<td>查看器</td>
+							<td class="child">在搜索结果中使用</td>
+							<td class="default">开</td>
+							<td>从搜索结果（标签页面和搜索页面）打开时显示查看器</td>
 						</tr>
 						<tr>
 							<td>查看器</td>
@@ -372,7 +393,7 @@
 						</tr>
 						<tr>
 							<td>查看器</td>
-							<td>侧边栏的滚动方式</td>
+							<td class="child">侧边栏的滚动方式</td>
 							<td class="default">整个侧边栏</td>
 							<td>将作品说明到评论连成一体滚动，还是固定作品说明、只滚动评论</td>
 						</tr>
@@ -386,7 +407,7 @@
 							<td>图片</td>
 							<td>预加载</td>
 							<td class="default">前后各 1 张</td>
-							<td>可以选择提前加载的图片张数：不预加载 / 前后各 1 张 / 前后各 3 张 / 自定义。选择自定义时，可从 1～10 张中选择前后各预加载的张数</td>
+							<td>可以选择提前加载的图片张数：不预加载 / 前后各 1 张 / 前后各 3 张 / 自定义。选择自定义时，可用滑块从 1～20 张中选择前后各预加载的张数。选择 10 张以上时，会提示可能占用大量内存</td>
 						</tr>
 						<tr>
 							<td>图片</td>
@@ -462,13 +483,13 @@
 							<td>查看器</td>
 							<td>背景浓度</td>
 							<td class="default">跟随主题</td>
-							<td>铺在图片后面的黑色幕布的浓度。可选择跟随主题（深色 92% / 浅色 88%），或从 100 / 90 / 80 / 70 / 60% 中选择。调低后可以透过它看到后面的页面</td>
+							<td>铺在图片后面的黑色幕布的浓度。可选择跟随主题（深色 92% / 浅色 88%），或选择自定义，用滑块从 0～100%（以 10% 为单位）中选择。调低后可以透过它看到后面的页面</td>
 						</tr>
 						<tr>
 							<td>操作</td>
 							<td>屏幕边缘点击区域宽度</td>
 							<td class="default">25%</td>
-							<td>点击屏幕边缘翻页时所用边缘的宽度，为相对于图片显示区域的比例。选择自定义时，可分别从 5～35%（以 5% 为单位）中选择左右宽度和上下宽度</td>
+							<td>点击屏幕边缘翻页时所用边缘的宽度，为相对于图片显示区域的比例。选择自定义时，可分别从 5～35%（以 5% 为单位）中选择左右宽度和上下宽度。只用左右或只用上下翻页时，无法操作不使用的方向的宽度</td>
 						</tr>
 						<tr>
 							<td>操作</td>
@@ -517,7 +538,7 @@
 				</div>
 				<div class="card">
 					<h3>适用页面</h3>
-					<p><code>https://www.pixiv.net/</code> 的用户页面。在其他网站上不会运行。</p>
+					<p><code>https://www.pixiv.net/</code> 的用户页面、首页（首页 / 插画 / 漫画）和搜索结果（标签页面和搜索页面）。在其他网站上不会运行。</p>
 				</div>
 				<div class="card">
 					<h3>许可证</h3>
@@ -590,7 +611,7 @@
 				</div>
 				<div class="card">
 					<h3>保存的内容</h3>
-					<p>你选择的 21 项设置，以及最后看到的 pixiv 显示语言。两者都只保留在浏览器中，不会发送到外部服务器。</p>
+					<p>你选择的 27 项设置，以及最后看到的 pixiv 显示语言。两者都只保留在浏览器中，不会发送到外部服务器。</p>
 				</div>
 				<div class="card">
 					<h3>请求的权限</h3>
@@ -616,7 +637,7 @@
 					<li>R-18 作品的显示遵循 pixiv 的设置。本扩展程序不会绕过年龄限制</li>
 					<li>赞无法取消。这是 pixiv 的机制，即使误点也无法撤回</li>
 					<li>发表和删除评论与在 pixiv 网站上操作相同。每次点击都会直接发送到 pixiv。删除后无法恢复，因此设有两步确认</li>
-					<li>没有收集作品的功能。既没有下载，也没有批量操作的自动化，只获取当前打开的作品及其前后的几张图片</li>
+					<li>没有收集作品的功能。既没有下载，也没有批量操作的自动化，只获取当前打开的作品以及预加载所选的范围</li>
 					<li>可能会因 pixiv 的改版而无法运行</li>
 				</ul>
 			</div>

@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#14161c" media="(prefers-color-scheme: dark)">
 <title>XViewer for Pixiv - pixiv に X 風の画像ビュワーを追加するブラウザ拡張機能</title>
-<meta name="description" content="pixiv のユーザーページで作品をクリックすると、ページ遷移せずにその場でモーダルが開きます。複数枚の切り替え、うごイラの再生、投稿文やコメントの閲覧から投稿までモーダルの中で完結する非公式のブラウザ拡張機能です。Chrome / Edge / Firefox に対応しています。">
+<meta name="description" content="pixiv のユーザーページ・ホーム・検索結果で作品をクリックすると、ページ遷移せずにその場でモーダルが開きます。複数枚の切り替え、うごイラの再生、投稿文やコメントの閲覧から投稿までモーダルの中で完結する非公式のブラウザ拡張機能です。Chrome / Edge / Firefox に対応しています。">
 <!-- lang:head -->
 <link rel="canonical" href="https://xviewer.neonsdesign.com/">
 <link rel="alternate" hreflang="ja" href="https://xviewer.neonsdesign.com/">
@@ -23,7 +23,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="XViewer for Pixiv">
 <meta property="og:title" content="XViewer for Pixiv">
-<meta property="og:description" content="pixiv のユーザーページに、X.com のメディア閲覧に近い画像ビュワーを追加するブラウザ拡張機能。Chrome / Edge / Firefox に対応。">
+<meta property="og:description" content="pixiv のユーザーページ・ホーム・検索結果に、X.com のメディア閲覧に近い画像ビュワーを追加するブラウザ拡張機能。Chrome / Edge / Firefox に対応。">
 <meta property="og:url" content="https://xviewer.neonsdesign.com/">
 <meta property="og:image" content="https://xviewer.neonsdesign.com/assets/img/og-viewer.jpg">
 <meta property="og:image:type" content="image/jpeg">
@@ -56,7 +56,7 @@
 			"url": "https://xviewer.neonsdesign.com/",
 			"name": "XViewer for Pixiv",
 			"inLanguage": "ja",
-			"description": "pixiv のユーザーページに X.com のメディア閲覧に近い画像ビュワーを追加するブラウザ拡張機能の紹介サイト。"
+			"description": "pixiv のユーザーページ・ホーム・検索結果に X.com のメディア閲覧に近い画像ビュワーを追加するブラウザ拡張機能の紹介サイト。"
 		},
 		{
 			"@type": "SoftwareApplication",
@@ -66,7 +66,7 @@
 			"operatingSystem": "Windows, macOS, Linux, ChromeOS",
 			"softwareRequirements": "Chrome 120 以上の Chromium 系ブラウザ (Chrome / Brave / Edge)、または Firefox 140 以上 (デスクトップ版)",
 			"inLanguage": "ja",
-			"description": "pixiv のユーザーページで作品をクリックすると、ページ遷移せずにその場でモーダルが開く非公式のブラウザ拡張機能。複数枚の切り替え、うごイラの再生、投稿文やコメントの閲覧から投稿までモーダルの中で完結する。",
+			"description": "pixiv のユーザーページ・ホーム・検索結果で作品をクリックすると、ページ遷移せずにその場でモーダルが開く非公式のブラウザ拡張機能。複数枚の切り替え、うごイラの再生、投稿文やコメントの閲覧から投稿までモーダルの中で完結する。",
 			"isAccessibleForFree": true,
 			"license": "https://opensource.org/licenses/MIT",
 			"sameAs": "https://github.com/NEONS-DESIGN/XViewer-for-Pixiv",
@@ -82,12 +82,13 @@
 				"https://xviewer.neonsdesign.com/assets/img/shot-popup.webp"
 			],
 			"featureList": [
-				"ページ遷移せずにモーダルで作品を開く",
+				"ユーザーページ・ホーム・検索結果の作品を、ページ遷移せずにモーダルで開く",
 				"複数枚の作品をキーボードで切り替える",
 				"うごイラを再生する",
 				"投稿文・タグ・カウンタ・コメントをサイドバーに表示する",
 				"いいね・ブックマーク・フォロー・コメントの投稿",
-				"ユーザーページの無限スクロール"
+				"ユーザーページの無限スクロール",
+				"ビュワーを使う画面や背景の濃さ、クリック領域の幅を細かく設定する"
 			]
 		}
 	]
@@ -165,7 +166,7 @@
 			<p class="eyebrow">Chrome / Brave / Edge / Firefox 対応</p>
 			<h1><span class="brand-pixiv">pixiv</span> を、<span class="brand-x">X</span> のように見る。</h1>
 			<p class="lede">
-				ユーザーページで作品をクリックすると、ページ遷移せずにその場でモーダルが開きます。
+				ユーザーページ、ホーム、検索結果で作品をクリックすると、ページ遷移せずにその場でモーダルが開きます。
 				複数枚の切り替え、うごイラの再生、投稿文やコメントの閲覧から、いいね・ブックマーク・フォロー・コメントの投稿まで、
 				すべてモーダルの中で完結します。
 				閉じれば、元のグリッドの元のスクロール位置に戻ります。
@@ -206,7 +207,7 @@
 			<div class="card-grid">
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-open"></use></svg></span>モーダルで開く</h3>
-					<p>グリッドのクリックを受け取り、ページ遷移せずに表示します。URL は作品ページのものへ差し替わるので、リロードも共有もできます。</p>
+					<p>グリッドのクリックを受け取り、ページ遷移せずに表示します。ユーザーページの作品一覧に加えて、ホームと検索結果の作品からも開けます。URL は作品ページのものへ差し替わるので、リロードも共有もできます。</p>
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-next"></use></svg></span>複数枚の切り替え</h3>
@@ -214,7 +215,7 @@
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-scroll"></use></svg></span>作品から作品へ</h3>
-					<p>上下キーでグリッドの前後の作品へ移動します。設定すれば、画面の上下の端のクリックでも移れます。端まで来たら次のページ分を自動で読み足します。イラストとマンガのタブでは、その種別の作品だけをたどります。</p>
+					<p>上下キーでグリッドの前後の作品へ移動します。設定すれば、画面の上下の端のクリックでも移れます。ユーザーページでは、端まで来たら次のページ分を自動で読み足し、イラストとマンガのタブではその種別の作品だけをたどります。ホームと検索結果では、押した作品の欄の中で送ります。</p>
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-play"></use></svg></span>うごイラの再生</h3>
@@ -238,7 +239,7 @@
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-tune"></use></svg></span>細かく調整できる</h3>
-					<p>サイドバーの幅、背景の濃さ、画面端のクリック領域の幅、一度に読むコメントの数を、設定画面の「詳細設定」タブで段階ごとに選べます。先読みも前後 1〜10 枚の範囲で指定できます。</p>
+					<p>設定画面の「詳細設定」タブでは、サイドバーの幅と一度に読むコメントの数を段階ごとに、背景の濃さとクリック領域の幅をスライダーで選べます。画面端のクリック領域は左右と上下を別々に指定でき、先読みも前後 1〜20 枚の範囲で選べます。</p>
 				</div>
 			</div>
 		</div>
@@ -320,9 +321,11 @@
 					</p>
 					<ul class="feature-list">
 						<li>画像の解像度と先読みの枚数を、回線や好みに合わせて選べます</li>
+						<li>ユーザーページ・ホーム・検索結果のそれぞれで、ビュワーを使うかを選べます</li>
 						<li>サイドバーの出し方やスクロール方式、背景クリックで閉じるか、画面端のクリックで送るかまで変えられます</li>
-						<li>「詳細設定」タブでは、サイドバーの幅、背景の濃さ、クリック領域の幅、一度に読むコメントの数まで段階ごとに選べます</li>
-						<li>ビュワー自体をオフにすれば、pixiv 標準の動作に戻ります</li>
+						<li>「詳細設定」タブでは、サイドバーの幅と一度に読むコメントの数を段階ごとに、背景の濃さとクリック領域の幅をスライダーで細かく選べます</li>
+						<li>関係する項目は親子にまとめてあり、親がオフの間は子を操作できません。どの項目をオンにすればよいかは、その場で案内します</li>
+						<li>ビュワー自体をオフにすれば、pixiv 標準の動作に戻ります。(ピックアップ欄を隠す・無限スクロール・グリッドの Tab 移動はそのまま使えます)</li>
 					</ul>
 				</div>
 				<!-- 設定ポップアップの上半分と下半分を一定時間ごとに重ねて切り替える (site.js)。JS が無ければ上半分のまま -->
@@ -347,7 +350,7 @@
 		<div class="wrap">
 			<div class="section-head">
 				<h2>設定でできること</h2>
-				<p>すべてツールバーのポップアップから変更できます。普段使う項目は「設定」タブに、サイドバーの幅やクリック領域の幅のような細かな調整は「詳細設定」タブにまとめています。設定はブラウザの同期領域に保存され、外部には送信されません。</p>
+				<p>すべてツールバーのポップアップから変更できます。普段使う項目は「設定」タブに、サイドバーの幅やクリック領域の幅のような細かな調整は「詳細設定」タブにまとめています。関係する項目は親子に組んであり、親の項目がオフの間は子の項目を操作できません。(下の表で字下げした項目。詳細設定タブの項目も、サイドバーの表示や画面端のクリックなど、関係する項目に従います) 設定はブラウザの同期領域に保存され、外部には送信されません。</p>
 			</div>
 			<div class="table-scroll">
 				<table>
@@ -364,7 +367,25 @@
 							<td>ビュワー</td>
 							<td>ビュワーを使う</td>
 							<td class="default">オン</td>
-							<td>オフにすると pixiv 標準の動作に戻ります</td>
+							<td>オフにすると pixiv 標準の動作に戻ります。ピックアップ欄を隠す・無限スクロール・グリッドの Tab 移動は、オフでもそのまま使えます</td>
+						</tr>
+						<tr>
+							<td>ビュワー</td>
+							<td class="child">ユーザーページで使う</td>
+							<td class="default">オン</td>
+							<td>作者のページの作品一覧から開いたときにビュワーを出します</td>
+						</tr>
+						<tr>
+							<td>ビュワー</td>
+							<td class="child">ホームで使う</td>
+							<td class="default">オン</td>
+							<td>pixiv のホーム (ホーム / イラスト / マンガ) の作品から開いたときにビュワーを出します</td>
+						</tr>
+						<tr>
+							<td>ビュワー</td>
+							<td class="child">検索結果で使う</td>
+							<td class="default">オン</td>
+							<td>検索結果 (タグのページと検索画面) から開いたときにビュワーを出します</td>
 						</tr>
 						<tr>
 							<td>ビュワー</td>
@@ -374,7 +395,7 @@
 						</tr>
 						<tr>
 							<td>ビュワー</td>
-							<td>サイドバーのスクロール</td>
+							<td class="child">サイドバーのスクロール</td>
 							<td class="default">サイドバーごと</td>
 							<td>投稿文からコメントまでを 1 つにつなげて送るか、投稿文を固定してコメントだけを送るか</td>
 						</tr>
@@ -388,7 +409,7 @@
 							<td>画像</td>
 							<td>先読み</td>
 							<td class="default">前後 1 枚</td>
-							<td>次のページを先に読み込んでおく枚数を、しない / 前後 1 枚 / 前後 3 枚 / カスタムから選べます。カスタムでは前後に読む枚数を 1〜10 枚から選べます</td>
+							<td>次のページを先に読み込んでおく枚数を、しない / 前後 1 枚 / 前後 3 枚 / カスタムから選べます。カスタムでは前後に読む枚数を 1〜20 枚からスライダーで選べます。10 枚以上ではメモリを圧迫する旨の注意が出ます</td>
 						</tr>
 						<tr>
 							<td>画像</td>
@@ -464,13 +485,13 @@
 							<td>ビュワー</td>
 							<td>背景の濃さ</td>
 							<td class="default">テーマに合わせる</td>
-							<td>画像の後ろに敷く黒い幕の濃さ。テーマに合わせる (ダーク 92% / ライト 88%) か、100 / 90 / 80 / 70 / 60% から選べます。下げると後ろのページが透けて見えます</td>
+							<td>画像の後ろに敷く黒い幕の濃さ。テーマに合わせる (ダーク 92% / ライト 88%) か、カスタムで 0〜100% (10% 刻み) からスライダーで選べます。下げると後ろのページが透けて見えます</td>
 						</tr>
 						<tr>
 							<td>操作</td>
 							<td>画面端のクリック領域の幅</td>
 							<td class="default">25%</td>
-							<td>画面端のクリックで送るときの、端の幅。画像を出す部分に対する割合で、カスタムでは左右の端と上下の端の幅を、それぞれ 5〜35% (5% 刻み) から別々に選べます</td>
+							<td>画面端のクリックで送るときの、端の幅。画像を出す部分に対する割合で、カスタムでは左右の端と上下の端の幅を、それぞれ 5〜35% (5% 刻み) から別々に選べます。左右だけ・上下だけで送るときは、使わない向きの幅は操作できません</td>
 						</tr>
 						<tr>
 							<td>操作</td>
@@ -519,7 +540,7 @@
 				</div>
 				<div class="card">
 					<h3>対象ページ</h3>
-					<p><code>https://www.pixiv.net/</code> のユーザーページ。他のサイトでは動作しません。</p>
+					<p><code>https://www.pixiv.net/</code> のユーザーページ、ホーム (ホーム / イラスト / マンガ)、検索結果 (タグのページと検索画面)。他のサイトでは動作しません。</p>
 				</div>
 				<div class="card">
 					<h3>ライセンス</h3>
@@ -592,7 +613,7 @@
 				</div>
 				<div class="card">
 					<h3>保存するもの</h3>
-					<p>あなたが選んだ 21 項目の設定と、最後に見た pixiv の表示言語。どちらもブラウザの中に留まり、外部サーバーへは出ません。</p>
+					<p>あなたが選んだ 27 項目の設定と、最後に見た pixiv の表示言語。どちらもブラウザの中に留まり、外部サーバーへは出ません。</p>
 				</div>
 				<div class="card">
 					<h3>要求する権限</h3>
@@ -618,7 +639,7 @@
 					<li>R-18 作品の表示は pixiv 側の設定に従います。拡張側で年齢制限を回避することはしません</li>
 					<li>いいねは取り消せません。これは pixiv の仕様で、押し間違えても元には戻せません</li>
 					<li>コメントの投稿・削除は pixiv 本体と同じ扱いです。押した分だけそのまま pixiv へ送られます。削除は元に戻せないので、2 段階の確認を挟んでいます</li>
-					<li>作品を収集する機能はありません。ダウンロードも一括操作の自動化もなく、取得するのはいま開いている作品とその前後の数枚だけです</li>
+					<li>作品を収集する機能はありません。ダウンロードも一括操作の自動化もなく、取得するのはいま開いている作品と、先読みに選んだ範囲だけです</li>
 					<li>pixiv の仕様変更によって動作しなくなる場合があります</li>
 				</ul>
 			</div>

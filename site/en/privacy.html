@@ -103,7 +103,7 @@
 			(<code>xviewer.neonsdesign.com</code>).
 		</p>
 		<p>
-			The extension is an unofficial tool that adds an image viewer to pixiv (https://www.pixiv.net/) user pages.
+			The extension is an unofficial tool that adds an image viewer to pixiv (https://www.pixiv.net/) user pages, the home page and search results.
 			It is not created or distributed by pixiv Inc. and is not affiliated with them. How pixiv itself handles
 			personal information is covered by pixiv Inc.'s own privacy policy.
 		</p>
@@ -143,9 +143,12 @@
 			a Microsoft account for Edge, a Mozilla account for Firefox). Neither the author nor any third
 			party can read it.
 		</p>
-		<p>There are 21 stored preferences. Each is a boolean or one of a fixed set of choices. (The custom prefetch count is a whole number from 1 to 10.)</p>
+		<p>There are 27 stored preferences. Each is a boolean, one of a fixed set of choices, or a whole number within a fixed range. (The custom prefetch count is 1 to 20, the background darkness 0 to 100 in steps of 10, and the click area widths 5 to 35 in steps of 5.)</p>
 		<ul>
 			<li>Whether the viewer is enabled</li>
+			<li>Whether the viewer is used on user pages</li>
+			<li>Whether the viewer is used on the home page</li>
+			<li>Whether the viewer is used on search results</li>
 			<li>Image resolution</li>
 			<li>Prefetch count</li>
 			<li>Custom prefetch count</li>
@@ -154,13 +157,16 @@
 			<li>Sidebar scrolling mode</li>
 			<li>Sidebar width</li>
 			<li>Pulled-out sidebar width</li>
+			<li>How the background darkness is set (match the theme / custom)</li>
 			<li>Background darkness</li>
 			<li>Number of comments loaded at once</li>
 			<li>Whether a backdrop click closes the viewer</li>
 			<li>Edge-click navigation behaviour</li>
+			<li>How the edge click area width is set (default / custom)</li>
 			<li>Edge click area left/right width</li>
 			<li>Edge click area top/bottom width</li>
 			<li>Whether clicking the image opens it full size</li>
+			<li>How the actual-size click area width is set (default / custom)</li>
 			<li>Actual-size click area width</li>
 			<li>Grid tab-order handling</li>
 			<li>Whether the pickup section is hidden</li>
@@ -230,7 +236,7 @@
 		<p>
 			Since nothing is collected, there is nothing to share. The extension does not sell, transfer or share user data.
 			It does not use data for any purpose unrelated to its single purpose - adding an image viewer to pixiv user
-			pages - and never for creditworthiness or lending purposes.
+			pages, the home page and search results - and never for creditworthiness or lending purposes.
 		</p>
 
 		<h2>8. About this website</h2>

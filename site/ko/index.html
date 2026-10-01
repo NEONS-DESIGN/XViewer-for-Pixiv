@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#14161c" media="(prefers-color-scheme: dark)">
 <title>XViewer for Pixiv - pixiv에 X 스타일의 이미지 뷰어를 추가하는 브라우저 확장 프로그램</title>
-<meta name="description" content="pixiv 유저 페이지에서 작품을 클릭하면 페이지를 이동하지 않고 그 자리에서 모달이 열립니다. 여러 장의 이미지 전환, 움짤(우고이라) 재생, 작품 설명과 댓글 보기부터 작성까지 모달 안에서 모두 할 수 있는 비공식 브라우저 확장 프로그램입니다. Chrome / Edge / Firefox를 지원합니다.">
+<meta name="description" content="pixiv 유저 페이지·홈·검색 결과에서 작품을 클릭하면 페이지를 이동하지 않고 그 자리에서 모달이 열립니다. 여러 장의 이미지 전환, 움짤(우고이라) 재생, 작품 설명과 댓글 보기부터 작성까지 모달 안에서 모두 할 수 있는 비공식 브라우저 확장 프로그램입니다. Chrome / Edge / Firefox를 지원합니다.">
 <!-- lang:head -->
 <link rel="canonical" href="https://xviewer.neonsdesign.com/ko/">
 <link rel="alternate" hreflang="ja" href="https://xviewer.neonsdesign.com/">
@@ -23,7 +23,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="XViewer for Pixiv">
 <meta property="og:title" content="XViewer for Pixiv">
-<meta property="og:description" content="pixiv 유저 페이지에 X.com의 미디어 보기와 비슷한 이미지 뷰어를 추가하는 브라우저 확장 프로그램. Chrome / Edge / Firefox 지원.">
+<meta property="og:description" content="pixiv 유저 페이지·홈·검색 결과에 X.com의 미디어 보기와 비슷한 이미지 뷰어를 추가하는 브라우저 확장 프로그램. Chrome / Edge / Firefox 지원.">
 <meta property="og:url" content="https://xviewer.neonsdesign.com/ko/">
 <meta property="og:image" content="https://xviewer.neonsdesign.com/assets/img/og-viewer-en.jpg">
 <meta property="og:image:type" content="image/jpeg">
@@ -56,7 +56,7 @@
 			"url": "https://xviewer.neonsdesign.com/ko/",
 			"name": "XViewer for Pixiv",
 			"inLanguage": "ko",
-			"description": "pixiv 유저 페이지에 X.com의 미디어 보기와 비슷한 이미지 뷰어를 추가하는 브라우저 확장 프로그램의 소개 사이트."
+			"description": "pixiv 유저 페이지·홈·검색 결과에 X.com의 미디어 보기와 비슷한 이미지 뷰어를 추가하는 브라우저 확장 프로그램의 소개 사이트."
 		},
 		{
 			"@type": "SoftwareApplication",
@@ -66,7 +66,7 @@
 			"operatingSystem": "Windows, macOS, Linux, ChromeOS",
 			"softwareRequirements": "Chrome 120 이상의 Chromium 계열 브라우저 (Chrome / Brave / Edge) 또는 Firefox 140 이상 (데스크톱 버전)",
 			"inLanguage": "ko",
-			"description": "pixiv 유저 페이지에서 작품을 클릭하면 페이지를 이동하지 않고 그 자리에서 모달이 열리는 비공식 브라우저 확장 프로그램. 여러 장의 이미지 전환, 움짤(우고이라) 재생, 작품 설명과 댓글 보기부터 작성까지 모달 안에서 모두 할 수 있다.",
+			"description": "pixiv 유저 페이지·홈·검색 결과에서 작품을 클릭하면 페이지를 이동하지 않고 그 자리에서 모달이 열리는 비공식 브라우저 확장 프로그램. 여러 장의 이미지 전환, 움짤(우고이라) 재생, 작품 설명과 댓글 보기부터 작성까지 모달 안에서 모두 할 수 있다.",
 			"isAccessibleForFree": true,
 			"license": "https://opensource.org/licenses/MIT",
 			"sameAs": "https://github.com/NEONS-DESIGN/XViewer-for-Pixiv",
@@ -82,12 +82,13 @@
 				"https://xviewer.neonsdesign.com/assets/img/shot-popup-en.webp"
 			],
 			"featureList": [
-				"페이지를 이동하지 않고 모달로 작품 열기",
+				"유저 페이지·홈·검색 결과의 작품을 페이지 이동 없이 모달로 열기",
 				"여러 장으로 된 작품을 키보드로 전환",
 				"움짤(우고이라) 재생",
 				"작품 설명·태그·카운터·댓글을 사이드바에 표시",
 				"좋아요·북마크·팔로우·댓글 작성",
-				"유저 페이지 무한 스크롤"
+				"유저 페이지 무한 스크롤",
+				"뷰어를 사용할 화면, 배경 농도, 클릭 영역 너비를 세세하게 설정"
 			]
 		}
 	]
@@ -163,7 +164,7 @@
 			<p class="eyebrow">Chrome / Brave / Edge / Firefox 지원</p>
 			<h1><span class="brand-pixiv">pixiv</span>를 <span class="brand-x">X</span>처럼 보다.</h1>
 			<p class="lede">
-				유저 페이지에서 작품을 클릭하면 페이지를 이동하지 않고 그 자리에서 모달이 열립니다.
+				유저 페이지, 홈, 검색 결과에서 작품을 클릭하면 페이지를 이동하지 않고 그 자리에서 모달이 열립니다.
 				여러 장의 이미지 전환, 움짤(우고이라) 재생, 작품 설명과 댓글 보기부터 좋아요·북마크·팔로우·댓글 작성까지
 				모두 모달 안에서 할 수 있습니다.
 				닫으면 원래 그리드의 원래 스크롤 위치로 돌아갑니다.
@@ -204,7 +205,7 @@
 			<div class="card-grid">
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-open"></use></svg></span>모달로 열기</h3>
-					<p>그리드의 클릭을 받아 페이지를 이동하지 않고 표시합니다. URL이 작품 페이지 주소로 바뀌므로 새로고침도 공유도 할 수 있습니다.</p>
+					<p>그리드의 클릭을 받아 페이지를 이동하지 않고 표시합니다. 유저 페이지의 작품 목록뿐 아니라 홈과 검색 결과의 작품에서도 열 수 있습니다. URL이 작품 페이지 주소로 바뀌므로 새로고침도 공유도 할 수 있습니다.</p>
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-next"></use></svg></span>여러 장 전환</h3>
@@ -212,7 +213,7 @@
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-scroll"></use></svg></span>작품에서 작품으로</h3>
-					<p>상하 키로 그리드의 이전·다음 작품으로 이동합니다. 설정하면 화면 상하 가장자리를 클릭해서도 이동할 수 있습니다. 끝에 다다르면 다음 페이지 분량을 자동으로 더 불러옵니다. 일러스트와 만화 탭에서는 그 종류의 작품만 따라갑니다.</p>
+					<p>상하 키로 그리드의 이전·다음 작품으로 이동합니다. 설정하면 화면 상하 가장자리를 클릭해서도 이동할 수 있습니다. 유저 페이지에서는 끝에 다다르면 다음 페이지 분량을 자동으로 더 불러오고, 일러스트와 만화 탭에서는 그 종류의 작품만 따라갑니다. 홈과 검색 결과에서는 누른 작품이 있는 영역 안에서 넘깁니다.</p>
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-play"></use></svg></span>움짤(우고이라) 재생</h3>
@@ -236,7 +237,7 @@
 				</div>
 				<div class="card">
 					<h3><span class="card-icon"><svg aria-hidden="true"><use href="#i-tune"></use></svg></span>세세하게 조정</h3>
-					<p>사이드바 너비, 배경 농도, 화면 가장자리 클릭 영역 너비, 한 번에 불러올 댓글 수를 설정 화면의 「상세 설정」 탭에서 단계별로 고를 수 있습니다. 미리 불러오기도 앞뒤 1~10장 범위에서 지정할 수 있습니다.</p>
+					<p>설정 화면의 「상세 설정」 탭에서는 사이드바 너비와 한 번에 불러올 댓글 수를 단계별로, 배경 농도와 클릭 영역 너비를 슬라이더로 고를 수 있습니다. 화면 가장자리 클릭 영역은 좌우와 상하를 따로 지정할 수 있고, 미리 불러오기도 앞뒤 1~20장 범위에서 고를 수 있습니다.</p>
 				</div>
 			</div>
 		</div>
@@ -318,9 +319,11 @@
 					</p>
 					<ul class="feature-list">
 						<li>이미지 해상도와 미리 불러올 장수를 회선이나 취향에 맞춰 고를 수 있습니다</li>
+						<li>유저 페이지·홈·검색 결과마다 뷰어를 사용할지 고를 수 있습니다</li>
 						<li>사이드바 표시 방식과 스크롤 방식, 배경 클릭으로 닫을지, 화면 가장자리 클릭으로 넘길지까지 바꿀 수 있습니다</li>
-						<li>「상세 설정」 탭에서는 사이드바 너비, 배경 농도, 클릭 영역 너비, 한 번에 불러올 댓글 수까지 단계별로 고를 수 있습니다</li>
-						<li>뷰어 자체를 끄면 pixiv 기본 동작으로 돌아갑니다</li>
+						<li>「상세 설정」 탭에서는 사이드바 너비와 한 번에 불러올 댓글 수를 단계별로, 배경 농도와 클릭 영역 너비를 슬라이더로 세세하게 고를 수 있습니다</li>
+						<li>관련된 항목은 부모와 자식으로 묶여 있어, 부모가 꺼져 있는 동안에는 자식을 조작할 수 없습니다. 어떤 항목을 켜면 되는지는 그 자리에서 안내합니다</li>
+						<li>뷰어 자체를 끄면 pixiv 기본 동작으로 돌아갑니다. (픽업 영역 숨기기·무한 스크롤·그리드의 Tab 이동은 그대로 쓸 수 있습니다)</li>
 					</ul>
 				</div>
 				<!-- 設定ポップアップの上半分と下半分を一定時間ごとに重ねて切り替える (site.js)。JS が無ければ上半分のまま -->
@@ -345,7 +348,7 @@
 		<div class="wrap">
 			<div class="section-head">
 				<h2>설정으로 할 수 있는 것</h2>
-				<p>모두 툴바의 팝업에서 변경할 수 있습니다. 자주 쓰는 항목은 「설정」 탭에, 사이드바 너비나 클릭 영역 너비 같은 세세한 조정은 「상세 설정」 탭에 모아 두었습니다. 설정은 브라우저의 동기화 영역에 저장되며, 외부로 전송되지 않습니다.</p>
+				<p>모두 툴바의 팝업에서 변경할 수 있습니다. 자주 쓰는 항목은 「설정」 탭에, 사이드바 너비나 클릭 영역 너비 같은 세세한 조정은 「상세 설정」 탭에 모아 두었습니다. 관련된 항목은 부모와 자식으로 묶여 있어, 부모 항목이 꺼져 있는 동안에는 자식 항목을 조작할 수 없습니다. (아래 표에서 들여쓴 항목. 상세 설정 탭의 항목도 사이드바 표시나 화면 가장자리 클릭 등 관련된 항목을 따릅니다) 설정은 브라우저의 동기화 영역에 저장되며, 외부로 전송되지 않습니다.</p>
 			</div>
 			<div class="table-scroll">
 				<table>
@@ -362,7 +365,25 @@
 							<td>뷰어</td>
 							<td>뷰어 사용</td>
 							<td class="default">켬</td>
-							<td>끄면 pixiv 기본 동작으로 돌아갑니다</td>
+							<td>끄면 pixiv 기본 동작으로 돌아갑니다. 픽업 영역 숨기기·무한 스크롤·그리드의 Tab 이동은 꺼도 그대로 쓸 수 있습니다</td>
+						</tr>
+						<tr>
+							<td>뷰어</td>
+							<td class="child">사용자 페이지에서 사용</td>
+							<td class="default">켬</td>
+							<td>작가 페이지의 작품 목록에서 열 때 뷰어를 표시합니다</td>
+						</tr>
+						<tr>
+							<td>뷰어</td>
+							<td class="child">홈에서 사용</td>
+							<td class="default">켬</td>
+							<td>pixiv 홈 (홈 / 일러스트 / 만화) 의 작품에서 열 때 뷰어를 표시합니다</td>
+						</tr>
+						<tr>
+							<td>뷰어</td>
+							<td class="child">검색 결과에서 사용</td>
+							<td class="default">켬</td>
+							<td>검색 결과 (태그 페이지와 검색 화면) 에서 열 때 뷰어를 표시합니다</td>
 						</tr>
 						<tr>
 							<td>뷰어</td>
@@ -372,7 +393,7 @@
 						</tr>
 						<tr>
 							<td>뷰어</td>
-							<td>사이드바 스크롤</td>
+							<td class="child">사이드바 스크롤</td>
 							<td class="default">사이드바 전체</td>
 							<td>작품 설명부터 댓글까지 하나로 이어서 스크롤할지, 작품 설명을 고정하고 댓글만 스크롤할지</td>
 						</tr>
@@ -386,7 +407,7 @@
 							<td>이미지</td>
 							<td>미리 불러오기</td>
 							<td class="default">앞뒤 1장</td>
-							<td>다음 페이지를 미리 불러와 둘 장수를 사용 안 함 / 앞뒤 1장 / 앞뒤 3장 / 사용자 지정 중에서 고를 수 있습니다. 사용자 지정에서는 앞뒤로 불러올 장수를 1~10장 중에서 고릅니다</td>
+							<td>다음 페이지를 미리 불러와 둘 장수를 사용 안 함 / 앞뒤 1장 / 앞뒤 3장 / 사용자 지정 중에서 고를 수 있습니다. 사용자 지정에서는 앞뒤로 불러올 장수를 1~20장 중에서 슬라이더로 고릅니다. 10장 이상이면 메모리를 압박한다는 주의가 표시됩니다</td>
 						</tr>
 						<tr>
 							<td>이미지</td>
@@ -462,13 +483,13 @@
 							<td>뷰어</td>
 							<td>배경 농도</td>
 							<td class="default">테마에 맞추기</td>
-							<td>이미지 뒤에 까는 검은 막의 농도. 테마에 맞추기 (다크 92% / 라이트 88%) 또는 100 / 90 / 80 / 70 / 60% 중에서 고를 수 있습니다. 낮추면 뒤의 페이지가 비쳐 보입니다</td>
+							<td>이미지 뒤에 까는 검은 막의 농도. 테마에 맞추기 (다크 92% / 라이트 88%) 또는 사용자 지정으로 0~100% (10% 단위) 중에서 슬라이더로 고를 수 있습니다. 낮추면 뒤의 페이지가 비쳐 보입니다</td>
 						</tr>
 						<tr>
 							<td>조작</td>
 							<td>화면 가장자리 클릭 영역 너비</td>
 							<td class="default">25%</td>
-							<td>화면 가장자리 클릭으로 넘길 때 쓰는 가장자리의 너비. 이미지를 표시하는 부분에 대한 비율로, 사용자 지정에서는 좌우 너비와 상하 너비를 각각 5~35% (5% 단위) 중에서 따로 고를 수 있습니다</td>
+							<td>화면 가장자리 클릭으로 넘길 때 쓰는 가장자리의 너비. 이미지를 표시하는 부분에 대한 비율로, 사용자 지정에서는 좌우 너비와 상하 너비를 각각 5~35% (5% 단위) 중에서 따로 고를 수 있습니다. 좌우만·상하만으로 넘길 때는 쓰지 않는 방향의 너비를 조작할 수 없습니다</td>
 						</tr>
 						<tr>
 							<td>조작</td>
@@ -517,7 +538,7 @@
 				</div>
 				<div class="card">
 					<h3>대상 페이지</h3>
-					<p><code>https://www.pixiv.net/</code>의 유저 페이지. 다른 사이트에서는 작동하지 않습니다.</p>
+					<p><code>https://www.pixiv.net/</code>의 유저 페이지, 홈 (홈 / 일러스트 / 만화), 검색 결과 (태그 페이지와 검색 화면). 다른 사이트에서는 작동하지 않습니다.</p>
 				</div>
 				<div class="card">
 					<h3>라이선스</h3>
@@ -590,7 +611,7 @@
 				</div>
 				<div class="card">
 					<h3>저장하는 것</h3>
-					<p>사용자가 고른 21개 항목의 설정과 마지막으로 본 pixiv의 표시 언어. 둘 다 브라우저 안에 머물며, 외부 서버로 나가지 않습니다.</p>
+					<p>사용자가 고른 27개 항목의 설정과 마지막으로 본 pixiv의 표시 언어. 둘 다 브라우저 안에 머물며, 외부 서버로 나가지 않습니다.</p>
 				</div>
 				<div class="card">
 					<h3>요구하는 권한</h3>
@@ -616,7 +637,7 @@
 					<li>R-18 작품의 표시는 pixiv 측의 설정을 따릅니다. 확장 프로그램 쪽에서 연령 제한을 우회하지 않습니다</li>
 					<li>좋아요는 취소할 수 없습니다. 이는 pixiv의 사양이며, 잘못 눌러도 되돌릴 수 없습니다</li>
 					<li>댓글의 작성·삭제는 pixiv 본체와 똑같이 취급됩니다. 누른 만큼 그대로 pixiv로 전송됩니다. 삭제는 되돌릴 수 없으므로 2단계 확인을 거칩니다</li>
-					<li>작품을 수집하는 기능은 없습니다. 다운로드도 일괄 조작 자동화도 없으며, 가져오는 것은 지금 열려 있는 작품과 그 앞뒤의 몇 장뿐입니다</li>
+					<li>작품을 수집하는 기능은 없습니다. 다운로드도 일괄 조작 자동화도 없으며, 가져오는 것은 지금 열려 있는 작품과 미리 불러오기로 고른 범위뿐입니다</li>
 					<li>pixiv의 사양 변경으로 작동하지 않게 될 수 있습니다</li>
 				</ul>
 			</div>

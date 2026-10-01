@@ -840,6 +840,24 @@ td.default {
 	white-space: nowrap;
 }
 
+/* 設定表の子の項目。親の項目がオフの間は操作できないことを、字下げと枝の線で示す。字下げの分だけ列が狭くなり 1〜2 文字ずつ折れるので、折り返さない */
+#settings td.child {
+	position: relative;
+	padding-inline-start: 38px;
+	white-space: nowrap;
+}
+
+#settings td.child::before {
+	content: "";
+	position: absolute;
+	inset-inline-start: 20px;
+	top: 13px;
+	width: 10px;
+	height: 0.8em;
+	border-inline-start: 1.5px solid var(--muted);
+	border-bottom: 1.5px solid var(--muted);
+}
+
 /* カードの中に置く小さな表 (対応言語)。列が少ないので横スクロールの下限を外す */
 .table-scroll.in-card {
 	margin-top: 16px;
