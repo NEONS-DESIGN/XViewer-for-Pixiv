@@ -35,25 +35,11 @@ test('すべての言語の messages.json が同じキーを持つ', async () =>
 	}
 });
 
-/**
- * 文字数の上限を見ない言語。英語は日本語と同じ内容を書くと上限を超える。(Chrome ウェブストアでは途中で切れて出る)
- */
-const DESCRIPTION_LENGTH_EXEMPT = Object.freeze(['en']);
-
-test('説明はストアの文字数の上限に収まる', async () => {
-	for (const locale of MANIFEST_LOCALES.filter((one) => !DESCRIPTION_LENGTH_EXEMPT.includes(one))) {
-		const { extDescription } = await readMessages(locale);
-		assert.ok(extDescription.message.length <= DESCRIPTION_MAX_LENGTH, `${locale} の説明が ${extDescription.message.length} 文字ある`);
-	}
-});
-
-/** Edge アドオンが受け付ける説明の文字数の上限。上限を見ない言語にも掛かる */
-const EDGE_DESCRIPTION_MAX_LENGTH = 190;
-
-test('どの言語の説明も Edge アドオンの文字数の上限に収まる', async () => {
+test('どの言語の説明もストアの文字数の上限に収まる', async () => {
+	// 超えると Chrome ウェブストアでは途中で切れて出る。Edge アドオンの上限 (190) はこれより緩い
 	for (const locale of MANIFEST_LOCALES) {
 		const { extDescription } = await readMessages(locale);
-		assert.ok(extDescription.message.length <= EDGE_DESCRIPTION_MAX_LENGTH, `${locale} の説明が ${extDescription.message.length} 文字ある`);
+		assert.ok(extDescription.message.length <= DESCRIPTION_MAX_LENGTH, `${locale} の説明が ${extDescription.message.length} 文字ある`);
 	}
 });
 
