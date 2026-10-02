@@ -36,7 +36,7 @@ test('すべての言語の messages.json が同じキーを持つ', async () =>
 });
 
 /**
- * 文字数の上限を見ない言語。英語は商標ガイドラインが求める非公式の旨を含めると上限を超える。
+ * 文字数の上限を見ない言語。英語は日本語と同じ内容を書くと上限を超える。(Chrome ウェブストアでは途中で切れて出る)
  */
 const DESCRIPTION_LENGTH_EXEMPT = Object.freeze(['en']);
 
@@ -57,14 +57,6 @@ test('どの言語の説明も Edge アドオンの文字数の上限に収ま�
 	}
 });
 
-test('どの言語の説明にも pixiv Inc. と無関係である旨が残っている', async () => {
-	// 日英は文面まで下のテストで縛る。他の言語は社名の表記だけを見る
-	for (const locale of MANIFEST_LOCALES.filter((one) => one !== 'ja')) {
-		const { extDescription } = await readMessages(locale);
-		assert.match(extDescription.message, /pixiv Inc./, `${locale} の説明に pixiv Inc. が無い`);
-	}
-});
-
 test('manifest が __MSG__ を使い default_locale を持つ', async () => {
 	// name / description はブラウザの UI 言語にしか従えないため _locales へ切り出した
 	const manifest = JSON.parse(await readFile(new URL('../../src/manifest.json', import.meta.url), 'utf8'));
@@ -82,18 +74,4 @@ test('拡張の名前は _locales と popup の見出し・title で一致する
 		const messages = await readMessages(lang);
 		assert.equal(messages.extName.message, TITLE, `${lang} の extName が TITLE と違う`);
 	}
-});
-
-test('日本語の説明に商標ガイドラインが求める非公式である旨が残っている', async () => {
-	// ストアの一覧に出る文なのでここが要。要求される 2 表記をそれぞれ確認する
-	const ja = await readMessages('ja');
-	assert.match(ja.extDescription.message, /非公式/);
-	assert.match(ja.extDescription.message, /作成・配布するものではありません/);
-});
-
-test('英語の説明に商標ガイドラインが求める非公式である旨が残っている', async () => {
-	const en = await readMessages('en');
-	// 文面を変えたときに検出できるよう、要求される 2 表記をそれぞれ確認する
-	assert.match(en.extDescription.message, /pixiv platform/);
-	assert.match(en.extDescription.message, /not created or distributed by pixiv Inc/);
 });

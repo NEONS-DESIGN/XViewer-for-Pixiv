@@ -159,6 +159,13 @@ h1 {
 	border-left: 2px solid var(--divider);
 }
 
+/* レンジが続けて並ぶとき (画面端のクリック領域の左右と上下)。間を外側の余白で空けると左の線が途切れるので、
+   内側の余白で空けて線を上のレンジから続ける */
+.field.range + .field.range {
+	margin-top: 0;
+	padding-top: 8px;
+}
+
 /* 子の項目の箱。(「ビュワーを使う」の下の 3 つなど) 選択肢の下に出すレンジと同じく、左に線を引いて字下げする */
 .field-children {
 	display: flex;
