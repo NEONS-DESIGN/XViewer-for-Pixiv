@@ -217,6 +217,11 @@ export function createNavZones(deps) {
 	// 押し始めが click に届かずに終わったら覚えを捨てる。(タッチのスクロールなど)
 	// 残すと、次のキーボードでのボタンの click (pointerdown を伴わない) を止めてしまう
 	stage.addEventListener('pointercancel', () => { pressedKind = null; });
+	// 領域で押し始めた操作では範囲選択を始めさせない。素早く続けて押すとダブル・トリプルクリックになり、
+	// 画像や余白が選択されて青くなるため。mousedown を止めないのは、フォーカスの移動を今までどおり起こすため
+	stage.addEventListener('selectstart', (event) => {
+		if (pressedKind) event.preventDefault();
+	}, true);
 	stage.addEventListener('click', (event) => {
 		const pressed = pressedKind;
 		pressedKind = null;
