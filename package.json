@@ -1,6 +1,6 @@
 {
 	"name": "xviewer_for_pixiv",
-	"version": "1.10.4",
+	"version": "1.10.5",
 	"private": true,
 	"type": "module",
 	"description": "pixiv のユーザーページ・ホーム・検索結果に独自の画像ビュワーを追加するブラウザ拡張機能 (Chrome 系 / Firefox)",

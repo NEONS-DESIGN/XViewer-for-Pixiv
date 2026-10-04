@@ -244,6 +244,54 @@ test('押し始めが click に届かなくても、次のキーボードでの�
 	assert.equal(keyboard.stopped, 0);
 });
 
+/**
+ * selectstart の代わり。preventDefault を呼んだかを数える。
+ * @returns {object} event の代わり
+ */
+function selectStart() {
+	return { prevented: 0, preventDefault() { this.prevented += 1; } };
+}
+
+test('領域で押し始めたら範囲選択を始めさせない (素早く続けて押したときの画像の選択)', async () => {
+	const { stage } = build();
+	// ダブルクリックの 2 回目: pointerdown の後に選択が始まる
+	await stage.dispatch('pointerdown', pointer(stage, 1090, 450, fakeElement('img')));
+	const onZone = selectStart();
+	await stage.dispatch('selectstart', onZone);
+	assert.equal(onZone.prevented, 1);
+	// 端に着いて送れない (idle) 領域でも同じ
+	const idle = build({ pages: [1] });
+	await idle.stage.dispatch('pointerdown', pointer(idle.stage, 110, 450));
+	const onIdle = selectStart();
+	await idle.stage.dispatch('selectstart', onIdle);
+	assert.equal(onIdle.prevented, 1);
+});
+
+test('領域の外・部品の上・オフでは範囲選択を止めない', async () => {
+	const { stage, state } = build();
+	const cases = [
+		['中央', pointer(stage, 600, 450)],
+		['ボタン', pointer(stage, 110, 450, fakeElement('button'))],
+	];
+	for (const [name, down] of cases) {
+		await stage.dispatch('pointerdown', down);
+		const event = selectStart();
+		await stage.dispatch('selectstart', event);
+		assert.equal(event.prevented, 0, name);
+	}
+	state.mode = NAV_ZONES.OFF;
+	await stage.dispatch('pointerdown', pointer(stage, 1090, 450));
+	const off = selectStart();
+	await stage.dispatch('selectstart', off);
+	assert.equal(off.prevented, 0, 'オフ');
+	// 押していない (キーボードでの選択など) ときも止めない
+	state.mode = NAV_ZONES.BOTH;
+	await press(stage, 1090, 450);
+	const keyboard = selectStart();
+	await stage.dispatch('selectstart', keyboard);
+	assert.equal(keyboard.prevented, 0, 'click の後');
+});
+
 test('pointercancel で押し始めの覚えを捨てる', async () => {
 	const { stage, moved } = build();
 	await stage.dispatch('pointerdown', pointer(stage, 1090, 450));
