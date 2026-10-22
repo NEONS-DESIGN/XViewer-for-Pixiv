@@ -253,6 +253,7 @@ export default {
 			image: 'Images',
 			userPage: 'User pages',
 			controls: 'Controls',
+			slideshow: 'Auto-advance',
 			comments: 'Comments',
 		},
 		fields: {
@@ -485,6 +486,47 @@ export default {
 					label: 'Left/right: pages, top/bottom: artworks',
 					description: 'Left and right turn pages, top and bottom switch artworks. The corners belong to left and right.',
 				},
+			},
+			slideshow: {
+				label: 'Auto-advance',
+				description: 'Moves to the next page automatically at a set interval. A control bar appears below the viewer.',
+				off: {
+					label: 'Off',
+					description: 'Advance by hand.',
+				},
+				work: {
+					label: 'Within a work',
+					description: 'Stops after the last page.',
+				},
+				sequence: {
+					label: 'Continue to next work',
+					description: 'After the last page, moves on to the next work.',
+				},
+			},
+			slideshowInterval: {
+				label: 'Interval',
+				description: 'Time until the next page. Counted from when the image is shown.',
+				/**
+				 * 間隔の選択肢の見出し。
+				 * @param {number} seconds 秒数
+				 * @returns {string} 見出し
+				 */
+				option: (s) => `${s} s`,
+				/**
+				 * 間隔の「カスタム」の選択肢。秒数は選択肢の下に出るレンジで選ぶ。
+				 * @param {number} min 選べる最小の秒数
+				 * @param {number} max 選べる最大の秒数
+				 * @returns {{label: string, description: string}} 選択肢の文言
+				 */
+				custom: (min, max) => ({ label: 'Custom', description: `Choose from ${min} to ${max} seconds in 0.5-second steps.` }),
+			},
+			slideshowIntervalCustom: {
+				label: 'Interval',
+				option: (s) => `${s} s`,
+			},
+			slideshowLoop: {
+				label: 'Loop',
+				description: 'Returns to the start after the last one. Within a work, goes back to page 1; with next work, back to the first work in the list.',
 			},
 			gridTabSkip: {
 				label: 'Tab movement in the grid',

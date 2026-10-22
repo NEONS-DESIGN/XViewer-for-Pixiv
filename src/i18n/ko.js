@@ -285,6 +285,7 @@ export default {
 			image: '이미지',
 			userPage: '유저 페이지',
 			controls: '조작',
+			slideshow: '자동 넘기기',
 			comments: '댓글',
 		},
 		fields: {
@@ -517,6 +518,47 @@ export default {
 					label: '좌우는 페이지, 상하는 작품',
 					description: '좌우로 페이지를, 상하로 작품을 넘깁니다. 네 모서리는 좌우가 우선입니다.',
 				},
+			},
+			slideshow: {
+				label: '자동 넘기기',
+				description: '일정한 간격으로 페이지를 자동으로 넘깁니다. 사용하면 뷰어 아래에 조작 바가 표시됩니다.',
+				off: {
+					label: '사용 안 함',
+					description: '직접 넘깁니다.',
+				},
+				work: {
+					label: '작품 안에서만',
+					description: '마지막 페이지까지 넘기면 멈춥니다.',
+				},
+				sequence: {
+					label: '끝에서 다음 작품으로',
+					description: '마지막 페이지 다음은 다음 작품으로 넘어갑니다.',
+				},
+			},
+			slideshowInterval: {
+				label: '넘기는 간격',
+				description: '다음 페이지로 넘어가기까지의 시간입니다. 이미지가 표시된 뒤부터 셉니다.',
+				/**
+				 * 間隔の選択肢の見出し。
+				 * @param {number} seconds 秒数
+				 * @returns {string} 見出し
+				 */
+				option: (s) => `${s}초`,
+				/**
+				 * 間隔の「カスタム」の選択肢。秒数は選択肢の下に出るレンジで選ぶ。
+				 * @param {number} min 選べる最小の秒数
+				 * @param {number} max 選べる最大の秒数
+				 * @returns {{label: string, description: string}} 選択肢の文言
+				 */
+				custom: (min, max) => ({ label: '사용자 지정', description: `${min}~${max}초를 0.5초 단위로 고릅니다.` }),
+			},
+			slideshowIntervalCustom: {
+				label: '간격',
+				option: (s) => `${s}초`,
+			},
+			slideshowLoop: {
+				label: '반복',
+				description: '끝까지 넘기면 처음으로 돌아갑니다. 작품 안에서만이면 첫 페이지로, 끝에서 다음 작품으로면 목록의 첫 작품으로 돌아갑니다.',
 			},
 			gridTabSkip: {
 				label: '그리드의 Tab 이동',

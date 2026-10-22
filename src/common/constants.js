@@ -393,6 +393,43 @@ export const NAV_ZONES = Object.freeze({
 	BOTH: 'both',
 });
 
+/** 自動送りの動き。ビュワーは常に停止状態で開き、再生中かどうかは保存しない。 */
+export const SLIDESHOW_MODES = Object.freeze({
+	/** 使わない (操作バーも出さない) */
+	OFF: 'off',
+	/** 作品の中だけ送る。最後のページで止まる */
+	WORK: 'work',
+	/** 最後のページの次は、次の作品へ移る */
+	SEQUENCE: 'sequence',
+});
+
+/** 自動送りの間隔の選択肢 (秒)。昇順に並べる。(設定画面はこの並びで選択肢を出す) */
+export const SLIDESHOW_INTERVAL_CHOICES = Object.freeze([2, 3, 4]);
+
+/** 自動送りの間隔の既定 (秒)。SLIDESHOW_INTERVAL_CHOICES のどれかであること */
+const DEFAULT_SLIDESHOW_INTERVAL = 3;
+
+/**
+ * 間隔の選択肢のうち「カスタム」を表す値。秒数は設定 slideshowIntervalCustom が持つ。
+ * 設定 slideshowInterval は SLIDESHOW_INTERVAL_CHOICES の数値か、この文字列のどちらか。
+ */
+export const SLIDESHOW_INTERVAL_CUSTOM = 'custom';
+
+/** カスタムの間隔で選べる秒数の範囲と刻み。(両端を含む) */
+export const SLIDESHOW_INTERVAL_CUSTOM_RANGE = Object.freeze({ min: 1, max: 30, step: 0.5 });
+
+/** カスタムの間隔のレンジの下に添える目盛りの間隔 (秒)。端の値は必ず出す */
+export const SLIDESHOW_INTERVAL_SCALE_STEP = 5;
+
+/** カスタムの間隔の既定の秒数 */
+const DEFAULT_SLIDESHOW_INTERVAL_CUSTOM = 5;
+
+/** 自動送りの操作バーを、操作が無いまま隠すまでの待ち (ミリ秒) */
+export const SLIDESHOW_CONTROLS_IDLE_MS = 3000;
+
+/** 1 秒のミリ秒数。間隔 (秒) をタイマーの待ちへ直すのに使う */
+export const MS_PER_SECOND = 1000;
+
 /**
  * 数値の設定を「既定のまま」か「カスタム (レンジで選ぶ)」かで持つ設定の値。
  * 画面端のクリック領域・原寸表示のクリック領域が使う。(背景の濃さは BACKDROP_MODES)
@@ -539,6 +576,10 @@ export const SETTINGS_DEFAULTS = Object.freeze({
 	commentPageSize: DEFAULT_COMMENT_PAGE_SIZE,
 	closeOnBackdrop: true,
 	navZones: NAV_ZONES.OFF,
+	slideshow: SLIDESHOW_MODES.OFF,
+	slideshowInterval: DEFAULT_SLIDESHOW_INTERVAL,
+	slideshowIntervalCustom: DEFAULT_SLIDESHOW_INTERVAL_CUSTOM,
+	slideshowLoop: false,
 	navZoneMode: SETTING_MODES.DEFAULT,
 	navZoneSize: DEFAULT_NAV_ZONE_SIZE,
 	navZoneSizeVertical: DEFAULT_NAV_ZONE_SIZE,
