@@ -55,6 +55,12 @@ const RANGE_FILL_VAR = '--slideshow-range-fill';
 const PERCENT = 100;
 
 /**
+ * 速度のボタンに出しうる秒数のうち、表示が一番長くなるもの。
+ * 数字は等幅で描くので、整数 2 桁に小数を足した「上限の 1 刻み手前」(29.5) が最も長い。
+ */
+const WIDEST_SECONDS = SLIDESHOW_INTERVAL_CUSTOM_RANGE.max - SLIDESHOW_INTERVAL_CUSTOM_RANGE.step;
+
+/**
  * @typedef {object} SlideshowControlsDeps
  * @property {Document} doc 対象のドキュメント
  * @property {HTMLElement} container 帯を差し込む先 (ステージ)
@@ -182,9 +188,18 @@ export function createSlideshowControls(deps) {
 	speedButton.className = 'slideshow-speed';
 	speedButton.setAttribute('aria-haspopup', 'dialog');
 	speedButton.setAttribute('aria-expanded', 'false');
+	// 今の秒数と、一番長い表示を隠した文字を同じ箱に重ね、箱の幅を一番長い表示に揃える。
+	// 整数 (3 秒) と小数 (12.5 秒) で文字幅が変わると、中央に置いた帯ごと左右へ揺れるため
+	const speedText = doc.createElement('span');
+	speedText.className = 'slideshow-speed-text';
 	const speedLabel = doc.createElement('span');
 	speedLabel.className = 'slideshow-speed-label';
-	speedButton.append(createIcon(doc, 'timer'), speedLabel);
+	const speedSizer = doc.createElement('span');
+	speedSizer.className = 'slideshow-speed-sizer';
+	speedSizer.setAttribute('aria-hidden', 'true');
+	speedSizer.textContent = text.seconds(WIDEST_SECONDS);
+	speedText.append(speedLabel, speedSizer);
+	speedButton.append(createIcon(doc, 'timer'), speedText);
 
 	const panel = doc.createElement('div');
 	panel.className = 'slideshow-speed-panel';
