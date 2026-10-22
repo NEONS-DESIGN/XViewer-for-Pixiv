@@ -129,6 +129,23 @@ test('workLoading で外れ、pageShown で張り直す', () => {
 	assert.equal(deps.timer.pending().length, 1);
 });
 
+test('pageLoading で外れ、pageShown で最初から張り直す。再生は続ける', () => {
+	const { deps, slideshow } = playingSlideshow();
+	const before = deps.timer.pending()[0].id;
+	slideshow.pageLoading();
+	assert.equal(deps.timer.pending().length, 0);
+	assert.equal(slideshow.isPlaying(), true);
+	assert.deepEqual(deps.changes.at(-1), { playing: true, durationMs: null });
+	// 理由を上げ下げしても、表示し終えるまでは張らない
+	slideshow.setSuspended('zoom', true);
+	slideshow.setSuspended('zoom', false);
+	assert.equal(deps.timer.pending().length, 0);
+	slideshow.pageShown();
+	const after = deps.timer.pending();
+	assert.deepEqual(after.map((entry) => entry.ms), [3000]);
+	assert.notEqual(after[0].id, before);
+});
+
 test('pageShown は計時を最初から数え直す (タイマーは 1 本のまま)', () => {
 	const { deps, slideshow } = playingSlideshow();
 	const before = deps.timer.pending()[0].id;

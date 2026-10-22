@@ -126,9 +126,10 @@ function fakeZoom() {
  * @param {object} [options.zoom] 原寸レイヤの代わり
  * @param {object} [options.strings] 文言のカタログ
  * @param {(index: number) => void} [options.onPageShown] ページが表示されたときの通知
+ * @param {(index: number) => void} [options.onPageLoading] ページの読み込みを始めたときの通知
  * @returns {{container: object, pane: object, created: object[], zoom: object}} 描画先・ペイン・作った先読み Image・原寸レイヤ
  */
-function build({ fetchImpl, prefetch = 0, clickZoom = false, imageQuality = IMAGE_QUALITY.REGULAR, zoom = fakeZoom(), strings = createStrings('ja'), onPageShown } = {}) {
+function build({ fetchImpl, prefetch = 0, clickZoom = false, imageQuality = IMAGE_QUALITY.REGULAR, zoom = fakeZoom(), strings = createStrings('ja'), onPageShown, onPageLoading } = {}) {
 	const container = fakeElement('div');
 	const created = [];
 	const pane = createImagePane({
@@ -137,6 +138,7 @@ function build({ fetchImpl, prefetch = 0, clickZoom = false, imageQuality = IMAG
 		settings: { imageQuality, prefetch, clickZoom },
 		zoom,
 		onPageShown,
+		onPageLoading,
 		getJsonImpl: fetchImpl ? (url) => getJson(url, { fetchImpl }) : undefined,
 		strings,
 		createImage: () => {
@@ -858,6 +860,57 @@ test('原寸表示中は差し替えず通知もせず、閉じて差し替え�
 	zoom.opened[0].onClose();
 	await image.dispatch('load');
 	assert.deepEqual(shown, [0, 1]);
+});
+
+/**
+ * 読み込み開始と表示の通知を、起きた順に 1 本の配列へ集めて画像ペインを組み立てる。
+ * @param {object} [options] build への差し替え
+ * @returns {object} build の戻り値と、通知の記録 events ('loading:番号' / 'shown:番号')
+ */
+function buildLoading(options = {}) {
+	const events = [];
+	return {
+		...build({
+			...options,
+			onPageShown: (index) => events.push(`shown:${index}`),
+			onPageLoading: (index) => events.push(`loading:${index}`),
+		}),
+		events,
+	};
+}
+
+test('読み込み中の画像へ差し替えたら onPageLoading を先に呼び、読み終えたら onPageShown を呼ぶ', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { container, pane, events } = buildLoading({ fetchImpl: impl });
+	await pane.render(DETAIL);
+	const image = find(container, 'img');
+	await image.dispatch('load');
+	assert.deepEqual(events, ['loading:0', 'shown:0']);
+	pane.next();
+	assert.deepEqual(events, ['loading:0', 'shown:0', 'loading:1']);
+	await image.dispatch('load');
+	assert.deepEqual(events, ['loading:0', 'shown:0', 'loading:1', 'shown:1']);
+});
+
+test('読み終えている画像へ差し替えたら onPageLoading を呼ばず onPageShown だけを呼ぶ', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { container, pane, events } = buildLoading({ fetchImpl: impl });
+	await pane.render(DETAIL);
+	const image = find(container, 'img');
+	await image.dispatch('load');
+	events.length = 0;
+	image.complete = true;
+	pane.next();
+	assert.deepEqual(events, ['shown:1']);
+});
+
+test('onPageShown が無ければ onPageLoading も呼ばない', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const loading = [];
+	const { pane } = build({ fetchImpl: impl, onPageLoading: (index) => loading.push(index) });
+	await pane.render(DETAIL);
+	pane.next();
+	assert.deepEqual(loading, []);
 });
 
 test('onPageShown が無くても落ちない', async () => {

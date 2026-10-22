@@ -263,13 +263,15 @@ test('rerenderMain は主役が読まない設定の変更では何もしない'
 	assert.equal(currentPage(), null, '画像ペインが無ければ null');
 });
 
-test('onPageShown を画像ペインへ渡し、showPage / pageCount は画像ペインへ取り次ぐ', async () => {
+test('onPageShown / onPageLoading を画像ペインへ渡し、showPage / pageCount は画像ペインへ取り次ぐ', async () => {
 	const shownCalls = [];
 	let received;
 	const onPageShown = (index) => shownCalls.push(index);
+	const onPageLoading = () => {};
 	await renderWork(detail({ commentOff: true }), LOGGED_IN, settings(true), {
 		...targets(),
 		onPageShown,
+		onPageLoading,
 		createImagePane: (deps) => {
 			received = deps;
 			return {
@@ -282,6 +284,7 @@ test('onPageShown を画像ペインへ渡し、showPage / pageCount は画像�
 		createSidebar: () => fakeSidebarPane([]),
 	});
 	assert.equal(received.onPageShown, onPageShown);
+	assert.equal(received.onPageLoading, onPageLoading);
 	assert.equal(pageCount(), 4);
 	showPage(2);
 	assert.deepEqual(shownCalls, ['show2']);

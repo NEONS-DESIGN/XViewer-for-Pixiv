@@ -1468,6 +1468,19 @@ test('再生して 1 枚目の読み込みを終えると、間隔が経った�
 	assert.equal(find(stage(), 'img').src, PAGE2_URL);
 });
 
+test('手でページを送った先が読み終わるまでは、前の計時で送らない', async () => {
+	const { doc, stage, timers } = await openPlaying();
+	assert.equal(timers.ids(SLIDESHOW_TEST_INTERVAL_MS).length, 1);
+	await doc.dispatch('keydown', { key: KEYS.NEXT_PAGE, preventDefault() {}, stopPropagation() {} });
+	assert.equal(find(stage(), '.counter').textContent, '2/2');
+	assert.deepEqual(timers.ids(SLIDESHOW_TEST_INTERVAL_MS), [], '読み込み中は数えない');
+	timers.fire(SLIDESHOW_TEST_INTERVAL_MS);
+	await flush();
+	assert.equal(find(stage(), '.slideshow-toggle').getAttribute('aria-label'), createStrings('ja').slideshow.PAUSE, '再生は続く');
+	await find(stage(), 'img').dispatch('load', {});
+	assert.equal(timers.ids(SLIDESHOW_TEST_INTERVAL_MS).length, 1, '読み終えたら最初から数える');
+});
+
 test('設定でオフにすると帯を外して再生を止め、オンへ戻すと停止状態の帯を出す', async () => {
 	const { viewer, stage, timers } = await openPlaying();
 	viewer.setSettings(slideshowSettings({ slideshow: SLIDESHOW_MODES.OFF }));
