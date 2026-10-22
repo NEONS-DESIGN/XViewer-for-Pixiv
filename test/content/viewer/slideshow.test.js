@@ -464,6 +464,100 @@ test('moveWork を待っている間に停止されたら、端でも先頭へ�
 	assert.deepEqual(deps.shownPages, []);
 });
 
+/* 作品の移動を待っている間 */
+
+/**
+ * sequence・ループ オンの最後のページで、moveWork を待たせた状態の自動送りを作る。
+ * @param {(slideshow: object, deps: object) => void} start 送りを始める処理
+ * @returns {{deps: object, slideshow: object, pending: {promise: Promise<boolean>, resolve: (value: boolean) => void}, calls: {moveWork: number, moveToFirst: number}}}
+ */
+function waitingForWorkMove(start) {
+	const { deps, slideshow } = playingSlideshow({ page: 2, settings: { slideshow: SLIDESHOW_MODES.SEQUENCE, slideshowLoop: true } });
+	const pending = deferred();
+	const calls = { moveWork: 0, moveToFirst: 0 };
+	deps.moveWork = () => { calls.moveWork += 1; return pending.promise; };
+	deps.moveToFirst = async () => { calls.moveToFirst += 1; return true; };
+	start(slideshow, deps);
+	return { deps, slideshow, pending, calls };
+}
+
+/** 送りの始め方。ボタンとタイマーの両方で確かめる */
+const STARTERS = Object.freeze({
+	ボタン: (slideshow) => { slideshow.step(1); },
+	タイマー: (slideshow, deps) => { deps.timer.fire(); },
+});
+
+for (const [label, start] of Object.entries(STARTERS)) {
+	test(`${label}: 作品の移動を待っている間に理由を下ろしてもタイマーを張らない`, async () => {
+		const { deps, slideshow, calls } = waitingForWorkMove((show, d) => {
+			show.setSuspended('hidden', true);
+			show.setSuspended('hidden', false);
+			start(show, d);
+		});
+		slideshow.setSuspended('zoom', true);
+		slideshow.setSuspended('zoom', false);
+		await flush();
+		assert.equal(deps.timer.pending().length, 0);
+		assert.deepEqual(calls, { moveWork: 1, moveToFirst: 0 });
+	});
+
+	test(`${label}: 作品の移動を待っている間の 2 回目の step(1) は何もしない`, async () => {
+		const { deps, slideshow, calls } = waitingForWorkMove(start);
+		await slideshow.step(1);
+		await flush();
+		assert.equal(deps.timer.pending().length, 0);
+		assert.deepEqual(calls, { moveWork: 1, moveToFirst: 0 });
+		assert.deepEqual(deps.moves, []);
+		assert.deepEqual(deps.shownPages, []);
+	});
+
+	test(`${label}: 作品の移動を待っている間に停止して再生してもタイマーを張らず、移れなくても先頭へ戻らない`, async () => {
+		const { deps, slideshow, pending, calls } = waitingForWorkMove(start);
+		slideshow.pause();
+		slideshow.play();
+		await flush();
+		assert.equal(deps.timer.pending().length, 0);
+		assert.deepEqual(calls, { moveWork: 1, moveToFirst: 0 });
+		pending.resolve(false);
+		await flush();
+		assert.deepEqual(calls, { moveWork: 1, moveToFirst: 0 });
+		assert.equal(slideshow.isPlaying(), true);
+		assert.deepEqual(deps.timer.pending().map((entry) => entry.ms), [3000], '移れなかったので今のページで数え直す');
+	});
+
+	test(`${label}: 作品の移動を待っている間に送った先の表示が終わったら、移り終えてから数える`, async () => {
+		const { deps, slideshow, pending } = waitingForWorkMove(start);
+		slideshow.workLoading();
+		deps.workId = '200';
+		slideshow.pageShown();
+		assert.equal(deps.timer.pending().length, 0);
+		pending.resolve(true);
+		await flush();
+		assert.deepEqual(deps.timer.pending().map((entry) => entry.ms), [3000]);
+	});
+
+	test(`${label}: 作品の移動を待っている間に送った先の表示が終わっていなければ、移り終えても数えない`, async () => {
+		const { deps, slideshow, pending } = waitingForWorkMove(start);
+		slideshow.workLoading();
+		deps.workId = '200';
+		pending.resolve(true);
+		await flush();
+		assert.equal(deps.timer.pending().length, 0);
+		slideshow.pageShown();
+		assert.equal(deps.timer.pending().length, 1);
+	});
+}
+
+test('作品の移動が終われば、次の step は受け付ける', async () => {
+	const { deps, slideshow, pending, calls } = waitingForWorkMove(STARTERS.ボタン);
+	pending.resolve(false);
+	await flush();
+	assert.equal(calls.moveToFirst, 1);
+	deps.moveWork = async () => { calls.moveWork += 1; return true; };
+	await slideshow.step(1);
+	assert.equal(calls.moveWork, 2);
+});
+
 /* 表 2.4: 前へ */
 
 test('前のページがあれば前のページへ', async () => {
