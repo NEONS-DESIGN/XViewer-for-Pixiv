@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { planPanes, MAIN_PANE, renderWork, rerenderMain, currentPage, disposeAll } from '../../../src/content/viewer/panes.js';
+import { planPanes, MAIN_PANE, renderWork, rerenderMain, currentPage, showPage, pageCount, disposeAll } from '../../../src/content/viewer/panes.js';
 import { ILLUST_TYPES } from '../../../src/pixiv/normalize.js';
 import { fakeDoc, fakeElement } from '../../helpers/dom.js';
 import { createStrings } from '../../../src/i18n/index.js';
@@ -261,4 +261,35 @@ test('rerenderMain は主役が読まない設定の変更では何もしない'
 	disposeAll();
 	assert.equal(made, 2);
 	assert.equal(currentPage(), null, '画像ペインが無ければ null');
+});
+
+test('onPageShown を画像ペインへ渡し、showPage / pageCount は画像ペインへ取り次ぐ', async () => {
+	const shownCalls = [];
+	let received;
+	const onPageShown = (index) => shownCalls.push(index);
+	await renderWork(detail({ commentOff: true }), LOGGED_IN, settings(true), {
+		...targets(),
+		onPageShown,
+		createImagePane: (deps) => {
+			received = deps;
+			return {
+				render: () => Promise.resolve(),
+				showPage: (index) => shownCalls.push(`show${index}`),
+				pageCount: () => 4,
+				dispose() {},
+			};
+		},
+		createSidebar: () => fakeSidebarPane([]),
+	});
+	assert.equal(received.onPageShown, onPageShown);
+	assert.equal(pageCount(), 4);
+	showPage(2);
+	assert.deepEqual(shownCalls, ['show2']);
+	disposeAll();
+});
+
+test('画像ペインが無いとき pageCount は null、showPage は何もしない', () => {
+	disposeAll();
+	assert.equal(pageCount(), null);
+	showPage(1);
 });

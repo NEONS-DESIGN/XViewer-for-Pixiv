@@ -457,3 +457,28 @@ test('dispose でも通知を消す', () => {
 	zoom.dispose();
 	assert.equal(findAll(container, '.notice').length, 0);
 });
+
+test('onOpenChange は open で true、close で false を渡し、開いていない close では呼ばない', () => {
+	const calls = [];
+	const container = fakeElement('div');
+	const zoom = createZoomLayer({
+		doc: fakeDoc(), container, strings: createStrings('ja'), onOpenChange: (open) => calls.push(open),
+	});
+	zoom.close();
+	assert.deepEqual(calls, []);
+	zoom.open(pages());
+	assert.deepEqual(calls, [true]);
+	zoom.close();
+	assert.deepEqual(calls, [true, false]);
+	zoom.close();
+	assert.deepEqual(calls, [true, false]);
+});
+
+test('onOpenChange は出す物が無くて開かなかったときは呼ばない', () => {
+	const calls = [];
+	const zoom = createZoomLayer({
+		doc: fakeDoc(), container: fakeElement('div'), strings: createStrings('ja'), onOpenChange: (open) => calls.push(open),
+	});
+	zoom.open(pages({ urls: [''] }));
+	assert.deepEqual(calls, []);
+});
