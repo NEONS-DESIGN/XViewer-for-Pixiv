@@ -227,6 +227,22 @@ test('速度のボタンでパネルを開き、選んでいる項目へフォ�
 	controls.dispose();
 });
 
+test('項目の上で矢印を押し続けた分 (repeat) は選び直さないが、本体へも渡さない', async () => {
+	const { doc, calls, stage, controls, part } = build();
+	await part('.slideshow-speed').click();
+	const three = option(stage, '3');
+	const held = { ...key('ArrowDown', three), repeat: true };
+	assert.equal(controls.consumeKey(held), true, '作品を送らせない');
+	assert.equal(held.prevented, true);
+	assert.deepEqual(calls.interval, []);
+	assert.equal(three.getAttribute('aria-checked'), 'true');
+	assert.equal(doc.activeElement, three);
+	// 押し直せば選び直す
+	assert.equal(controls.consumeKey(key('ArrowDown', three)), true);
+	assert.deepEqual(calls.interval, [{ slideshowInterval: 4 }]);
+	controls.dispose();
+});
+
 test('項目を押すと選び、同じ項目をもう一度押しても知らせない', async () => {
 	const { calls, stage, controls, part } = build();
 	await part('.slideshow-speed').click();

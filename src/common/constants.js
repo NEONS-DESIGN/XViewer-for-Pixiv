@@ -427,6 +427,9 @@ const DEFAULT_SLIDESHOW_INTERVAL_CUSTOM = 5;
 /** 自動送りの操作バーを、操作が無いまま隠すまでの待ち (ミリ秒) */
 export const SLIDESHOW_CONTROLS_IDLE_MS = 3000;
 
+/** 自動送りの操作バーで変えた設定を、最後の操作から保存するまでの待ち (ミリ秒)。設定キーごとにまとめる */
+export const SLIDESHOW_SAVE_DELAY_MS = 1000;
+
 /** 1 秒のミリ秒数。間隔 (秒) をタイマーの待ちへ直すのに使う */
 export const MS_PER_SECOND = 1000;
 

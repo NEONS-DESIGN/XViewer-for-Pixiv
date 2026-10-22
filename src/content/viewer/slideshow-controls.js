@@ -534,7 +534,8 @@ export function createSlideshowControls(deps) {
 		/**
 		 * キーを食い止める。ビュワー本体のキー操作 (Escape で閉じる・矢印で送る) より先に呼ばれ、
 		 * true を返したときは本体が反応してはいけない。パネルを開いているときだけ食い止める。
-		 * 矢印と端のキーで選び直すのは項目の上だけ。スライダーの上の上下は作品を送らせないよう食い止め、
+		 * 矢印と端のキーで選び直すのは項目の上だけで、押し続けて繰り返し届く分は食い止めるだけにする。
+		 * スライダーの上の上下は作品を送らせないよう食い止め、
 		 * 左右と端のキーは、つまみを動かす既定の動作に任せるので false を返す。
 		 * @param {KeyboardEvent} event キー
 		 * @returns {boolean} 食い止めたなら true
@@ -557,6 +558,8 @@ export function createSlideshowControls(deps) {
 			const targetIndex = radioTargetIndex(event.key);
 			if (targetIndex === null) return false;
 			event.preventDefault?.();
+			// 押し続けて繰り返し届く分では選び直さない。(作品も送らせない)
+			if (event.repeat === true) return true;
 			choose(INTERVAL_OPTIONS[targetIndex]);
 			options[targetIndex].focus();
 			return true;
