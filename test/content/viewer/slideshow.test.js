@@ -599,15 +599,16 @@ for (const [label, start] of Object.entries(STARTERS)) {
 		assert.deepEqual(deps.timer.pending().map((entry) => entry.ms), [3000], '移れなかったので今のページで数え直す');
 	});
 
-	test(`${label}: 作品の移動を待っている間に送った先の表示が終わったら、移り終えてから数える`, async () => {
+	test(`${label}: 作品の移動を待っている間に送った先の表示が終わったら、その場で数え始め、移り終えても数え直さない`, async () => {
 		const { deps, slideshow, pending } = waitingForWorkMove(start);
 		slideshow.workLoading();
 		deps.workId = '200';
 		slideshow.pageShown();
-		assert.equal(deps.timer.pending().length, 0);
+		assert.deepEqual(deps.timer.pending().map((entry) => entry.ms), [3000]);
+		const counting = deps.timer.pending()[0].id;
 		pending.resolve(true);
 		await flush();
-		assert.deepEqual(deps.timer.pending().map((entry) => entry.ms), [3000]);
+		assert.deepEqual(deps.timer.pending().map((entry) => entry.id), [counting]);
 	});
 
 	test(`${label}: 作品の移動を待っている間に送った先の表示が終わっていなければ、移り終えても数えない`, async () => {
@@ -621,6 +622,62 @@ for (const [label, start] of Object.entries(STARTERS)) {
 		assert.equal(deps.timer.pending().length, 1);
 	});
 }
+
+test('作品の移動を待っている間でも、同じ作品の表示 (描き直し) では待ちを解かない', async () => {
+	const { deps, slideshow, calls } = waitingForWorkMove(STARTERS.タイマー);
+	slideshow.pageShown();
+	assert.equal(deps.timer.pending().length, 0);
+	deps.page = 0;
+	await slideshow.step(1);
+	assert.deepEqual(deps.moves, []);
+	assert.deepEqual(calls, { moveWork: 1, moveToFirst: 0 });
+});
+
+test('作品の移動を待っている間に手で別の作品へ移って表示し終えたら、数え始め、前後ボタンも効く', async () => {
+	const { deps, slideshow } = waitingForWorkMove(STARTERS.タイマー);
+	slideshow.workLoading();
+	deps.workId = '300';
+	deps.page = 0;
+	slideshow.pageShown();
+	assert.deepEqual(deps.timer.pending().map((entry) => entry.ms), [3000]);
+	await slideshow.step(1);
+	assert.deepEqual(deps.moves, [1]);
+});
+
+test('前の作品の移動が終わっても、後から始めた作品の移動の待ちは解かない', async () => {
+	const { deps, slideshow } = playingSlideshow({ page: 2, settings: { slideshow: SLIDESHOW_MODES.SEQUENCE } });
+	const first = deferred();
+	const second = deferred();
+	const queue = [first, second];
+	let calls = 0;
+	deps.moveWork = () => { calls += 1; return queue.shift().promise; };
+	deps.timer.fire();
+	slideshow.workLoading();
+	deps.workId = '200';
+	deps.page = 0;
+	deps.count = 1;
+	slideshow.pageShown();
+	deps.timer.fire();
+	assert.equal(calls, 2, '移った先から次の作品へ');
+	first.resolve(true);
+	await flush();
+	await slideshow.step(1);
+	assert.equal(calls, 2, '後の移動を待っている間は送らない');
+	slideshow.setSuspended('zoom', true);
+	slideshow.setSuspended('zoom', false);
+	assert.equal(deps.timer.pending().length, 0);
+});
+
+test('reset で作品の移動の待ちも捨てる', async () => {
+	const { deps, slideshow, calls } = waitingForWorkMove(STARTERS.タイマー);
+	slideshow.reset();
+	deps.moveWork = async () => { calls.moveWork += 1; return true; };
+	slideshow.pageShown();
+	slideshow.play();
+	assert.deepEqual(deps.timer.pending().map((entry) => entry.ms), [3000], '開き直した後は数える');
+	await slideshow.step(1);
+	assert.equal(calls.moveWork, 2);
+});
 
 test('作品の移動が終われば、次の step は受け付ける', async () => {
 	const { deps, slideshow, pending, calls } = waitingForWorkMove(STARTERS.ボタン);

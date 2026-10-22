@@ -58,12 +58,13 @@ const HELD = 'held';
  * @property {() => void} toggle 再生と停止を切り替える
  * @property {() => boolean} isPlaying 再生中か
  * @property {(direction: 1|-1) => Promise<void>} step 前後ボタンからの送り。再生 / 停止は変えない。作品の移動を待っている間は何もしない。reject しない
- * @property {() => void} pageShown 今のページが表示し終わった。再生中なら計時を最初から始める
+ * @property {() => void} pageShown 今のページが表示し終わった。再生中なら計時を最初から始める。
+ *   作品の移動を待っている間に、移る前とは別の作品で届いたら、移動の待ちも解く
  * @property {() => void} pageLoading 作品の中で別のページの読み込みを待ち始めた。表示し終わるまで計時しない
  * @property {() => void} workLoading 作品を開き始めた。表示し終わるまで計時しない
  * @property {(reason: 'zoom'|'hidden'|'typing'|'panel', on: boolean) => void} setSuspended 計時を止める理由を立てる / 下ろす
  * @property {() => void} refresh 設定が変わった。off なら停止し、計時中なら新しい間隔で数え直す
- * @property {() => void} reset ビュワーを閉じた。停止し、理由も表示済みも捨てる
+ * @property {() => void} reset ビュワーを閉じた。停止し、理由も表示済みも作品の移動の待ちも捨てる
  */
 
 /**
@@ -73,7 +74,7 @@ const HELD = 'held';
  * - タイマーが切れたとき (内部の advance): 送るものが無ければ停止する。今の作品を離れられなければ送らずに数え直す
  * - 前後ボタン (step): 再生 / 停止は変えない。送るものが無ければ、再生中なら計時を最初からやり直す
  * どちらも送り先の判断は同じ関数 (decide) で行う。
- * 作品の移動 (moveWork / moveToFirst) を待っている間は計時せず、新しい送りも受け付けない。
+ * 作品の移動 (moveWork / moveToFirst) を待っている間は、移った先が表示し終えるまで計時せず、新しい送りも受け付けない。
  * @param {SlideshowDeps} deps 依存
  * @returns {Slideshow}
  */
@@ -91,8 +92,8 @@ export function createSlideshow(deps) {
 	let durationMs = null;
 	/** 送りの世代。新しい送り・停止・reset のたびに進め、古い送りの結果を捨てるのに使う */
 	let generation = 0;
-	/** 作品の移動を待っている間は true */
-	let workMovePending = false;
+	/** @type {{fromWorkId: string|null}|null} 待っている作品の移動と、移る前の作品 ID。待っていなければ null */
+	let pendingMove = null;
 	/** 最後に知らせた状態。開いた直後の状態 (停止・計時なし) は知らせ済みとみなす */
 	let lastNotified = { playing: false, durationMs: null };
 
@@ -152,7 +153,7 @@ export function createSlideshow(deps) {
 	 * @returns {boolean}
 	 */
 	function canCount() {
-		return playing && shown && suspended.size === 0 && !workMovePending;
+		return playing && shown && suspended.size === 0 && pendingMove === null;
 	}
 
 	/**
@@ -188,18 +189,21 @@ export function createSlideshow(deps) {
 
 	/**
 	 * 作品の移動を待つ。待っている間は計時しない。例外は警告を出して「移れなかった」とみなす。
+	 * 終わったときに待ちを解くのは、その待ちがまだこの移動のものであるときだけ。
+	 * (先に解かれて別の移動が始まっていれば、そちらの待ちを残す)
 	 * @param {() => Promise<boolean>} move 作品を移る処理
 	 * @returns {Promise<boolean>} 移れたら true
 	 */
 	async function awaitWorkMove(move) {
-		workMovePending = true;
+		const waiting = { fromWorkId: deps.currentWorkId() };
+		pendingMove = waiting;
 		try {
 			return (await move()) === true;
 		} catch (error) {
 			warn('自動送りで作品を移れませんでした', error);
 			return false;
 		} finally {
-			workMovePending = false;
+			if (pendingMove === waiting) pendingMove = null;
 		}
 	}
 
@@ -318,7 +322,7 @@ export function createSlideshow(deps) {
 	 * @returns {Promise<void>}
 	 */
 	async function advance() {
-		if (workMovePending) return;
+		if (pendingMove !== null) return;
 		const token = captureToken();
 		const result = await decide(FORWARD, token, true);
 		if (result === false && !isStale(token)) pause();
@@ -358,7 +362,7 @@ export function createSlideshow(deps) {
 
 	/** @type {Slideshow['step']} */
 	async function step(direction) {
-		if (workMovePending) return;
+		if (pendingMove !== null) return;
 		try {
 			const token = captureToken();
 			stopCounting();
@@ -372,6 +376,8 @@ export function createSlideshow(deps) {
 	/** @type {Slideshow['pageShown']} */
 	function pageShown() {
 		shown = true;
+		// 移った先 (手で移った先も含む) が表示し終えたら、移動の終わりを待たずに計時と送りを受け付ける
+		if (pendingMove !== null && pendingMove.fromWorkId !== deps.currentWorkId()) pendingMove = null;
 		restartCounting();
 	}
 
@@ -416,6 +422,7 @@ export function createSlideshow(deps) {
 		generation += 1;
 		playing = false;
 		shown = false;
+		pendingMove = null;
 		suspended.clear();
 		stopCounting();
 	}
