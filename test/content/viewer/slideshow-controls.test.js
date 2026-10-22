@@ -168,6 +168,20 @@ test('速度のボタンは今の間隔を出す。小数は末尾の 0 を付�
 	controls.dispose();
 });
 
+test('速度のボタンの文字欄は、一番長い表示の幅を隠した文字で取っておく (整数と小数で帯の幅を変えない)', () => {
+	const { controls, part } = build();
+	const sizer = part('.slideshow-speed-sizer');
+	const { max, step } = SLIDESHOW_INTERVAL_CUSTOM_RANGE;
+	assert.equal(sizer.textContent, `${max - step} 秒`);
+	assert.equal(sizer.getAttribute('aria-hidden'), 'true');
+	const box = part('.slideshow-speed-text');
+	assert.ok(box.children.includes(sizer), '今の秒数と同じ箱に重ねる');
+	assert.ok(box.children.includes(part('.slideshow-speed-label')));
+	controls.setSettings({ slideshowInterval: 'custom', slideshowIntervalCustom: 7.5, slideshowLoop: false });
+	assert.equal(sizer.textContent, `${max - step} 秒`, '秒数が変わっても取っておく幅は変えない');
+	controls.dispose();
+});
+
 test('setSettings でループと速度の表示を合わせる。コールバックは呼ばない', () => {
 	const { calls, stage, controls, part } = build();
 	controls.setSettings({ slideshowInterval: 4, slideshowIntervalCustom: 7.5, slideshowLoop: true });

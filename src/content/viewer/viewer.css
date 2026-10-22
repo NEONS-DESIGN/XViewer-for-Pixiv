@@ -1974,6 +1974,20 @@ a.comment-name:hover {
 	height: 20px;
 }
 
+/* 今の秒数と、一番長い表示を隠した文字を同じ升に重ねる。升の幅は長いほうで決まるので、秒数が変わっても帯の幅が変わらない */
+.slideshow-speed-text {
+	display: inline-grid;
+	justify-items: start;
+}
+
+.slideshow-speed-label,
+.slideshow-speed-sizer {
+	grid-area: 1 / 1;
+	white-space: nowrap;
+}
+
+.slideshow-speed-sizer { visibility: hidden; }
+
 /* 上向きに開く。下は画面の端なので、下に開くと切れる */
 .slideshow-speed-panel {
 	position: absolute;
