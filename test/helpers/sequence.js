@@ -7,7 +7,7 @@
 /**
  * ID の配列から並びの代わりを作る。
  * @param {string[]} ids 作品 ID (表示順)
- * @returns {{next: (id: string) => string|null, prev: (id: string) => string|null, has: (id: string) => boolean}} 並びの代わり
+ * @returns {{ids: string[], next: (id: string) => string|null, prev: (id: string) => string|null, has: (id: string) => boolean}} 並びの代わり
  */
 export function fakeSequence(ids) {
 	const at = (id, offset) => {
@@ -16,6 +16,7 @@ export function fakeSequence(ids) {
 		return ids[index + offset] ?? null;
 	};
 	return {
+		ids,
 		next: (id) => at(id, 1),
 		prev: (id) => at(id, -1),
 		has: (id) => ids.includes(id),
