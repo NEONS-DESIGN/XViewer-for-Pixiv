@@ -8,8 +8,11 @@
 import { NAV_ZONES, NAV_ZONE_RATIOS, NAV_ZONE_KINDS } from '../../common/constants.js';
 import { warn } from '../../common/log.js';
 
-/** 領域の中でも領域より優先する部品。押せば今までどおりその部品が動く */
-const PASS_THROUGH_SELECTOR = 'button, a, input, textarea, select, .blocked-panel, .ugoira-controls';
+/**
+ * 領域の中でも領域より優先する部品。押せば今までどおりその部品が動く。
+ * 操作の帯 (うごイラ・自動送り) は、ボタンの隙間や進捗の線を押しても送らない
+ */
+const PASS_THROUGH_SELECTOR = 'button, a, input, textarea, select, .blocked-panel, .ugoira-controls, .slideshow-controls';
 
 /**
  * 今は送れない領域に付ける data-nav-zone の値。(端に着いた向き・作品の読み込み中のページ送り)

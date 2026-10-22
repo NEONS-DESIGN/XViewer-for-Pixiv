@@ -24,12 +24,13 @@ import {
 	INERT_SELECTOR,
 	VIEWER_CSS_SETTINGS,
 	DEFAULT_UGOIRA_RATE,
+	SLIDESHOW_MODES,
 } from '../../common/constants.js';
 import { createIcon } from '../../common/icons.js';
 import { assignImageSrc } from '../../common/image-source.js';
 import { currentLocalePrefix } from '../../common/locale.js';
 import { warn } from '../../common/log.js';
-import { navZoneSizesOf } from '../../common/storage.js';
+import { navZoneSizesOf, saveSetting } from '../../common/storage.js';
 import { getJson, FRESH_FETCH_INIT } from '../../pixiv/client.js';
 import { clearUserCache } from '../../pixiv/user.js';
 import { PIXIV_ERROR_KINDS } from '../../pixiv/errors.js';
@@ -37,12 +38,24 @@ import { artworkPath, illustUrl, safeCdnUrl } from '../../pixiv/endpoints.js';
 import { fetchIllustPages, fetchUgoiraMeta } from '../../pixiv/illust-assets.js';
 import { normalizeDetail, ILLUST_TYPES } from '../../pixiv/normalize.js';
 import { readSession } from '../session.js';
-import { renderWork, rerenderMain, disposeAll, movePage, canMovePage, currentPage, consumeKey } from './panes.js';
+import {
+	renderWork,
+	rerenderMain,
+	disposeAll,
+	movePage,
+	canMovePage,
+	currentPage,
+	consumeKey,
+	showPage,
+	pageCount,
+} from './panes.js';
 import { blockReason } from './blocked.js';
 import { createZoomLayer } from './zoom.js';
 import { createNavigation } from './navigation.js';
 import { createNavZones, eventPathMatches } from './nav-zones.js';
 import { createPrefetchSlot } from './prefetch-slot.js';
+import { createSlideshow } from './slideshow.js';
+import { createSlideshowControls } from './slideshow-controls.js';
 
 /** ホストページのスクロールを止めるために body へ付ける style。 */
 const BODY_LOCK_STYLE = 'overflow:hidden';
@@ -81,6 +94,26 @@ const RERENDER_SETTING_KEYS = Object.freeze(['imageQuality', 'prefetch', 'prefet
  */
 const SIDEBAR_RERENDER_SETTING_KEYS = Object.freeze(['showSidebar']);
 
+/**
+ * 変わったら自動送りの計時をやり直す設定。(モードと送る間隔)
+ * ループは次の送りで読むだけなので入れない。入れると切り替えるたびに進捗の線が 0 へ戻る
+ */
+const SLIDESHOW_TIMING_SETTING_KEYS = Object.freeze(['slideshow', 'slideshowInterval', 'slideshowIntervalCustom']);
+
+/** 自動送りの計時を止める理由。 */
+const SLIDESHOW_SUSPEND = Object.freeze({
+	ZOOM: 'zoom',
+	HIDDEN: 'hidden',
+	TYPING: 'typing',
+	PANEL: 'panel',
+});
+
+/** タブが隠れているときの document.visibilityState */
+const HIDDEN_VISIBILITY_STATE = 'hidden';
+
+/** INPUT のうち、文字を打たないレンジ (シークバー・スライダー) の type */
+const RANGE_INPUT_TYPE = 'range';
+
 /** % で持つ設定 (画面端のクリック領域の幅) を 0-1 の割合へ直すときの分母。 */
 const PERCENT = 100;
 
@@ -114,6 +147,7 @@ const KEEP_OPEN_SELECTOR = [
 	'a',
 	'.blocked-panel',
 	'.ugoira-controls',
+	'.slideshow-controls',
 	'.counter',
 	'.pane-error',
 	'.status',
@@ -134,6 +168,7 @@ const KEEP_OPEN_SELECTOR = [
  * @property {(fn: Function, ms: number) => number} [setTimeout] 遅延実行の差し替え。既定は window.setTimeout
  * @property {(id: number) => void} [clearTimeout] 上の取り消し。既定は window.clearTimeout
  * @property {() => HTMLImageElement} [createImage] 隣の作品の画像を読んでおく Image の工場。Node には Image が無い
+ * @property {(key: string, value: unknown) => Promise<boolean>} [saveSetting] 設定の保存。既定は common/storage.js の saveSetting
  */
 
 /**
@@ -190,6 +225,38 @@ export function isTextEntry(event) {
 }
 
 /**
+ * 要素が文字を打つ入力欄か。(textarea・編集できる要素・レンジ以外の input)
+ * isTextEntry と違い、レンジ (うごイラのシークバー・自動送りのスライダー) は含めない。
+ * @param {Element|null|undefined} element 対象
+ * @returns {boolean} 文字を打つ入力欄なら true
+ */
+export function isTypingTarget(element) {
+	if (!element) return false;
+	if (element.isContentEditable === true) return true;
+	if (!TEXT_ENTRY_TAGS.includes(element.tagName)) return false;
+	return !(element.tagName === 'INPUT' && element.type === RANGE_INPUT_TYPE);
+}
+
+/**
+ * 自動送りが使われる設定か。(モードが off 以外)
+ * @param {object} settings 設定
+ * @returns {boolean} 使われるなら true
+ */
+function slideshowEnabled(settings) {
+	return settings.slideshow === SLIDESHOW_MODES.WORK || settings.slideshow === SLIDESHOW_MODES.SEQUENCE;
+}
+
+/**
+ * 自動送りの計時に効く設定が変わったか。
+ * @param {object} previous 前の設定
+ * @param {object} next 新しい設定
+ * @returns {boolean} 変わったなら true
+ */
+function slideshowTimingChanged(previous, next) {
+	return SLIDESHOW_TIMING_SETTING_KEYS.some((key) => previous[key] !== next[key]);
+}
+
+/**
  * 作品詳細を取れなかった理由を、利用者向けの文言にする。
  * 見分けるのは「作品が無い (削除・非公開)」と「通信の失敗」だけで、他は共通の文言にする。
  * @param {unknown} error 取得で投げられた例外
@@ -217,6 +284,7 @@ export function createViewer(deps) {
 	const later = deps.setTimeout ?? ((fn, ms) => setTimeout(fn, ms));
 	const cancelLater = deps.clearTimeout ?? ((id) => clearTimeout(id));
 	const createImage = deps.createImage ?? (() => new Image());
+	const persistSetting = deps.saveSetting ?? saveSetting;
 	let settings = deps.settings;
 
 	/** @type {HTMLElement|null} */
@@ -283,6 +351,22 @@ export function createViewer(deps) {
 		extendSequence: (current) => deps.extendSequence(current),
 		movePage,
 		focusNext: (event) => trapFocus(event),
+	});
+	/** @type {ReturnType<typeof createSlideshowControls>|null} 自動送りの帯。設定が off 以外の間だけ置く */
+	let controls = null;
+	// 自動送りの計時と送りの判断。ビュワーを閉じても作り直さず、reset() で停止状態へ戻す
+	const slideshow = createSlideshow({
+		getSettings: () => settings,
+		canMovePage,
+		movePage,
+		showPage,
+		pageCount,
+		moveWork: (direction) => navigation.moveWork(direction),
+		moveToFirst: () => navigation.moveToFirst(),
+		currentWorkId: () => navigation.currentWorkId(),
+		onChange: (state) => controls?.setState(state),
+		setTimeout: later,
+		clearTimeout: cancelLater,
 	});
 
 	/**
@@ -389,9 +473,25 @@ export function createViewer(deps) {
 			isPending: () => awaitingPanes,
 		});
 
+		// 入力欄に文字を打っている間は自動送りを止める。
+		// 入力欄から入力欄へ移るときは、外れた時点で行き先を見て止めたままにする
+		overlay.addEventListener('focusin', (event) => {
+			const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+			slideshow.setSuspended(SLIDESHOW_SUSPEND.TYPING, isTypingTarget(path[0] ?? event.target));
+		});
+		overlay.addEventListener('focusout', (event) => {
+			slideshow.setSuspended(SLIDESHOW_SUSPEND.TYPING, isTypingTarget(event.relatedTarget));
+		});
+
 		// 原寸表示は overlay の直下に敷く。ステージの中に入れるとサイドバーが上に残る。
 		// 閉じたらフォーカスはダイアログ本体へ戻す (レイヤの中の部品ごと消えるため)
-		zoomLayer = createZoomLayer({ doc, container: overlay, restoreFocus: () => overlay?.focus({ preventScroll: true }), strings });
+		zoomLayer = createZoomLayer({
+			doc,
+			container: overlay,
+			restoreFocus: () => overlay?.focus({ preventScroll: true }),
+			strings,
+			onOpenChange: (open) => slideshow.setSuspended(SLIDESHOW_SUSPEND.ZOOM, open),
+		});
 
 		doc.body.appendChild(host);
 	}
@@ -471,6 +571,88 @@ export function createViewer(deps) {
 		sidebarToggle.replaceChildren(createIcon(doc, open ? 'sidebarClose' : 'sidebarOpen'));
 		if (open) overlay.dataset.sidebarOpen = '';
 		else delete overlay.dataset.sidebarOpen;
+	}
+
+	/**
+	 * 自動送りの帯を設定に合わせて出し入れする。
+	 * off 以外なら帯を (無ければ) 作ってステージへ足し、ステージにモードを写す。
+	 * off なら帯を外して属性も外す。再生を止めるのは呼び出し側の slideshow.refresh()。
+	 * @returns {void}
+	 */
+	function applySlideshow() {
+		if (!stage || !overlay) return;
+		if (!slideshowEnabled(settings)) {
+			disposeControls();
+			delete stage.dataset.slideshow;
+			return;
+		}
+		stage.dataset.slideshow = settings.slideshow;
+		if (controls) return;
+		controls = createSlideshowControls({
+			doc,
+			container: stage,
+			activityTarget: overlay,
+			strings,
+			settings,
+			onToggle: () => slideshow.toggle(),
+			onStep: (direction) => { void slideshow.step(direction); },
+			onLoopChange: (loop) => changeSlideshowSettings({ slideshowLoop: loop }),
+			onIntervalChange: (change) => changeSlideshowSettings(change),
+			onPanelChange: (open) => slideshow.setSuspended(SLIDESHOW_SUSPEND.PANEL, open),
+			setTimeout: later,
+			clearTimeout: cancelLater,
+			matchMedia: (query) => doc.defaultView?.matchMedia?.(query),
+		});
+	}
+
+	/**
+	 * 自動送りの帯を外す。
+	 * 帯は外すときにパネルの開閉を知らせないので、パネルによる一時停止はここで下ろす。
+	 * 外した帯へキーや wake が届かないよう、先に参照を捨てる
+	 * @returns {void}
+	 */
+	function disposeControls() {
+		if (!controls) return;
+		const disposing = controls;
+		controls = null;
+		disposing.dispose();
+		slideshow.setSuspended(SLIDESHOW_SUSPEND.PANEL, false);
+	}
+
+	/**
+	 * 帯で変えられた自動送りの設定を、手元へ反映してから保存する。
+	 * 保存の結果は待たない。失敗しても再生は続け、warn に残すだけにする。
+	 * @param {object} change 変わった設定 (キーと値)
+	 * @returns {void}
+	 */
+	function changeSlideshowSettings(change) {
+		const previous = settings;
+		settings = { ...settings, ...change };
+		controls?.setSettings(settings);
+		if (slideshowTimingChanged(previous, settings)) slideshow.refresh();
+		for (const [key, value] of Object.entries(change)) void saveSlideshowSetting(key, value);
+	}
+
+	/**
+	 * 設定を 1 つ保存する。保存できなかったら warn に残す。(投げない)
+	 * @param {string} key 設定キー
+	 * @param {unknown} value 値
+	 * @returns {Promise<void>}
+	 */
+	async function saveSlideshowSetting(key, value) {
+		try {
+			if (await persistSetting(key, value) !== true) warn('failed to save setting', key);
+		} catch (error) {
+			warn('failed to save setting', key, error);
+		}
+	}
+
+	/**
+	 * タブの表示状態を自動送りへ伝える。隠れている間は数えない。
+	 * @returns {void}
+	 */
+	function onVisibilityChange() {
+		slideshow.setSuspended(SLIDESHOW_SUSPEND.HIDDEN, doc.visibilityState === HIDDEN_VISIBILITY_STATE);
 	}
 
 	/**
@@ -703,14 +885,21 @@ export function createViewer(deps) {
 	 * キーボード操作。
 	 *
 	 * キーは手前に出ているものから順に使わせる。
-	 * 原寸表示 (画面全体を覆う) が最優先で、次がサイドバーの部品。(シェアメニュー・コメント欄)
+	 * 原寸表示 (画面全体を覆う) が最優先で、次が自動送りの速度のパネル、その次がペインの部品。(シェアメニュー・コメント欄)
 	 * 開いているメニューを閉じたつもりでモーダルごと閉じる、メニューの項目を
 	 * 下キーで送ったつもりで次の作品へ移る、を防ぐ。
+	 * どのキーでも、隠れた自動送りの帯は出し直す。
 	 * @param {KeyboardEvent} event キー
 	 * @returns {void}
 	 */
 	function onKeyDown(event) {
+		controls?.wake();
 		if (zoomLayer?.consumeKey(event)) {
+			event.preventDefault();
+			event.stopPropagation();
+			return;
+		}
+		if (controls?.consumeKey(event)) {
 			event.preventDefault();
 			event.stopPropagation();
 			return;
@@ -745,13 +934,15 @@ export function createViewer(deps) {
 			startPage,
 			ugoiraRate,
 			onUgoiraRateChange: (rate) => { ugoiraRate = rate; },
+			onPageShown: () => slideshow.pageShown(),
 		};
 	}
 
 	/**
 	 * 描画の失敗を出す。描きかけのペインを捨ててから文言を出す。
 	 * 捨てないと、主役の描画で落ちたときに .frame や .ugoira の横に文言が並ぶ。
-	 * 覚えている作品詳細も捨てる。設定が変わったときに主役だけを描き足さず、取得から組み直させるため
+	 * 覚えている作品詳細も捨てる。設定が変わったときに主役だけを描き足さず、取得から組み直させるため。
+	 * 自動送りには表示し終えたと伝え、失敗した作品で止まり続けないようにする
 	 * @param {string} workId 作品 ID (warn に残す)
 	 * @param {unknown} error 失敗の理由
 	 * @returns {void}
@@ -762,6 +953,7 @@ export function createViewer(deps) {
 		disposeAll();
 		showStatus(strings.viewer.LOAD_FAILED, STATUS_KINDS.ERROR);
 		warn('failed to render', workId, error);
+		slideshow.pageShown();
 	}
 
 	/**
@@ -787,6 +979,8 @@ export function createViewer(deps) {
 			return;
 		}
 		if (token !== requestToken) return;
+		// 画像の無い主役 (うごイラ・ブロック表示) は、描き終えた時点で表示し終えたとみなす
+		if (currentPage() === null) slideshow.pageShown();
 		// 枚数が決まったので、ポインタの下の領域のカーソルを合わせ直す
 		navZones?.refresh();
 		// 主役を組み終えてから、低い優先度で隣を温める
@@ -835,6 +1029,8 @@ export function createViewer(deps) {
 	 */
 	async function openWork(workId, startPage = 0) {
 		const token = ++requestToken;
+		// 表示し終えるまで自動送りは数えない
+		slideshow.workLoading();
 		navigation.setCurrentWorkId(workId);
 		requestedStartPage = startPage;
 		awaitingPanes = true;
@@ -861,9 +1057,13 @@ export function createViewer(deps) {
 		applyTheme();
 		applySidebarScroll();
 		applyCssSettings();
+		applySlideshow();
 		if (!wasOpen) {
 			lockBody();
 			doc.addEventListener('keydown', onKeyDown, true);
+			doc.addEventListener('visibilitychange', onVisibilityChange);
+			// 隠れたタブで開かれることもあるので、張った時点の状態も伝える
+			onVisibilityChange();
 			lockBackground();
 			// 閉じている間にページ側でフォローを切り替えられていても、開いたときは最新を出す。
 			// 開いている間はページのボタンに触れないので、作品を送るたびには捨てない
@@ -909,6 +1109,8 @@ export function createViewer(deps) {
 			navZones?.refresh();
 			showStatus(loadFailedMessage(error, strings), STATUS_KINDS.ERROR);
 			warn('failed to open', workId, error);
+			// 取得できなかった作品で自動送りを止め続けない
+			slideshow.pageShown();
 			return;
 		}
 		cancelLoadingStatus();
@@ -938,6 +1140,10 @@ export function createViewer(deps) {
 		requestedStartPage = 0;
 		pressKeptOpen = false;
 		doc.removeEventListener('keydown', onKeyDown, true);
+		doc.removeEventListener('visibilitychange', onVisibilityChange);
+		// 帯を先に外してから止める。次に開いたときは停止状態から始まる
+		disposeControls();
+		slideshow.reset();
 		unlockBody();
 		unlockBackground();
 		zoomLayer?.dispose();
@@ -1004,6 +1210,10 @@ export function createViewer(deps) {
 			applyWorkLink(workId);
 			applySidebarToggle();
 			navZones?.refresh();
+			// 自動送りの設定は描き直しに含めない。帯の出し入れと表示だけ合わせ、計時に効くときだけ数え直す
+			applySlideshow();
+			controls?.setSettings(next);
+			if (slideshowTimingChanged(previous, next)) slideshow.refresh();
 			const changed = RERENDER_SETTING_KEYS.filter((key) => previous[key] !== next[key]);
 			if (changed.length === 0) return;
 			const midFetch = awaitingPanes || !lastDetail || String(lastDetail.id) !== String(workId);
