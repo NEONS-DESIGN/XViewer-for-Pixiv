@@ -168,13 +168,24 @@
 
 /* 画像側。ここの余白部分を押すと閉じる */
 .stage {
+	/* 内側の余白。ペイン (.frame / .ugoira / .blocked) はこの内側に広がる */
+	--stage-padding: 24px;
+	/* 自動送りの帯の、ステージの下端からの距離 */
+	--slideshow-controls-bottom: 12px;
+	/* 自動送りの帯の外寸の高さ。丸ボタン 40px + 上下の余白 4px ずつ + 枠 1px ずつ。
+	   帯の中身の寸法を変えたらここも直す (下端の部品を逃がす高さがこれで決まる) */
+	--slideshow-controls-height: 50px;
+	/* 自動送りの帯と、その上へ逃がす部品の間 */
+	--slideshow-controls-gap: 8px;
+	/* ペインの下端から、自動送りの帯の上へ逃がすまでの距離。ペインは内側の余白の分だけ帯より上から始まる */
+	--slideshow-clearance: calc(var(--slideshow-controls-bottom) + var(--slideshow-controls-height) + var(--slideshow-controls-gap) - var(--stage-padding));
 	position: relative;
 	flex: 1 1 auto;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	min-width: 0;
-	padding: 24px;
+	padding: var(--stage-padding);
 }
 
 .stage img {
@@ -230,12 +241,16 @@
 	padding: 16px 16px 0;
 }
 
-/* 40px の丸いボタン。(閉じる・サイドバーの引き出し・左右の矢印・うごイラの再生)
+/* 40px の丸いボタン。(閉じる・サイドバーの引き出し・左右の矢印・うごイラの再生・自動送りの帯)
    画像の上に重なるので、地と枠でボタンだと分かるようにする。位置はそれぞれの規則が持つ */
 .close,
 .sidebar-toggle,
 .arrow,
-.ugoira-toggle {
+.ugoira-toggle,
+.slideshow-prev,
+.slideshow-toggle,
+.slideshow-next,
+.slideshow-loop {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -252,6 +267,10 @@
 .close:hover,
 .sidebar-toggle:hover,
 .ugoira-toggle:hover,
+.slideshow-prev:hover,
+.slideshow-toggle:hover,
+.slideshow-next:hover,
+.slideshow-loop:hover,
 .arrow:hover:not(:disabled) {
 	background: var(--control-hover);
 }
@@ -260,7 +279,11 @@
 .close svg,
 .sidebar-toggle svg,
 .arrow svg,
-.ugoira-toggle svg {
+.ugoira-toggle svg,
+.slideshow-prev svg,
+.slideshow-toggle svg,
+.slideshow-next svg,
+.slideshow-loop svg {
 	width: 24px;
 	height: 24px;
 }
@@ -552,6 +575,13 @@
 	background: var(--surface);
 	color: var(--danger);
 	font-size: 12px;
+}
+
+/* 自動送りがオンの間は、自動送りの帯の上へ逃がす。帯が隠れていても位置は戻さない。
+   うごイラの帯の上へ逃がす規則 (.ugoira-controls:not([hidden]) ~ .pane-error) と詳細度が同じなので、
+   あちらが勝つようにこの規則を前に置く */
+.stage[data-slideshow] .pane-error {
+	bottom: var(--slideshow-clearance);
 }
 
 /* 作者のアイコン・名前とフォローを同じ行に。名前が長くても畳んでフォローを右端に残す */
@@ -1844,4 +1874,185 @@ a.comment-name:hover {
 /* 形は閉じるボタンと同じ 40px の円。帯の中で縮ませない */
 .ugoira-toggle {
 	flex: 0 0 auto;
+}
+
+/* 自動送りの操作の帯 (slideshow-controls.js)。ステージの下端の中央に重ね、
+   前へ / 再生 / 次へ / ループ / 送る間隔を 1 行に並べる。見た目はうごイラの帯に揃える。
+   ペインより後ろの DOM 順にならないことがあるので、閉じるボタンと同じく重ね順を上げる */
+.slideshow-controls {
+	/* 操作が無いときに淡く消える時間 */
+	--slideshow-fade: 200ms;
+
+	position: absolute;
+	left: 50%;
+	bottom: var(--slideshow-controls-bottom);
+	z-index: 1;
+	transform: translateX(-50%);
+	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	max-width: calc(100% - 24px);
+	padding: 4px;
+	border: 1px solid var(--control-border);
+	border-radius: 999px;
+	background: var(--control-bg);
+	color: var(--fg);
+	white-space: nowrap;
+	transition: opacity var(--slideshow-fade) ease;
+}
+
+/* 消え終わってから visibility で押せなくする。(消えている途中に押しても効くように、visibility は遅らせて切り替える) */
+.slideshow-controls[data-idle] {
+	opacity: 0;
+	visibility: hidden;
+	transition: opacity var(--slideshow-fade) ease, visibility 0s linear var(--slideshow-fade);
+}
+
+/* うごイラの帯は、自動送りの帯の上へ逃がす。帯が隠れていても位置は戻さない */
+.stage[data-slideshow] .ugoira {
+	--ugoira-controls-bottom: var(--slideshow-clearance);
+}
+
+/* 次へ送るまでの残り時間。帯の下の縁に沿って 0 から端まで伸ばす。止まっている間は幅 0 で見えない */
+.slideshow-progress {
+	position: absolute;
+	left: 20px;
+	right: 20px;
+	bottom: 2px;
+	height: 2px;
+	border-radius: 1px;
+	background: var(--accent);
+	transform: scaleX(0);
+	transform-origin: left center;
+	pointer-events: none;
+}
+
+.slideshow-progress[data-running] {
+	transform: scaleX(1);
+	transition: transform var(--slideshow-duration) linear;
+}
+
+.slideshow-prev,
+.slideshow-toggle,
+.slideshow-next,
+.slideshow-loop {
+	flex: 0 0 auto;
+}
+
+/* ループが入っている。色だけに頼らず枠でも示す */
+.slideshow-loop[aria-pressed='true'] {
+	border-color: var(--accent);
+	color: var(--accent);
+}
+
+.slideshow-speed-wrap {
+	position: relative;
+	flex: 0 0 auto;
+}
+
+.slideshow-speed {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	height: 32px;
+	padding: 0 10px 0 8px;
+	border: 0;
+	border-radius: 999px;
+	background: transparent;
+	color: var(--fg);
+	font: inherit;
+	font-size: 13px;
+	font-variant-numeric: tabular-nums;
+	cursor: pointer;
+}
+
+.slideshow-speed:hover { background: var(--hover); }
+
+.slideshow-speed svg {
+	width: 20px;
+	height: 20px;
+}
+
+/* 上向きに開く。下は画面の端なので、下に開くと切れる */
+.slideshow-speed-panel {
+	position: absolute;
+	right: 0;
+	bottom: calc(100% + 8px);
+	box-sizing: border-box;
+	min-width: 168px;
+	padding: 6px 0;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	background: var(--surface);
+	box-shadow: var(--menu-shadow);
+}
+
+.slideshow-speed-option {
+	box-sizing: border-box;
+	display: block;
+	width: 100%;
+	padding: 6px 12px;
+	border: 0;
+	background: transparent;
+	color: var(--fg);
+	font: inherit;
+	font-size: 13px;
+	font-variant-numeric: tabular-nums;
+	text-align: left;
+	cursor: pointer;
+}
+
+.slideshow-speed-option:hover { background: var(--hover); }
+/* 項目の縁が隣と接しているので、輪郭は内側に出す (外側だと隣の項目に重なる) */
+.slideshow-speed-option:focus-visible { outline-offset: -2px; }
+
+/* 選んでいる間隔。色だけに頼らず太さでも示す */
+.slideshow-speed-option[aria-checked='true'] {
+	color: var(--accent);
+	font-weight: 600;
+}
+
+/* カスタムの秒数。見出しを上に、スライダーと今の秒数を下に並べる */
+.slideshow-custom {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	align-items: center;
+	gap: 4px 8px;
+	margin-top: 6px;
+	padding: 8px 12px 2px;
+	border-top: 1px solid var(--border);
+	font-size: 12px;
+}
+
+.slideshow-custom-label {
+	grid-column: 1 / -1;
+	color: var(--muted);
+}
+
+.slideshow-custom-range {
+	min-width: 0;
+	margin: 0;
+	accent-color: var(--accent);
+	cursor: pointer;
+}
+
+/* 桁が変わっても並びが揺れないよう、数字の幅を揃える */
+.slideshow-custom-value {
+	min-width: 4em;
+	color: var(--fg);
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+}
+
+/* 動きを減らす設定では、フェードを付けずにすぐ消し、進捗の線を出さない */
+@media (prefers-reduced-motion: reduce) {
+	.slideshow-controls,
+	.slideshow-controls[data-idle] {
+		transition: none;
+	}
+
+	.slideshow-progress {
+		display: none;
+	}
 }

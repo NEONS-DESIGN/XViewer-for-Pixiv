@@ -202,6 +202,23 @@ export default {
 		 */
 		frame: (current, total) => `${total} コマ中 ${current} コマ目`,
 	},
+	slideshow: {
+		CONTROLS: '自動送り',
+		PLAY: '自動送りを再生',
+		PAUSE: '自動送りを停止',
+		PREV: '前へ',
+		NEXT: '次へ',
+		LOOP: 'ループ',
+		INTERVAL: '送る間隔',
+		CUSTOM: 'カスタム',
+		CUSTOM_RANGE: '間隔 (秒)',
+		/**
+		 * 秒数の見出し。小数はそのまま出す。(2.5 秒)
+		 * @param {number} value 秒数
+		 * @returns {string} 見出し
+		 */
+		seconds: (value) => `${value} 秒`,
+	},
 	blocked: {
 		LOGIN_REQUIRED: 'この作品を見るには pixiv にログインしてください',
 		HIDDEN_BY_SETTING: 'pixiv の表示設定により非表示になっています',

@@ -175,6 +175,23 @@ export default {
 		 */
 		frame: (current, total) => `Frame ${current} of ${total}`,
 	},
+	slideshow: {
+		CONTROLS: 'Auto-advance',
+		PLAY: 'Start auto-advance',
+		PAUSE: 'Stop auto-advance',
+		PREV: 'Previous',
+		NEXT: 'Next',
+		LOOP: 'Loop',
+		INTERVAL: 'Interval',
+		CUSTOM: 'Custom',
+		CUSTOM_RANGE: 'Interval (seconds)',
+		/**
+		 * 秒数の見出し。小数はそのまま出す。(2.5 秒)
+		 * @param {number} value 秒数
+		 * @returns {string} 見出し
+		 */
+		seconds: (value) => `${value} s`,
+	},
 	blocked: {
 		LOGIN_REQUIRED: 'Log in to pixiv to view this artwork',
 		HIDDEN_BY_SETTING: 'Hidden by your pixiv viewing settings',

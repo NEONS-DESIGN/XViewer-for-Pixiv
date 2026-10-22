@@ -22,6 +22,7 @@ test('ビュワーのフォーカスの輪郭は 1 本にまとめる', () => {
 		'.overlay:focus, .overlay:focus-visible, .zoom:focus, .zoom:focus-visible',
 		// 内側に出す例外 (項目の縁が隣と接しているメニュー)
 		'.share-item:focus-visible',
+		'.slideshow-speed-option:focus-visible',
 		'.ugoira-rate-item:focus-visible',
 		// 共通
 		':focus-visible',
@@ -88,6 +89,30 @@ test('うごイラの失敗表示は、操作の帯が出ているときだけ�
 	const body = block(viewer, '.ugoira-controls:not([hidden]) ~ .pane-error');
 	assert.ok(body.includes('var(--ugoira-controls-height)'));
 	assert.throws(() => block(viewer, '.ugoira > .pane-error'), '帯の有無を見ずに上げる規則を残さない');
+});
+
+test('自動送りがオンの間は、下端の失敗表示とうごイラの帯を自動送りの帯の上へ逃がす', () => {
+	// 逃がす距離は帯の高さから 1 か所で決める
+	const clearance = variable(block(viewer, '.stage'), '--slideshow-clearance');
+	assert.ok(clearance?.includes('var(--slideshow-controls-height)'), '逃がす距離が帯の高さを見ていない');
+	assert.ok(block(viewer, '.stage[data-slideshow] .pane-error').includes('bottom: var(--slideshow-clearance)'), '失敗表示を逃がしていない');
+	const ugoira = block(viewer, '.stage[data-slideshow] .ugoira');
+	assert.equal(variable(ugoira, '--ugoira-controls-bottom'), 'var(--slideshow-clearance)', 'うごイラの帯を逃がしていない');
+	// 2 つは詳細度が同じなので後ろが勝つ。うごイラの帯が出ているときは、その上へ逃がす規則を勝たせる
+	assert.ok(
+		viewer.indexOf('.stage[data-slideshow] .pane-error {') < viewer.indexOf('.ugoira-controls:not([hidden]) ~ .pane-error {'),
+		'うごイラの帯の上へ逃がす規則より後ろに置くと、帯の裏へ潜る',
+	);
+});
+
+test('自動送りの帯は消え終わったら押せなくし、動きを減らす設定ではフェードと進捗の線を止める', () => {
+	const idle = block(viewer, '.slideshow-controls[data-idle]');
+	assert.ok(idle.includes('opacity: 0'), '淡く消えない');
+	assert.ok(idle.includes('visibility: hidden'), '見えないボタンが押せてしまう');
+	assert.ok(block(viewer, '.slideshow-progress[data-running]').includes('var(--slideshow-duration)'), '線の伸びる時間を変数から引いていない');
+	const reduced = block(viewer, '@media (prefers-reduced-motion: reduce)');
+	assert.ok(reduced.includes('.slideshow-controls'), 'フェードを止めていない');
+	assert.ok(reduced.includes('.slideshow-progress'), '進捗の線を止めていない');
 });
 
 test('浮いている部品の影の色は通知と同じトークンから引く', () => {

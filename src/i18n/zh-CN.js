@@ -205,6 +205,23 @@ export default {
 		 */
 		frame: (current, total) => `第 ${current} 帧，共 ${total} 帧`,
 	},
+	slideshow: {
+		CONTROLS: '自动翻页',
+		PLAY: '开始自动翻页',
+		PAUSE: '停止自动翻页',
+		PREV: '上一个',
+		NEXT: '下一个',
+		LOOP: '循环',
+		INTERVAL: '翻页间隔',
+		CUSTOM: '自定义',
+		CUSTOM_RANGE: '间隔（秒）',
+		/**
+		 * 秒数の見出し。小数はそのまま出す。(2.5 秒)
+		 * @param {number} value 秒数
+		 * @returns {string} 見出し
+		 */
+		seconds: (value) => `${value} 秒`,
+	},
 	blocked: {
 		LOGIN_REQUIRED: '请登录 pixiv 后查看此作品',
 		HIDDEN_BY_SETTING: '根据 pixiv 的显示设置，此作品已被隐藏',
