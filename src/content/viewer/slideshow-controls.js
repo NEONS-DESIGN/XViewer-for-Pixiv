@@ -17,7 +17,7 @@ import {
 	SLIDESHOW_INTERVAL_CUSTOM_RANGE,
 } from '../../common/constants.js';
 import { slideshowIntervalSeconds } from '../../common/storage.js';
-import { hasFocusWithin } from './focus.js';
+import { activeElementIn, hasFocusWithin } from './focus.js';
 
 /** 再生ボタンの表示。キーは今の再生状態、値は「押すと何になるか」。アイコンは言語に依らない。 */
 const TOGGLE = Object.freeze({
@@ -41,6 +41,9 @@ const RANGE_BLOCKED_KEYS = Object.freeze([KEYS.PREV_WORK, KEYS.NEXT_WORK]);
 
 /** 動きを減らす設定の問い合わせ */
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+
+/** キーボードで来たフォーカス (輪郭を出す状態) の判定 */
+const FOCUS_VISIBLE_SELECTOR = ':focus-visible';
 
 /** 進捗の線が伸びきるまでの時間を渡す CSS 変数 */
 const DURATION_VAR = '--slideshow-duration';
@@ -385,13 +388,28 @@ export function createSlideshowControls(deps) {
 	}
 
 	/**
-	 * 待ち終えたら隠す。カーソルが乗っている・フォーカスがある・パネルが開いている間は隠さない。
+	 * 帯の中に、キーボードで操作しているフォーカス (輪郭が出ている状態) があるか。
+	 * マウスや指で押したボタンに残るフォーカスは数えない。判定できないときも数えない。
+	 * @returns {boolean} キーボードのフォーカスがあれば true
+	 */
+	function hasKeyboardFocusWithin() {
+		if (!hasFocusWithin(doc, element)) return false;
+		const active = activeElementIn(doc, element);
+		try {
+			return active.matches(FOCUS_VISIBLE_SELECTOR) === true;
+		} catch {
+			return false;
+		}
+	}
+
+	/**
+	 * 待ち終えたら隠す。カーソルが乗っている・キーボードのフォーカスがある・パネルが開いている間は隠さない。
 	 * (それぞれが終わったときに計時をやり直す)
 	 * @returns {void}
 	 */
 	function onIdle() {
 		idleTimer = null;
-		if (hovering || panelOpen || hasFocusWithin(doc, element)) return;
+		if (hovering || panelOpen || hasKeyboardFocusWithin()) return;
 		element.dataset.idle = '';
 	}
 
@@ -516,7 +534,8 @@ export function createSlideshowControls(deps) {
 		/**
 		 * キーを食い止める。ビュワー本体のキー操作 (Escape で閉じる・矢印で送る) より先に呼ばれ、
 		 * true を返したときは本体が反応してはいけない。パネルを開いているときだけ食い止める。
-		 * スライダーの上の左右と端のキーは、つまみを動かす既定の動作に任せるので false を返す。
+		 * 矢印と端のキーで選び直すのは項目の上だけ。スライダーの上の上下は作品を送らせないよう食い止め、
+		 * 左右と端のキーは、つまみを動かす既定の動作に任せるので false を返す。
 		 * @param {KeyboardEvent} event キー
 		 * @returns {boolean} 食い止めたなら true
 		 */
@@ -533,6 +552,8 @@ export function createSlideshowControls(deps) {
 				event.preventDefault?.();
 				return true;
 			}
+			// 選び直すのは項目の上で押されたときだけ。速度のボタンなどの上では本体へ渡す
+			if (!options.includes(target)) return false;
 			const targetIndex = radioTargetIndex(event.key);
 			if (targetIndex === null) return false;
 			event.preventDefault?.();
