@@ -1067,6 +1067,8 @@ export function createViewer(deps) {
 			return;
 		}
 		if (token !== requestToken) return;
+		// 画像の無い主役 (うごイラ・ブロック表示) は、描き直し終えた時点で表示し終えたとみなす
+		if (currentPage() === null) slideshow.pageShown();
 		navZones?.refresh();
 		warmNeighbor();
 	}

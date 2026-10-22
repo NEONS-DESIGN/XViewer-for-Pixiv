@@ -1772,6 +1772,30 @@ test('並びで送る自動送りは、コメントに書きかけがある間�
 	assert.deepEqual(navigated, ['2'], '書きかけが無くなれば移る');
 });
 
+test('うごイラを読み込んでいる間に設定で主役を描き直しても、描き終えたら表示し終えた扱いにする', async (t) => {
+	t.mock.method(console, 'warn', () => {});
+	let rejectMeta;
+	// 主役の描き直しの前後で、同じ meta の取得を待たせる
+	void fetchUgoiraMeta('1', 'ja', { getJsonImpl: () => new Promise((_, reject) => { rejectMeta = reject; }) }).catch(() => {});
+	const timers = fakeTimers();
+	const { viewer, stage } = setup({
+		settings: slideshowSettings(),
+		setTimeout: timers.setTimeout,
+		clearTimeout: timers.clearTimeout,
+		getJsonImpl: async (url) => rawDetail(idOf(url), { illustType: 2 }),
+	});
+	const opening = viewer.open('1');
+	await flush();
+	await find(stage(), '.slideshow-toggle').click();
+	viewer.setSettings(slideshowSettings({ imageQuality: 'original' }));
+	await flush();
+	assert.deepEqual(timers.ids(SLIDESHOW_TEST_INTERVAL_MS), [], '描き終えるまでは数えない');
+	rejectMeta(new Error('meta を取れない'));
+	await opening;
+	await flush();
+	assert.equal(timers.ids(SLIDESHOW_TEST_INTERVAL_MS).length, 1);
+});
+
 test('閉じると visibilitychange を外し、タイマーを残さない。開き直すと停止状態から始まる', async () => {
 	const { viewer, doc, stage, timers } = await openPlaying();
 	await find(stage(), '.slideshow-speed').click();
