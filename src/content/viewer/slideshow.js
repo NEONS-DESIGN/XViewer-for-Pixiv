@@ -55,6 +55,7 @@ const UNKNOWN_PAGE_COUNT = 1;
  * @property {() => boolean} isPlaying 再生中か
  * @property {(direction: 1|-1) => Promise<void>} step 前後ボタンからの送り。再生 / 停止は変えない。作品の移動を待っている間は何もしない。reject しない
  * @property {() => void} pageShown 今のページが表示し終わった。再生中なら計時を最初から始める
+ * @property {() => void} pageLoading 作品の中で別のページの読み込みを待ち始めた。表示し終わるまで計時しない
  * @property {() => void} workLoading 作品を開き始めた。表示し終わるまで計時しない
  * @property {(reason: 'zoom'|'hidden'|'typing'|'panel', on: boolean) => void} setSuspended 計時を止める理由を立てる / 下ろす
  * @property {() => void} refresh 設定が変わった。off なら停止し、計時中なら新しい間隔で数え直す
@@ -353,6 +354,12 @@ export function createSlideshow(deps) {
 		restartCounting();
 	}
 
+	/** @type {Slideshow['pageLoading']} */
+	function pageLoading() {
+		shown = false;
+		stopCounting();
+	}
+
 	/** @type {Slideshow['workLoading']} */
 	function workLoading() {
 		shown = false;
@@ -399,6 +406,7 @@ export function createSlideshow(deps) {
 		isPlaying: () => playing,
 		step,
 		pageShown,
+		pageLoading,
 		workLoading,
 		setSuspended,
 		refresh,

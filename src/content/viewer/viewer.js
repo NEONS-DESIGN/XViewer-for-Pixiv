@@ -981,6 +981,7 @@ export function createViewer(deps) {
 			ugoiraRate,
 			onUgoiraRateChange: (rate) => { ugoiraRate = rate; },
 			onPageShown: () => slideshow.pageShown(),
+			onPageLoading: () => slideshow.pageLoading(),
 		};
 	}
 

@@ -84,6 +84,7 @@ export function planPanes(detail, session, settings) {
  * @property {HTMLElement} sidebar サイドバーの描画先 (.sidebar)
  * @property {{open: (pages: object) => void}} [zoom] 原寸表示のレイヤ (zoom.js)。画像ペインだけが使う
  * @property {(index: number) => void} [onPageShown] 画像のページが表示されたら呼ぶ。画像ペインだけが使う
+ * @property {(index: number) => void} [onPageLoading] 画像のページの読み込みを待ち始めたら呼ぶ。画像ペインだけが使う
  * @property {(userId: string, lang: string) => Promise<object>} [fetchUser] 作者情報の取得。(サイドバーとアクションの両方へ渡す) テストから通信させないために使う
  * @property {object} strings 文言のカタログ (src/i18n)
  * @property {typeof createImagePane} [createImagePane] 画像ペインの差し替え口。テストが組み立ての順番を記録するために使う
@@ -120,7 +121,7 @@ function startMain(plan, detail, settings, targets) {
 	}
 	// 原寸表示を開けるのは静止画だけ。うごイラ (canvas) と見られない作品には渡さない
 	const makeImagePane = targets.createImagePane ?? createImagePane;
-	imagePane = makeImagePane({ doc, container: stage, settings, zoom: targets.zoom, onPageShown: targets.onPageShown, strings });
+	imagePane = makeImagePane({ doc, container: stage, settings, zoom: targets.zoom, onPageShown: targets.onPageShown, onPageLoading: targets.onPageLoading, strings });
 	return imagePane.render(detail, { startPage: targets.startPage ?? 0 });
 }
 

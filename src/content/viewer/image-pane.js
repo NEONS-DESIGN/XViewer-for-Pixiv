@@ -119,6 +119,8 @@ function clamp(value, min, max) {
  *   原寸表示のレイヤ (zoom.js)。設定がオンのときだけ使う
  * @property {(url: string, deps?: object, init?: RequestInit) => Promise<unknown>} [getJsonImpl] /pages の取得の差し替え。テストから pixiv を叩かないために使う
  * @property {(index: number) => void} [onPageShown] 表示するページの画像が読み終わった (成功・失敗とも) ときに 1 回呼ぶ
+ * @property {(index: number) => void} [onPageLoading] 表示するページの画像をまだ読み終えていないときに、読み込みを待ち始める前に 1 回呼ぶ。
+ *   onPageShown を渡したときだけ呼ぶ (後で必ず onPageShown が続く)
  * @property {() => HTMLImageElement} [createImage] 先読み用 Image の差し替え。Node には Image が無い
  * @property {object} strings 文言のカタログ (src/i18n)
  */
@@ -261,7 +263,7 @@ export function createImagePane(deps) {
 
 	/**
 	 * 指定したページの表示を知らせるきっかけを整える。
-	 * 既に読み込みを終えていれば (成功でも失敗でも) すぐに呼び、そうでなければ load / error を 1 回待つ。
+	 * 既に読み込みを終えていれば (成功でも失敗でも) すぐに呼び、そうでなければ読み込み中だと知らせてから load / error を 1 回待つ。
 	 * 前のページ向けに待っていたリスナーは外すので、古いページの分は呼ばれない
 	 * @param {number} pageIndex 表示したページ番号
 	 * @returns {void}
@@ -273,6 +275,7 @@ export function createImagePane(deps) {
 			deps.onPageShown(pageIndex);
 			return;
 		}
+		deps.onPageLoading?.(pageIndex);
 		pageShownHandler = () => {
 			clearPageShownHandler();
 			if (!disposed) deps.onPageShown?.(pageIndex);
