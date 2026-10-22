@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { planPanes, MAIN_PANE, renderWork, rerenderMain, currentPage, showPage, pageCount, disposeAll } from '../../../src/content/viewer/panes.js';
+import { planPanes, MAIN_PANE, renderWork, rerenderMain, currentPage, showPage, pageCount, disposeAll, hasCommentDraft } from '../../../src/content/viewer/panes.js';
 import { ILLUST_TYPES } from '../../../src/pixiv/normalize.js';
 import { fakeDoc, fakeElement } from '../../helpers/dom.js';
 import { createStrings } from '../../../src/i18n/index.js';
@@ -289,6 +289,19 @@ test('onPageShown / onPageLoading を画像ペインへ渡し、showPage / pageC
 	showPage(2);
 	assert.deepEqual(shownCalls, ['show2']);
 	disposeAll();
+});
+
+test('hasCommentDraft はコメント区画が無い・入力欄が無いときは false', async () => {
+	disposeAll();
+	assert.equal(hasCommentDraft(), false);
+	await renderWork(detail({ commentOff: true }), LOGGED_IN, settings(true), {
+		...targets(),
+		createImagePane: () => ({ render: () => Promise.resolve(), dispose() {} }),
+		createSidebar: () => fakeSidebarPane([]),
+	});
+	assert.equal(hasCommentDraft(), false);
+	disposeAll();
+	assert.equal(hasCommentDraft(), false);
 });
 
 test('画像ペインが無いとき pageCount は null、showPage は何もしない', () => {

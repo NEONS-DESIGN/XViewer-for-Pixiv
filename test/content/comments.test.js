@@ -1063,6 +1063,21 @@ test('書きかけがあるうちは Escape をビュワーへ渡さない', asy
 	assert.equal(find(container, '.comment-picker'), null);
 });
 
+test('hasDraft は入力欄に書きかけがある間だけ true', async () => {
+	const { container, comments } = buildPostable();
+	assert.equal(comments.hasDraft(), false, '読み込む前');
+	await comments.load(POST_DETAIL);
+	const input = find(container, '.comment-form-input');
+	assert.equal(comments.hasDraft(), false);
+	input.value = '書きかけ';
+	assert.equal(comments.hasDraft(), true);
+	input.value = '   ';
+	assert.equal(comments.hasDraft(), false, '空白だけは書きかけとみなさない');
+	input.value = '書きかけ';
+	comments.dispose();
+	assert.equal(comments.hasDraft(), false, '片付けた後');
+});
+
 test('commentDate は実行環境のタイムゾーンに依らず JST の時刻として読む', () => {
 	// API は時差を持たない 'YYYY-MM-DD HH:mm' で返す。
 	assert.equal(parseCommentDate('2026-09-10 09:20').toISOString(), '2026-09-10T00:20:00.000Z');
