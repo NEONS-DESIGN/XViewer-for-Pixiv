@@ -283,6 +283,7 @@ export default {
 			image: '图片',
 			userPage: '用户页面',
 			controls: '操作',
+			slideshow: '自动翻页',
 			comments: '评论',
 		},
 		fields: {
@@ -515,6 +516,47 @@ export default {
 					label: '左右翻页・上下切换作品',
 					description: '左右翻页，上下切换作品。四角以左右优先。',
 				},
+			},
+			slideshow: {
+				label: '自动翻页',
+				description: '按固定间隔自动翻到下一页。启用后查看器下方会出现操作栏。',
+				off: {
+					label: '不使用',
+					description: '手动翻页。',
+				},
+				work: {
+					label: '仅在作品内',
+					description: '翻到最后一页后停止。',
+				},
+				sequence: {
+					label: '到末尾后进入下一作品',
+					description: '最后一页之后，进入下一个作品。',
+				},
+			},
+			slideshowInterval: {
+				label: '翻页间隔',
+				description: '翻到下一页前的等待时间。从图片显示后开始计时。',
+				/**
+				 * 間隔の選択肢の見出し。
+				 * @param {number} seconds 秒数
+				 * @returns {string} 見出し
+				 */
+				option: (s) => `${s} 秒`,
+				/**
+				 * 間隔の「カスタム」の選択肢。秒数は選択肢の下に出るレンジで選ぶ。
+				 * @param {number} min 選べる最小の秒数
+				 * @param {number} max 選べる最大の秒数
+				 * @returns {{label: string, description: string}} 選択肢の文言
+				 */
+				custom: (min, max) => ({ label: '自定义', description: `从 ${min}～${max} 秒中选择，以 0.5 秒为单位。` }),
+			},
+			slideshowIntervalCustom: {
+				label: '间隔',
+				option: (s) => `${s} 秒`,
+			},
+			slideshowLoop: {
+				label: '循环',
+				description: '翻到最后后回到开头。仅在作品内时回到第 1 页，到末尾后进入下一作品时回到列表中的第一个作品。',
 			},
 			gridTabSkip: {
 				label: '网格中的 Tab 键导航',

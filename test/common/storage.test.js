@@ -1,6 +1,6 @@
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeSettings, loadSettings, saveSetting, resetSettings, watchSettings, prefetchCount, navZoneSizesOf } from '../../src/common/storage.js';
+import { normalizeSettings, loadSettings, saveSetting, resetSettings, watchSettings, prefetchCount, navZoneSizesOf, slideshowIntervalSeconds } from '../../src/common/storage.js';
 import { LOG_PREFIX } from '../../src/common/log.js';
 import { fakeArea } from '../helpers/storage.js';
 import { flush } from '../helpers/dom.js';
@@ -181,6 +181,10 @@ test('normalizeSettings は正しい値をそのまま通す', () => {
 		navZoneMode: SETTING_MODES.CUSTOM,
 		navZoneSize: 35,
 		navZoneSizeVertical: 10,
+		slideshow: 'sequence',
+		slideshowInterval: 'custom',
+		slideshowIntervalCustom: 12.5,
+		slideshowLoop: true,
 		clickZoom: true,
 		zoomZoneMode: SETTING_MODES.CUSTOM,
 		zoomZoneSize: 5,
@@ -190,6 +194,39 @@ test('normalizeSettings は正しい値をそのまま通す', () => {
 		popupTheme: POPUP_THEMES.LIGHT,
 	};
 	assert.deepEqual(normalizeSettings(input), input);
+});
+
+test('normalizeSettings は自動送りの動きを選択肢へ丸める', () => {
+	assert.equal(normalizeSettings({}).slideshow, 'off');
+	assert.equal(normalizeSettings({ slideshow: 'bogus' }).slideshow, 'off');
+	assert.equal(normalizeSettings({ slideshow: 'work' }).slideshow, 'work');
+});
+
+test('normalizeSettings は自動送りの間隔を選択肢かカスタムへ丸める', () => {
+	assert.equal(normalizeSettings({}).slideshowInterval, 3);
+	assert.equal(normalizeSettings({ slideshowInterval: 4 }).slideshowInterval, 4);
+	assert.equal(normalizeSettings({ slideshowInterval: 5 }).slideshowInterval, 3);
+	assert.equal(normalizeSettings({ slideshowInterval: '3' }).slideshowInterval, 3);
+	assert.equal(normalizeSettings({ slideshowInterval: 'custom' }).slideshowInterval, 'custom');
+});
+
+test('normalizeSettings はカスタムの間隔を範囲と刻みへ寄せる', () => {
+	assert.equal(normalizeSettings({ slideshowIntervalCustom: 7.3 }).slideshowIntervalCustom, 7.5);
+	assert.equal(normalizeSettings({ slideshowIntervalCustom: 0 }).slideshowIntervalCustom, 1);
+	assert.equal(normalizeSettings({ slideshowIntervalCustom: 99 }).slideshowIntervalCustom, 30);
+	assert.equal(normalizeSettings({ slideshowIntervalCustom: '5' }).slideshowIntervalCustom, 5);
+	assert.equal(normalizeSettings({ slideshowIntervalCustom: NaN }).slideshowIntervalCustom, 5);
+});
+
+test('normalizeSettings はループを真偽値だけ通し、既定は false', () => {
+	assert.equal(normalizeSettings({}).slideshowLoop, false);
+	assert.equal(normalizeSettings({ slideshowLoop: true }).slideshowLoop, true);
+	assert.equal(normalizeSettings({ slideshowLoop: 'yes' }).slideshowLoop, false);
+});
+
+test('slideshowIntervalSeconds はカスタムのときだけ slideshowIntervalCustom の秒数を返す', () => {
+	assert.equal(slideshowIntervalSeconds({ slideshowInterval: 2, slideshowIntervalCustom: 9 }), 2);
+	assert.equal(slideshowIntervalSeconds({ slideshowInterval: 'custom', slideshowIntervalCustom: 9 }), 9);
 });
 
 test('normalizeSettings は prefetchNeighbor を既定 false にし、真偽値だけを通す', () => {

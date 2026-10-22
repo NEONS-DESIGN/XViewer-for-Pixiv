@@ -80,10 +80,10 @@ test('ビュワーの見出しに、ビュワーを使う画面のスイッチ�
 	assert.deepEqual(changes, [{ viewerOnHome: false }]);
 });
 
-test('設定タブの見出しは ビュワー / 画像 / ユーザーページ / 操作 の順に並ぶ', () => {
+test('設定タブの見出しは ビュワー / 画像 / ユーザーページ / 操作 / 自動送り の順に並ぶ', () => {
 	const { root } = build();
 	const headings = collect(findRole(root, 'panel-settings'), 'h2');
-	assert.deepEqual(headings.map((heading) => heading.textContent), ['ビュワー', '画像', 'ユーザーページ', '操作']);
+	assert.deepEqual(headings.map((heading) => heading.textContent), ['ビュワー', '画像', 'ユーザーページ', '操作', '自動送り']);
 });
 
 test('設定画面の見出し行にはタイトルとテーマの切り替えボタンが並ぶ', () => {
@@ -619,6 +619,66 @@ test('レンジは動かす間は表示だけを変え、離したときに数�
 	assert.deepEqual(changes, [], '動かしている間は保存しない');
 	range.dispatch('change');
 	assert.deepEqual(changes, [{ prefetchCustom: 8 }]);
+});
+
+/* --- 自動送り ------------------------------------------------- */
+
+/**
+ * 設定タブの項目を、カスタムの子も含めずキーで探す。
+ * @param {string} key 設定キー
+ * @returns {object} 項目の定義
+ */
+function settingsField(key) {
+	return createSections(createStrings('ja')).flatMap((section) => section.fields).find((one) => one.key === key);
+}
+
+test('自動送りの動きは 使わない / 作品の中だけ / 端で次の作品へ の 3 択', () => {
+	const field = settingsField('slideshow');
+	assert.equal(field.kind, 'choice');
+	assert.deepEqual(field.options.map((option) => option.value), ['off', 'work', 'sequence']);
+	const { root } = build();
+	assert.equal(findRole(root, 'slideshow').value, 'off');
+});
+
+test('自動送りの間隔の選択肢は 2 / 3 / 4 / カスタムで、既定の 3 に印が付く', () => {
+	const field = settingsField('slideshowInterval');
+	assert.deepEqual(field.options.map((option) => option.value), ['2', '3', '4', 'custom']);
+	const labels = Object.fromEntries(field.options.map((option) => [option.value, option.label]));
+	assert.equal(labels['3'], createStrings('ja').popup.withDefault('3 秒'));
+	assert.equal(labels['2'], '2 秒');
+});
+
+test('自動送りのカスタムの間隔は 1〜30 を 0.5 刻みで選び、目盛りは 5 ごと', () => {
+	const range = settingsField('slideshowInterval').reveal.fields[0];
+	assert.equal(range.key, 'slideshowIntervalCustom');
+	assert.deepEqual([range.min, range.max, range.step], [1, 30, 0.5]);
+	assert.deepEqual([...range.scale], [1, 5, 10, 15, 20, 25, 30]);
+});
+
+test('自動送りの間隔とループは、自動送りが使わないのままだと非活性になる', () => {
+	for (const key of ['slideshowInterval', 'slideshowLoop']) {
+		const own = settingsField(key).requires.find((one) => one.key === 'slideshow');
+		assert.equal(own.off, 'off', key);
+	}
+});
+
+test('自動送りの間隔の選択は数値で、カスタムは文字列のまま保存する', () => {
+	const { root, changes } = build({ settings: { slideshow: 'work', slideshowInterval: 2 } });
+	const select = findRole(root, 'slideshowInterval');
+	select.value = '3';
+	select.dispatch('change');
+	select.value = 'custom';
+	select.dispatch('change');
+	assert.deepEqual(changes, [{ slideshowInterval: 3 }, { slideshowInterval: 'custom' }]);
+});
+
+test('自動送りのカスタムの間隔のレンジを動かすと、小数のまま保存する', () => {
+	const { root, changes } = build({ settings: { slideshow: 'work', slideshowInterval: 'custom' } });
+	const range = findRole(root, 'slideshowIntervalCustom');
+	range.value = '12.5';
+	range.dispatch('input');
+	range.dispatch('change');
+	assert.deepEqual(changes, [{ slideshowIntervalCustom: 12.5 }]);
 });
 
 test('詳細設定タブの文言は全言語にある', () => {

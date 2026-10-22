@@ -14,6 +14,11 @@ import {
 	SIDEBAR_SCROLL,
 	INFINITE_SCROLL,
 	NAV_ZONES,
+	SLIDESHOW_MODES,
+	SLIDESHOW_INTERVAL_CHOICES,
+	SLIDESHOW_INTERVAL_CUSTOM,
+	SLIDESHOW_INTERVAL_CUSTOM_RANGE,
+	SLIDESHOW_INTERVAL_SCALE_STEP,
 	SETTING_MODES,
 	ZONE_SIZE_RANGE,
 	ZONE_SIZE_SCALE_STEP,
@@ -166,6 +171,51 @@ function prefetchField(strings) {
 					scale: rangeTicks(min, max, PREFETCH_CUSTOM_SCALE_STEP),
 					warnAt: PREFETCH_CUSTOM_WARN_AT,
 					warning: f.prefetchCustom.warning,
+				}),
+			]),
+		}),
+	});
+}
+
+/**
+ * 自動送りの間隔の項目を組み立てる。SLIDESHOW_INTERVAL_CHOICES の秒数に「カスタム」を足し、
+ * カスタムを選んだときだけ選択肢の下に秒数のレンジ (slideshowIntervalCustom) を出す。
+ * @param {object} strings 文言のカタログ
+ * @param {object} requires 親の項目の条件 (requirement の戻り値)
+ * @returns {object} 項目の定義
+ */
+function slideshowIntervalField(strings, requires) {
+	const f = strings.popup.fields;
+	const { min, max, step } = SLIDESHOW_INTERVAL_CUSTOM_RANGE;
+	return Object.freeze({
+		kind: 'choice',
+		key: 'slideshowInterval',
+		label: f.slideshowInterval.label,
+		description: f.slideshowInterval.description,
+		requires,
+		options: Object.freeze([
+			...SLIDESHOW_INTERVAL_CHOICES.map((seconds) => {
+				const label = f.slideshowInterval.option(seconds);
+				return Object.freeze({
+					value: String(seconds),
+					label: seconds === SETTINGS_DEFAULTS.slideshowInterval ? strings.popup.withDefault(label) : label,
+					description: '',
+				});
+			}),
+			Object.freeze({ value: SLIDESHOW_INTERVAL_CUSTOM, ...f.slideshowInterval.custom(min, max) }),
+		]),
+		reveal: Object.freeze({
+			when: SLIDESHOW_INTERVAL_CUSTOM,
+			fields: Object.freeze([
+				Object.freeze({
+					kind: 'range',
+					key: 'slideshowIntervalCustom',
+					label: f.slideshowIntervalCustom.label,
+					min,
+					max,
+					step,
+					format: f.slideshowIntervalCustom.option,
+					scale: rangeTicks(min, max, SLIDESHOW_INTERVAL_SCALE_STEP),
 				}),
 			]),
 		}),
@@ -333,6 +383,7 @@ export function createAdvancedSections(strings) {
  */
 export function createSections(strings) {
 	const f = strings.popup.fields;
+	const needsSlideshow = requirement('slideshow', strings, { value: SLIDESHOW_MODES.OFF, label: f.slideshow.off.label });
 	return requireViewer([
 		Object.freeze({
 			heading: strings.popup.headings.viewer,
@@ -509,6 +560,30 @@ export function createSections(strings) {
 							description: f.gridTabSkip.none.description,
 						}),
 					]),
+				}),
+			]),
+		}),
+		Object.freeze({
+			heading: strings.popup.headings.slideshow,
+			fields: Object.freeze([
+				Object.freeze({
+					kind: 'choice',
+					key: 'slideshow',
+					label: f.slideshow.label,
+					description: f.slideshow.description,
+					options: Object.freeze([
+						Object.freeze({ value: SLIDESHOW_MODES.OFF, ...f.slideshow.off }),
+						Object.freeze({ value: SLIDESHOW_MODES.WORK, ...f.slideshow.work }),
+						Object.freeze({ value: SLIDESHOW_MODES.SEQUENCE, ...f.slideshow.sequence }),
+					]),
+				}),
+				slideshowIntervalField(strings, needsSlideshow),
+				Object.freeze({
+					kind: 'toggle',
+					key: 'slideshowLoop',
+					label: f.slideshowLoop.label,
+					description: f.slideshowLoop.description,
+					requires: needsSlideshow,
 				}),
 			]),
 		}),

@@ -14,6 +14,10 @@ import {
 	SIDEBAR_SCROLL,
 	INFINITE_SCROLL,
 	NAV_ZONES,
+	SLIDESHOW_MODES,
+	SLIDESHOW_INTERVAL_CHOICES,
+	SLIDESHOW_INTERVAL_CUSTOM,
+	SLIDESHOW_INTERVAL_CUSTOM_RANGE,
 	SETTING_MODES,
 	ZONE_SIZE_RANGE,
 	DEFAULT_NAV_ZONE_SIZE,
@@ -142,6 +146,10 @@ export function normalizeSettings(raw) {
 		commentPageSize: oneOf(source.commentPageSize, COMMENT_PAGE_SIZE_CHOICES, d.commentPageSize),
 		closeOnBackdrop: asBoolean(source.closeOnBackdrop, d.closeOnBackdrop),
 		navZones: oneOf(source.navZones, Object.values(NAV_ZONES), d.navZones),
+		slideshow: oneOf(source.slideshow, Object.values(SLIDESHOW_MODES), d.slideshow),
+		slideshowInterval: oneOf(source.slideshowInterval, [...SLIDESHOW_INTERVAL_CHOICES, SLIDESHOW_INTERVAL_CUSTOM], d.slideshowInterval),
+		slideshowIntervalCustom: snapToRange(source.slideshowIntervalCustom, SLIDESHOW_INTERVAL_CUSTOM_RANGE, d.slideshowIntervalCustom),
+		slideshowLoop: asBoolean(source.slideshowLoop, d.slideshowLoop),
 		navZoneMode: readMode(source.navZoneMode, Object.values(SETTING_MODES), SETTING_MODES.CUSTOM,
 			[source.navZoneSize, source.navZoneSizeVertical].some((size) => typeof size === 'number' && size !== DEFAULT_NAV_ZONE_SIZE),
 			d.navZoneMode),
@@ -166,6 +174,15 @@ export function normalizeSettings(raw) {
  */
 export function prefetchCount(settings) {
 	return settings.prefetch === PREFETCH_CUSTOM ? settings.prefetchCustom : settings.prefetch;
+}
+
+/**
+ * 実際に自動送りで待つ間隔 (秒) を返す。「カスタム」なら slideshowIntervalCustom の秒数を使う。
+ * @param {{slideshowInterval: number|string, slideshowIntervalCustom: number}} settings 正規化済みの設定
+ * @returns {number} 次のページへ送るまでの秒数
+ */
+export function slideshowIntervalSeconds(settings) {
+	return settings.slideshowInterval === SLIDESHOW_INTERVAL_CUSTOM ? settings.slideshowIntervalCustom : settings.slideshowInterval;
 }
 
 /**

@@ -280,6 +280,7 @@ export default {
 			image: '画像',
 			userPage: 'ユーザーページ',
 			controls: '操作',
+			slideshow: '自動送り',
 			comments: 'コメント',
 		},
 		fields: {
@@ -512,6 +513,47 @@ export default {
 					label: '左右でページ・上下で作品',
 					description: '左右でページ、上下で作品を送ります。四隅は左右が優先です。',
 				},
+			},
+			slideshow: {
+				label: '自動送り',
+				description: 'ページを一定の間隔で自動的に送ります。使うとビュワーの下に操作バーが出ます。',
+				off: {
+					label: '使わない',
+					description: '手で送ります。',
+				},
+				work: {
+					label: '作品の中だけ',
+					description: '最後のページまで送ったら止まります。',
+				},
+				sequence: {
+					label: '端で次の作品へ',
+					description: '最後のページの次は、次の作品へ移ります。',
+				},
+			},
+			slideshowInterval: {
+				label: '送る間隔',
+				description: '次のページへ送るまでの時間です。画像が表示されてから数えます。',
+				/**
+				 * 間隔の選択肢の見出し。
+				 * @param {number} seconds 秒数
+				 * @returns {string} 見出し
+				 */
+				option: (s) => `${s} 秒`,
+				/**
+				 * 間隔の「カスタム」の選択肢。秒数は選択肢の下に出るレンジで選ぶ。
+				 * @param {number} min 選べる最小の秒数
+				 * @param {number} max 選べる最大の秒数
+				 * @returns {{label: string, description: string}} 選択肢の文言
+				 */
+				custom: (min, max) => ({ label: 'カスタム', description: `${min}〜${max} 秒を 0.5 秒刻みで選びます。` }),
+			},
+			slideshowIntervalCustom: {
+				label: '間隔',
+				option: (s) => `${s} 秒`,
+			},
+			slideshowLoop: {
+				label: 'ループ',
+				description: '最後まで送ったら先頭へ戻ります。作品の中だけなら 1 ページ目へ、端で次の作品へなら並びの最初の作品へ戻ります。',
 			},
 			gridTabSkip: {
 				label: 'グリッドの Tab 移動',
