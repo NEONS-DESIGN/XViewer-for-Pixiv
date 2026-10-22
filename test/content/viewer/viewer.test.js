@@ -15,6 +15,7 @@ import { createStrings } from '../../../src/i18n/index.js';
 import { PixivError, PIXIV_ERROR_KINDS } from '../../../src/pixiv/errors.js';
 import { fakeElement, fakeDoc as fakeDocBase, find, findAll, flush, iconName } from '../../helpers/dom.js';
 import { fakeSequence } from '../../helpers/sequence.js';
+import { buildNextData } from '../../helpers/pixiv.js';
 import { clearIllustAssetCache, fetchIllustPages, fetchUgoiraMeta } from '../../../src/pixiv/illust-assets.js';
 
 // 隣の先読みは /pages と ugoira_meta を作品単位で覚える取得へ入れる。テストの間で持ち越さない
@@ -105,10 +106,11 @@ function enrich(element) {
 
 /**
  * ビュワー用の document の代わり。body / documentElement / activeElement を持つ。
+ * @param {{nextData?: string}} [options] __NEXT_DATA__ の中身。渡さなければ未ログイン
  * @returns {object} doc の代わり
  */
-function fakeDoc() {
-	const doc = fakeDocBase();
+function fakeDoc(options = {}) {
+	const doc = fakeDocBase(options);
 	const createElement = doc.createElement;
 	doc.createElement = (tag) => enrich(createElement(tag));
 	doc.body = enrich(fakeElement('body'));
@@ -126,12 +128,12 @@ function fakeDoc() {
 
 /**
  * ビュワーと依存の記録を用意する。
- * @param {object} [options] getJsonImpl と settings、setTimeout / clearTimeout / createImage / saveSetting の差し替え
+ * @param {object} [options] getJsonImpl と settings、setTimeout / clearTimeout / createImage / saveSetting の差し替え、__NEXT_DATA__ の中身 (nextData)
  * @returns {{viewer: object, doc: object, fetched: string[], navigated: string[], closed: () => number, shadow: () => object, stage: () => object}} 一式
  */
 function setup(options = {}) {
 	clearSessionCache();
-	const doc = fakeDoc();
+	const doc = fakeDoc({ nextData: options.nextData });
 	const fetched = [];
 	const navigated = [];
 	let closeRequests = 0;
@@ -1740,6 +1742,34 @@ test('見られない作品・取得や描画に失敗した作品でも、表�
 	await viewer.open('1');
 	await find(stage(), '.slideshow-toggle').click();
 	assert.equal(timers.ids(SLIDESHOW_TEST_INTERVAL_MS).length, 1);
+});
+
+test('並びで送る自動送りは、コメントに書きかけがある間は作品を移らず数え直す', async () => {
+	const timers = fakeTimers();
+	const { viewer, stage, shadow, navigated } = setup({
+		settings: slideshowSettings({ slideshow: SLIDESHOW_MODES.SEQUENCE, showSidebar: true }),
+		fetchUser: async () => ({}),
+		nextData: buildNextData({ token: 'csrf-token' }),
+		setTimeout: timers.setTimeout,
+		clearTimeout: timers.clearTimeout,
+	});
+	await viewer.open('1', fakeSequence(['1', '2']));
+	await flush();
+	await find(stage(), 'img').dispatch('load', {});
+	await find(stage(), '.slideshow-toggle').click();
+	const input = find(shadow(), '.comment-form-input');
+	assert.ok(input, 'コメントの入力欄がある');
+	input.value = '書きかけ';
+	timers.fire(SLIDESHOW_TEST_INTERVAL_MS);
+	await flush();
+	assert.deepEqual(navigated, [], '作品を移らない');
+	assert.equal(find(shadow(), '.comment-form-input'), input, '入力欄を作り直さない');
+	assert.equal(timers.ids(SLIDESHOW_TEST_INTERVAL_MS).length, 1, '数え直す');
+	assert.equal(find(stage(), '.slideshow-toggle').getAttribute('aria-label'), createStrings('ja').slideshow.PAUSE);
+	input.value = '';
+	timers.fire(SLIDESHOW_TEST_INTERVAL_MS);
+	await flush();
+	assert.deepEqual(navigated, ['2'], '書きかけが無くなれば移る');
 });
 
 test('閉じると visibilitychange を外し、タイマーを残さない。開き直すと停止状態から始まる', async () => {

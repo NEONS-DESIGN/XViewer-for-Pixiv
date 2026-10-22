@@ -49,6 +49,7 @@ import {
 	consumeKey,
 	showPage,
 	pageCount,
+	hasCommentDraft,
 } from './panes.js';
 import { blockReason } from './blocked.js';
 import { createZoomLayer } from './zoom.js';
@@ -367,6 +368,8 @@ export function createViewer(deps) {
 		moveWork: (direction) => navigation.moveWork(direction),
 		moveToFirst: () => navigation.moveToFirst(),
 		currentWorkId: () => navigation.currentWorkId(),
+		// コメントの書きかけは作品を移ると消えるので、タイマーでは移らない
+		canLeaveWork: () => !hasCommentDraft(),
 		onChange: (state) => controls?.setState(state),
 		setTimeout: later,
 		clearTimeout: cancelLater,

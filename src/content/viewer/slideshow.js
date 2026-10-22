@@ -23,6 +23,9 @@ const FIRST_PAGE_INDEX = 0;
 /** ページ数が分からない (画像の無いペイン) ときに仮に使うページ数 */
 const UNKNOWN_PAGE_COUNT = 1;
 
+/** 作品を離れられないので送らずに留まった、という送りの結果 */
+const HELD = 'held';
+
 /**
  * 自動送りが使う依存。
  * @typedef {object} SlideshowDeps
@@ -34,6 +37,7 @@ const UNKNOWN_PAGE_COUNT = 1;
  * @property {(direction: 1|-1) => Promise<boolean>} moveWork 隣の作品へ移る。移れたら true
  * @property {() => Promise<boolean>} moveToFirst 並びの先頭の作品へ移る。移れたら true
  * @property {() => string|null} currentWorkId 今開いている作品の ID
+ * @property {() => boolean} [canLeaveWork] タイマーで今の作品を離れてよいか。省くと常に離れてよい
  * @property {(state: SlideshowState) => void} onChange 再生中か・計時の長さが変わったときに呼ばれる
  * @property {(callback: () => void, ms: number) => unknown} setTimeout タイマーを張る
  * @property {(handle: unknown) => void} clearTimeout タイマーを外す
@@ -66,7 +70,7 @@ const UNKNOWN_PAGE_COUNT = 1;
  * 自動送りの状態機械を作る。開いた直後は停止している。
  *
  * 送りの入口は 2 つある。
- * - タイマーが切れたとき (内部の advance): 送るものが無ければ停止する
+ * - タイマーが切れたとき (内部の advance): 送るものが無ければ停止する。今の作品を離れられなければ送らずに数え直す
  * - 前後ボタン (step): 再生 / 停止は変えない。送るものが無ければ、再生中なら計時を最初からやり直す
  * どちらも送り先の判断は同じ関数 (decide) で行う。
  * 作品の移動 (moveWork / moveToFirst) を待っている間は計時せず、新しい送りも受け付けない。
@@ -76,6 +80,7 @@ const UNKNOWN_PAGE_COUNT = 1;
 export function createSlideshow(deps) {
 	const schedule = deps.setTimeout;
 	const cancel = deps.clearTimeout;
+	const canLeaveWork = () => (deps.canLeaveWork ? deps.canLeaveWork() : true);
 
 	let playing = false;
 	let shown = false;
@@ -225,11 +230,22 @@ export function createSlideshow(deps) {
 	}
 
 	/**
+	 * 今の作品を離れる送りを止めるか。止めるのはタイマーからの送りで、離れられないときだけ。
+	 * @param {boolean} automatic タイマーからの送りか
+	 * @returns {boolean} 止めるなら true
+	 */
+	function holdsWork(automatic) {
+		return automatic && !canLeaveWork();
+	}
+
+	/**
 	 * 次へ送る先を決めて送る。
 	 * @param {{generation: number, workId: string|null}} token 送りの目印
-	 * @returns {Promise<boolean|null>} 送ったら true、送るものが無ければ false、途中で状況が変わったら null
+	 * @param {boolean} automatic タイマーからの送りか
+	 * @returns {Promise<boolean|null|'held'>} 送ったら true、送るものが無ければ false、途中で状況が変わったら null、
+	 *   作品を離れられずに留まったら 'held'
 	 */
-	async function decideForward(token) {
+	async function decideForward(token, automatic) {
 		if (deps.canMovePage(FORWARD)) return movePageLocally(() => deps.movePage(FORWARD));
 		const current = mode();
 		if (current === SLIDESHOW_MODES.WORK) {
@@ -237,10 +253,12 @@ export function createSlideshow(deps) {
 			return false;
 		}
 		if (current !== SLIDESHOW_MODES.SEQUENCE) return false;
+		if (holdsWork(automatic)) return HELD;
 		const movedToNext = await awaitWorkMove(() => deps.moveWork(FORWARD));
 		if (isStale(token)) return null;
 		if (movedToNext) return true;
 		if (!loopEnabled()) return false;
+		if (holdsWork(automatic)) return HELD;
 		const movedToFirst = await awaitWorkMove(() => deps.moveToFirst());
 		if (isStale(token)) return null;
 		if (movedToFirst) return true;
@@ -272,11 +290,13 @@ export function createSlideshow(deps) {
 	 * 送り先を決めて送る。依存の例外は警告を出して「送るものが無い」とみなす。
 	 * @param {1|-1} direction 向き
 	 * @param {{generation: number, workId: string|null}} token 送りの目印
-	 * @returns {Promise<boolean|null>} 送ったら true、送るものが無ければ false、途中で状況が変わったら null
+	 * @param {boolean} [automatic] タイマーからの送りか。省くとボタンからの送り
+	 * @returns {Promise<boolean|null|'held'>} 送ったら true、送るものが無ければ false、途中で状況が変わったら null、
+	 *   作品を離れられずに留まったら 'held'
 	 */
-	async function decide(direction, token) {
+	async function decide(direction, token, automatic = false) {
 		try {
-			return direction === BACKWARD ? await decideBackward(token) : await decideForward(token);
+			return direction === BACKWARD ? await decideBackward(token) : await decideForward(token, automatic);
 		} catch (error) {
 			warn('自動送りの送りに失敗しました', error);
 			return isStale(token) ? null : false;
@@ -294,12 +314,13 @@ export function createSlideshow(deps) {
 
 	/**
 	 * タイマーが切れたときの送り。送るものが無ければ停止する。待っている間に停止されたら結果を捨てる。
+	 * 作品を離れられずに留まったときは、停止せずに最初から数え直す。
 	 * @returns {Promise<void>}
 	 */
 	async function advance() {
 		if (workMovePending) return;
 		const token = captureToken();
-		const result = await decide(FORWARD, token);
+		const result = await decide(FORWARD, token, true);
 		if (result === false && !isStale(token)) pause();
 		else resumeCountingAfterStep();
 	}

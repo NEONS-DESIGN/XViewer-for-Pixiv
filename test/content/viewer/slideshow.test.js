@@ -405,6 +405,63 @@ test('sequence で moveToFirst が false でページ数 null (うごイラ) な
 	assert.equal(slideshow.isPlaying(), false);
 });
 
+/* 作品を離れられないとき (コメントの書きかけ) */
+
+test('作品を離れられない間は、タイマーで次の作品へ移らず、再生したまま最初から数え直す', async () => {
+	const { deps, slideshow } = playingSlideshow({
+		page: 2,
+		settings: { slideshow: SLIDESHOW_MODES.SEQUENCE },
+		overrides: { canLeaveWork: () => false },
+	});
+	deps.timer.fire();
+	await flush();
+	assert.deepEqual(deps.workMoves, []);
+	assert.equal(slideshow.isPlaying(), true);
+	assert.deepEqual(deps.timer.pending().map((entry) => entry.ms), [3000]);
+	// 離れられるようになれば、次の計時で移る
+	deps.canLeaveWork = () => true;
+	deps.timer.fire();
+	await flush();
+	assert.deepEqual(deps.workMoves, [1]);
+});
+
+test('並びの端で先頭の作品へ戻るときも、離れられなければ戻らず数え直す', async () => {
+	const { deps, slideshow } = playingSlideshow({
+		page: 2,
+		settings: { slideshow: SLIDESHOW_MODES.SEQUENCE, slideshowLoop: true },
+	});
+	let leavable = true;
+	deps.canLeaveWork = () => leavable;
+	// 隣を探している間に書き始めた
+	deps.moveWork = async (direction) => { deps.workMoves.push(direction); leavable = false; return false; };
+	deps.timer.fire();
+	await flush();
+	assert.deepEqual(deps.workMoves, [1]);
+	assert.equal(deps.firstMoves, 0);
+	assert.deepEqual(deps.shownPages, []);
+	assert.equal(slideshow.isPlaying(), true);
+	assert.deepEqual(deps.timer.pending().map((entry) => entry.ms), [3000]);
+});
+
+test('作品を離れられなくても、作品の中のページ送りとボタンからの送りは止めない', async () => {
+	const inside = playingSlideshow({
+		page: 0,
+		settings: { slideshow: SLIDESHOW_MODES.SEQUENCE },
+		overrides: { canLeaveWork: () => false },
+	});
+	inside.deps.timer.fire();
+	await flush();
+	assert.deepEqual(inside.deps.moves, [1]);
+
+	const { deps, slideshow } = playingSlideshow({
+		page: 2,
+		settings: { slideshow: SLIDESHOW_MODES.SEQUENCE },
+		overrides: { canLeaveWork: () => false },
+	});
+	await slideshow.step(1);
+	assert.deepEqual(deps.workMoves, [1]);
+});
+
 test('moveWork が例外を投げたら移れなかったとみなす (ループ オフなら停止)', async () => {
 	const original = console.warn;
 	const warned = [];

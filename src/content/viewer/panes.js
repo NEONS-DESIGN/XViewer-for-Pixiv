@@ -252,6 +252,14 @@ export function consumeKey(event) {
 }
 
 /**
+ * コメントの入力欄に書きかけがあるか。コメント区画が無ければ false。
+ * @returns {boolean} 書きかけがあれば true
+ */
+export function hasCommentDraft() {
+	return commentsPane?.hasDraft() === true;
+}
+
+/**
  * 画像のページを送る。うごイラとブロック表示ではページの概念が無いので何もしない。
  * @param {number} direction 1 なら次、-1 なら前
  * @returns {void}

@@ -169,7 +169,7 @@ export function renderStamp(doc, stampId, strings) {
 /**
  * コメント区画を作る。
  * @param {CommentsDeps} deps 依存
- * @returns {{load: (detail: object) => Promise<void>, consumeKey: (event: KeyboardEvent) => boolean, dispose: () => void}}
+ * @returns {{load: (detail: object) => Promise<void>, consumeKey: (event: KeyboardEvent) => boolean, hasDraft: () => boolean, dispose: () => void}}
  */
 export function createComments(deps) {
 	const { doc, container, strings } = deps;
@@ -1082,6 +1082,17 @@ export function createComments(deps) {
 			if (event.key === KEYS.CLOSE && confirmations.cancel()) return true;
 			for (const form of forms) {
 				if (form.consumeKey(event) === true) return true;
+			}
+			return false;
+		},
+
+		/**
+		 * 開いている入力欄 (投稿欄・返信欄) のどれかに書きかけ (本文かスタンプ) があるか。
+		 * @returns {boolean} 書きかけがあれば true
+		 */
+		hasDraft() {
+			for (const form of forms) {
+				if (form.hasInput() === true) return true;
 			}
 			return false;
 		},
