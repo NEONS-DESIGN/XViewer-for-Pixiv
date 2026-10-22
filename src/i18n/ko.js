@@ -207,6 +207,23 @@ export default {
 		 */
 		frame: (current, total) => `${total}프레임 중 ${current}번째`,
 	},
+	slideshow: {
+		CONTROLS: '자동 넘기기',
+		PLAY: '자동 넘기기 재생',
+		PAUSE: '자동 넘기기 정지',
+		PREV: '이전',
+		NEXT: '다음',
+		LOOP: '반복',
+		INTERVAL: '넘기는 간격',
+		CUSTOM: '사용자 지정',
+		CUSTOM_RANGE: '간격 (초)',
+		/**
+		 * 秒数の見出し。小数はそのまま出す。(2.5 秒)
+		 * @param {number} value 秒数
+		 * @returns {string} 見出し
+		 */
+		seconds: (value) => `${value}초`,
+	},
 	blocked: {
 		LOGIN_REQUIRED: '이 작품을 보려면 pixiv에 로그인해 주세요',
 		HIDDEN_BY_SETTING: 'pixiv 표시 설정에 따라 숨겨져 있습니다',
