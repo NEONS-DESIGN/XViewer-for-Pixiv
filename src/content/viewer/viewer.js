@@ -25,6 +25,7 @@ import {
 	VIEWER_CSS_SETTINGS,
 	DEFAULT_UGOIRA_RATE,
 	SLIDESHOW_MODES,
+	SLIDESHOW_SAVE_DELAY_MS,
 } from '../../common/constants.js';
 import { createIcon } from '../../common/icons.js';
 import { assignImageSrc } from '../../common/image-source.js';
@@ -354,6 +355,8 @@ export function createViewer(deps) {
 	});
 	/** @type {ReturnType<typeof createSlideshowControls>|null} 自動送りの帯。設定が off 以外の間だけ置く */
 	let controls = null;
+	/** @type {Map<string, {value: unknown, timer: unknown}>} 帯で変えて保存を待っている設定。キーごとに最後の値とタイマーを持つ */
+	const pendingSlideshowSaves = new Map();
 	// 自動送りの計時と送りの判断。ビュワーを閉じても作り直さず、reset() で停止状態へ戻す
 	const slideshow = createSlideshow({
 		getSettings: () => settings,
@@ -617,10 +620,12 @@ export function createViewer(deps) {
 		controls = null;
 		disposing.dispose();
 		slideshow.setSuspended(SLIDESHOW_SUSPEND.PANEL, false);
+		flushSlideshowSaves();
 	}
 
 	/**
-	 * 帯で変えられた自動送りの設定を、手元へ反映してから保存する。
+	 * 帯で変えられた自動送りの設定を、手元へ反映してから保存を予約する。
+	 * 保存は設定キーごとに、最後の変更から少し待ってまとめて 1 回にする。
 	 * 保存の結果は待たない。失敗しても再生は続け、warn に残すだけにする。
 	 * @param {object} change 変わった設定 (キーと値)
 	 * @returns {void}
@@ -630,7 +635,48 @@ export function createViewer(deps) {
 		settings = { ...settings, ...change };
 		controls?.setSettings(settings);
 		if (slideshowTimingChanged(previous, settings)) slideshow.refresh();
-		for (const [key, value] of Object.entries(change)) void saveSlideshowSetting(key, value);
+		for (const [key, value] of Object.entries(change)) scheduleSlideshowSave(key, value);
+	}
+
+	/**
+	 * 設定 1 つの保存を予約する。同じキーの予約が残っていれば、待ちをやり直して値を差し替える。
+	 * @param {string} key 設定キー
+	 * @param {unknown} value 値
+	 * @returns {void}
+	 */
+	function scheduleSlideshowSave(key, value) {
+		const pending = pendingSlideshowSaves.get(key);
+		if (pending) cancelLater(pending.timer);
+		const timer = later(() => {
+			pendingSlideshowSaves.delete(key);
+			void saveSlideshowSetting(key, value);
+		}, SLIDESHOW_SAVE_DELAY_MS);
+		pendingSlideshowSaves.set(key, { value, timer });
+	}
+
+	/**
+	 * 予約してある保存を、待たずにすべて済ませる。
+	 * @returns {void}
+	 */
+	function flushSlideshowSaves() {
+		for (const [key, { value, timer }] of pendingSlideshowSaves) {
+			cancelLater(timer);
+			void saveSlideshowSetting(key, value);
+		}
+		pendingSlideshowSaves.clear();
+	}
+
+	/**
+	 * 届いた設定に、まだ保存していない帯の変更を重ねる。
+	 * 保存を待っている間に前の値の通知が届いても、選んだばかりの値へ戻さないため。
+	 * @param {object} next 届いた設定
+	 * @returns {object} 重ねた設定。予約が無ければ next そのもの
+	 */
+	function withPendingSlideshowSaves(next) {
+		if (pendingSlideshowSaves.size === 0) return next;
+		const merged = { ...next };
+		for (const [key, { value }] of pendingSlideshowSaves) merged[key] = value;
+		return merged;
 	}
 
 	/**
@@ -1143,6 +1189,7 @@ export function createViewer(deps) {
 		doc.removeEventListener('visibilitychange', onVisibilityChange);
 		// 帯を先に外してから止める。次に開いたときは停止状態から始まる
 		disposeControls();
+		flushSlideshowSaves();
 		slideshow.reset();
 		unlockBody();
 		unlockBackground();
@@ -1195,11 +1242,13 @@ export function createViewer(deps) {
 		 * 主役の設定だけなら主役のペインだけを覚えている作品詳細から作り直す。(作品詳細もコメントも取り直さない)
 		 * サイドバーの設定が変わったときと、取得の途中 (主役のペインをまだ作っていない) なら取得からやり直す。
 		 * どちらも今見ているページ (取得の途中なら頼まれていたページ) から開く
-		 * @param {object} next 新しい設定
+		 * 帯で変えてまだ保存していない自動送りの設定は、届いた値より手元の値を優先する
+		 * @param {object} incoming 新しい設定
 		 * @returns {void}
 		 */
-		setSettings(next) {
+		setSettings(incoming) {
 			const previous = settings;
+			const next = withPendingSlideshowSaves(incoming);
 			settings = next;
 			if (!next.prefetchNeighbor) stopNeighborWarm();
 			const workId = navigation.currentWorkId();

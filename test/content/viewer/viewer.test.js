@@ -9,6 +9,7 @@ import {
 	SETTING_MODES,
 	SLIDESHOW_MODES,
 	SLIDESHOW_CONTROLS_IDLE_MS,
+	SLIDESHOW_SAVE_DELAY_MS,
 } from '../../../src/common/constants.js';
 import { createStrings } from '../../../src/i18n/index.js';
 import { PixivError, PIXIV_ERROR_KINDS } from '../../../src/pixiv/errors.js';
@@ -1538,6 +1539,9 @@ test('ループを押すと手元の設定を差し替えて保存し、計時�
 	const before = timers.ids(SLIDESHOW_TEST_INTERVAL_MS);
 	await find(stage(), '.slideshow-loop').click();
 	await flush();
+	assert.deepEqual(saved, [], '少し待ってから保存する');
+	timers.fire(SLIDESHOW_SAVE_DELAY_MS);
+	await flush();
 	assert.deepEqual(saved, [['slideshowLoop', true]]);
 	assert.deepEqual(timers.ids(SLIDESHOW_TEST_INTERVAL_MS), before);
 });
@@ -1555,10 +1559,97 @@ test('送る間隔を選ぶと保存し、パネルを閉じたら新しい間�
 	const short = findAll(stage(), '.slideshow-speed-option')
 		.find((item) => item.dataset.interval === String(SLIDESHOW_SHORT_INTERVAL));
 	await short.click();
+	timers.fire(SLIDESHOW_SAVE_DELAY_MS);
 	await flush();
 	assert.deepEqual(saved, [['slideshowInterval', SLIDESHOW_SHORT_INTERVAL]]);
 	await doc.dispatch('keydown', { key: KEYS.CLOSE, composedPath: () => [short], preventDefault() {}, stopPropagation() {} });
 	assert.equal(timers.ids(SLIDESHOW_SHORT_INTERVAL_MS).length, 1);
+});
+
+/**
+ * 速度の項目を、間隔の値で引く。
+ * @param {object} stage .stage の代わり
+ * @param {number|string} value data-interval の値
+ * @returns {object} 項目
+ */
+function speedOption(stage, value) {
+	return findAll(stage, '.slideshow-speed-option').find((item) => item.dataset.interval === String(value));
+}
+
+/**
+ * 選んでいる速度の項目の上で押したキーの代わり。
+ * @param {object} stage .stage の代わり
+ * @param {string} name キー名
+ * @returns {object} event の代わり
+ */
+function keyOnCheckedOption(stage, name) {
+	const target = findAll(stage, '.slideshow-speed-option').find((item) => item.getAttribute('aria-checked') === 'true');
+	return { key: name, composedPath: () => [target], preventDefault() {}, stopPropagation() {} };
+}
+
+test('帯で続けて選び直しても、キーごとに最後の値を待ってから 1 回だけ保存する', async () => {
+	const saved = [];
+	const { doc, stage, timers } = await openPlaying({
+		saveSetting: async (key, value) => { saved.push([key, value]); return true; },
+	});
+	await find(stage(), '.slideshow-speed').click();
+	// 4 秒 -> カスタム -> 2 秒 -> 3 秒
+	await doc.dispatch('keydown', keyOnCheckedOption(stage(), 'ArrowRight'));
+	await doc.dispatch('keydown', keyOnCheckedOption(stage(), 'ArrowRight'));
+	await doc.dispatch('keydown', keyOnCheckedOption(stage(), 'ArrowRight'));
+	await find(stage(), '.slideshow-loop').click();
+	await find(stage(), '.slideshow-loop').click();
+	await flush();
+	assert.deepEqual(saved, [], '待っている間は保存しない');
+	timers.fire(SLIDESHOW_SAVE_DELAY_MS);
+	await flush();
+	assert.deepEqual(saved, [['slideshowInterval', 3], ['slideshowLoop', false]]);
+	timers.fire(SLIDESHOW_SAVE_DELAY_MS);
+	await flush();
+	assert.equal(saved.length, 2, '保存し終えたものは繰り返さない');
+});
+
+test('保存を待っている間に閉じる・帯を外すと、その場で保存する', async () => {
+	const saved = [];
+	const saveSetting = async (key, value) => { saved.push([key, value]); return true; };
+	const { viewer, stage, timers } = await openPlaying({ saveSetting });
+	await find(stage(), '.slideshow-loop').click();
+	viewer.close();
+	await flush();
+	assert.deepEqual(saved, [['slideshowLoop', true]]);
+	assert.equal(timers.size(), 0, '保存の待ちを残さない');
+
+	const removed = await openPlaying({ saveSetting });
+	saved.length = 0;
+	await find(removed.stage(), '.slideshow-speed').click();
+	await speedOption(removed.stage(), SLIDESHOW_SHORT_INTERVAL).click();
+	removed.viewer.setSettings(slideshowSettings({ slideshow: SLIDESHOW_MODES.OFF }));
+	await flush();
+	assert.deepEqual(saved, [['slideshowInterval', SLIDESHOW_SHORT_INTERVAL]]);
+	removed.timers.fire(SLIDESHOW_SAVE_DELAY_MS);
+	await flush();
+	assert.equal(saved.length, 1);
+});
+
+test('保存を待っている間に古い設定が届いても、帯の表示と計時は選んだ値のまま', async () => {
+	const { viewer, doc, stage, timers } = await openPlaying();
+	await find(stage(), '.slideshow-speed').click();
+	const short = speedOption(stage(), SLIDESHOW_SHORT_INTERVAL);
+	await short.click();
+	// 前の保存の通知が遅れて届いた
+	viewer.setSettings(slideshowSettings());
+	assert.equal(short.getAttribute('aria-checked'), 'true');
+	assert.equal(find(stage(), '.slideshow-speed-label').textContent, `${SLIDESHOW_SHORT_INTERVAL} 秒`);
+	await doc.dispatch('keydown', { key: KEYS.CLOSE, composedPath: () => [short], preventDefault() {}, stopPropagation() {} });
+	assert.equal(timers.ids(SLIDESHOW_SHORT_INTERVAL_MS).length, 1);
+	assert.deepEqual(timers.ids(SLIDESHOW_TEST_INTERVAL_MS), []);
+	// 保存した値の通知が届けば、そのまま受け入れる
+	timers.fire(SLIDESHOW_SAVE_DELAY_MS);
+	await flush();
+	viewer.setSettings(slideshowSettings({ slideshowInterval: SLIDESHOW_SHORT_INTERVAL }));
+	assert.equal(short.getAttribute('aria-checked'), 'true');
+	viewer.setSettings(slideshowSettings());
+	assert.equal(speedOption(stage(), SLIDESHOW_TEST_INTERVAL).getAttribute('aria-checked'), 'true', '保存し終えた後の変更は受け入れる');
 });
 
 test('isTypingTarget は文字を打つ要素だけを見分ける', () => {
