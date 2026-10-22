@@ -26,7 +26,8 @@ import { warn } from '../../common/log.js';
 
 /**
  * @typedef {object} Navigation
- * @property {(direction: number) => Promise<void>} moveWork 前後の作品へ移動する
+ * @property {(direction: number) => Promise<boolean>} moveWork 前後の作品へ移動する。開いたら true
+ * @property {() => Promise<boolean>} moveToFirst 並びの先頭へ移動する。開いたら true
  * @property {(event: KeyboardEvent) => void} onKeyDown キーボード操作
  * @property {(next: Sequence) => void} setSequence 並びを差し替える
  * @property {(workId: string) => void} setCurrentWorkId 今開いている作品を記録する
@@ -117,23 +118,38 @@ export function createNavigation(deps) {
 	 * 前後の作品へ移動する。
 	 * 端に達したら全作品の並びへ広げてもう一度試す。
 	 * @param {number} direction 1 なら次、-1 なら前
-	 * @returns {Promise<void>}
+	 * @returns {Promise<boolean>} 作品を開いたら true。並びが無い・端・広げ損ね・待つ間に別の作品へ移った場合は false
 	 */
 	async function moveWork(direction) {
-		if (!sequence || !currentWorkId) return;
+		if (!sequence || !currentWorkId) return false;
 		rememberDirection(direction);
 		let target = neighbor(direction);
 
 		// 端に来た。全作品の並びへ広げられるなら広げてもう一度。
 		// 待っている間に別の作品へ移っていたら extend() が false を返すので、ここでは確かめ直さない
 		if (!target && !extended && !extending && deps.canExtendSequence()) {
-			if (!(await extend())) return;
+			if (!(await extend())) return false;
 			target = neighbor(direction);
 		}
-		if (!target) return;
+		if (!target) return false;
 
 		deps.onNavigate(target);
 		await deps.openWork(target);
+		return true;
+	}
+
+	/**
+	 * 並びの先頭の作品へ移動する。動いた向きは次へ戻す。
+	 * @returns {Promise<boolean>} 作品を開いたら true。並びが無い・今が先頭なら false
+	 */
+	async function moveToFirst() {
+		if (!sequence || !currentWorkId) return false;
+		const first = sequence.ids[0];
+		if (!first || first === currentWorkId) return false;
+		rememberDirection(1);
+		deps.onNavigate(first);
+		await deps.openWork(first);
+		return true;
 	}
 
 	/**
@@ -176,6 +192,7 @@ export function createNavigation(deps) {
 
 	return {
 		moveWork,
+		moveToFirst,
 		onKeyDown,
 
 		/**

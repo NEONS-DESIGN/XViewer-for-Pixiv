@@ -371,3 +371,56 @@ test('canMove は並びが無い (閉じている) ときは false を返す', (
 	assert.equal(nav.canMove(1), false);
 	assert.equal(nav.canMove(-1), false);
 });
+
+test('moveWork は隣へ移れたら true を返す', async () => {
+	const deps = fakeDeps();
+	const nav = openedNavigation(deps, ['1', '2', '3'], '2');
+	assert.equal(await nav.moveWork(1), true);
+	assert.deepEqual(deps.opened, ['3']);
+});
+
+test('moveWork は端で広げられなければ false を返す', async () => {
+	const deps = fakeDeps();
+	const nav = openedNavigation(deps, ['1', '2'], '2');
+	assert.equal(await nav.moveWork(1), false);
+	assert.deepEqual(deps.opened, []);
+});
+
+test('moveWork は広げた並びに今の作品が無ければ false を返す', async () => {
+	const deps = fakeDeps({
+		canExtendSequence: () => true,
+		extendSequence: async () => fakeSequence(['8', '9']),
+	});
+	const nav = openedNavigation(deps, ['1', '2'], '2');
+	assert.equal(await nav.moveWork(1), false);
+	assert.deepEqual(deps.opened, []);
+});
+
+test('moveWork は並びが無いときは false を返す', async () => {
+	const nav = createNavigation(fakeDeps());
+	assert.equal(await nav.moveWork(1), false);
+});
+
+test('moveToFirst は先頭へ移って true を返し、向きを次へ戻す', async () => {
+	const deps = fakeDeps();
+	const nav = openedNavigation(deps, ['1', '2', '3'], '3');
+	await nav.moveWork(-1);
+	assert.equal(nav.lastDirection(), -1);
+	assert.equal(await nav.moveToFirst(), true);
+	assert.deepEqual(deps.navigated, ['2', '1']);
+	assert.deepEqual(deps.opened, ['2', '1']);
+	assert.equal(nav.lastDirection(), 1);
+});
+
+test('moveToFirst は先頭にいれば false を返し、作品を開かない', async () => {
+	const deps = fakeDeps();
+	const nav = openedNavigation(deps, ['1', '2'], '1');
+	assert.equal(await nav.moveToFirst(), false);
+	assert.deepEqual(deps.opened, []);
+	assert.deepEqual(deps.navigated, []);
+});
+
+test('moveToFirst は並びが無いときは false を返す', async () => {
+	const nav = createNavigation(fakeDeps());
+	assert.equal(await nav.moveToFirst(), false);
+});
