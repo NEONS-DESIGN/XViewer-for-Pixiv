@@ -301,6 +301,24 @@ test('スライダーの上の左右と端のキーはブラウザに任せ、�
 	controls.dispose();
 });
 
+test('パネルが開いていても、項目の上でなければ矢印と端のキーで選び直さない', async () => {
+	const { doc, calls, controls, part } = build();
+	const speed = part('.slideshow-speed');
+	await speed.click();
+	speed.focus();
+	assert.equal(doc.activeElement, speed);
+	for (const name of ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End']) {
+		const onButton = key(name, speed);
+		assert.equal(controls.consumeKey(onButton), false, `${name} (速度のボタンの上)`);
+		assert.equal(onButton.prevented, undefined, name);
+		assert.equal(controls.consumeKey(key(name)), false, `${name} (対象が分からない)`);
+	}
+	assert.deepEqual(calls.interval, []);
+	assert.equal(part('.slideshow-speed-label').textContent, '3 秒');
+	assert.equal(part('.slideshow-speed-panel').hidden, false);
+	controls.dispose();
+});
+
 test('パネルの外を押すと閉じ、中を押しても閉じない', async () => {
 	const { doc, overlay, calls, controls, part } = build();
 	await part('.slideshow-speed').click();
@@ -366,9 +384,45 @@ test('帯の上にカーソルがある間は隠さない。離れたら数え�
 	controls.dispose();
 });
 
-test('帯の中にフォーカスがある間は隠さない。外へ出たら数え直す', async () => {
+/**
+ * フォーカスの輪郭が出ているか (:focus-visible) の判定を差し替える。
+ * 偽の DOM は :focus-visible を解せないので、キーボードで来たかどうかをここで決める。
+ * @param {object} button 対象のボタン
+ * @param {boolean} visible キーボードで来たフォーカスなら true
+ * @returns {void}
+ */
+function setFocusVisible(button, visible) {
+	const original = button.matches;
+	button.matches = (selector) => (selector === ':focus-visible' ? visible : original(selector));
+}
+
+test('マウスで押したボタンにフォーカスが残っていても、待てば隠す', async () => {
+	const { calls, timer, controls, part } = build();
+	const toggle = part('.slideshow-toggle');
+	setFocusVisible(toggle, false);
+	toggle.focus();
+	await toggle.click();
+	assert.equal(calls.toggle, 1);
+	assert.equal(timer.pending().map((one) => one.ms).at(-1), SLIDESHOW_CONTROLS_IDLE_MS);
+	timer.fire();
+	assert.equal(controls.element.hasAttribute('data-idle'), true);
+	controls.dispose();
+});
+
+test(':focus-visible を判定できないときは、マウスで来たフォーカスと同じく隠す', () => {
+	const { timer, controls, part } = build();
+	// 偽の DOM の matches は解せないセレクタで投げる
+	part('.slideshow-loop').focus();
+	timer.fire();
+	assert.equal(controls.element.hasAttribute('data-idle'), true);
+	controls.dispose();
+});
+
+test('キーボードで帯の中にフォーカスしている間は隠さない。外へ出たら数え直す', async () => {
 	const { overlay, timer, controls, part } = build();
-	part('.slideshow-toggle').focus();
+	const toggle = part('.slideshow-toggle');
+	setFocusVisible(toggle, true);
+	toggle.focus();
 	timer.fire();
 	assert.equal(controls.element.hasAttribute('data-idle'), false);
 	overlay.focus();
