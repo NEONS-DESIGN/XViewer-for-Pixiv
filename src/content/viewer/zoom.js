@@ -45,6 +45,7 @@ const ZONE_SHAPES = Object.freeze({
  * @property {Document} doc 対象のドキュメント
  * @property {HTMLElement} container レイヤを置く先 (ビュワーの overlay)
  * @property {() => void} [restoreFocus] 閉じたときにフォーカスを戻す役
+ * @property {(open: boolean) => void} [onOpenChange] レイヤを組み立てたら true、外したら false で呼ばれる
  * @property {object} strings 文言のカタログ (src/i18n)
  * @property {() => HTMLImageElement} [createImage] 原寸の読み込み役 (Image) の差し替え。テスト用
  */
@@ -309,6 +310,7 @@ export function createZoomLayer(deps) {
 		placeholderAt = null;
 		sizes = null;
 		onClose = null;
+		deps.onOpenChange?.(false);
 		deps.restoreFocus?.();
 	}
 
@@ -373,6 +375,7 @@ export function createZoomLayer(deps) {
 			lockBehind();
 			paint();
 			layer.focus?.();
+			deps.onOpenChange?.(true);
 		},
 
 		/**

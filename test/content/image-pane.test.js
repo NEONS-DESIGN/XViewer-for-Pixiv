@@ -125,9 +125,10 @@ function fakeZoom() {
  * @param {string} [options.imageQuality] 表示解像度の設定
  * @param {object} [options.zoom] 原寸レイヤの代わり
  * @param {object} [options.strings] 文言のカタログ
+ * @param {(index: number) => void} [options.onPageShown] ページが表示されたときの通知
  * @returns {{container: object, pane: object, created: object[], zoom: object}} 描画先・ペイン・作った先読み Image・原寸レイヤ
  */
-function build({ fetchImpl, prefetch = 0, clickZoom = false, imageQuality = IMAGE_QUALITY.REGULAR, zoom = fakeZoom(), strings = createStrings('ja') } = {}) {
+function build({ fetchImpl, prefetch = 0, clickZoom = false, imageQuality = IMAGE_QUALITY.REGULAR, zoom = fakeZoom(), strings = createStrings('ja'), onPageShown } = {}) {
 	const container = fakeElement('div');
 	const created = [];
 	const pane = createImagePane({
@@ -135,6 +136,7 @@ function build({ fetchImpl, prefetch = 0, clickZoom = false, imageQuality = IMAG
 		container,
 		settings: { imageQuality, prefetch, clickZoom },
 		zoom,
+		onPageShown,
 		getJsonImpl: fetchImpl ? (url) => getJson(url, { fetchImpl }) : undefined,
 		strings,
 		createImage: () => {
@@ -769,4 +771,144 @@ test('startPage が枚数を超えていたら最後のページに留め、1 �
 	const single = build({ fetchImpl });
 	await single.pane.render({ ...DETAIL, pageCount: 1 }, { startPage: 2 });
 	assert.equal(find(single.container, '.counter').textContent, '1/1');
+});
+
+/**
+ * ページの表示通知を集めて画像ペインを組み立てる。
+ * @param {object} [options] build への差し替え
+ * @returns {object} build の戻り値と、通知されたページ番号の配列 shown
+ */
+function buildShown(options = {}) {
+	const shown = [];
+	return { ...build({ ...options, onPageShown: (index) => shown.push(index) }), shown };
+}
+
+test('1 枚目の img が load したら onPageShown(0) を 1 回呼ぶ', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { container, pane, shown } = buildShown({ fetchImpl: impl });
+	const rendering = pane.render(DETAIL);
+	assert.deepEqual(shown, []);
+	await find(container, 'img').dispatch('load');
+	assert.deepEqual(shown, [0]);
+	await rendering;
+	await find(container, 'img').dispatch('load');
+	assert.deepEqual(shown, [0]);
+});
+
+test('既に complete の img は貼った時点で onPageShown を呼ぶ', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { container, pane, shown } = buildShown({ fetchImpl: impl });
+	await pane.render(DETAIL);
+	const image = find(container, 'img');
+	image.complete = true;
+	pane.next();
+	assert.deepEqual(shown, [1]);
+});
+
+test('/pages が届いて同じ URL のまま描き直されても、onPageShown は呼び直さない', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { container, pane, shown } = buildShown({ fetchImpl: impl });
+	const rendering = pane.render(DETAIL);
+	const image = find(container, 'img');
+	image.complete = true;
+	await image.dispatch('load');
+	assert.deepEqual(shown, [0]);
+	await rendering;
+	assert.deepEqual(shown, [0]);
+});
+
+test('next() で URL が変わったら、error でも onPageShown(1) を呼ぶ', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { container, pane, shown } = buildShown({ fetchImpl: impl });
+	await pane.render(DETAIL);
+	const image = find(container, 'img');
+	await image.dispatch('load');
+	pane.next();
+	assert.deepEqual(shown, [0]);
+	await image.dispatch('error');
+	assert.deepEqual(shown, [0, 1]);
+});
+
+test('差し替え前の load が遅れて届いても、古いページの分は呼ばない', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { container, pane, shown } = buildShown({ fetchImpl: impl });
+	await pane.render(DETAIL);
+	const image = find(container, 'img');
+	// 1 枚目の load を待たずに 2 枚目へ移る
+	pane.next();
+	await image.dispatch('load');
+	assert.deepEqual(shown, [1]);
+	await image.dispatch('load');
+	assert.deepEqual(shown, [1]);
+});
+
+test('原寸表示中は差し替えず通知もせず、閉じて差し替えたときに呼ぶ', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const zoom = { opened: [], open(pages) { this.opened.push(pages); }, isOpen: () => true };
+	const { container, pane, shown } = buildShown({ fetchImpl: impl, clickZoom: true, zoom });
+	await pane.render(DETAIL);
+	const image = find(container, 'img');
+	image.complete = true;
+	await image.dispatch('load');
+	assert.deepEqual(shown, [0]);
+	await image.dispatch('click');
+	zoom.opened[0].onIndexChange(1);
+	assert.deepEqual(shown, [0]);
+	image.complete = false;
+	zoom.opened[0].onClose();
+	await image.dispatch('load');
+	assert.deepEqual(shown, [0, 1]);
+});
+
+test('onPageShown が無くても落ちない', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { container, pane } = build({ fetchImpl: impl });
+	await pane.render(DETAIL);
+	await find(container, 'img').dispatch('load');
+	pane.next();
+});
+
+test('dispose した後は onPageShown を呼ばない', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { container, pane, shown } = buildShown({ fetchImpl: impl });
+	await pane.render(DETAIL);
+	const image = find(container, 'img');
+	pane.dispose();
+	await image.dispatch('load');
+	await image.dispatch('error');
+	assert.deepEqual(shown, []);
+});
+
+test('showPage は指定したページへ移り、範囲外は無視する', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { container, pane } = buildShown({ fetchImpl: impl });
+	await pane.render(DETAIL);
+	pane.showPage(2);
+	assert.equal(pane.pageIndex(), 2);
+	assert.equal(find(container, 'img').src, cdn('r2'));
+	pane.showPage(99);
+	pane.showPage(-1);
+	pane.showPage(1.5);
+	assert.equal(pane.pageIndex(), 2);
+	pane.showPage(0);
+	assert.equal(pane.pageIndex(), 0);
+});
+
+test('/pages 待ちの showPage は行き先として覚え、届いたら移る', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { container, pane } = buildShown({ fetchImpl: impl });
+	const rendering = pane.render(DETAIL);
+	pane.showPage(2);
+	assert.equal(pane.pageIndex(), 2);
+	await rendering;
+	assert.equal(find(container, 'img').src, cdn('r2'));
+});
+
+test('pageCount は /pages が届く前は詳細の枚数、届いたら実際の枚数を返す', async () => {
+	const { impl } = fakeApiFetch(PAGES);
+	const { pane } = buildShown({ fetchImpl: impl });
+	const rendering = pane.render(DETAIL);
+	assert.equal(pane.pageCount(), 3);
+	await rendering;
+	assert.equal(pane.pageCount(), 3);
 });

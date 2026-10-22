@@ -83,6 +83,7 @@ export function planPanes(detail, session, settings) {
  * @property {HTMLElement} stage 主役の描画先 (.stage)
  * @property {HTMLElement} sidebar サイドバーの描画先 (.sidebar)
  * @property {{open: (pages: object) => void}} [zoom] 原寸表示のレイヤ (zoom.js)。画像ペインだけが使う
+ * @property {(index: number) => void} [onPageShown] 画像のページが表示されたら呼ぶ。画像ペインだけが使う
  * @property {(userId: string, lang: string) => Promise<object>} [fetchUser] 作者情報の取得。(サイドバーとアクションの両方へ渡す) テストから通信させないために使う
  * @property {object} strings 文言のカタログ (src/i18n)
  * @property {typeof createImagePane} [createImagePane] 画像ペインの差し替え口。テストが組み立ての順番を記録するために使う
@@ -119,7 +120,7 @@ function startMain(plan, detail, settings, targets) {
 	}
 	// 原寸表示を開けるのは静止画だけ。うごイラ (canvas) と見られない作品には渡さない
 	const makeImagePane = targets.createImagePane ?? createImagePane;
-	imagePane = makeImagePane({ doc, container: stage, settings, zoom: targets.zoom, strings });
+	imagePane = makeImagePane({ doc, container: stage, settings, zoom: targets.zoom, onPageShown: targets.onPageShown, strings });
 	return imagePane.render(detail, { startPage: targets.startPage ?? 0 });
 }
 
@@ -257,6 +258,23 @@ export function consumeKey(event) {
 export function movePage(direction) {
 	if (direction > 0) imagePane?.next();
 	else imagePane?.prev();
+}
+
+/**
+ * 画像のページを番号で指す。範囲外は無視し、うごイラとブロック表示では何もしない。
+ * @param {number} index ページ番号 (0 始まり)
+ * @returns {void}
+ */
+export function showPage(index) {
+	imagePane?.showPage(index);
+}
+
+/**
+ * 画像の総ページ数。画像ペインが無ければ (うごイラ・ブロック表示・読み込み中) null。
+ * @returns {number|null} 総ページ数
+ */
+export function pageCount() {
+	return imagePane ? imagePane.pageCount() : null;
 }
 
 /**

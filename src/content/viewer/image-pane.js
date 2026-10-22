@@ -118,6 +118,7 @@ function clamp(value, min, max) {
  * @property {{open: (pages: object) => void, isOpen?: () => boolean, updatePages?: (pages: object) => void}} [zoom]
  *   原寸表示のレイヤ (zoom.js)。設定がオンのときだけ使う
  * @property {(url: string, deps?: object, init?: RequestInit) => Promise<unknown>} [getJsonImpl] /pages の取得の差し替え。テストから pixiv を叩かないために使う
+ * @property {(index: number) => void} [onPageShown] 表示するページの画像が読み終わった (成功・失敗とも) ときに 1 回呼ぶ
  * @property {() => HTMLImageElement} [createImage] 先読み用 Image の差し替え。Node には Image が無い
  * @property {object} strings 文言のカタログ (src/i18n)
  */
@@ -126,7 +127,8 @@ function clamp(value, min, max) {
  * 画像ペインを作る。
  * @param {ImagePaneDeps} deps 依存
  * @returns {{render: (detail: object, options?: {startPage?: number}) => Promise<void>, next: () => void, prev: () => void,
- *   canMove: (offset: number) => boolean, pageIndex: () => number, loadedUrlAt: (index: number) => string | null, dispose: () => void}}
+ *   canMove: (offset: number) => boolean, pageIndex: () => number, showPage: (target: number) => void, pageCount: () => number,
+ *   loadedUrlAt: (index: number) => string | null, dispose: () => void}}
  */
 export function createImagePane(deps) {
 	const { doc, container, strings } = deps;
@@ -185,6 +187,11 @@ export function createImagePane(deps) {
 	 * 次の schedulePrefetch() と dispose() で外すため参照を持つ
 	 */
 	let prefetchReadyHandler = null;
+	/**
+	 * 表示中の画像の load / error を待って onPageShown を呼ぶハンドラ。
+	 * 先読みのハンドラとは別に持つ。次の通知の張り直しと dispose() で外すため参照を持つ
+	 */
+	let pageShownHandler = null;
 	/** 破棄済みか。応答を待っている間に捨てられたときに DOM を触らないようにする */
 	let disposed = false;
 	/**
@@ -238,6 +245,40 @@ export function createImagePane(deps) {
 			image.removeEventListener('error', prefetchReadyHandler);
 		}
 		prefetchReadyHandler = null;
+	}
+
+	/**
+	 * 表示中の画像の load / error 待ち (ページの表示通知) のリスナーを外す。
+	 * @returns {void}
+	 */
+	function clearPageShownHandler() {
+		if (image && pageShownHandler) {
+			image.removeEventListener('load', pageShownHandler);
+			image.removeEventListener('error', pageShownHandler);
+		}
+		pageShownHandler = null;
+	}
+
+	/**
+	 * 指定したページの表示を知らせるきっかけを整える。
+	 * 既に読み込みを終えていれば (成功でも失敗でも) すぐに呼び、そうでなければ load / error を 1 回待つ。
+	 * 前のページ向けに待っていたリスナーは外すので、古いページの分は呼ばれない
+	 * @param {number} pageIndex 表示したページ番号
+	 * @returns {void}
+	 */
+	function schedulePageShown(pageIndex) {
+		clearPageShownHandler();
+		if (!image || !deps.onPageShown) return;
+		if (image.complete) {
+			deps.onPageShown(pageIndex);
+			return;
+		}
+		pageShownHandler = () => {
+			clearPageShownHandler();
+			if (!disposed) deps.onPageShown?.(pageIndex);
+		};
+		image.addEventListener('load', pageShownHandler);
+		image.addEventListener('error', pageShownHandler);
 	}
 
 	/**
@@ -301,6 +342,7 @@ export function createImagePane(deps) {
 			shownUrl = next;
 			frame?.querySelector('.pane-error')?.remove();
 			assignImageSrc(image, next);
+			schedulePageShown(index);
 		}
 		if (counter) counter.textContent = `${index + 1}/${total}`;
 		const single = total <= 1;
@@ -500,6 +542,26 @@ export function createImagePane(deps) {
 			return pendingIndex ?? index;
 		},
 
+		/**
+		 * ページを番号で指して移る。範囲外は無視する。
+		 * /pages 待ちの間は move と同じく行き先として覚える
+		 * @param {number} target ページ番号 (0 始まり)
+		 * @returns {void}
+		 */
+		showPage(target) {
+			if (disposed || !Number.isInteger(target)) return;
+			const offset = target - (pendingIndex ?? index);
+			if (offset !== 0) move(offset);
+		},
+
+		/**
+		 * 総ページ数。/pages が届く前は詳細の枚数。
+		 * @returns {number} 総ページ数
+		 */
+		pageCount() {
+			return total;
+		},
+
 		loadedUrlAt,
 
 		dispose() {
@@ -507,6 +569,7 @@ export function createImagePane(deps) {
 			// 破棄したあとに古い画像の error が発火して、
 			// 新しく描いた画面にエラーを出すのを防ぐ
 			clearPrefetchReadyHandler();
+			clearPageShownHandler();
 			if (image && onImageError) image.removeEventListener('error', onImageError);
 			if (image && onImageClick) image.removeEventListener('click', onImageClick);
 			if (image) assignImageSrc(image, '');
