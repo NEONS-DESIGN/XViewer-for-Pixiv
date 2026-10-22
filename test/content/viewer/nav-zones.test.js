@@ -176,6 +176,17 @@ test('端に着いた向きは送らず止めるだけ。どちらにも送れ�
 	assert.deepEqual(moved, []);
 });
 
+test('自動送りの帯の上 (ボタンの隙間・進捗の線) では、下端の領域でも作品を送らずカーソルも変えない', async () => {
+	const { stage, moved } = build();
+	const controls = fakeElement('div');
+	controls.className = 'slideshow-controls';
+	const click = await press(stage, 600, 840, controls);
+	assert.equal(click.stopped, 0);
+	assert.deepEqual(moved, []);
+	await stage.dispatch('pointermove', pointer(stage, 600, 840, controls));
+	assert.equal(stage.dataset.navZone, undefined);
+});
+
 test('ポインタの下の領域を data-nav-zone に書き、部品の上と外では外す', async () => {
 	const { stage, state, zones } = build({ pages: [1] });
 	await stage.dispatch('pointermove', pointer(stage, 1090, 450));

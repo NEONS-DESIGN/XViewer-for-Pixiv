@@ -2,7 +2,14 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { register } from 'node:module';
 import { clearSessionCache } from '../../../src/content/session.js';
-import { KEYS, LOADING_STATUS_DELAY_MS, BACKDROP_MODES, SETTING_MODES } from '../../../src/common/constants.js';
+import {
+	KEYS,
+	LOADING_STATUS_DELAY_MS,
+	BACKDROP_MODES,
+	SETTING_MODES,
+	SLIDESHOW_MODES,
+	SLIDESHOW_CONTROLS_IDLE_MS,
+} from '../../../src/common/constants.js';
 import { createStrings } from '../../../src/i18n/index.js';
 import { PixivError, PIXIV_ERROR_KINDS } from '../../../src/pixiv/errors.js';
 import { fakeElement, fakeDoc as fakeDocBase, find, findAll, flush, iconName } from '../../helpers/dom.js';
@@ -21,7 +28,7 @@ export async function load(url, context, next) {
 	return next(url, context);
 }
 `)}`);
-const { createViewer, isTextEntry, isRangeInput } = await import('../../../src/content/viewer/viewer.js');
+const { createViewer, isTextEntry, isRangeInput, isTypingTarget } = await import('../../../src/content/viewer/viewer.js');
 
 /** 実際の CDN と同じ形の URL。safeCdnUrl の関門を通す必要がある。 */
 const REGULAR_URL = 'https://i.pximg.net/img-master/img/2026/09/10/00/00/00/x_p0_master1200.jpg';
@@ -118,20 +125,21 @@ function fakeDoc() {
 
 /**
  * ビュワーと依存の記録を用意する。
- * @param {object} [options] getJsonImpl と settings、setTimeout / clearTimeout / createImage の差し替え
- * @returns {{viewer: object, doc: object, fetched: string[], closed: () => number, shadow: () => object, stage: () => object}} 一式
+ * @param {object} [options] getJsonImpl と settings、setTimeout / clearTimeout / createImage / saveSetting の差し替え
+ * @returns {{viewer: object, doc: object, fetched: string[], navigated: string[], closed: () => number, shadow: () => object, stage: () => object}} 一式
  */
 function setup(options = {}) {
 	clearSessionCache();
 	const doc = fakeDoc();
 	const fetched = [];
+	const navigated = [];
 	let closeRequests = 0;
 	const viewer = createViewer({
 		doc,
 		settings: options.settings ?? settings(),
 		strings: options.strings ?? createStrings('ja'),
 		onRequestClose: () => { closeRequests += 1; },
-		onNavigate: () => {},
+		onNavigate: (workId) => { navigated.push(workId); },
 		canExtendSequence: () => false,
 		extendSequence: async (current) => current,
 		getJsonImpl: options.getJsonImpl ?? (async (url) => {
@@ -144,12 +152,14 @@ function setup(options = {}) {
 		setTimeout: options.setTimeout,
 		clearTimeout: options.clearTimeout,
 		createImage: options.createImage,
+		saveSetting: options.saveSetting ?? (async () => true),
 	});
 	const shadow = () => doc.body.children[0]?.shadowRoot ?? null;
 	return {
 		viewer,
 		doc,
 		fetched,
+		navigated,
 		closed: () => closeRequests,
 		shadow,
 		stage: () => find(shadow(), '.stage'),
@@ -1339,4 +1349,305 @@ test('サイドバーの設定が変わったら作品詳細から取り直し�
 	await flush();
 	assert.deepEqual(fetched, ['/ajax/illust/1?lang=ja', '/ajax/illust/1?lang=ja']);
 	assert.equal(find(shadow(), '.sidebar').hidden, false);
+});
+
+/** 自動送りのテストで選ぶ送る間隔 (秒)。帯を隠すまでの待ち (3000ms) と重ならない長さにする */
+const SLIDESHOW_TEST_INTERVAL = 4;
+
+/** 上の間隔で張られるタイマーの長さ (ms) */
+const SLIDESHOW_TEST_INTERVAL_MS = SLIDESHOW_TEST_INTERVAL * 1000;
+
+/** 選び直した先の送る間隔 (秒) と、そのタイマーの長さ (ms) */
+const SLIDESHOW_SHORT_INTERVAL = 2;
+const SLIDESHOW_SHORT_INTERVAL_MS = SLIDESHOW_SHORT_INTERVAL * 1000;
+
+/** 2 枚目の画像の URL。safeCdnUrl の関門を通す形にする */
+const PAGE2_URL = 'https://i.pximg.net/img-master/img/2026/09/10/00/00/00/x_p1_master1200.jpg';
+
+/**
+ * 自動送りをオンにした設定の代わり。
+ * @param {object} [overrides] 上書きする値
+ * @returns {object} settings の代わり
+ */
+function slideshowSettings(overrides = {}) {
+	return settings({
+		slideshow: SLIDESHOW_MODES.WORK,
+		slideshowInterval: SLIDESHOW_TEST_INTERVAL,
+		slideshowIntervalCustom: 5,
+		slideshowLoop: false,
+		...overrides,
+	});
+}
+
+/**
+ * 張られたタイマーを覚えて、指定の長さのものだけを手で発火させる偽のタイマー。
+ * @returns {{setTimeout: Function, clearTimeout: Function, ids: (ms: number) => number[], fire: (ms: number) => void, size: () => number}} 一式
+ */
+function fakeTimers() {
+	const pending = new Map();
+	let nextId = 1;
+	return {
+		setTimeout: (fn, ms) => {
+			const id = nextId;
+			nextId += 1;
+			pending.set(id, { fn, ms });
+			return id;
+		},
+		clearTimeout: (id) => { pending.delete(id); },
+		ids: (ms) => [...pending].filter(([, timer]) => timer.ms === ms).map(([id]) => id),
+		fire: (ms) => {
+			for (const [id, timer] of [...pending]) {
+				if (timer.ms !== ms) continue;
+				pending.delete(id);
+				timer.fn();
+			}
+		},
+		size: () => pending.size,
+	};
+}
+
+/**
+ * 作品 1 の /pages を 2 枚で覚えさせる。画像ペインは作品単位で覚えた取得を使う。
+ * @returns {Promise<void>}
+ */
+async function primeTwoPages() {
+	await fetchIllustPages('1', 'ja', {
+		getJsonImpl: async () => [
+			{ urls: { regular: REGULAR_URL }, width: 1, height: 1 },
+			{ urls: { regular: PAGE2_URL }, width: 1, height: 1 },
+		],
+	});
+}
+
+/**
+ * 2 枚の作品 1 を自動送りの設定で開き、1 枚目の読み込みを終えて再生を始める。
+ * @param {object} [options] settings の上書きと setup への追加
+ * @returns {Promise<object>} setup の一式と timers
+ */
+async function openPlaying(options = {}) {
+	const timers = fakeTimers();
+	await primeTwoPages();
+	const env = setup({
+		...options,
+		settings: slideshowSettings(options.settings),
+		setTimeout: timers.setTimeout,
+		clearTimeout: timers.clearTimeout,
+		getJsonImpl: async (url) => rawDetail(idOf(url), { pageCount: 2 }),
+	});
+	await env.viewer.open('1', fakeSequence(['1', '2']));
+	await flush();
+	await find(env.stage(), 'img').dispatch('load', {});
+	await find(env.stage(), '.slideshow-toggle').click();
+	return { ...env, timers };
+}
+
+test('自動送りがオフならステージに帯を置かず、オンなら置いて data-slideshow を立てる', async () => {
+	const off = setup();
+	await off.viewer.open('1');
+	assert.equal(find(off.stage(), '.slideshow-controls'), null);
+	assert.equal(off.stage().dataset.slideshow, undefined);
+
+	const on = setup({ settings: slideshowSettings() });
+	await on.viewer.open('1');
+	const controls = find(on.stage(), '.slideshow-controls');
+	assert.ok(controls, '帯がある');
+	assert.equal(on.stage().dataset.slideshow, SLIDESHOW_MODES.WORK);
+	// 作品を送っても作り直さない (フォーカスを失わない)
+	await on.viewer.open('2');
+	assert.equal(find(on.stage(), '.slideshow-controls'), controls);
+});
+
+test('再生して 1 枚目の読み込みを終えると、間隔が経ったところで 2 枚目へ進む', async () => {
+	const { stage, timers } = await openPlaying();
+	assert.equal(timers.ids(SLIDESHOW_TEST_INTERVAL_MS).length, 1);
+	assert.equal(find(stage(), '.counter').textContent, '1/2');
+	timers.fire(SLIDESHOW_TEST_INTERVAL_MS);
+	await flush();
+	assert.equal(find(stage(), '.counter').textContent, '2/2');
+	assert.equal(find(stage(), 'img').src, PAGE2_URL);
+});
+
+test('設定でオフにすると帯を外して再生を止め、オンへ戻すと停止状態の帯を出す', async () => {
+	const { viewer, stage, timers } = await openPlaying();
+	viewer.setSettings(slideshowSettings({ slideshow: SLIDESHOW_MODES.OFF }));
+	assert.equal(find(stage(), '.slideshow-controls'), null);
+	assert.equal(stage().dataset.slideshow, undefined);
+	assert.deepEqual(timers.ids(SLIDESHOW_TEST_INTERVAL_MS), [], '計時が止まる');
+
+	viewer.setSettings(slideshowSettings({ slideshow: SLIDESHOW_MODES.SEQUENCE }));
+	const toggle = find(stage(), '.slideshow-toggle');
+	assert.equal(toggle.getAttribute('aria-label'), createStrings('ja').slideshow.PLAY);
+	assert.equal(stage().dataset.slideshow, SLIDESHOW_MODES.SEQUENCE);
+	assert.deepEqual(timers.ids(SLIDESHOW_TEST_INTERVAL_MS), []);
+});
+
+test('速度のパネルを開いたまま設定でオフにして戻しても、パネルによる一時停止は残らない', async () => {
+	// 帯は外すときにパネルの開閉を知らせない
+	const { viewer, stage, timers } = await openPlaying();
+	await find(stage(), '.slideshow-speed').click();
+	viewer.setSettings(slideshowSettings({ slideshow: SLIDESHOW_MODES.OFF }));
+	viewer.setSettings(slideshowSettings());
+	await find(stage(), '.slideshow-toggle').click();
+	assert.equal(timers.ids(SLIDESHOW_TEST_INTERVAL_MS).length, 1);
+});
+
+test('隠れた帯は、どのキーを押しても出し直す', async () => {
+	const timers = fakeTimers();
+	const { viewer, doc, stage } = setup({ settings: slideshowSettings(), setTimeout: timers.setTimeout, clearTimeout: timers.clearTimeout });
+	await viewer.open('1');
+	timers.fire(SLIDESHOW_CONTROLS_IDLE_MS);
+	const controls = find(stage(), '.slideshow-controls');
+	assert.equal(controls.dataset.idle, '');
+	await doc.dispatch('keydown', { key: 'a', preventDefault() {}, stopPropagation() {} });
+	assert.equal(controls.dataset.idle, undefined);
+});
+
+test('設定のループだけが変わっても計時をやり直さず、間隔が変わったらやり直す', async () => {
+	const { viewer, timers } = await openPlaying();
+	const before = timers.ids(SLIDESHOW_TEST_INTERVAL_MS);
+	viewer.setSettings(slideshowSettings({ slideshowLoop: true }));
+	assert.deepEqual(timers.ids(SLIDESHOW_TEST_INTERVAL_MS), before);
+	viewer.setSettings(slideshowSettings({ slideshowLoop: true, slideshowInterval: SLIDESHOW_SHORT_INTERVAL }));
+	assert.deepEqual(timers.ids(SLIDESHOW_TEST_INTERVAL_MS), []);
+	assert.equal(timers.ids(SLIDESHOW_SHORT_INTERVAL_MS).length, 1);
+});
+
+test('速度のパネルを開いている間は、Escape で閉じず、下キーで作品を送らない', async () => {
+	const { viewer, doc, stage, closed, navigated } = setup({ settings: slideshowSettings() });
+	await viewer.open('1', fakeSequence(['1', '2']));
+	await find(stage(), '.slideshow-speed').click();
+	const option = findAll(stage(), '.slideshow-speed-option')[0];
+	const key = (name) => ({ key: name, composedPath: () => [option], preventDefault() {}, stopPropagation() {} });
+	await doc.dispatch('keydown', key(KEYS.NEXT_WORK));
+	await flush();
+	assert.deepEqual(navigated, [], '作品は移らない');
+	await doc.dispatch('keydown', key(KEYS.CLOSE));
+	assert.equal(closed(), 0, 'ビュワーは閉じない');
+	assert.equal(find(stage(), '.slideshow-speed-panel').hidden, true, 'パネルだけが閉じる');
+	// パネルを閉じた後は本体が受ける
+	await doc.dispatch('keydown', nextWorkKey());
+	await flush();
+	assert.deepEqual(navigated, ['2']);
+});
+
+test('ループを押すと手元の設定を差し替えて保存し、計時はやり直さない', async () => {
+	const saved = [];
+	const { stage, timers } = await openPlaying({
+		saveSetting: async (key, value) => { saved.push([key, value]); return true; },
+	});
+	const before = timers.ids(SLIDESHOW_TEST_INTERVAL_MS);
+	await find(stage(), '.slideshow-loop').click();
+	await flush();
+	assert.deepEqual(saved, [['slideshowLoop', true]]);
+	assert.deepEqual(timers.ids(SLIDESHOW_TEST_INTERVAL_MS), before);
+});
+
+test('送る間隔を選ぶと保存し、パネルを閉じたら新しい間隔で数える。保存に失敗しても止まらない', async () => {
+	const saved = [];
+	const { doc, stage, timers } = await openPlaying({
+		saveSetting: async (key, value) => {
+			saved.push([key, value]);
+			throw new Error('保存できない');
+		},
+	});
+	await find(stage(), '.slideshow-speed').click();
+	assert.deepEqual(timers.ids(SLIDESHOW_TEST_INTERVAL_MS), [], 'パネルを開いている間は数えない');
+	const short = findAll(stage(), '.slideshow-speed-option')
+		.find((item) => item.dataset.interval === String(SLIDESHOW_SHORT_INTERVAL));
+	await short.click();
+	await flush();
+	assert.deepEqual(saved, [['slideshowInterval', SLIDESHOW_SHORT_INTERVAL]]);
+	await doc.dispatch('keydown', { key: KEYS.CLOSE, composedPath: () => [short], preventDefault() {}, stopPropagation() {} });
+	assert.equal(timers.ids(SLIDESHOW_SHORT_INTERVAL_MS).length, 1);
+});
+
+test('isTypingTarget は文字を打つ要素だけを見分ける', () => {
+	assert.equal(isTypingTarget({ tagName: 'TEXTAREA' }), true);
+	assert.equal(isTypingTarget({ tagName: 'DIV', isContentEditable: true }), true);
+	assert.equal(isTypingTarget({ tagName: 'INPUT', type: 'text' }), true);
+	assert.equal(isTypingTarget({ tagName: 'INPUT', type: 'range' }), false);
+	assert.equal(isTypingTarget({ tagName: 'BUTTON' }), false);
+	assert.equal(isTypingTarget(null), false);
+});
+
+test('入力欄にフォーカスがある間は数えず、入力欄どうしの移動では数え直さない', async () => {
+	const { shadow, timers } = await openPlaying();
+	const overlay = find(shadow(), '.overlay');
+	const textarea = { tagName: 'TEXTAREA' };
+	const input = { tagName: 'INPUT', type: 'text' };
+	await overlay.dispatch('focusin', { composedPath: () => [textarea] });
+	assert.deepEqual(timers.ids(SLIDESHOW_TEST_INTERVAL_MS), []);
+	await overlay.dispatch('focusout', { relatedTarget: input });
+	assert.deepEqual(timers.ids(SLIDESHOW_TEST_INTERVAL_MS), [], '行き先も入力欄なら、外れた時点で数え直さない');
+	await overlay.dispatch('focusin', { composedPath: () => [input] });
+	assert.deepEqual(timers.ids(SLIDESHOW_TEST_INTERVAL_MS), []);
+	await overlay.dispatch('focusout', { relatedTarget: null });
+	assert.equal(timers.ids(SLIDESHOW_TEST_INTERVAL_MS).length, 1);
+});
+
+test('タブが隠れている間は数えない。隠れた状態で開いても数えない', async () => {
+	const { doc, timers } = await openPlaying();
+	doc.visibilityState = 'hidden';
+	await doc.dispatch('visibilitychange', {});
+	assert.deepEqual(timers.ids(SLIDESHOW_TEST_INTERVAL_MS), []);
+	doc.visibilityState = 'visible';
+	await doc.dispatch('visibilitychange', {});
+	assert.equal(timers.ids(SLIDESHOW_TEST_INTERVAL_MS).length, 1);
+
+	const hiddenTimers = fakeTimers();
+	const hidden = setup({ settings: slideshowSettings(), setTimeout: hiddenTimers.setTimeout, clearTimeout: hiddenTimers.clearTimeout });
+	hidden.doc.visibilityState = 'hidden';
+	await hidden.viewer.open('1');
+	await find(hidden.stage(), 'img').dispatch('load', {});
+	await find(hidden.stage(), '.slideshow-toggle').click();
+	assert.deepEqual(hiddenTimers.ids(SLIDESHOW_TEST_INTERVAL_MS), []);
+});
+
+test('原寸表示を開いている間は数えない', async () => {
+	const { doc, stage, timers } = await openPlaying({ settings: { clickZoom: true } });
+	await find(stage(), 'img').dispatch('click', {});
+	assert.deepEqual(timers.ids(SLIDESHOW_TEST_INTERVAL_MS), []);
+	await doc.dispatch('keydown', { key: KEYS.CLOSE, preventDefault() {}, stopPropagation() {} });
+	assert.equal(timers.ids(SLIDESHOW_TEST_INTERVAL_MS).length, 1);
+});
+
+test('見られない作品・取得や描画に失敗した作品でも、表示し終えた扱いにして止まらない', async () => {
+	const cases = [
+		{ getJsonImpl: async (url) => rawDetail(idOf(url), { xRestrict: 1 }) },
+		{ getJsonImpl: async () => { throw new PixivError(PIXIV_ERROR_KINDS.NETWORK, 'network'); } },
+	];
+	for (const extra of cases) {
+		const timers = fakeTimers();
+		const { viewer, stage } = setup({
+			...extra,
+			settings: slideshowSettings({ slideshow: SLIDESHOW_MODES.SEQUENCE }),
+			setTimeout: timers.setTimeout,
+			clearTimeout: timers.clearTimeout,
+		});
+		await viewer.open('1', fakeSequence(['1', '2']));
+		await find(stage(), '.slideshow-toggle').click();
+		assert.equal(timers.ids(SLIDESHOW_TEST_INTERVAL_MS).length, 1);
+	}
+
+	const timers = fakeTimers();
+	const broken = slideshowSettings();
+	Object.defineProperty(broken, 'imageQuality', { get() { throw new Error('壊れた設定'); } });
+	const { viewer, stage } = setup({ settings: broken, setTimeout: timers.setTimeout, clearTimeout: timers.clearTimeout });
+	await viewer.open('1');
+	await find(stage(), '.slideshow-toggle').click();
+	assert.equal(timers.ids(SLIDESHOW_TEST_INTERVAL_MS).length, 1);
+});
+
+test('閉じると visibilitychange を外し、タイマーを残さない。開き直すと停止状態から始まる', async () => {
+	const { viewer, doc, stage, timers } = await openPlaying();
+	await find(stage(), '.slideshow-speed').click();
+	viewer.close();
+	assert.equal((doc.listeners.visibilitychange ?? []).length, 0);
+	assert.equal(timers.size(), 0);
+
+	await viewer.open('1');
+	await flush();
+	await find(stage(), 'img').dispatch('load', {});
+	assert.deepEqual(timers.ids(SLIDESHOW_TEST_INTERVAL_MS), [], '再生は持ち越さない');
+	assert.equal(find(stage(), '.slideshow-toggle').getAttribute('aria-label'), createStrings('ja').slideshow.PLAY);
 });
