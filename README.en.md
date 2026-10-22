@@ -56,6 +56,7 @@ on the grid, at the scroll position you left.
 | **Work to work** | `↑` `↓` move to the previous or next work in the grid. With the setting on, clicking the top or bottom edge of the screen does too. On user pages, reaching the end loads the next page for you, and on the illustration and manga tabs only works of that kind are visited. On the home page and in search results, you move within the section of the work you clicked |
 | **Ugoira** | The zip is decoded into frames and played in the viewer, with pause and resume |
 | **Actual size** | Click the image to open it at its original resolution, filling the screen. (The same way pixiv's own artwork page looks) Page through with the screen edges or `←` `→` (off by default) |
+| **Auto-advance** | Moves to the next page automatically at a set interval. Choose whether it stays within a work or continues to the next work after the last page. A control bar below the viewer lets you play, pause, go back or forward, loop, and pick the interval (2, 3 or 4 seconds, or Custom from 1 to 30 seconds in 0.5-second steps). It pauses while you view at actual size, type a comment, or have the tab in the background (off by default) |
 
 ### Sidebar
 
@@ -85,7 +86,7 @@ The caption, tags, post date, counters and comments sit beside the image in a si
 | | |
 | --- | --- |
 | **Theme** | The viewer follows pixiv's own dark / light setting. The settings popup can be switched by hand |
-| **Fine-grained settings** | The Settings tab (viewer, images, user pages, controls) and the Advanced tab (viewer, controls, comments) let you tune where the viewer is used, image quality, prefetch, how the sidebar appears and how wide it is, background darkness, infinite scroll and more |
+| **Fine-grained settings** | The Settings tab (viewer, images, user pages, controls, auto-advance) and the Advanced tab (viewer, controls, comments) let you tune where the viewer is used, image quality, prefetch, how the sidebar appears and how wide it is, background darkness, the auto-advance interval, infinite scroll and more |
 | **Accessibility** | A focus trap, `role="dialog"`, and a tidier tab order on the grid. Opening and closing works entirely from the keyboard |
 
 ## Requirements
@@ -156,7 +157,7 @@ Open a pixiv **user page** (`https://www.pixiv.net/users/{id}` and its tabs), th
 | `←` `→` | Page through the current work (the same at actual size) |
 | `↑` `↓` | Previous or next work |
 | `Ctrl` + `Enter` | Send from the comment box. (`Cmd` + `Enter` on Mac) `Enter` is a line break |
-| `Esc` | Closes the frontmost thing first. (emoji panel → actual size or the share menu → the viewer) It will not close the viewer while a draft is unsent |
+| `Esc` | Closes the frontmost thing first. (emoji panel → actual size, the share menu or the auto-advance interval panel → the viewer) It will not close the viewer while a draft is unsent |
 | `Tab` | Move focus inside the modal (it never leaves) |
 
 While you are writing a comment, `←` `→` `↑` `↓` move the caret. (The work stays put)
@@ -167,8 +168,8 @@ Open the popup from the toolbar icon. It has a Settings tab and an Advanced tab,
 are grouped so you can tune each part to suit you. Settings marked `↳` belong to the one above them.
 A setting cannot be changed while the setting it depends on is off. (Everything to do with the viewer while
 "Use the viewer" is off, the sidebar widths and the number of comments while "Show the sidebar" is off, the edge
-click area width while "Click the edges to navigate" is Off, and the actual-size click area width while "Click to
-view at actual size" is off) The Licenses tab carries the disclaimer and the notices for the bundled third-party assets.
+click area width while "Click the edges to navigate" is Off, the actual-size click area width while "Click to
+view at actual size" is off, and the interval and loop while "Auto-advance" is Off) The Licenses tab carries the disclaimer and the notices for the bundled third-party assets.
 
 **Settings tab**
 
@@ -189,6 +190,9 @@ view at actual size" is off) The Licenses tab carries the disclaimer and the not
 | Controls | Click the background to close | On | Whether clicking outside the image closes the viewer |
 | Controls | Click the edges to navigate | Off | The left and right edges of the screen turn pages, the top and bottom edges switch artworks. Choose left/right only, top/bottom only, or both. Edges you cannot move past show a not-allowed cursor, so they are easy to tell from the empty area that closes the viewer |
 | Controls | Tab movement in the grid | Do not skip | Whether Tab skips the bookmark button and the title in artwork lists (user pages, the home page and search results). Artist links are not skipped |
+| Auto-advance | Auto-advance | Off | Moves to the next page automatically at a set interval. Choose Within a work (stops after the last page) or Continue to next work (moves on to the next work after the last page). When on, a control bar below the viewer lets you play, pause, go back or forward, loop and change the interval. The viewer always opens paused |
+| Auto-advance | Interval | 3 s | Choose 2, 3 or 4 seconds, or Custom, which lets you pick 1 to 30 seconds in 0.5-second steps. Counted from when the image is shown. Changes made on the control bar are saved here too |
+| Auto-advance | Loop | Off | Returns to the start after the last one. Within a work goes back to page 1; Continue to next work goes back to the first work in the list |
 
 **Advanced tab**
 
