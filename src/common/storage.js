@@ -95,7 +95,7 @@ function intInRange(value, { min, max }, fallback) {
  * @param {number} fallback 既定
  * @returns {number} 寄せた値
  */
-function snapToRange(value, { min, max, step }, fallback) {
+export function snapToRange(value, { min, max, step }, fallback) {
 	if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
 	const clamped = Math.min(max, Math.max(min, value));
 	return min + Math.round((clamped - min) / step) * step;

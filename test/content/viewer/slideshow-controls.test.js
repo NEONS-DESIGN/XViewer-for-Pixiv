@@ -180,7 +180,7 @@ test('setSettings でループと速度の表示を合わせる。コールバ�
 	assert.equal(part('.slideshow-speed-label').textContent, '7.5 秒');
 	assert.equal(part('.slideshow-custom').hidden, false);
 	assert.equal(part('.slideshow-custom-range').value, '7.5');
-	assert.equal(part('.slideshow-custom-value').textContent, '7.5 秒');
+	assert.equal(part('.slideshow-custom-value').value, '7.5');
 	assert.deepEqual(calls.loop, []);
 	assert.deepEqual(calls.interval, []);
 	controls.dispose();
@@ -271,12 +271,87 @@ test('カスタムのスライダーは input で表示だけ変え、change で
 
 	range.value = '12.5';
 	await range.dispatch('input', {});
-	assert.equal(part('.slideshow-custom-value').textContent, '12.5 秒');
+	assert.equal(part('.slideshow-custom-value').value, '12.5', 'スライダーを動かすと数字の欄も合わせる');
 	assert.equal(range.getAttribute('aria-valuetext'), '12.5 秒');
 	assert.equal(calls.interval.length, 1, 'input では知らせない');
 	await range.dispatch('change', {});
 	assert.deepEqual(calls.interval.at(-1), { slideshowIntervalCustom: 12.5 });
 	assert.equal(part('.slideshow-speed-label').textContent, '12.5 秒');
+	controls.dispose();
+});
+
+test('秒数の欄は数字の入力欄で、スライダーと同じ範囲と刻みを持つ', async () => {
+	const { stage, controls, part } = build({ settings: { ...SETTINGS, slideshowInterval: 'custom', slideshowIntervalCustom: 7.5 } });
+	await part('.slideshow-speed').click();
+	await option(stage, 'custom').click();
+	const field = part('.slideshow-custom-value');
+	assert.equal(field.tagName, 'INPUT');
+	assert.equal(field.type, 'number');
+	assert.equal(field.min, String(SLIDESHOW_INTERVAL_CUSTOM_RANGE.min));
+	assert.equal(field.max, String(SLIDESHOW_INTERVAL_CUSTOM_RANGE.max));
+	assert.equal(field.step, String(SLIDESHOW_INTERVAL_CUSTOM_RANGE.step));
+	assert.equal(field.value, '7.5');
+	assert.equal(field.getAttribute('aria-label'), '間隔 (秒)');
+	controls.dispose();
+});
+
+test('秒数の欄で打った値は input でスライダーへ写し、change で確定して知らせる', async () => {
+	const { calls, controls, part } = build({ settings: { ...SETTINGS, slideshowInterval: 'custom' } });
+	await part('.slideshow-speed').click();
+	const field = part('.slideshow-custom-value');
+	const range = part('.slideshow-custom-range');
+	field.value = '20';
+	await field.dispatch('input', {});
+	assert.equal(range.value, '20', '打っている間もつまみを合わせる');
+	assert.deepEqual(calls.interval, [], 'input では知らせない');
+	await field.dispatch('change', {});
+	assert.deepEqual(calls.interval, [{ slideshowIntervalCustom: 20 }]);
+	assert.equal(part('.slideshow-speed-label').textContent, '20 秒');
+	controls.dispose();
+});
+
+test('秒数の欄の範囲外と刻みの外の値は、範囲の端と近い刻みへ寄せて確定する', async () => {
+	const { calls, controls, part } = build({ settings: { ...SETTINGS, slideshowInterval: 'custom' } });
+	await part('.slideshow-speed').click();
+	const field = part('.slideshow-custom-value');
+	for (const [typed, expected] of [['99', 30], ['0', 1], ['7.3', 7.5]]) {
+		field.value = typed;
+		await field.dispatch('change', {});
+		assert.equal(field.value, String(expected), typed);
+		assert.deepEqual(calls.interval.at(-1), { slideshowIntervalCustom: expected }, typed);
+	}
+	controls.dispose();
+});
+
+test('秒数の欄を空にしたり数字でない値にしたりしたら、元の値へ戻して知らせない', async () => {
+	const { calls, controls, part } = build({ settings: { ...SETTINGS, slideshowInterval: 'custom' } });
+	await part('.slideshow-speed').click();
+	const field = part('.slideshow-custom-value');
+	const range = part('.slideshow-custom-range');
+	for (const typed of ['', 'abc']) {
+		field.value = typed;
+		await field.dispatch('input', {});
+		assert.equal(range.value, '5', `${JSON.stringify(typed)} ではつまみを動かさない`);
+		await field.dispatch('change', {});
+		assert.equal(field.value, '5', JSON.stringify(typed));
+	}
+	field.value = '5';
+	await field.dispatch('change', {});
+	assert.deepEqual(calls.interval, [], '同じ値と読めない値では知らせない');
+	controls.dispose();
+});
+
+test('秒数の欄の上のキーはブラウザに任せる (上下で値を増減できる)。Escape はパネルを閉じる', async () => {
+	const { controls, part } = build({ settings: { ...SETTINGS, slideshowInterval: 'custom' } });
+	await part('.slideshow-speed').click();
+	const field = part('.slideshow-custom-value');
+	for (const name of ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter']) {
+		const event = key(name, field);
+		assert.equal(controls.consumeKey(event), false, name);
+		assert.equal(event.prevented, undefined, name);
+	}
+	assert.equal(controls.consumeKey(key('Escape', field)), true);
+	assert.equal(part('.slideshow-speed-panel').hidden, true);
 	controls.dispose();
 });
 

@@ -1980,7 +1980,7 @@ a.comment-name:hover {
 	right: 0;
 	bottom: calc(100% + 8px);
 	box-sizing: border-box;
-	min-width: 168px;
+	min-width: 200px;
 	padding: 6px 0;
 	border: 1px solid var(--border);
 	border-radius: 8px;
@@ -2013,14 +2013,14 @@ a.comment-name:hover {
 	font-weight: 600;
 }
 
-/* カスタムの秒数。見出しを上に、スライダーと今の秒数を下に並べる */
+/* カスタムの秒数。見出しを上に、スライダーと秒数の欄を下に並べる */
 .slideshow-custom {
 	display: grid;
 	grid-template-columns: 1fr auto;
 	align-items: center;
-	gap: 4px 8px;
+	gap: 4px 6px;
 	margin-top: 6px;
-	padding: 8px 12px 2px;
+	padding: 8px 12px 4px;
 	border-top: 1px solid var(--border);
 	font-size: 12px;
 }
@@ -2030,20 +2030,63 @@ a.comment-name:hover {
 	color: var(--muted);
 }
 
+/* スライダー。軌道を細く描き、つまみの手前 (--slideshow-range-fill) を強調色で塗る */
 .slideshow-custom-range {
+	--slideshow-range-fill: 0%;
 	min-width: 0;
+	height: 20px;
 	margin: 0;
-	accent-color: var(--accent);
+	background: transparent;
 	cursor: pointer;
+	appearance: none;
 }
 
-/* 桁が変わっても並びが揺れないよう、数字の幅を揃える */
+.slideshow-custom-range::-webkit-slider-runnable-track {
+	height: 3px;
+	border-radius: 2px;
+	background: linear-gradient(to right, var(--accent) var(--slideshow-range-fill), var(--seek-rest) var(--slideshow-range-fill));
+}
+
+.slideshow-custom-range::-moz-range-track {
+	height: 3px;
+	border-radius: 2px;
+	background: linear-gradient(to right, var(--accent) var(--slideshow-range-fill), var(--seek-rest) var(--slideshow-range-fill));
+}
+
+.slideshow-custom-range::-webkit-slider-thumb {
+	width: 12px;
+	height: 12px;
+	/* 軌道 (3px) の中央に置く */
+	margin-top: -4.5px;
+	border: 0;
+	border-radius: 50%;
+	background: var(--accent);
+	appearance: none;
+}
+
+.slideshow-custom-range::-moz-range-thumb {
+	width: 12px;
+	height: 12px;
+	border: 0;
+	border-radius: 50%;
+	background: var(--accent);
+}
+
+/* 秒数の欄。押すと数字を打てる。30.0 まで収まる幅に留め、スライダーへ幅を回す */
 .slideshow-custom-value {
-	min-width: 4em;
+	box-sizing: border-box;
+	width: 4.5em;
+	padding: 2px 2px 2px 6px;
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	background: var(--field-bg);
 	color: var(--fg);
+	font: inherit;
 	font-variant-numeric: tabular-nums;
 	text-align: right;
 }
+
+.slideshow-custom-value:hover { background: var(--field-bg-hover); }
 
 /* 動きを減らす設定では、フェードを付けずにすぐ消し、進捗の線を出さない */
 @media (prefers-reduced-motion: reduce) {

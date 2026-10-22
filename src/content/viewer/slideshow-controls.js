@@ -16,7 +16,7 @@ import {
 	SLIDESHOW_INTERVAL_CUSTOM,
 	SLIDESHOW_INTERVAL_CUSTOM_RANGE,
 } from '../../common/constants.js';
-import { slideshowIntervalSeconds } from '../../common/storage.js';
+import { slideshowIntervalSeconds, snapToRange } from '../../common/storage.js';
 import { activeElementIn, hasFocusWithin } from './focus.js';
 
 /** 再生ボタンの表示。キーは今の再生状態、値は「押すと何になるか」。アイコンは言語に依らない。 */
@@ -47,6 +47,12 @@ const FOCUS_VISIBLE_SELECTOR = ':focus-visible';
 
 /** 進捗の線が伸びきるまでの時間を渡す CSS 変数 */
 const DURATION_VAR = '--slideshow-duration';
+
+/** カスタムのスライダーの軌道を、つまみの手前まで塗る割合を渡す CSS 変数。 */
+const RANGE_FILL_VAR = '--slideshow-range-fill';
+
+/** 割合を % へ直すときの掛け数。 */
+const PERCENT = 100;
 
 /**
  * @typedef {object} SlideshowControlsDeps
@@ -204,41 +210,91 @@ export function createSlideshowControls(deps) {
 		return item;
 	});
 
-	// label で包んでスライダーと結び付ける。(id を振らずに済む)
-	const custom = doc.createElement('label');
+	// スライダーと秒数の欄の 2 つの入力を持つので、見出しは label で包まず、それぞれに aria-label を付ける
+	const custom = doc.createElement('div');
 	custom.className = 'slideshow-custom';
 	const customLabel = doc.createElement('span');
 	customLabel.className = 'slideshow-custom-label';
+	customLabel.setAttribute('aria-hidden', 'true');
 	customLabel.textContent = text.CUSTOM_RANGE;
+	const { min: customMin, max: customMax, step: customStep } = SLIDESHOW_INTERVAL_CUSTOM_RANGE;
 	const range = doc.createElement('input');
 	range.type = 'range';
 	range.className = 'slideshow-custom-range';
-	range.min = String(SLIDESHOW_INTERVAL_CUSTOM_RANGE.min);
-	range.max = String(SLIDESHOW_INTERVAL_CUSTOM_RANGE.max);
-	range.step = String(SLIDESHOW_INTERVAL_CUSTOM_RANGE.step);
-	const rangeValue = doc.createElement('output');
-	rangeValue.className = 'slideshow-custom-value';
-	custom.append(customLabel, range, rangeValue);
+	range.min = String(customMin);
+	range.max = String(customMax);
+	range.step = String(customStep);
+	range.setAttribute('aria-label', text.CUSTOM_RANGE);
+	// 秒数の欄。押すと数字を打て、上下キーと欄の矢印で刻みずつ増減できる
+	const field = doc.createElement('input');
+	field.type = 'number';
+	field.className = 'slideshow-custom-value';
+	field.min = String(customMin);
+	field.max = String(customMax);
+	field.step = String(customStep);
+	field.setAttribute('inputmode', 'decimal');
+	field.setAttribute('aria-label', text.CUSTOM_RANGE);
+	custom.append(customLabel, range, field);
 
 	/**
-	 * スライダーの今の値を秒数の表示へ写す。
+	 * スライダーの位置と読み上げを秒数に合わせる。軌道の塗りの割合も CSS 変数へ写す。
 	 * @param {number} seconds 秒数
 	 * @returns {void}
 	 */
 	function showRangeValue(seconds) {
-		const label = text.seconds(seconds);
-		rangeValue.textContent = label;
-		range.setAttribute('aria-valuetext', label);
+		range.value = String(seconds);
+		range.setAttribute('aria-valuetext', text.seconds(seconds));
+		const ratio = (seconds - customMin) / (customMax - customMin);
+		range.style.setProperty(RANGE_FILL_VAR, `${Math.round(ratio * PERCENT)}%`);
 	}
 
-	// 動かしている間は表示だけ。離したとき (change) に確定する
-	listen(range, 'input', () => showRangeValue(Number(range.value)));
+	/**
+	 * 秒数の欄に打たれた値を数として読む。空・数でなければ null。
+	 * @returns {number|null} 秒数
+	 */
+	function readField() {
+		const raw = String(field.value ?? '').trim();
+		if (raw === '') return null;
+		const seconds = Number(raw);
+		return Number.isFinite(seconds) ? seconds : null;
+	}
+
+	/**
+	 * カスタムの秒数を確定する。今の値と同じなら表示を整えるだけで知らせない。
+	 * @param {number} seconds 秒数 (範囲と刻みへ寄せ済み)
+	 * @returns {void}
+	 */
+	function commitCustom(seconds) {
+		const changed = seconds !== customSeconds;
+		customSeconds = seconds;
+		renderInterval();
+		if (changed) deps.onIntervalChange({ slideshowIntervalCustom: seconds });
+	}
+
+	// スライダーは動かしている間は表示だけ。離したとき (change) に確定する
+	listen(range, 'input', () => {
+		const seconds = Number(range.value);
+		showRangeValue(seconds);
+		field.value = String(seconds);
+	});
 	listen(range, 'change', () => {
 		const seconds = Number(range.value);
 		if (!Number.isFinite(seconds)) return;
-		customSeconds = seconds;
-		renderInterval();
-		deps.onIntervalChange({ slideshowIntervalCustom: seconds });
+		commitCustom(seconds);
+	});
+	// 秒数の欄は、打っている間は範囲の中の値だけつまみへ写し、確定 (change) で範囲と刻みへ寄せる
+	listen(field, 'input', () => {
+		const seconds = readField();
+		if (seconds === null || seconds < customMin || seconds > customMax) return;
+		showRangeValue(seconds);
+	});
+	listen(field, 'change', () => {
+		const seconds = readField();
+		if (seconds === null) {
+			renderInterval();
+			return;
+		}
+		commitCustom(snapToRange(seconds, SLIDESHOW_INTERVAL_CUSTOM_RANGE, customSeconds));
 	});
 
 	panel.append(radiogroup, custom);
@@ -272,8 +328,8 @@ export function createSlideshowControls(deps) {
 			item.setAttribute('tabindex', at === selected ? '0' : '-1');
 		});
 		custom.hidden = interval !== SLIDESHOW_INTERVAL_CUSTOM;
-		range.value = String(customSeconds);
 		showRangeValue(customSeconds);
+		field.value = String(customSeconds);
 	}
 
 	/**
@@ -537,6 +593,7 @@ export function createSlideshowControls(deps) {
 		 * 矢印と端のキーで選び直すのは項目の上だけで、押し続けて繰り返し届く分は食い止めるだけにする。
 		 * スライダーの上の上下は作品を送らせないよう食い止め、
 		 * 左右と端のキーは、つまみを動かす既定の動作に任せるので false を返す。
+		 * 秒数の欄の上のキーは、上下で値を増減する既定の動作に任せるので、Escape 以外は false を返す。
 		 * @param {KeyboardEvent} event キー
 		 * @returns {boolean} 食い止めたなら true
 		 */
