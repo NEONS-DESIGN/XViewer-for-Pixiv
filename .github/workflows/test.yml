@@ -1,0 +1,40 @@
+# 拡張機能のテスト・ビルドと、紹介サイトの言語の一覧の検査を走らせる。
+name: Test
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  # Actions タブから手動でも動かせるようにする
+  workflow_dispatch:
+
+# 読むだけ。リポジトリへは何も書かない
+permissions:
+  contents: read
+
+# 同じブランチで新しい push が来たら、走っている古い実行は止める
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          # package.json の engines を満たす版を使う
+          node-version-file: package.json
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run tests
+        run: npm test
+      - name: Check site language lists
+        run: node scripts/site-langs.mjs --check
+      - name: Build
+        run: npm run build
