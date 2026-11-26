@@ -12,6 +12,7 @@ import { USER_ID_PATTERN } from '../../common/constants.js';
 import { currentLocalePrefix } from '../../common/locale.js';
 import { PIXIV_ORIGIN, artworkPath, userPath, tagWorksPath } from '../../pixiv/endpoints.js';
 import { createAvatar, showAvatar } from './avatar.js';
+import { el, externalLink } from './dom.js';
 import { fetchUserProfile } from '../../pixiv/user.js';
 import { createShareMenu } from './share-menu.js';
 
@@ -47,10 +48,7 @@ const NAMED_ENTITY_PATTERN = /&(?:amp|lt|gt|quot);/g;
 /** 投稿文の br。この前後で行を分ける。 */
 const LINE_BREAK_PATTERN = /<br\s*\/?>/i;
 
-/**
- * 投稿文の a。1 番目の捕捉が href、2 番目が中身。
- * g フラグ付きは lastIndex を持つので、使うときは行ごとに `new RegExp()` で複製する
- */
+/** 投稿文の a。1 番目の捕捉が href、2 番目が中身。matchAll で回すので g 付き。 */
 const ANCHOR_PATTERN = /<a\b[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/gis;
 
 /** 残すタグ以外の全てのタグ。中身のテキストだけ残すために消す。 */
@@ -130,11 +128,8 @@ export function splitComment(html) {
 		.split(LINE_BREAK_PATTERN)
 		.map((line) => {
 			const parts = [];
-			// g 付きの正規表現は lastIndex を持ち回るので、行ごとに複製して使う
-			const pattern = new RegExp(ANCHOR_PATTERN);
 			let cursor = 0;
-			let matched;
-			while ((matched = pattern.exec(line)) !== null) {
+			for (const matched of line.matchAll(ANCHOR_PATTERN)) {
 				const before = line.slice(cursor, matched.index);
 				if (before) parts.push({ type: 'text', value: decodeEntities(before.replace(ANY_TAG_PATTERN, '')) });
 				const label = decodeEntities(matched[2].replace(ANY_TAG_PATTERN, ''));
@@ -159,13 +154,10 @@ export function commentToNodes(doc, html) {
 	const fragment = doc.createDocumentFragment();
 	const lines = splitComment(html);
 	lines.forEach((parts, lineIndex) => {
-		if (lineIndex > 0) fragment.appendChild(doc.createElement('br'));
+		if (lineIndex > 0) fragment.appendChild(el(doc, 'br'));
 		for (const part of parts) {
 			if (part.type === 'link') {
-				const anchor = doc.createElement('a');
-				anchor.href = part.href;
-				anchor.target = '_blank';
-				anchor.rel = 'noopener noreferrer';
+				const anchor = externalLink(doc, part.href);
 				anchor.textContent = part.value;
 				fragment.appendChild(anchor);
 			} else {
@@ -231,19 +223,15 @@ export function createSidebar(deps) {
 	 * @returns {HTMLElement} 要素
 	 */
 	function createCount(iconName, label, value, marker) {
-		const item = doc.createElement('span');
-		item.className = marker ? `count ${marker}` : 'count';
-		item.appendChild(createIcon(doc, iconName));
-		const name = doc.createElement('span');
-		name.className = VISUALLY_HIDDEN_CLASS;
-		name.textContent = `${label} `;
-		item.appendChild(name);
-		const text = doc.createElement('span');
-		// 数字だけを持つ要素に印を付けておく。bumpCommentCount() がここだけを書き換える
-		text.className = COUNT_VALUE_CLASS;
-		text.textContent = formatCount(value, strings.lang);
-		item.appendChild(text);
-		item.title = `${label} ${formatCount(value, strings.lang)}`;
+		const item = el(doc, 'span', marker ? `count ${marker}` : 'count');
+		const count = formatCount(value, strings.lang);
+		item.append(
+			createIcon(doc, iconName),
+			el(doc, 'span', VISUALLY_HIDDEN_CLASS, `${label} `),
+			// 数字だけを持つ要素に印を付けておく。bumpCommentCount() がここだけを書き換える
+			el(doc, 'span', COUNT_VALUE_CLASS, count),
+		);
+		item.title = `${label} ${count}`;
 		return item;
 	}
 
@@ -281,35 +269,27 @@ export function createSidebar(deps) {
 	 * @returns {HTMLElement} .author-row
 	 */
 	function createAuthorRow(detail) {
-		const row = doc.createElement('div');
-		row.className = 'author-row';
+		const row = el(doc, 'div', 'author-row');
 
 		// 数字でない ID はパスに埋めると別のページを指しうるので、リンクにせず文字だけ出す
 		const linkable = USER_ID_PATTERN.test(detail.userId);
-		const author = doc.createElement(linkable ? 'a' : 'span');
-		author.className = 'author';
+		const author = el(doc, linkable ? 'a' : 'span', 'author');
 		if (linkable) author.href = userPath(detail.userId, localePrefix);
 
 		// 取れるまでは枠だけ。読み込めなかったときと同じ見え方にしておく
 		const avatar = createAvatar(doc, 'author-avatar');
 		author.appendChild(avatar);
 
-		const identity = doc.createElement('span');
-		identity.className = 'author-identity';
-		const name = doc.createElement('span');
-		name.className = 'author-name';
-		name.textContent = detail.userName;
-		const userId = doc.createElement('span');
-		userId.className = 'author-id';
-		userId.textContent = `${USER_ID_PREFIX}${detail.userId}`;
-		identity.append(name, userId);
-		author.appendChild(identity);
+		const identity = author.appendChild(el(doc, 'span', 'author-identity'));
+		identity.append(
+			el(doc, 'span', 'author-name', detail.userName),
+			el(doc, 'span', 'author-id', `${USER_ID_PREFIX}${detail.userId}`),
+		);
 
 		// 形の違う ID は /ajax/user の URL にも埋めない。アイコンは枠だけにする
 		if (linkable) loadAuthorIcon(detail.userId, avatar);
 
-		follow = doc.createElement('div');
-		follow.className = 'follow-slot';
+		follow = el(doc, 'div', 'follow-slot');
 		row.append(author, follow);
 		return row;
 	}
@@ -320,18 +300,10 @@ export function createSidebar(deps) {
 	 * @returns {HTMLElement} .link-row
 	 */
 	function createLinkRow(detail) {
-		const row = doc.createElement('div');
-		row.className = 'link-row';
+		const row = el(doc, 'div', 'link-row');
 
-		const original = doc.createElement('a');
-		original.className = 'original-link';
-		original.href = artworkPath(detail.id, localePrefix);
-		original.setAttribute('target', '_blank');
-		original.setAttribute('rel', 'noopener noreferrer');
-		const label = doc.createElement('span');
-		label.textContent = strings.sidebar.OPEN_ORIGINAL;
-		original.append(label, createIcon(doc, 'openInNew'));
-		row.appendChild(original);
+		const original = row.appendChild(externalLink(doc, artworkPath(detail.id, localePrefix), 'original-link'));
+		original.append(el(doc, 'span', '', strings.sidebar.OPEN_ORIGINAL), createIcon(doc, 'openInNew'));
 
 		shareMenu = createShareMenu({ doc, detail, strings });
 		row.appendChild(shareMenu.element);
@@ -372,46 +344,27 @@ export function createSidebar(deps) {
 			// 作品情報とコメントを別の入れ物に分ける。
 			// スクロールするのはコメント一覧だけにしたいので、
 			// サイドバー自身ではなく中の 2 つで縦の領域を分け合う (viewer.css の .sidebar)
-			const info = doc.createElement('div');
-			info.className = 'sidebar-info';
-			container.appendChild(info);
+			const info = container.appendChild(el(doc, 'div', 'sidebar-info'));
 
 			// 作者のアイコン・名前とフォローを同じ行に置く。
 			// pixiv 本体と同じで、誰の作品かが最初に目に入る
 			info.appendChild(createAuthorRow(detail));
 
-			const title = doc.createElement('h2');
-			title.className = 'title';
-			title.textContent = detail.title;
-			info.appendChild(title);
-
-			const comment = doc.createElement('p');
-			comment.className = 'comment';
-			comment.appendChild(commentToNodes(doc, detail.comment));
-			info.appendChild(comment);
+			info.appendChild(el(doc, 'h2', 'title', detail.title));
+			info.appendChild(el(doc, 'p', 'comment')).appendChild(commentToNodes(doc, detail.comment));
 
 			if (detail.tags.length > 0) {
-				const tagList = doc.createElement('ul');
-				tagList.className = 'tags';
+				const tagList = info.appendChild(el(doc, 'ul', 'tags'));
 				for (const tag of detail.tags) {
-					const item = doc.createElement('li');
-					const link = doc.createElement('a');
+					const link = tagList.appendChild(el(doc, 'li')).appendChild(el(doc, 'a', '', `#${tag}`));
 					link.href = tagWorksPath(tag, localePrefix);
-					link.textContent = `#${tag}`;
-					item.appendChild(link);
-					tagList.appendChild(item);
 				}
-				info.appendChild(tagList);
 			}
 
 			// 投稿日時はタグの下・カウンタの罫線の上。読み物の締めくくりとして置く
-			const date = doc.createElement('p');
-			date.className = 'date';
-			date.textContent = formatDate(detail.createDate, strings);
-			info.appendChild(date);
+			info.appendChild(el(doc, 'p', 'date', formatDate(detail.createDate, strings)));
 
-			counts = doc.createElement('div');
-			counts.className = 'counts';
+			counts = el(doc, 'div', 'counts');
 			// アイコンの対応は pixiv 本体に合わせる。いいねは顔、ブックマークはハート
 			counts.append(
 				createCount('like', strings.sidebar.LIKE, detail.likeCount, 'count-like'),
@@ -425,9 +378,7 @@ export function createSidebar(deps) {
 
 			info.appendChild(createLinkRow(detail));
 
-			comments = doc.createElement('div');
-			comments.className = 'comments';
-			container.appendChild(comments);
+			comments = container.appendChild(el(doc, 'div', 'comments'));
 		},
 
 		followSlot() { return follow; },

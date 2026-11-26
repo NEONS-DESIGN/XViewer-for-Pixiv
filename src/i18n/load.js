@@ -1,24 +1,26 @@
 /**
  * 設定画面 (popup) 用の文言カタログの入口。
  * 使う 1 言語のカタログだけを読む。content script は index.js の createStrings を使う。
+ * 1 言語のカタログはビュワー側の節 (<言語>.js) と設定画面の節 (<言語>-popup.js) に分かれていて、
+ * 設定画面はビュワー側の節を使わないので、設定画面の節だけを読む。
  */
 import { SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE } from '../common/language.js';
 import { buildStrings } from './freeze.js';
 
 /** 言語ごとの読み込み。キーは SUPPORTED_LANGUAGES と 1 対 1。 */
 const LOADERS = Object.freeze({
-	ja: () => import('./ja.js'),
-	en: () => import('./en.js'),
-	ko: () => import('./ko.js'),
-	'zh-CN': () => import('./zh-CN.js'),
-	'zh-TW': () => import('./zh-TW.js'),
+	ja: () => import('./ja-popup.js'),
+	en: () => import('./en-popup.js'),
+	ko: () => import('./ko-popup.js'),
+	'zh-CN': () => import('./zh-CN-popup.js'),
+	'zh-TW': () => import('./zh-TW-popup.js'),
 });
 
 /**
  * 指定した言語のカタログを読む。
  * @param {string} lang 言語コード
  * @param {{loaders?: Record<string, () => Promise<{default: object}>>}} [deps] テスト用の依存
- * @returns {Promise<object>} 文言のカタログ。未知の言語や、読み込みの表に無い言語なら既定の言語
+ * @returns {Promise<object>} 文言のカタログ (設定画面の節)。未知の言語や、読み込みの表に無い言語なら既定の言語
  */
 export async function loadStrings(lang, deps = {}) {
 	const loaders = deps.loaders ?? LOADERS;

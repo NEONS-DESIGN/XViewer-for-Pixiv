@@ -543,7 +543,8 @@ test('watchSettings は最初の通知でだけ読み、以後は変更を重ね
 	watch.dispose();
 });
 
-test('watchSettings は最初に読めなければ既定を渡し、次の通知で読み直す', async () => {
+test('watchSettings は最初に読めなければ何も渡さず、次の通知で読み直す', async () => {
+	// 既定値を配ると、ビュワーや無限スクロールを切っていた人でも一時的に入ってしまう
 	let listener = null;
 	let fail = true;
 	const { area: inner } = fakeArea({ prefetch: 3 });
@@ -561,10 +562,42 @@ test('watchSettings は最初に読めなければ既定を渡し、次の通知
 	fail = false;
 	listener({}, 'sync');
 	await flush();
-	assert.deepEqual(received.map((one) => one.prefetch), [SETTINGS_DEFAULTS.prefetch, 3]);
+	assert.deepEqual(received.map((one) => one.prefetch), [3]);
 });
 
-test('watchSettings は sync 領域の無い storage では既定の chrome.storage.sync へ戻らず既定を渡す', async () => {
+test('watchSettings は読めなかった通知のあとも読み直しを続け、読めた値を手元に持つ', async () => {
+	let listener = null;
+	let failures = 2;
+	let reads = 0;
+	const { area: inner } = fakeArea({ enabled: false, prefetch: 3 });
+	const area = {
+		async get(keys) {
+			reads += 1;
+			if (failures > 0) {
+				failures -= 1;
+				throw new Error('no storage');
+			}
+			return inner.get(keys);
+		},
+	};
+	const storage = { sync: area, onChanged: { addListener(fn) { listener = fn; }, removeListener() {} } };
+	const received = [];
+	watchSettings((settings) => received.push(settings), { storage });
+	listener({ enabled: { newValue: false } }, 'sync');
+	listener({ prefetch: { newValue: 3 } }, 'sync');
+	await flush();
+	await flush();
+	assert.deepEqual(received, [], '読めていないのに設定を配っている');
+	listener({ prefetch: { newValue: 3 } }, 'sync');
+	listener({ prefetch: { oldValue: 3, newValue: 1 } }, 'sync');
+	await flush();
+	await flush();
+	// 3 回目で読め、4 回目は手元の値へ重ねるだけ
+	assert.equal(reads, 3);
+	assert.deepEqual(received.map((one) => [one.enabled, one.prefetch]), [[false, 3], [false, 1]]);
+});
+
+test('watchSettings は sync 領域の無い storage では既定の chrome.storage.sync へ戻らず、何も渡さない', async () => {
 	let listener = null;
 	const original = globalThis.chrome;
 	globalThis.chrome = { storage: { sync: fakeArea({ prefetch: 3 }).area } };
@@ -573,7 +606,8 @@ test('watchSettings は sync 領域の無い storage では既定の chrome.stor
 		watchSettings((settings) => received.push(settings), { storage: { onChanged: { addListener(fn) { listener = fn; }, removeListener() {} } } });
 		listener({}, 'sync');
 		await flush();
-		assert.deepEqual(received, [SETTINGS_DEFAULTS]);
+		// 既定の領域 (prefetch: 3) を読んでいれば 3 が届く。読めない領域として扱い、既定値も配らない
+		assert.deepEqual(received, []);
 	} finally {
 		globalThis.chrome = original;
 	}

@@ -21,9 +21,7 @@ test('ビュワーのフォーカスの輪郭は 1 本にまとめる', () => {
 		// 輪郭を出さない例外 (Tab の巡回先ではないダイアログ本体。モーダルと原寸表示の 2 つ)
 		'.overlay:focus, .overlay:focus-visible, .zoom:focus, .zoom:focus-visible',
 		// 内側に出す例外 (項目の縁が隣と接しているメニュー)
-		'.share-item:focus-visible',
-		'.slideshow-speed-option:focus-visible',
-		'.ugoira-rate-item:focus-visible',
+		'.share-item:focus-visible, .ugoira-rate-item:focus-visible, .slideshow-speed-option:focus-visible',
 		// 共通
 		':focus-visible',
 	]);
@@ -157,4 +155,19 @@ test('コメントの投稿者アイコンのリンクはアイコンの大き�
 	// .comment-item は flex で、既定の align-items: stretch のままだとリンクが本文の高さまで伸び、
 	// アイコンの下の余白を押しても投稿者ページへ飛んでしまう
 	assert.ok(block(viewer, '.comment-avatar-link').includes('align-self: flex-start'), 'リンクが行の高さまで伸びる');
+});
+
+test('地の無いボタンの枠・地・字体は共通の 1 本が外し、個別の規則より前に置く', () => {
+	// 個別の規則が font-size などを後ろで上書きする。共通の 1 本が後ろに来ると font: inherit が上書きを消す
+	const header = /\n((?:\.[\w-]+,\n)+\.[\w-]+) \{\n\tborder: 0;\n\tbackground: transparent;\n\tfont: inherit;\n\tcursor: pointer;\n\}/.exec(viewer);
+	assert.ok(header, '共通の規則が無い');
+	const selectors = header[1].split(',\n');
+	assert.ok(selectors.length > 1);
+	const before = viewer.slice(0, header.index);
+	const after = viewer.slice(header.index + header[0].length);
+	for (const selector of selectors) {
+		assert.ok(!before.includes(`\n${selector} {`), `${selector} の個別の規則が共通の規則より前にある`);
+		if (!after.includes(`\n${selector} {`)) continue;
+		assert.ok(!/font: inherit|background: transparent/.test(block(after, selector)), `${selector} が共通の宣言を書き直している`);
+	}
 });

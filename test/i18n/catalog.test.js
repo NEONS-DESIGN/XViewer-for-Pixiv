@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStrings } from '../../src/i18n/index.js';
 import { SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE } from '../../src/common/language.js';
+import { CATALOG_PARTS, createPopupStrings } from '../helpers/popup.js';
 
 /**
  * 値の種類を 1 語で表す。形の比較に使う。
@@ -46,15 +47,37 @@ function assertSameShape(a, b, path) {
 	}
 }
 
-test('すべての言語のカタログが同じ形を持つ', () => {
-	const base = createStrings(DEFAULT_LANGUAGE);
-	for (const lang of SUPPORTED_LANGUAGES) {
-		if (lang === DEFAULT_LANGUAGE) continue;
-		// lang の値だけは言語ごとに違ってよいので、形の比較からは外す
-		const { lang: _baseLang, ...baseRest } = base;
-		const { lang: _otherLang, ...otherRest } = createStrings(lang);
-		assertSameShape(baseRest, otherRest, lang);
+test('すべての言語のカタログが同じ形を持つ (ビュワー側と設定画面側のそれぞれ)', () => {
+	for (const part of ['viewer', 'popup']) {
+		const base = CATALOG_PARTS[DEFAULT_LANGUAGE][part];
+		for (const lang of SUPPORTED_LANGUAGES) {
+			if (lang === DEFAULT_LANGUAGE) continue;
+			assertSameShape(base, CATALOG_PARTS[lang][part], `${lang} (${part})`);
+		}
 	}
+});
+
+test('content script のカタログは設定画面側の節を持たない', () => {
+	// content.js の束に設定画面の文言を入れないための分割。節が戻ってくると束が膨らむ
+	const popupKeys = Object.keys(CATALOG_PARTS[DEFAULT_LANGUAGE].popup);
+	assert.deepEqual(popupKeys.sort(), ['licenses', 'popup', 'theme']);
+	for (const lang of SUPPORTED_LANGUAGES) {
+		const strings = createStrings(lang);
+		for (const key of popupKeys) assert.equal(Object.hasOwn(strings, key), false, `${lang}: ${key}`);
+	}
+});
+
+test('ビュワー側と設定画面側の節は重ならない', () => {
+	// 重ねるときに後ろの断片が前の節を黙って上書きしないこと
+	for (const lang of SUPPORTED_LANGUAGES) {
+		const { viewer, popup } = CATALOG_PARTS[lang];
+		const shared = Object.keys(popup).filter((key) => Object.hasOwn(viewer, key));
+		assert.deepEqual(shared, [], lang);
+	}
+});
+
+test('すべての対応言語に両方の断片がある', () => {
+	assert.deepEqual(Object.keys(CATALOG_PARTS).sort(), [...SUPPORTED_LANGUAGES].sort());
 });
 
 test('カタログは自分の言語を持つ', () => {
@@ -75,9 +98,11 @@ test('カタログは入れ子まで凍結されている', () => {
 	for (const lang of SUPPORTED_LANGUAGES) {
 		const strings = createStrings(lang);
 		assert.ok(Object.isFrozen(strings), `${lang}: 最上位`);
-		assert.ok(Object.isFrozen(strings.popup.fields.enabled), `${lang}: popup.fields.enabled`);
-		assert.ok(Object.isFrozen(strings.licenses.disclaimer.body), `${lang}: licenses.disclaimer.body (配列)`);
 		assert.ok(Object.isFrozen(strings.actionsBar.messages), `${lang}: actionsBar.messages`);
+		const popupStrings = createPopupStrings(lang);
+		assert.ok(Object.isFrozen(popupStrings), `${lang}: 設定画面の最上位`);
+		assert.ok(Object.isFrozen(popupStrings.popup.fields.enabled), `${lang}: popup.fields.enabled`);
+		assert.ok(Object.isFrozen(popupStrings.licenses.disclaimer.body), `${lang}: licenses.disclaimer.body (配列)`);
 	}
 });
 

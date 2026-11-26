@@ -1,12 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SETTINGS_DEFAULTS } from '../../src/common/constants.js';
-import { createStrings } from '../../src/i18n/index.js';
 import { renderPopup } from '../../src/popup/popup-ui.js';
 import { findRole, flush } from '../helpers/dom.js';
-import { bootPopup as boot } from '../helpers/popup.js';
+import { bootPopup as boot, createPopupStrings } from '../helpers/popup.js';
 
-const { SAVE_FAILED, RESET_FAILED } = createStrings('ja').popup;
+const { SAVE_FAILED, RESET_FAILED } = createPopupStrings('ja').popup;
 
 /**
  * 後から決着させられる Promise。保存の完了のタイミングを試験側で握る。
@@ -137,6 +136,45 @@ test('初期化に失敗したらその旨を通知して描き直す', async ()
 	assert.equal(last().notice, RESET_FAILED);
 });
 
+test('初期化が reject しても失敗として通知を出し、保存済みの値で描き直して記録も残す', async () => {
+	// resetSettings は false を返す契約だが、差し替えた実装が投げたときに「初期化したつもり」の画面を残さない
+	const failure = new Error('storage が壊れた');
+	const { renders, loads, last, reports, resetNow } = await boot({ deps: { resetSettings: async () => { throw failure; } } });
+	resetNow();
+	await flush();
+	assert.equal(renders.length, 2);
+	assert.equal(last().notice, RESET_FAILED);
+	assert.equal(loads.length, 2, '保存済みの値を読み直す');
+	assert.equal(reports.length, 1);
+	assert.match(reports[0][0], /初期化に失敗/);
+	assert.equal(reports[0][1], failure);
+});
+
+test('設定の読み出しを待たずに文言のカタログを読み始める', async () => {
+	// 言語が決まったら、設定の読み出しの完了を待たずにカタログの読み込みへ進む
+	let releaseSettings;
+	const settingsGate = new Promise((resolve) => { releaseSettings = resolve; });
+	const asked = [];
+	const booting = boot({
+		deps: {
+			loadSettings: async () => {
+				await settingsGate;
+				return { ...SETTINGS_DEFAULTS };
+			},
+			loadPageLanguage: async () => 'en',
+			loadStrings: async (lang) => {
+				asked.push(lang);
+				return createPopupStrings(lang);
+			},
+		},
+	});
+	await flush();
+	assert.deepEqual(asked, ['en'], '設定の読み出しの途中でカタログを読んでいる');
+	releaseSettings();
+	const { renders } = await booting;
+	assert.equal(renders[0].strings.lang, 'en');
+});
+
 test('描き直しは進行中の保存を待ってから読み直す', async () => {
 	// A の失敗で読み直す間に B を変えると、B の set より前に get が返って画面が B の旧値になる
 	const saves = [];
@@ -194,7 +232,7 @@ test('文言のカタログが読めなければ既定の言語で描き、記�
 			loadStrings: async (lang) => {
 				asked.push(lang);
 				if (lang === 'en') throw failure;
-				return createStrings(lang);
+				return createPopupStrings(lang);
 			},
 		},
 	});

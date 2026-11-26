@@ -101,12 +101,11 @@ export async function main({
 	const root = doc.getElementById(ROOT_ID);
 	if (!root) return;
 
-	// 設定の読み出しと言語の解決を同時に行う。直列にすると popup が開くのが遅くなる
-	const [initialSettings, lang] = await Promise.all([
+	// 設定の読み出しと、言語の解決からカタログの読み込みまでを同時に行う。直列にすると popup が開くのが遅くなる
+	const [initialSettings, strings] = await Promise.all([
 		loadSettings(),
-		resolvePopupLanguage({ loadPageLanguage, getUILanguage }),
+		resolvePopupLanguage({ loadPageLanguage, getUILanguage }).then((lang) => loadCatalog(loadStrings, lang, report)),
 	]);
-	const strings = await loadCatalog(loadStrings, lang, report);
 	// popup.html は lang="ja" で書いてある。実際に描く言語へ合わせる
 	doc.documentElement.lang = strings.lang;
 
@@ -201,7 +200,12 @@ export async function main({
 	 * @returns {void}
 	 */
 	function onReset() {
-		void track(resetSettings()).then((done) => {
+		// 保存と同じく、差し替えた実装が reject しても失敗として畳み、通知を出して描き直す
+		const resetting = resetSettings().catch((error) => {
+			report('popup: 設定の初期化に失敗しました', error);
+			return false;
+		});
+		void track(resetting).then((done) => {
 			notice = done ? null : strings.popup.RESET_FAILED;
 			// 確定ボタンを押した直後の現在地は、描き直した後の初期化ボタンに戻す。
 			// 戻せたなら中身は既定そのものなので読み直さない。失敗したときは保存済みの値を読み直す

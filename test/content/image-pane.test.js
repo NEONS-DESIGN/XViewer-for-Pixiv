@@ -4,9 +4,10 @@ import { pickPageUrls, pickPageSizes, prefetchTargets, releaseTargets, createIma
 import { fakeElement, fakeDoc, find, findAll, flush } from '../helpers/dom.js';
 import { fakeFetch, fakeApiFetch } from '../helpers/pixiv.js';
 import { createStrings } from '../../src/i18n/index.js';
-import { PREFETCH_RELEASE_MARGIN, IMAGE_QUALITY } from '../../src/common/constants.js';
+import { PREFETCH_RELEASE_MARGIN, IMAGE_QUALITY, SLIDESHOW_MODES } from '../../src/common/constants.js';
 import { getJson } from '../../src/pixiv/client.js';
 import { clearIllustAssetCache } from '../../src/pixiv/illust-assets.js';
+import { createSlideshow } from '../../src/content/viewer/slideshow.js';
 
 // /pages は作品単位で覚えて共有する。テストの間で覚えた応答を持ち越さない。
 // 共有の取得を通るので fetch は render() の同期部分では呼ばれない。応答を返す前に flush() で待つ
@@ -964,4 +965,93 @@ test('pageCount は /pages が届く前は詳細の枚数、届いたら実際�
 	assert.equal(pane.pageCount(), 3);
 	await rendering;
 	assert.equal(pane.pageCount(), 3);
+});
+
+test('/pages 待ちの間に送られた後に /pages が失敗したら、1 枚目の表示を知らせ直す', async () => {
+	const { impl } = fakeFetch({ status: 500, json: { error: true, message: 'x' } });
+	const { container, pane, events } = buildLoading({ fetchImpl: impl });
+	const rendering = pane.render(DETAIL);
+	const image = find(container, 'img');
+	image.complete = true;
+	await image.dispatch('load');
+	assert.deepEqual(events, ['loading:0', 'shown:0']);
+	pane.next();
+	await rendering;
+	assert.equal(find(container, 'img').src, cdn('r0'));
+	assert.deepEqual(events, ['loading:0', 'shown:0', 'shown:0']);
+});
+
+test('/pages 待ちの間に送らなければ、/pages が失敗しても表示を知らせ直さない', async () => {
+	const { impl } = fakeFetch({ status: 500, json: { error: true, message: 'x' } });
+	const { container, pane, events } = buildLoading({ fetchImpl: impl });
+	const rendering = pane.render(DETAIL);
+	const image = find(container, 'img');
+	image.complete = true;
+	await image.dispatch('load');
+	await rendering;
+	assert.deepEqual(events, ['loading:0', 'shown:0']);
+});
+
+test('/pages の枚数が足りず、送った行き先が今のページに落ちたら表示を知らせ直す', async () => {
+	const { impl } = fakeApiFetch([PAGES[0]]);
+	const { container, pane, events } = buildLoading({ fetchImpl: impl });
+	const rendering = pane.render(DETAIL);
+	const image = find(container, 'img');
+	image.complete = true;
+	await image.dispatch('load');
+	pane.next();
+	await rendering;
+	assert.equal(pane.pageIndex(), 0);
+	assert.deepEqual(events, ['loading:0', 'shown:0', 'shown:0']);
+});
+
+test('/pages 待ちに覚えた行き先を読み込み中に知らせ直すときは、読み終えたところで表示を知らせる', async () => {
+	const { impl } = fakeFetch({ status: 500, json: { error: true, message: 'x' } });
+	const { container, pane, events } = buildLoading({ fetchImpl: impl });
+	const rendering = pane.render(DETAIL);
+	pane.next();
+	await rendering;
+	const image = find(container, 'img');
+	await image.dispatch('load');
+	// 1 枚目の読み込みを待ち直すだけで、表示の通知は 1 回にまとまる
+	assert.deepEqual(events, ['loading:0', 'loading:0', 'shown:0']);
+});
+
+test('自動送りが /pages 待ちにページを送り、/pages が失敗しても計時を続ける', async () => {
+	const timers = new Map();
+	let nextTimerId = 1;
+	let pane = null;
+	const slideshow = createSlideshow({
+		getSettings: () => ({ slideshow: SLIDESHOW_MODES.WORK, slideshowInterval: 3, slideshowIntervalCustom: 5, slideshowLoop: false }),
+		canMovePage: (direction) => pane.canMove(direction),
+		movePage: (direction) => { if (direction > 0) pane.next(); else pane.prev(); },
+		showPage: (index) => pane.showPage(index),
+		pageCount: () => pane.pageCount(),
+		moveWork: async () => false,
+		moveToFirst: async () => false,
+		currentWorkId: () => DETAIL.id,
+		onChange: () => {},
+		setTimeout: (fn, ms) => { const id = nextTimerId++; timers.set(id, { fn, ms }); return id; },
+		clearTimeout: (id) => { timers.delete(id); },
+	});
+	let respond;
+	const fetchImpl = () => new Promise((resolve) => { respond = resolve; });
+	const built = build({ fetchImpl, onPageShown: () => slideshow.pageShown(), onPageLoading: () => slideshow.pageLoading() });
+	pane = built.pane;
+	const rendering = pane.render(DETAIL);
+	const image = find(built.container, 'img');
+	image.complete = true;
+	await image.dispatch('load');
+	slideshow.play();
+	assert.equal(timers.size, 1);
+	// /pages が届く前にタイマーが切れて 2 枚目へ送る (行き先だけ覚えて、計時は止まる)
+	const [[id, entry]] = [...timers.entries()];
+	timers.delete(id);
+	entry.fn();
+	await flush();
+	assert.equal(timers.size, 0);
+	respond({ ok: false, status: 500, text: async () => JSON.stringify({ error: true, message: 'x' }) });
+	await rendering;
+	assert.equal(slideshow.isPlaying(), true);
+	assert.equal(timers.size, 1, '/pages の失敗の後も計時を張り直す');
 });

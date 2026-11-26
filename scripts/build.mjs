@@ -5,13 +5,15 @@
  * viewer.css と common/tokens.css は text loader で文字列として取り込み、Shadow DOM へ注入する。
  * tokens.css は popup.html も <link> で読むので、静的ファイルとして <出力先>/common/ にも置く。(static-files.mjs)
  * popup は拡張のページとして開くので ESM を読める。content/inject とは別の設定で束ね、
- * 言語のカタログを分割して使う 1 言語だけを読む。(popupOptionsFor)
+ * 言語のカタログを分割して使う 1 言語だけを読む。(build-options.mjs の popupOptionsFor)
  *
  * 出力はブラウザごとに分ける。(scripts/browsers.mjs) Chrome 系は dist、Firefox は dist-firefox。
  * 束ねる元のソースは同じで、違うのは esbuild の target と manifest に差し込むキーだけ。
  *   node scripts/build.mjs                    両方
  *   node scripts/build.mjs --target=chrome    Chrome 系だけ
  *   node scripts/build.mjs --target=firefox   Firefox だけ
+ *
+ * パスはリポジトリのルートから解く。どのフォルダから実行しても、ルートの dist / dist-firefox を作る。
  *
  * version の出どころは package.json 1 か所。src/manifest.json は version を持たず、
  * ここで差し込む。minimum_chrome_version / strict_min_version も同様に
@@ -24,88 +26,25 @@ import { toManifestVersion } from './manifest-version.mjs';
 // コピーする静的ファイルの表は static-files.mjs にある。(副作用なしのモジュールにしてテストからも読む)
 import { staticFilesFor } from './static-files.mjs';
 import { resolveTargets } from './browsers.mjs';
-import { cssTextPlugin, minifyCssText } from './css-text-plugin.mjs';
+import { minifyCssText } from './css-text-plugin.mjs';
+import { buildOptionsFor, popupOptionsFor, planFailureCleanup } from './build-options.mjs';
+import { PACKAGE_JSON, readJson } from './json.mjs';
+import { ROOT_DIR } from './paths.mjs';
+
+// 出力先・静的ファイルの表はルートからの相対パスなので、カレントをルートへ移してから使う
+process.chdir(ROOT_DIR);
 
 /** 監視モードで起動するか。 */
 const WATCH = process.argv.includes('--watch');
 
-/** version の出どころ。 */
-const PACKAGE_JSON = 'package.json';
+/** esbuild の設定に渡すビルドの種類。 */
+const MODE = Object.freeze({ watch: WATCH });
 
 /** manifest の雛形。version を差し込むので静的ファイルの表とは別に扱う。 */
 const MANIFEST_SOURCE = 'src/manifest.json';
 
-/** 束ねる入口。出力先からの相対パスで置く。 */
-const ENTRY_POINTS = Object.freeze({
-	content: 'src/content/main.js',
-	// page world へ注入する分。content.js とは別 world なので束を分ける
-	inject: 'src/inject/inject.js',
-});
-
 /** 静的ファイルのうち、コピーの代わりに圧縮して書き出すもの。(popup が <link> で読む CSS) 監視中は素のまま置く。 */
 const CSS_FILE_PATTERN = /\.css$/;
-
-/** popup だけの束ねる入口。popup は拡張のページなので ESM で言語のカタログを分割できる。 */
-const POPUP_ENTRY_POINTS = Object.freeze({ 'popup/popup': 'src/popup/popup.js' });
-
-/**
- * ブラウザごとの esbuild の設定を作る。
- * @param {import('./browsers.mjs').BrowserTarget} target 作るブラウザ
- * @returns {import('esbuild').BuildOptions} esbuild の設定
- */
-function buildOptionsFor(target) {
-	return {
-		entryPoints: ENTRY_POINTS,
-		outdir: target.outDir,
-		bundle: true,
-		format: 'iife',
-		target: target.esbuildTarget,
-		// 監視中は読みやすさを残す。配布物は縮める
-		minify: !WATCH,
-		// 日本語などの文字を \uXXXX に逃がさず UTF-8 のまま出す
-		charset: 'utf8',
-		// viewer.css と common/tokens.css を圧縮してから文字列として import する
-		plugins: [cssTextPlugin(target.esbuildTarget)],
-		logLevel: 'info',
-	};
-}
-
-/**
- * popup の esbuild の設定を作る。
- * popup は拡張のページなので ESM を読める。言語のカタログを分割し、使う 1 言語だけを読む。
- * @param {import('./browsers.mjs').BrowserTarget} target 作るブラウザ
- * @returns {import('esbuild').BuildOptions} esbuild の設定
- */
-function popupOptionsFor(target) {
-	return {
-		...buildOptionsFor(target),
-		entryPoints: POPUP_ENTRY_POINTS,
-		format: 'esm',
-		splitting: true,
-		// 分割した断片は popup/ の下へ置く。(web_accessible にしない。拡張のページからしか読まない)
-		chunkNames: 'popup/chunks/[name]-[hash]',
-	};
-}
-
-/**
- * JSON ファイルを読む。
- * @param {string} path ファイルの場所
- * @returns {Promise<object>} 中身
- * @throws {Error} 読めない・JSON として解釈できないとき
- */
-async function readJson(path) {
-	let text;
-	try {
-		text = await readFile(path, 'utf8');
-	} catch (error) {
-		throw new Error(`${path} を読めません: ${error.message}`);
-	}
-	try {
-		return JSON.parse(text);
-	} catch (error) {
-		throw new Error(`${path} を JSON として読めません: ${error.message}`);
-	}
-}
 
 /**
  * package.json の version を読んで検証する。
@@ -168,21 +107,28 @@ async function emitAssets(target, packageVersion) {
 }
 
 /**
- * 出力先を空にして作り直す。
- * @param {import('./browsers.mjs').BrowserTarget} target 作るブラウザ
- * @returns {Promise<void>}
+ * 出力先に手を付けたブラウザの名前。失敗したときに、ここに無い出力は前回のまま残す。
+ * @type {Set<string>}
  */
-async function resetOutDir(target) {
-	await rm(target.outDir, { recursive: true, force: true });
-	// writeManifest が出力先の存在を esbuild 任せにしないよう、先に作っておく
-	await mkdir(target.outDir, { recursive: true });
-}
+const started = new Set();
 
 /**
  * 作り終えたブラウザの名前。失敗したときに、ここに入っている出力は消さずに残す。
  * @type {Set<string>}
  */
 const completed = new Set();
+
+/**
+ * 出力先を空にして作り直す。消す前に started へ入れる。(消し始めた出力先は途中で落ちても片付けの対象にする)
+ * @param {import('./browsers.mjs').BrowserTarget} target 作るブラウザ
+ * @returns {Promise<void>}
+ */
+async function resetOutDir(target) {
+	started.add(target.name);
+	await rm(target.outDir, { recursive: true, force: true });
+	// writeManifest が出力先の存在を esbuild 任せにしないよう、先に作っておく
+	await mkdir(target.outDir, { recursive: true });
+}
 
 /**
  * ビルドを実行する。1 ブラウザ作り終えるたびに completed へ入れる。
@@ -195,8 +141,8 @@ async function build(targets) {
 	if (WATCH) {
 		for (const target of targets) {
 			await resetOutDir(target);
-			const ctx = await context(buildOptionsFor(target));
-			const popupCtx = await context(popupOptionsFor(target));
+			const ctx = await context(buildOptionsFor(target, MODE));
+			const popupCtx = await context(popupOptionsFor(target, MODE));
 			await ctx.watch();
 			await popupCtx.watch();
 			await emitAssets(target, packageVersion);
@@ -210,8 +156,8 @@ async function build(targets) {
 	// 1 ブラウザずつ最後まで作る。Chrome 系が先なので、Firefox 側で落ちても dist は作り終えている
 	for (const target of targets) {
 		await resetOutDir(target);
-		await bundle(buildOptionsFor(target));
-		await bundle(popupOptionsFor(target));
+		await bundle(buildOptionsFor(target, MODE));
+		await bundle(popupOptionsFor(target, MODE));
 		await emitAssets(target, packageVersion);
 		completed.add(target.name);
 	}
@@ -230,10 +176,14 @@ try {
 	await build(targets);
 } catch (error) {
 	console.error(`[build] ${error?.message ?? error}`);
-	// 作り終えていないブラウザの出力だけを消す。片付けの失敗は表示するだけにする
-	for (const target of targets) {
-		if (completed.has(target.name)) {
+	// 作り始めて作り終えていないブラウザの出力だけを消す。片付けの失敗は表示するだけにする
+	for (const { target, action } of planFailureCleanup(targets, started, completed)) {
+		if (action === 'completed') {
 			console.error(`[build] ${target.outDir} は作り終えているので残します`);
+			continue;
+		}
+		if (action === 'untouched') {
+			console.error(`[build] ${target.outDir} は手を付ける前に止まったので前回のまま残します`);
 			continue;
 		}
 		try {

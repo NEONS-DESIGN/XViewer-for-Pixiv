@@ -14,8 +14,8 @@ import { warn } from '../../common/log.js';
 import { prefetchCount } from '../../common/storage.js';
 
 /**
- * 矢印ボタンの向きごとの見た目。ラベルは文言カタログ (strings.imagePane) から引くため、
- * キー操作の表示とアイコンだけをここに持つ。
+ * ページを送るボタンの向きごとの見た目。画像ペインの矢印と原寸表示の左右の領域が使う。
+ * ラベルは文言カタログ (strings.imagePane) から引くため、キー操作の表示とアイコンだけをここに持つ。
  */
 const ARROW_SHAPES = Object.freeze({
 	prev: Object.freeze({ messageKey: 'PREV_PAGE', key: '←', icon: 'chevronLeft' }),
@@ -24,7 +24,7 @@ const ARROW_SHAPES = Object.freeze({
 
 /** 開発者向けの失敗理由。画面には出さず warn に渡す。 */
 const REASONS = Object.freeze({
-	PAGES_EMPTY: '/pages の body にページがありません',
+	PAGES_EMPTY: 'pages body is empty',
 });
 
 /** 表示中の画像の fetchPriority。今見ている画像なので優先度を上げる。 */
@@ -97,6 +97,45 @@ export function prefetchTargets(index, total, count, direction = 1) {
 export function releaseTargets(entries, index, count, margin) {
 	const threshold = count + margin;
 	return entries.filter(([page]) => Math.abs(page - index) > threshold).map(([page]) => page);
+}
+
+/**
+ * ページを送るボタンを作る。クラスは `${className} ${className}-${direction}` になる。
+ * @param {Document} doc 文書
+ * @param {object} strings 文言のカタログ (src/i18n)
+ * @param {'prev'|'next'} direction 向き
+ * @param {string} className 部品のクラス名
+ * @param {(event: Event) => void} onClick 押されたとき
+ * @returns {HTMLButtonElement} ボタン
+ */
+export function createPageButton(doc, strings, direction, className, onClick) {
+	const shape = ARROW_SHAPES[direction];
+	const label = strings.imagePane[shape.messageKey];
+	const button = doc.createElement('button');
+	button.type = 'button';
+	button.className = `${className} ${className}-${direction}`;
+	button.setAttribute('aria-label', label);
+	button.title = `${label} (${shape.key})`;
+	button.appendChild(createIcon(doc, shape.icon));
+	button.addEventListener('click', onClick);
+	return button;
+}
+
+/**
+ * 枠の中のエラー行を差し替える。前に出していたエラー行は消す。
+ * 共有の状態表示を使うと既に見えている画像まで消えてしまうため、ペインごとに自分の枠の中へ出す。
+ * @param {Document} doc 文書
+ * @param {HTMLElement} parent エラー行を置く枠
+ * @param {string} message 文言
+ * @returns {void}
+ */
+export function replacePaneError(doc, parent, message) {
+	parent.querySelector('.pane-error')?.remove();
+	const line = doc.createElement('p');
+	line.className = 'pane-error';
+	line.setAttribute('role', 'alert');
+	line.textContent = message;
+	parent.appendChild(line);
 }
 
 /**
@@ -203,38 +242,13 @@ export function createImagePane(deps) {
 	let zoomShowing = false;
 
 	/**
-	 * 矢印ボタンを作る。
-	 * @param {'prev'|'next'} direction 向き
-	 * @param {() => void} onClick 押されたとき
-	 * @returns {HTMLButtonElement} ボタン
-	 */
-	function createArrow(direction, onClick) {
-		const shape = ARROW_SHAPES[direction];
-		const label = strings.imagePane[shape.messageKey];
-		const button = doc.createElement('button');
-		button.type = 'button';
-		button.className = `arrow arrow-${direction}`;
-		button.setAttribute('aria-label', label);
-		button.title = `${label} (${shape.key})`;
-		button.appendChild(createIcon(doc, shape.icon));
-		button.addEventListener('click', onClick);
-		return button;
-	}
-
-	/**
-	 * ペインの中にエラー行を出す。
-	 * 共有の状態表示を使うと既に見えている画像まで消えてしまうため、自分の枠の中に出す。
+	 * ペインの枠の中にエラー行を出す。
 	 * @param {string} message 文言
 	 * @returns {void}
 	 */
 	function showPaneError(message) {
 		if (disposed || !frame) return;
-		frame.querySelector('.pane-error')?.remove();
-		const line = doc.createElement('p');
-		line.className = 'pane-error';
-		line.setAttribute('role', 'alert');
-		line.textContent = message;
-		frame.appendChild(line);
+		replacePaneError(doc, frame, message);
 	}
 
 	/**
@@ -466,8 +480,8 @@ export function createImagePane(deps) {
 			counter = doc.createElement('p');
 			counter.className = 'counter';
 
-			prevButton = createArrow('prev', () => move(-1));
-			nextButton = createArrow('next', () => move(1));
+			prevButton = createPageButton(doc, strings, 'prev', 'arrow', () => move(-1));
+			nextButton = createPageButton(doc, strings, 'next', 'arrow', () => move(1));
 
 			frame.append(prevButton, image, nextButton, counter);
 			container.appendChild(frame);
@@ -502,9 +516,13 @@ export function createImagePane(deps) {
 				pageSizes = pickPageSizes(pages);
 				total = urls.length;
 				// /pages を待つ間に押された矢印はここで反映する
+				const queued = pendingIndex !== null;
+				const before = shownUrl;
 				index = clamp(pendingIndex ?? index, 0, urls.length - 1);
 				pendingIndex = null;
 				paint();
+				// 行き先が今のページに落ちたときは、待っていた側 (自動送り) へ今のページの表示を知らせ直す
+				if (queued && shownUrl === before) schedulePageShown(index);
 				// 開いた後に届いた分は原寸表示にも渡す。渡さないと閉じるまで 2 枚目以降へ送れない
 				if (zoomShowing) {
 					const showPlaceholder = deps.settings.imageQuality !== IMAGE_QUALITY.ORIGINAL;
@@ -515,11 +533,14 @@ export function createImagePane(deps) {
 				if (disposed) return;
 				// 実際に採れたのは 1 枚だけなので、先出ししていた分母を戻す (矢印が消える)
 				total = urls.length;
+				const queued = pendingIndex !== null;
 				pendingIndex = null;
 				// 1 枚目は出ているので、複数枚が開けないことだけを伝える
 				showPaneError(strings.imagePane.PAGES_FAILED);
 				warn('failed to load pages', detail.id, error);
 				paint();
+				// 送ろうとしていた行き先は無くなったので、待っていた側へ 1 枚目の表示を知らせ直す
+				if (queued) schedulePageShown(index);
 			}
 		},
 

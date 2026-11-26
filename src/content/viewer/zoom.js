@@ -9,22 +9,13 @@
  * ここは「渡された URL の並びを原寸で出す」ことだけを担い、通信はしない。
  */
 import { KEYS, INERT_ATTRIBUTE } from '../../common/constants.js';
-import { createIcon } from '../../common/icons.js';
 import { assignImageSrc } from '../../common/image-source.js';
 import { createNoticeArea, NOTICE_KINDS } from '../../common/notice.js';
 import { hasModifier } from './navigation.js';
+import { createPageButton, replacePaneError } from './image-pane.js';
 
 /** 標準画質の仮表示中に出す通知の ID。1 つしか出さないので固定値で足りる。 */
 const PREVIEW_NOTICE_ID = 'zoom-preview';
-
-/**
- * 左右のクリック領域の見た目。
- * 幅は viewer.css の --zoom-zone-width が持つ。ラベルは文言カタログ (strings.zoom) から引く
- */
-const ZONE_SHAPES = Object.freeze({
-	prev: Object.freeze({ messageKey: 'PREV_PAGE', key: '←', icon: 'chevronLeft', step: -1 }),
-	next: Object.freeze({ messageKey: 'NEXT_PAGE', key: '→', icon: 'chevronRight', step: 1 }),
-});
 
 /**
  * @typedef {object} ZoomPages 原寸表示に渡すページの指定
@@ -121,27 +112,19 @@ export function createZoomLayer(deps) {
 	}
 
 	/**
-	 * 左右のクリック領域を作る。
+	 * 左右のクリック領域を作る。幅は viewer.css の --zoom-zone-width が持つ。
 	 * 見た目は透明で、専用のカーソルと、ホバー時に薄く出る矢印だけが目印になる。
 	 * 読み上げには普通のボタンとして見えるよう aria-label を持たせる。
 	 * @param {'prev'|'next'} direction 向き
+	 * @param {1|-1} step 押したときに送るページ数
 	 * @returns {HTMLButtonElement} ボタン
 	 */
-	function createZone(direction) {
-		const shape = ZONE_SHAPES[direction];
-		const label = strings.zoom[shape.messageKey];
-		const button = doc.createElement('button');
-		button.type = 'button';
-		button.className = `zoom-zone zoom-zone-${direction}`;
-		button.setAttribute('aria-label', label);
-		button.title = `${label} (${shape.key})`;
-		button.appendChild(createIcon(doc, shape.icon));
-		button.addEventListener('click', (event) => {
+	function createZone(direction, step) {
+		return createPageButton(doc, strings, direction, 'zoom-zone', (event) => {
 			// レイヤ本体の「押したら閉じる」まで伝わらせない
 			event.stopPropagation?.();
-			move(shape.step);
+			move(step);
 		});
-		return button;
 	}
 
 	/**
@@ -151,12 +134,7 @@ export function createZoomLayer(deps) {
 	 */
 	function showZoomError() {
 		if (!layer) return;
-		canvas.querySelector('.pane-error')?.remove();
-		const line = doc.createElement('p');
-		line.className = 'pane-error';
-		line.setAttribute('role', 'alert');
-		line.textContent = strings.imagePane.IMAGE_FAILED;
-		canvas.appendChild(line);
+		replacePaneError(doc, canvas, strings.imagePane.IMAGE_FAILED);
 	}
 
 	/**
@@ -361,7 +339,7 @@ export function createZoomLayer(deps) {
 			image.setAttribute('alt', pages.alt ?? '');
 			canvas.appendChild(image);
 
-			zones = { prev: createZone('prev'), next: createZone('next') };
+			zones = { prev: createZone('prev', -1), next: createZone('next', 1) };
 
 			counter = doc.createElement('p');
 			counter.className = 'zoom-counter';

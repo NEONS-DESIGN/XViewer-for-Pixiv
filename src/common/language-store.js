@@ -46,6 +46,28 @@ export async function savePageLanguage(language, deps = {}) {
 }
 
 /**
+ * 今見ている pixiv の表示言語から決めた UI の言語を、覚えている値と違うときだけ書く。
+ * content script は pixiv のページを開くたびに呼ぶ。値は普通変わらないので、書き込みをほぼ 0 回にする。
+ * 覚えている値が読めなければ書きにいく。
+ * @param {string} language UI の言語コード (uiLanguage の結果。SUPPORTED_LANGUAGES のどれか)
+ * @param {{area?: object}} [deps] 保存領域の差し替え
+ * @returns {Promise<boolean>} 覚えている値が language になっていれば true (書かずに済んだときも true)
+ */
+export async function rememberPageLanguage(language, deps = {}) {
+	return withArea(deps, async (area) => {
+		let stored = null;
+		try {
+			stored = await area.get([KEY]);
+		} catch {
+			// 読めないだけなら書き込みで上書きする
+		}
+		if (stored?.[KEY] === language) return true;
+		await area.set({ [KEY]: language });
+		return true;
+	}, false);
+}
+
+/**
  * 最後に見た pixiv の表示言語を読む。
  * @param {{area?: object}} [deps] 保存領域の差し替え
  * @returns {Promise<string|null>} 言語コード。無い・壊れていれば null

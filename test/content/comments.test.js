@@ -1640,6 +1640,8 @@ function collapsible(rendered) {
 
 			observe(target) { this.targets.add(target); }
 
+			unobserve(target) { this.targets.delete(target); }
+
 			disconnect() { this.targets.clear(); }
 		},
 	};
@@ -2030,4 +2032,106 @@ test('中断による失敗では読み込み失敗の表示を出さない', as
 	assert.equal(findAll(container, '.status').length, 0);
 	// 再試行にも切り替えない (中断は失敗として伝えない)
 	assert.equal(find(container, '.more').hidden, true);
+});
+
+/**
+ * roots の URL から offset を読む。
+ * @param {string} url roots の URL
+ * @returns {number} offset
+ */
+const rootsOffset = (url) => Number(new URL(url, 'https://www.pixiv.net').searchParams.get('offset'));
+
+/**
+ * 一覧に並んでいるルートコメントの本文を上から読む。
+ * @param {object} container 描画先
+ * @returns {string[]} 本文
+ */
+const rootTexts = (container) => find(container, '.comment-list').children
+	.map((item) => find(item, '.comment-text').textContent);
+
+test('「もっと見る」が出したコメントをもう一度返しても二重に並べず、offset は受け取った件数で進める', async () => {
+	// 投稿や他人の書き込みで roots の並びがずれると、読み込み済みの 1 件や投稿した 1 件がもう一度返る
+	const urls = [];
+	const pages = [
+		{ comments: [{ ...ROOT, id: 'a', comment: 'A', hasReplies: false }, { ...ROOT, id: 'b', comment: 'B', hasReplies: false }], hasNext: true },
+		{ comments: [{ ...ROOT, id: 'b', comment: 'B', hasReplies: false }, { ...ROOT, id: '900', comment: 'いいですね', hasReplies: false }, { ...ROOT, id: 'c', comment: 'C', hasReplies: false }], hasNext: true },
+		{ comments: [{ ...ROOT, id: 'd', comment: 'D', hasReplies: false }], hasNext: false },
+	];
+	const { container, comments } = buildPostable({
+		fetchJson: async (url) => {
+			urls.push(url);
+			return pages.shift();
+		},
+	});
+	await comments.load(POST_DETAIL);
+	await submitText(find(find(container, '.comments-header'), '.comment-form'), 'いいですね');
+	await find(container, '.more').click();
+	await flush();
+	assert.deepEqual(rootTexts(container), ['いいですね', 'A', 'B', 'C']);
+	await find(container, '.more').click();
+	await flush();
+	assert.deepEqual(rootTexts(container), ['いいですね', 'A', 'B', 'C', 'D']);
+	// 飛ばした 2 件も含めて進める。進めないと同じ範囲を読み直す
+	assert.deepEqual(urls.filter(isRootsUrl).map(rootsOffset), [0, 2, 5]);
+});
+
+test('作品を開き直したら、前に出したコメントも並べ直す', async () => {
+	// 出した ID の控えは作品ごと。残すと同じ作品を開き直したときに 1 件も出なくなる
+	const { container, comments } = build(async () => ({ comments: [ROOT], hasNext: false }));
+	await comments.load(DETAIL);
+	await comments.load(DETAIL);
+	assert.equal(find(container, '.comment-list').children.length, 1);
+});
+
+test('続きが残っているうちは、見えているコメントを全部消しても空の案内を出さない', async () => {
+	// 「もっと見る」と「まだコメントはありません」が並ぶと食い違う
+	const { container, comments } = buildPostable({
+		fetchJson: async (url) => (url.includes('/ajax/illust/')
+			? { commentCount: 5 }
+			: { comments: [{ ...ROOT, editable: true, hasReplies: false }], hasNext: true }),
+		actions: { deleteComment: async () => {} },
+	});
+	await comments.load(POST_DETAIL);
+	const button = find(container, '.comment-delete');
+	await button.click();
+	await button.click();
+	await flush();
+	assert.equal(find(container, '.comment-list').children.length, 0);
+	assert.equal(find(container, '.more').hidden, false);
+	assert.equal(findAll(container, '.status').length, 0);
+});
+
+test('読み込みの失敗の表示を外すときは、高さの見張りも解く', async () => {
+	// ResizeObserver は解くまで相手を持ち続ける。失敗と再試行を繰り返すと外した表示が溜まる
+	const observed = new Set();
+	const doc = loggedInDoc();
+	doc.defaultView = {
+		ResizeObserver: class {
+			observe(target) { observed.add(target); }
+
+			unobserve(target) { observed.delete(target); }
+
+			disconnect() { observed.clear(); }
+		},
+	};
+	const container = fakeElement('div');
+	let fail = true;
+	const comments = createComments({
+		doc,
+		container,
+		strings: STRINGS,
+		fetchJson: async () => {
+			if (fail) throw new Error('落ちた');
+			return { comments: [ROOT], hasNext: false };
+		},
+	});
+	await comments.load(DETAIL);
+	const failed = find(container, '.status');
+	assert.equal(observed.has(failed), true);
+	fail = false;
+	await find(container, '.more').click();
+	await flush();
+	assert.equal(failed.parent, null);
+	assert.equal(observed.has(failed), false);
+	comments.dispose();
 });

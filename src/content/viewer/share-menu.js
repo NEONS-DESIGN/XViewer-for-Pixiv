@@ -13,6 +13,7 @@
  */
 import { createIcon } from '../../common/icons.js';
 import { buildShareTargets } from '../../pixiv/share.js';
+import { el, btn, externalLink } from './dom.js';
 import { activeElementIn } from './focus.js';
 import { KEYS } from '../../common/constants.js';
 import { warn } from '../../common/log.js';
@@ -48,42 +49,29 @@ export function createShareMenu(deps) {
 	/** @type {HTMLElement[]} メニューの項目。矢印キーの移動先 */
 	const items = [];
 
-	const element = doc.createElement('div');
-	element.className = 'share-wrap';
+	const element = el(doc, 'div', 'share-wrap');
 
-	const button = doc.createElement('button');
-	button.type = 'button';
-	button.className = 'share-button';
+	const button = btn(doc, 'share-button');
 	button.setAttribute('aria-haspopup', 'true');
 	button.setAttribute('aria-expanded', 'false');
-	button.appendChild(createIcon(doc, 'share'));
 	// 文言が見えているので title は付けない (同じ文字が重なるだけ)
-	const buttonText = doc.createElement('span');
-	buttonText.textContent = strings.shareMenu.SHARE;
-	button.appendChild(buttonText);
+	button.append(createIcon(doc, 'share'), el(doc, 'span', '', strings.shareMenu.SHARE));
 
 	/** 開閉する枠。見出し・項目・コピーの結果をまとめて出し入れする */
-	const list = doc.createElement('div');
-	list.className = 'share-menu';
+	const list = el(doc, 'div', 'share-menu');
 	list.hidden = true;
 
-	const heading = doc.createElement('p');
-	heading.className = 'share-menu-heading';
-	heading.textContent = strings.shareMenu.SHARE;
+	const heading = list.appendChild(el(doc, 'p', 'share-menu-heading', strings.shareMenu.SHARE));
 	// 同じ文字を menu の aria-label が持っているので、読み上げでは二重にしない
 	heading.setAttribute('aria-hidden', 'true');
-	list.appendChild(heading);
 
 	// role="menu" の子に置けるのは menuitem だけ。見出しとコピーの結果は外に置き、項目だけをここへ入れる
-	const menu = doc.createElement('div');
-	menu.className = 'share-menu-items';
+	const menu = list.appendChild(el(doc, 'div', 'share-menu-items'));
 	menu.setAttribute('role', 'menu');
 	menu.setAttribute('aria-label', strings.shareMenu.SHARE);
-	list.appendChild(menu);
 
 	/** コピーの結果を伝える場所。読み上げにも渡す */
-	const status = doc.createElement('p');
-	status.className = 'share-status';
+	const status = el(doc, 'p', 'share-status');
 	status.setAttribute('role', 'status');
 
 	/**
@@ -141,28 +129,21 @@ export function createShareMenu(deps) {
 	function fillItem(item, target) {
 		item.className = 'share-item';
 		item.setAttribute('role', 'menuitem');
-		item.appendChild(createIcon(doc, target.icon));
-		const text = doc.createElement('span');
-		text.textContent = target.label;
-		item.appendChild(text);
+		item.append(createIcon(doc, target.icon), el(doc, 'span', '', target.label));
 		items.push(item);
 	}
 
 	for (const target of buildShareTargets(detail, strings)) {
 		if (target.href) {
-			const link = doc.createElement('a');
-			link.href = target.href;
-			link.setAttribute('target', '_blank');
 			// 外部サイトへ渡すので opener を持たせない
-			link.setAttribute('rel', 'noopener noreferrer');
+			const link = externalLink(doc, target.href);
 			fillItem(link, target);
 			// 押した a は hidden の中に入るので、ボタンへ戻さないとフォーカスが body へ落ちる
 			link.addEventListener('click', closeAndRefocus);
 			menu.appendChild(link);
 			continue;
 		}
-		const copy = doc.createElement('button');
-		copy.type = 'button';
+		const copy = btn(doc);
 		fillItem(copy, target);
 		copy.addEventListener('click', () => {
 			// クリップボードは権限や実行文脈で失敗しうる。落とさずに結果だけ伝える。

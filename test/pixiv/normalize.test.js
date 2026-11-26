@@ -17,6 +17,17 @@ test('canView は未ログイン (self が null) を全年齢のみとして扱�
 	assert.equal(canView({ xRestrict: 1 }, null), false);
 });
 
+test('canView は作品の xRestrict が読めなければ見られない側に倒す', () => {
+	// null <= 0 は true なので、比べるだけでは null の作品が全年齢として通ってしまう
+	for (const xRestrict of [null, undefined, '0', Number.NaN, 0.5]) {
+		for (const self of [null, { xRestrict: 0 }, { xRestrict: 2 }]) {
+			assert.equal(canView({ xRestrict }, self), false, `${String(xRestrict)} / ${JSON.stringify(self)}`);
+		}
+	}
+	assert.equal(canView({}, { xRestrict: 2 }), false);
+	assert.equal(canView(null, { xRestrict: 2 }), false);
+});
+
 test('normalizeDetail は詳細をまとめ、いいね済みとブックマーク ID を取り出す', () => {
 	const raw = {
 		illustId: '149425016',

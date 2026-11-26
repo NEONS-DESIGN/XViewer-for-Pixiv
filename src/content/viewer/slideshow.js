@@ -124,7 +124,7 @@ export function createSlideshow(deps) {
 		try {
 			deps.onChange(state);
 		} catch (error) {
-			warn('自動送りの状態の通知に失敗しました', error);
+			warn('slideshow: state notification failed', error);
 		}
 	}
 
@@ -169,7 +169,7 @@ export function createSlideshow(deps) {
 				durationMs = ms;
 				timer = schedule(onTimer, ms);
 			} else {
-				warn('自動送りの間隔が不正なので計時しません', ms);
+				warn('slideshow: invalid interval', ms);
 			}
 		}
 		notify();
@@ -200,7 +200,7 @@ export function createSlideshow(deps) {
 		try {
 			return (await move()) === true;
 		} catch (error) {
-			warn('自動送りで作品を移れませんでした', error);
+			warn('slideshow: work move failed', error);
 			return false;
 		} finally {
 			if (pendingMove === waiting) pendingMove = null;
@@ -302,7 +302,7 @@ export function createSlideshow(deps) {
 		try {
 			return direction === BACKWARD ? await decideBackward(token) : await decideForward(token, automatic);
 		} catch (error) {
-			warn('自動送りの送りに失敗しました', error);
+			warn('slideshow: advance failed', error);
 			return isStale(token) ? null : false;
 		}
 	}
@@ -337,7 +337,7 @@ export function createSlideshow(deps) {
 		timer = null;
 		durationMs = null;
 		notify();
-		advance().catch((error) => { warn('自動送りの送りに失敗しました', error); });
+		advance().catch((error) => { warn('slideshow: advance failed', error); });
 	}
 
 	/** @type {Slideshow['play']} */
@@ -369,7 +369,7 @@ export function createSlideshow(deps) {
 			await decide(direction === BACKWARD ? BACKWARD : FORWARD, token);
 			resumeCountingAfterStep();
 		} catch (error) {
-			warn('自動送りの送りに失敗しました', error);
+			warn('slideshow: advance failed', error);
 		}
 	}
 
@@ -381,14 +381,11 @@ export function createSlideshow(deps) {
 		restartCounting();
 	}
 
-	/** @type {Slideshow['pageLoading']} */
-	function pageLoading() {
-		shown = false;
-		stopCounting();
-	}
-
-	/** @type {Slideshow['workLoading']} */
-	function workLoading() {
+	/**
+	 * 表示し終わるまで計時しない。(pageLoading と workLoading の中身)
+	 * @returns {void}
+	 */
+	function waitForShown() {
 		shown = false;
 		stopCounting();
 	}
@@ -396,7 +393,7 @@ export function createSlideshow(deps) {
 	/** @type {Slideshow['setSuspended']} */
 	function setSuspended(reason, on) {
 		if (!SUSPEND_REASONS.includes(reason)) {
-			warn('自動送りの一時停止の理由が不明です', reason);
+			warn('slideshow: unknown suspend reason', reason);
 			return;
 		}
 		if (on) {
@@ -434,8 +431,8 @@ export function createSlideshow(deps) {
 		isPlaying: () => playing,
 		step,
 		pageShown,
-		pageLoading,
-		workLoading,
+		pageLoading: waitForShown,
+		workLoading: waitForShown,
 		setSuspended,
 		refresh,
 		reset,

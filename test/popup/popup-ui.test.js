@@ -4,10 +4,10 @@ import { renderPopup, resolveTheme } from '../../src/popup/popup-ui.js';
 import { createSections, createAdvancedSections, rangeTicks } from '../../src/popup/sections.js';
 import { SETTINGS_DEFAULTS, POPUP_THEMES, PREFETCH_CHOICES, PREFETCH_CUSTOM, PREFETCH_CUSTOM_RANGE } from '../../src/common/constants.js';
 import { PROJECT_LICENSE, THIRD_PARTY } from '../../src/common/licenses.js';
-import { createStrings } from '../../src/i18n/index.js';
 import { SUPPORTED_LANGUAGES } from '../../src/common/language.js';
 import { fakeElement, find, findRole, iconName } from '../helpers/dom.js';
-import { fakePopupDoc } from '../helpers/popup.js';
+import { fakePopupDoc, createPopupStrings } from '../helpers/popup.js';
+import { LOCK_WARNING_MS } from '../../src/popup/field-lock.js';
 
 /**
  * タグ名で要素を集める。
@@ -22,12 +22,35 @@ function collect(node, tag) {
 }
 
 /**
+ * 手で進める偽のタイマ。本物のタイマを張ると、テストが終わってもプロセスが待たされる。
+ * @returns {{setTimeout: Function, clearTimeout: Function, pending: () => Array<{fn: Function, ms: number}>, fire: () => void}} タイマ
+ */
+function fakeTimers() {
+	const timers = new Map();
+	let nextId = 1;
+	return {
+		setTimeout: (fn, ms) => {
+			const id = nextId++;
+			timers.set(id, { fn, ms });
+			return id;
+		},
+		clearTimeout: (id) => { timers.delete(id); },
+		pending: () => [...timers.values()],
+		fire: () => {
+			const due = [...timers.values()];
+			timers.clear();
+			for (const { fn } of due) fn();
+		},
+	};
+}
+
+/**
  * popup を組み立てる。
- * @param {object} [overrides] settings / 環境 / コールバックの差し替え
- * @returns {object} doc / root / changes / resets をまとめたもの
+ * @param {object} [overrides] settings / 環境 / コールバック / タイマの差し替え
+ * @returns {object} doc / root / changes / resets / timers をまとめたもの
  */
 function build(overrides = {}) {
-	const { settings = {}, rich = false, prefersLight = false, strings = createStrings('ja'), ...rest } = overrides;
+	const { settings = {}, rich = false, prefersLight = false, strings = createPopupStrings('ja'), timers = fakeTimers(), ...rest } = overrides;
 	const doc = fakePopupDoc({ rich, prefersLight });
 	const root = fakeElement('main');
 	const changes = [];
@@ -39,16 +62,17 @@ function build(overrides = {}) {
 		strings,
 		onChange: (patch) => changes.push(patch),
 		onReset: () => { resets += 1; },
+		timers,
 		...rest,
 	});
-	return { doc, root, changes, resets: () => resets, screen };
+	return { doc, root, changes, resets: () => resets, screen, timers };
 }
 
 test('定義表のキーは popupTheme を除く全設定と 1 対 1 に対応する', () => {
 	// タイポしたキーで saveSetting が成功し、読み込み側は既定へ倒すので誰も気づけない。
 	// 設定タブと詳細設定タブの両方を合わせて数える。(同じキーを両方へ置くと重複で落ちる)
 	for (const lang of SUPPORTED_LANGUAGES) {
-		const strings = createStrings(lang);
+		const strings = createPopupStrings(lang);
 		const keys = [...createSections(strings), ...createAdvancedSections(strings)]
 			.flatMap((section) => section.fields)
 			.flatMap(function walk(field) {
@@ -60,7 +84,7 @@ test('定義表のキーは popupTheme を除く全設定と 1 対 1 に対応�
 });
 
 test('先読みの選択肢は PREFETCH_CHOICES の値と並びから起こし、末尾にカスタムを置く', () => {
-	const field = createSections(createStrings('ja')).flatMap((section) => section.fields).find((one) => one.key === 'prefetch');
+	const field = createSections(createPopupStrings('ja')).flatMap((section) => section.fields).find((one) => one.key === 'prefetch');
 	assert.deepEqual(field.options.map((option) => option.value), [...PREFETCH_CHOICES.map(String), PREFETCH_CUSTOM]);
 	for (const option of field.options) {
 		assert.ok(option.label.length > 0 && option.description.length > 0, `${option.value} の文言が無い`);
@@ -486,7 +510,7 @@ test('詳細設定タブの見出しは ビュワー / 操作 / コメント の
 });
 
 test('数値の段階の選択肢は既定の値にだけ印が付く', () => {
-	const fields = createAdvancedSections(createStrings('ja')).flatMap((section) => section.fields);
+	const fields = createAdvancedSections(createPopupStrings('ja')).flatMap((section) => section.fields);
 	for (const field of fields.filter((one) => !one.reveal)) {
 		const marked = field.options.filter((option) => option.label.endsWith('(既定)'));
 		assert.equal(marked.length, 1, `${field.key} の既定の印が 1 つではない`);
@@ -495,7 +519,7 @@ test('数値の段階の選択肢は既定の値にだけ印が付く', () => {
 });
 
 test('背景の濃さとクリック領域は「既定 / カスタム」から選び、カスタムのときだけレンジを出す', () => {
-	const fields = createAdvancedSections(createStrings('ja')).flatMap((section) => section.fields);
+	const fields = createAdvancedSections(createPopupStrings('ja')).flatMap((section) => section.fields);
 	const backdrop = fields.find((one) => one.key === 'backdropMode');
 	assert.deepEqual(backdrop.options.map((option) => option.label), ['テーマに合わせる (既定)', 'カスタム']);
 	assert.ok(backdrop.options[0].description.length > 0);
@@ -593,7 +617,7 @@ test('先読みのレンジは 20 枚まで。10 枚以上では値を警告の�
 	range.dispatch('input');
 	assert.equal(warning.hidden, false, '動かしている間も追従する');
 	assert.equal(warning.getAttribute('role'), 'status');
-	assert.equal(warning.textContent, createStrings('ja').popup.fields.prefetchCustom.warning);
+	assert.equal(warning.textContent, createPopupStrings('ja').popup.fields.prefetchCustom.warning);
 	assert.equal(output.className.includes('is-warning'), true);
 	assert.equal(range.getAttribute('aria-describedby'), 'prefetchCustom-warning');
 	range.value = '3';
@@ -629,7 +653,7 @@ test('レンジは動かす間は表示だけを変え、離したときに数�
  * @returns {object} 項目の定義
  */
 function settingsField(key) {
-	return createSections(createStrings('ja')).flatMap((section) => section.fields).find((one) => one.key === key);
+	return createSections(createPopupStrings('ja')).flatMap((section) => section.fields).find((one) => one.key === key);
 }
 
 test('自動送りの動きは 使わない / 作品の中だけ / 端で次の作品へ の 3 択', () => {
@@ -644,7 +668,7 @@ test('自動送りの間隔の選択肢は 2 / 3 / 4 / カスタムで、既定�
 	const field = settingsField('slideshowInterval');
 	assert.deepEqual(field.options.map((option) => option.value), ['2', '3', '4', 'custom']);
 	const labels = Object.fromEntries(field.options.map((option) => [option.value, option.label]));
-	assert.equal(labels['3'], createStrings('ja').popup.withDefault('3 秒'));
+	assert.equal(labels['3'], createPopupStrings('ja').popup.withDefault('3 秒'));
 	assert.equal(labels['2'], '2 秒');
 });
 
@@ -683,7 +707,7 @@ test('自動送りのカスタムの間隔のレンジを動かすと、小数�
 
 test('詳細設定タブの文言は全言語にある', () => {
 	for (const lang of SUPPORTED_LANGUAGES) {
-		assert.ok(createStrings(lang).popup.tabs.advanced.length > 0, `${lang} のタブ名が無い`);
+		assert.ok(createPopupStrings(lang).popup.tabs.advanced.length > 0, `${lang} のタブ名が無い`);
 	}
 });
 
@@ -743,7 +767,7 @@ test('外部リンクは新しいタブで開き、参照元を渡さない', ()
 test('描き直しても前の中身は残らない', () => {
 	const { doc, root } = build();
 	const before = collect(root, 'h2').length;
-	renderPopup({ doc, root, settings: { ...SETTINGS_DEFAULTS }, strings: createStrings('ja'), onChange() {}, onReset() {} });
+	renderPopup({ doc, root, settings: { ...SETTINGS_DEFAULTS }, strings: createPopupStrings('ja'), onChange() {}, onReset() {} });
 	assert.equal(collect(root, 'h2').length, before);
 });
 
@@ -762,7 +786,7 @@ test('resolveTheme は matchMedia が無くてもダークを返す', () => {
 /* --- 英語のカタログ ----------------------------------------------------- */
 
 test('英語のカタログで設定画面が英語になる', () => {
-	const { root } = build({ strings: createStrings('en') });
+	const { root } = build({ strings: createPopupStrings('en') });
 	assert.match(root.textContent, /Use the viewer/);
 	assert.match(root.textContent, /Reset settings/);
 	assert.match(root.textContent, /Licenses/);
@@ -813,6 +837,23 @@ test('「ビュワーを使う」がオフなら子は非活性になり、押�
 	// 止めきれずに change が来ても保存しない
 	home.dispatch('change');
 	assert.deepEqual(changes, []);
+});
+
+test('非活性の項目の警告は一定時間で消え、aria-describedby からも外れる', () => {
+	const { root, timers } = build({ settings: { enabled: false } });
+	const home = findRole(root, 'viewerOnHome');
+	const warning = findRole(root, 'viewerOnHome-lock');
+	home.dispatch('click', { preventDefault() {} });
+	assert.equal(warning.hidden, false);
+	assert.deepEqual(timers.pending().map(({ ms }) => ms), [LOCK_WARNING_MS]);
+	// 続けて押したら消すまでの時間を延ばす (前の計時は捨てる)
+	home.dispatch('click', { preventDefault() {} });
+	assert.equal(timers.pending().length, 1);
+	timers.fire();
+	assert.equal(warning.hidden, true);
+	assert.equal(warning.textContent, '');
+	assert.ok(!(home.getAttribute('aria-describedby') ?? '').includes('viewerOnHome-lock'));
+	assert.equal(home.getAttribute('aria-disabled'), 'true', '非活性のまま');
 });
 
 test('親をオンにするとその場で子が活性に戻り、警告も消える', () => {
@@ -918,7 +959,7 @@ test('「ビュワーを使う」がオフなら、ビュワーを開かない�
 });
 
 test('定義表の項目は、グリッドの 3 つと「ビュワーを使う」以外すべて、最初の条件が「ビュワーを使う」', () => {
-	const strings = createStrings('ja');
+	const strings = createPopupStrings('ja');
 	const fields = [...createSections(strings), ...createAdvancedSections(strings)]
 		.flatMap((section) => section.fields)
 		.flatMap(function walk(field) { return [field, ...(field.children ?? []).flatMap(walk)]; });

@@ -18,12 +18,7 @@ import {
 } from '../../common/constants.js';
 import { slideshowIntervalSeconds, snapToRange } from '../../common/storage.js';
 import { activeElementIn, hasFocusWithin } from './focus.js';
-
-/** 再生ボタンの表示。キーは今の再生状態、値は「押すと何になるか」。アイコンは言語に依らない。 */
-const TOGGLE = Object.freeze({
-	PLAYING: Object.freeze({ icon: 'pause', labelKey: 'PAUSE' }),
-	PAUSED: Object.freeze({ icon: 'play', labelKey: 'PLAY' }),
-});
+import { PLAY_TOGGLE_LOOKS, createPopupToggle, setButtonLook, setPlayToggleLook } from './control-parts.js';
 
 /** 送る間隔の項目に並べる値。秒数の選択肢の後ろにカスタムを置く。 */
 const INTERVAL_OPTIONS = Object.freeze([...SLIDESHOW_INTERVAL_CHOICES, SLIDESHOW_INTERVAL_CUSTOM]);
@@ -103,8 +98,6 @@ export function createSlideshowControls(deps) {
 	let customSeconds = deps.settings.slideshowIntervalCustom;
 	/** ループするか */
 	let loop = deps.settings.slideshowLoop === true;
-	/** 送る間隔のパネルを開いているか */
-	let panelOpen = false;
 	/** カーソルが帯の上にあるか */
 	let hovering = false;
 	/** 隠すまでのタイマー。張っていなければ null */
@@ -136,21 +129,8 @@ export function createSlideshowControls(deps) {
 		const button = doc.createElement('button');
 		button.type = 'button';
 		button.className = className;
-		setButtonLook(button, icon, label);
+		setButtonLook(doc, button, icon, label);
 		return button;
-	}
-
-	/**
-	 * ボタンのアイコンと名前を差し替える。
-	 * @param {HTMLButtonElement} button ボタン
-	 * @param {string} icon アイコンの名前
-	 * @param {string} label 名前
-	 * @returns {void}
-	 */
-	function setButtonLook(button, icon, label) {
-		button.setAttribute('aria-label', label);
-		button.title = label;
-		button.replaceChildren(createIcon(doc, icon));
 	}
 
 	const element = doc.createElement('div');
@@ -167,7 +147,7 @@ export function createSlideshowControls(deps) {
 	const prev = iconButton('slideshow-prev', 'skipPrevious', text.PREV);
 	listen(prev, 'click', () => deps.onStep(-1));
 
-	const toggle = iconButton('slideshow-toggle', TOGGLE.PAUSED.icon, text[TOGGLE.PAUSED.labelKey]);
+	const toggle = iconButton('slideshow-toggle', PLAY_TOGGLE_LOOKS.PAUSED.icon, text[PLAY_TOGGLE_LOOKS.PAUSED.labelKey]);
 	listen(toggle, 'click', () => deps.onToggle());
 
 	const next = iconButton('slideshow-next', 'skipNext', text.NEXT);
@@ -369,72 +349,19 @@ export function createSlideshowControls(deps) {
 		loopButton.setAttribute('aria-pressed', String(next));
 	}
 
-	/**
-	 * パネルの開閉を画面に反映し、変わったときだけ知らせる。
-	 * 開いている間は帯を隠さず、閉じたら隠すまでの計時をやり直す。
-	 * @param {boolean} open 開くなら true
-	 * @returns {void}
-	 */
-	function setPanelOpen(open) {
-		if (open === panelOpen) return;
-		panelOpen = open;
-		panel.hidden = !open;
-		speedButton.setAttribute('aria-expanded', String(open));
-		if (open) showControls();
-		else scheduleIdle();
-		deps.onPanelChange(open);
-	}
-
-	/**
-	 * パネルを閉じる。キーで閉じたときは速度のボタンへフォーカスを戻す。
-	 * (戻さないと、隠れた項目にフォーカスが残ってモーダルのキー操作が効かなくなる)
-	 * @param {boolean} refocus ボタンへフォーカスを戻すか
-	 * @returns {void}
-	 */
-	function closePanel(refocus) {
-		if (!panelOpen) return;
-		setPanelOpen(false);
-		if (refocus) speedButton.focus();
-	}
-
-	listen(speedButton, 'click', () => {
-		if (panelOpen) {
-			closePanel(false);
-			return;
-		}
-		setPanelOpen(true);
-		// 開いたら選んでいる項目へ。そのまま矢印で選び直せる
-		options[selectedIndex()].focus();
+	// 開いている間は帯を隠さず、閉じたら隠すまでの計時をやり直す。開いたら選んでいる項目へ。そのまま矢印で選び直せる
+	const speedPanel = createPopupToggle({
+		doc,
+		wrap: speedWrap,
+		button: speedButton,
+		popup: panel,
+		focusOnOpen: () => options[selectedIndex()],
+		onChange: (open) => {
+			if (open) showControls();
+			else scheduleIdle();
+			deps.onPanelChange(open);
+		},
 	});
-
-	/**
-	 * フォーカスが速度の部品の外へ出たら閉じる。(Tab で抜けたとき)
-	 * 行き先が無いとき (窓が非アクティブになった等) は閉じない。外側のクリックは pointerdown が受け持つ
-	 * @param {FocusEvent} event フォーカスの移動
-	 * @returns {void}
-	 */
-	function onSpeedFocusOut(event) {
-		if (!panelOpen) return;
-		const target = event.relatedTarget;
-		if (!target) return;
-		if (speedWrap.contains(target)) return;
-		closePanel(false);
-	}
-	listen(speedWrap, 'focusout', onSpeedFocusOut);
-
-	/**
-	 * パネルの外が押されたら閉じる。Shadow DOM の中なので composedPath() で見る。
-	 * @param {PointerEvent} event 押された位置
-	 * @returns {void}
-	 */
-	function onDocumentPointerDown(event) {
-		if (!panelOpen) return;
-		const path = event.composedPath?.() ?? [];
-		if (path.includes(speedWrap)) return;
-		closePanel(false);
-	}
-	// 捕捉フェーズで受ける。pixiv 側やビュワーが途中で止めても届くようにする
-	listen(doc, 'pointerdown', onDocumentPointerDown, true);
 
 	/* --- 自動で隠す ------------------------------------------------------ */
 
@@ -480,7 +407,7 @@ export function createSlideshowControls(deps) {
 	 */
 	function onIdle() {
 		idleTimer = null;
-		if (hovering || panelOpen || hasKeyboardFocusWithin()) return;
+		if (hovering || speedPanel.isOpen() || hasKeyboardFocusWithin()) return;
 		element.dataset.idle = '';
 	}
 
@@ -550,8 +477,7 @@ export function createSlideshowControls(deps) {
 	 * @returns {void}
 	 */
 	function setPlaying(playing) {
-		const look = playing ? TOGGLE.PLAYING : TOGGLE.PAUSED;
-		setButtonLook(toggle, look.icon, text[look.labelKey]);
+		setPlayToggleLook(doc, toggle, playing, text);
 	}
 
 	/**
@@ -613,10 +539,10 @@ export function createSlideshowControls(deps) {
 		 * @returns {boolean} 食い止めたなら true
 		 */
 		consumeKey(event) {
-			if (!panelOpen) return false;
+			if (!speedPanel.isOpen()) return false;
 			if (event.key === KEYS.CLOSE) {
 				event.preventDefault?.();
-				closePanel(true);
+				speedPanel.close(true);
 				return true;
 			}
 			const target = event.composedPath?.()[0];
@@ -645,6 +571,7 @@ export function createSlideshowControls(deps) {
 			if (disposed) return;
 			disposed = true;
 			cancelIdle();
+			speedPanel.dispose();
 			for (const { target, type, handler, capture } of listeners) target.removeEventListener(type, handler, capture);
 			listeners.length = 0;
 			element.remove();

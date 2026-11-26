@@ -16,10 +16,10 @@
 import { createHash, verify } from 'node:crypto';
 
 /** ファイル先頭の識別子。 */
-export const CRX_MAGIC = 'Cr24';
+const CRX_MAGIC = 'Cr24';
 
 /** 扱う CRX の形式の版。 */
-export const CRX_FORMAT_VERSION = 3;
+const CRX_FORMAT_VERSION = 3;
 
 /** 署名対象の前に付く固定の接頭辞。(末尾の NUL を含む) */
 const SIGNATURE_CONTEXT = Buffer.from('CRX3 SignedData\x00', 'latin1');

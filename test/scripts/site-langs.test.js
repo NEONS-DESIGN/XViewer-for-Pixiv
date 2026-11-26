@@ -1,8 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
+import { mkdtemp, mkdir, copyFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import {
 	SITE_LANGUAGES,
+	SITE_PAGES,
 	relativeHref,
 	renderPage,
 	renderSitemap,
@@ -87,4 +91,34 @@ test('site/ の全ページと sitemap.xml は言語の表と揃っている', a
 	// 揃っていなければ node scripts/site-langs.mjs を走らせる
 	const siteDir = fileURLToPath(new URL('../../site/', import.meta.url));
 	assert.deepEqual(await syncSiteLanguages({ siteDir, check: true }), []);
+});
+
+/**
+ * site/ のページだけを一時フォルダへ写す。sitemap.xml は写さない。
+ * @returns {Promise<string>} 一時フォルダ (site/ の代わり)
+ */
+async function copyPagesToTemp() {
+	const source = fileURLToPath(new URL('../../site/', import.meta.url));
+	const dir = await mkdtemp(path.join(tmpdir(), 'xviewer-site-langs-'));
+	for (const language of SITE_LANGUAGES) {
+		await mkdir(path.join(dir, language.dir), { recursive: true });
+		for (const page of SITE_PAGES) {
+			await copyFile(path.join(source, language.dir, page), path.join(dir, language.dir, page));
+		}
+	}
+	return dir;
+}
+
+test('sitemap.xml が無ければ作り直す対象にする', async (t) => {
+	const dir = await copyPagesToTemp();
+	t.after(() => rm(dir, { recursive: true, force: true }));
+	assert.deepEqual(await syncSiteLanguages({ siteDir: dir, check: true }), [path.join(dir, 'sitemap.xml')]);
+});
+
+test('sitemap.xml が無い以外の理由で読めなければ投げ、lastmod を書き直さない', async (t) => {
+	const dir = await copyPagesToTemp();
+	t.after(() => rm(dir, { recursive: true, force: true }));
+	// フォルダにしておくと readFile が ENOENT 以外 (EISDIR) で失敗する
+	await mkdir(path.join(dir, 'sitemap.xml'));
+	await assert.rejects(syncSiteLanguages({ siteDir: dir, check: true }), /sitemap.xml を読めません/);
 });

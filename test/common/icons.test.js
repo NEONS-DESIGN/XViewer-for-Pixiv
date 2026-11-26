@@ -1,10 +1,17 @@
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { createIcon } from '../../src/common/icons.js';
-import { ICON_SHAPES } from '../../src/common/icon-shapes.js';
+import { fileURLToPath } from 'node:url';
+import { build } from 'esbuild';
+import { createIcon, createIconFromShape } from '../../src/common/icons.js';
+import * as iconShapes from '../../src/common/icon-shapes.js';
 import { LOG_PREFIX } from '../../src/common/log.js';
 import { ALLOWED_ATTRIBUTES, ALLOWED_TAGS } from '../../scripts/svg-elements.mjs';
 import { fakeDoc, fakeElement, iconName } from '../helpers/dom.js';
+
+const { ICON_SHAPES } = iconShapes;
+
+/** icon-shapes.js の図形ごとの定数名の頭。 */
+const SHAPE_CONSTANT_PREFIX = 'ICON_';
 
 /** 図形が見つからないときに createIcon が使う空の描画領域。(icons.js の EMPTY_VIEW_BOX と同じ値) */
 const EMPTY_VIEW_BOX = '0 0 24 24';
@@ -224,4 +231,59 @@ test('ICON_SHAPES からリボン型の bookmark は外してある', () => {
 	// ブックマークはハート (favorite) で表す。取り違えの元になるので図形ごと持たない
 	assert.equal(ICON_SHAPES.bookmark, undefined);
 	assert.equal(ICON_SHAPES.favorite.elements[0].tag, 'path');
+});
+
+test('図形ごとの定数は ICON_SHAPES の同じ名前の図形と同じものを指す', () => {
+	const constants = Object.entries(iconShapes).filter(([key]) => key.startsWith(SHAPE_CONSTANT_PREFIX) && key !== 'ICON_SHAPES');
+	assert.equal(constants.length, Object.keys(ICON_SHAPES).length);
+	const tableValues = new Set(Object.values(ICON_SHAPES));
+	for (const [key, shape] of constants) {
+		assert.ok(tableValues.has(shape), key);
+		assert.ok(Object.isFrozen(shape.elements), key);
+	}
+	assert.equal(iconShapes.ICON_CHEVRON_LEFT, ICON_SHAPES.chevronLeft);
+	assert.equal(iconShapes.ICON_BRAND_X, ICON_SHAPES.brandX);
+});
+
+test('createIconFromShape は渡した図形を createIcon と同じ形で描く', () => {
+	const doc = fakeDoc();
+	const fromShape = createIconFromShape(doc, iconShapes.ICON_CLOSE, 'close');
+	const byName = createIcon(doc, 'close');
+	assert.deepEqual(fromShape.attributes, byName.attributes);
+	assert.deepEqual(drawnElements(fromShape), drawnElements(byName));
+});
+
+test('createIconFromShape は図形が無ければ空の svg を返し、warn で名前を残す', () => {
+	const warn = mock.method(console, 'warn', () => {});
+	try {
+		const svg = createIconFromShape(fakeDoc(), undefined, 'missing');
+		assert.equal(svg.attributes.viewBox, EMPTY_VIEW_BOX);
+		assert.equal(svg.children.length, 0);
+		assert.equal(warn.mock.callCount(), 1);
+		assert.equal(warn.mock.calls[0].arguments[1], 'missing');
+	} finally {
+		warn.mock.restore();
+	}
+});
+
+test('名前つきで import した図形だけが束に残る (ほかの図形は木の刈り込みで落ちる)', async () => {
+	// 図形の表を 1 つの呼び出しにまとめると、使わない図形も束から落とせなくなる
+	const entry = [
+		"import { createIconFromShape } from './icons.js';",
+		"import { ICON_ERROR } from './icon-shapes.js';",
+		'globalThis.icon = createIconFromShape(document, ICON_ERROR, "error");',
+	].join('\n');
+	const result = await build({
+		stdin: { contents: entry, resolveDir: fileURLToPath(new URL('../../src/common/', import.meta.url)), loader: 'js' },
+		bundle: true,
+		minify: true,
+		format: 'esm',
+		write: false,
+		logLevel: 'silent',
+	});
+	const output = result.outputFiles[0].text;
+	assert.ok(output.includes(ICON_SHAPES.error.elements[0].attrs.d), 'error の図形が残っている');
+	for (const name of ['close', 'like', 'brandX', 'lightMode']) {
+		assert.ok(!output.includes(ICON_SHAPES[name].elements[0].attrs.d), `${name} の図形が落ちている`);
+	}
 });

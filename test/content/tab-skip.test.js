@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { planSkipTargets, planLabeledSkipTargets, attachTabSkip, stripTabSkipMarks } from '../../src/content/tab-skip.js';
+import { planSkipTargets, planLabeledSkipTargets, attachTabSkip, stripTabSkipMarks, outermostConnected } from '../../src/content/tab-skip.js';
 import {
 	GRID_TAB_SKIP, TAB_SKIP_MARK_ATTR, TAB_SKIP_LABEL_ATTR, ARTWORK_LINK_SELECTOR, THUMB_LINK_SELECTOR, CARD_BUTTON_SELECTOR,
 } from '../../src/common/constants.js';
@@ -311,6 +311,43 @@ test('要素でないノード (テキスト) が増えても投げない', () =
 	const { deps, trigger } = fakeObserverDeps();
 	attachTabSkip(doc, GRID_TAB_SKIP.BOTH, deps);
 	assert.doesNotThrow(() => trigger({ nodeType: 3, textContent: 'text' }));
+});
+
+test('通知で増えたノードのうち、要素だけを溜め、外れたものと他の部分木に含まれるものはたどらない', () => {
+	// React の描き直しはテキストノードも大量に足す。溜めると flush で無駄にたどる
+	const doc = fakeDoc([makeCard('1')]);
+	let callback = null;
+	let flushNow = null;
+	attachTabSkip(doc, GRID_TAB_SKIP.BOTH, {
+		createObserver(fn) { callback = fn; return { observe() {}, disconnect() {} }; },
+		schedule(fn) { flushNow = fn; return 1; },
+		cancel() {},
+	});
+	const outer = makeCard('2');
+	doc.add(outer);
+	const inner = outer.title;
+	const gone = makeCard('3');
+	gone.card.isConnected = false;
+	let innerScans = 0;
+	let goneScans = 0;
+	const innerQuery = inner.querySelectorAll;
+	inner.querySelectorAll = (selector) => { innerScans += 1; return innerQuery(selector); };
+	const goneQuery = gone.card.querySelectorAll;
+	gone.card.querySelectorAll = (selector) => { goneScans += 1; return goneQuery(selector); };
+	callback([{ addedNodes: [{ nodeType: 3, textContent: 'text' }, outer.card, inner, gone.card] }]);
+	flushNow();
+	assert.equal(innerScans, 0, '外側のカードの部分木に含まれるノードを二度たどっている');
+	assert.equal(goneScans, 0, '外れたノードをたどっている');
+	assert.equal(outer.title.getAttribute('tabindex'), '-1');
+	assert.equal(gone.title.getAttribute('tabindex'), null);
+});
+
+test('outermostConnected は他の起点の子孫と外れた起点を落とす', () => {
+	const { card, title } = makeCard('1');
+	const loose = el('div');
+	loose.isConnected = false;
+	assert.deepEqual(outermostConnected(new Set([title, card, loose])), [card]);
+	assert.deepEqual(outermostConnected(new Set([title])), [title]);
 });
 
 test('同期で発火するスケジューラでも 2 回目以降の通知を捨てない', () => {

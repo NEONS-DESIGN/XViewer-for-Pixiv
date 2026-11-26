@@ -6,37 +6,32 @@ import {
 	isViewerTarget,
 	pageKind,
 	isProfileHome,
-	isInfiniteScrollTarget,
 	parseArtworkPath,
 	parseUserPage,
 	pageKey,
-	parsePageParam,
 } from './page.js';
-import { createRouter, createEntryTracker, replaceUrlKeepingState } from './router.js';
-import { attachGridListener, collectWorkIds, collectGroupIds, findGridList } from './grid.js';
+import { createRouter, createEntryTracker } from './router.js';
+import { attachGridListener, collectWorkIds, collectGroupIds } from './grid.js';
 import { attachTabSkip } from './tab-skip.js';
 import { ensureFocusStyle } from './grid-focus.js';
 import { attachPickupHider } from './pickup.js';
-import { attachInfiniteScroll } from './infinite.js';
-import { decideInfiniteSync, SYNC_ACTIONS } from './infinite-sync.js';
+import { createInfiniteController, infiniteModeOf } from './infinite-controller.js';
 import { readSession } from './session.js';
 import { createViewer } from './viewer/viewer.js';
 import { createSequence, extendWithAllWorks } from './sequence.js';
-import { createPageSource } from '../pixiv/pages.js';
 import { loadSettings, watchSettings } from '../common/storage.js';
-import { warn, info } from '../common/log.js';
+import { info } from '../common/log.js';
 import { runWhenIdle } from '../common/idle.js';
 import {
 	NAV_EVENTS,
 	LOCATION_CHECK_DELAY_MS,
 	INFINITE_SCROLL,
-	PAGE_KEY_SEPARATOR,
 	SESSION_WARMUP_TIMEOUT_MS,
 	PAGE_KINDS,
 	GRID_TAB_SKIP,
 } from '../common/constants.js';
 import { readPageLanguage, uiLanguage } from '../common/language.js';
-import { savePageLanguage } from '../common/language-store.js';
+import { rememberPageLanguage } from '../common/language-store.js';
 import { createStrings } from '../i18n/index.js';
 
 /** 今の購読。ページから離れるときに解除する。 */
@@ -50,60 +45,6 @@ let focusStyle = null;
  * ピックアップ欄を隠す CSS。ビュワーの入切とは独立に効くので stop() では触らない
  */
 let pickupHider = null;
-/**
- * @type {import('./infinite.js').InfiniteHandle|null}
- * グリッドの無限スクロール。ビュワーの入切とは独立に効くので stop() では触らない。
- * 雛形が採れずに張れなかったときも (何もしない handle を) 持つ。isActive() で見分ける
- */
-let infinite = null;
-/**
- * 今 infinite を張ろうとしたグリッドのキー (作者 + タブ)。張っていなければ null。
- * 同じグリッドを見続けている間は作り直さず、別のグリッドへ移ったら必ず捨てるための目印。
- * 雛形が採れずに張れなかったときも覚え、同じ ul に対して組み直しを繰り返さない。
- * (試し直すのは別の ul が現れたか、ul の画像が増えたときだけ)
- */
-let infiniteKey = null;
-/**
- * @type {Element|null} このグリッドで最後に見た ul。まだ見ていなければ null。
- * React がグリッドを描き直すと、置いた sentinel ごと DOM から外れて継ぎ足しが黙って止まる。
- * 外れたことに気付くための手掛かりとして持つ。
- * 撤去 (dispose) では捨てない。監視を止めている間に描き直されたことにも気付きたいため
- */
-let infiniteList = null;
-/**
- * 張れなかったとき、`infiniteList` にあった画像の数。
- * 直接開いたページでは img がまだ figure のままで雛形が採れないことがあり、
- * 画像が読み込まれて (同じ ul のまま) img に置き換わったら試し直したい。
- * 一方、全カードがブックマーク済みの作者ページ等では何度試しても同じなので、
- * 画像の数が変わらない限り captureTemplates (getComputedStyle x 48) を回さない
- */
-let infiniteListImages = -1;
-/**
- * 下の `infiniteBasePage` がどのグリッドについての記憶か。対象外のページなら null。
- * ページ (作者 + タブ) だけで決める。**設定を切っても変わらない**のが要点で、
- * オフの間も「このグリッドは何ページ目を並べているか」を覚えておくために `infiniteKey` と分けてある
- */
-let infiniteGridKey = null;
-/**
- * pixiv 自身がグリッドに並べているページ番号。(継ぎ足したぶんは数えない)
- * 継ぎ足しはこの次のページから読む。値が動くのは pixiv が `?p=` を動かしたとき
- * (別のグリッドを見始めた / ページャ / 戻る) だけ。pixiv はその値のページを並べている。
- * 同じグリッドを描き直されても変えない。(描き直しは pixiv が最後に遷移したクエリで起きる)
- *
- * `?p=` をそのまま使えないのは、継ぎ足しに合わせて自分で書き換えているため。
- * 撤去して張り直す (オフ→オンなど) と、グリッドには pixiv が並べたぶんしか残らない
- */
-let infiniteBasePage = 1;
-/**
- * 自分が `?p=` に書いた値。書いていなければ null。
- * `?p=` を動かしたのが pixiv (直接アクセス / リロード / ページャ) なのか自分なのかを見分ける。
- * pixiv が動かした値はグリッドの中身と一致するので基準ページにできるが、
- * 自分が書いた値は画面に出ている場所でしかなく、撤去すると中身と合わなくなる。
- * スクロールで上下するので、基準ページより大きいとは限らない
- */
-let infiniteOwnPage = null;
-/** syncInfinite() を走らせている最中か。自分の ?p= の書き込みで再入するのを防ぐ目印 */
-let syncingInfinite = false;
 let router = null;
 /**
  * 今の履歴エントリが自分のモーダル用に積んだものか。history.state を読まずに追う。
@@ -140,10 +81,20 @@ let navigationWatch = null;
 let observedPath = null;
 /** パス確認の遅延タイマ ID。0 なら動いていない */
 let checkTimer = 0;
-/** 遷移通知から無限スクロールの追従までの遅延タイマ ID。0 なら動いていない */
-let infiniteSyncTimer = 0;
-/** 監視を外したとき、モーダルを閉じる popstate を待ってから継ぎ足しを撤去する購読を張っているか */
-let awaitingCloseForDispose = false;
+/** 遷移通知から、グリッドへの追従 (Tab 移動と無限スクロール) までの遅延タイマ ID。0 なら動いていない */
+let deferredSyncTimer = 0;
+/**
+ * グリッドの無限スクロールの追従。ビュワーの入切とは独立に効くので stop() では触らない。
+ * 設定・文言・ビュワーは呼ばれた時点の値を読む
+ */
+const infinite = createInfiniteController({
+	doc: document,
+	win: window,
+	getSettings: () => settings,
+	getStrings: () => strings,
+	isViewingOwnWork,
+	isViewerOpen: () => viewer?.isOpen() === true,
+});
 
 /**
  * 作品が開かれたときの処理。
@@ -174,7 +125,7 @@ function handlePopState(workId) {
 		viewer.close();
 		// 閉じると Next.js が自分の履歴 state の URL (= pixiv が最後に遷移した ?p=) へ
 		// replaceState し直すことがある。グリッドは継ぎ足したままなので、URL を今の位置へ合わせ直す
-		syncPageParam();
+		infinite.restoreParam();
 		return;
 	}
 	// 既に開いている作品なら描き直さない (作品移動で replaceState した直後など)
@@ -328,257 +279,19 @@ function syncPickup() {
 }
 
 /**
- * 無限スクロールの対象として読めるページか。
- * 作品グリッドの 3 タブ以外は対象外。(ホーム・タグ絞り込み・ブックマークには
- * pixiv 本体のページャが無く、profile/all と並びも一致しない)
- * @param {string} path location.pathname
- * @returns {import('./page.js').UserPage|null} 対象でなければ null
- */
-function infiniteTargetPage(path) {
-	return isInfiniteScrollTarget(path) ? parseUserPage(path) : null;
-}
-
-/**
- * どのグリッドを見ているかを表すキーを作る。
- * タブが変われば並ぶ作品も変わるので、作者だけでなく種別もキーに入れる。
- * @param {import('./page.js').UserPage|null} page infiniteTargetPage() の結果
- * @returns {string|null} グリッドのキー。対象外のページなら null
- */
-function gridKeyOf(page) {
-	return page ? [page.userId, page.category ?? ''].join(PAGE_KEY_SEPARATOR) : null;
-}
-
-/**
- * 最後に見た ul が DOM から外れたか。
- * pixiv がグリッドを描き直すと、継ぎ足したカードも sentinel もろとも外れ、
- * 見張っている sentinel が二度と画面に入らないまま継ぎ足しが黙って止まる。
- * この場合は張り直しが要る。(基準ページは変えない)
- * @returns {boolean} 外れていれば true
- */
-function isGridDetached() {
-	return Boolean(infiniteList) && !infiniteList.isConnected;
-}
-
-/**
- * 無限スクロールを使っておらず、何も張っていないか。
- * 設定がオフか対象外のページで、継ぎ足しも張りかけのキーも無ければ、
- * URL が変わらない限り syncInfinite() を走らせても判断は前回と同じになる。
- * @returns {boolean} 合わせ直す必要が無ければ true
- */
-function isInfiniteIdle() {
-	if (infinite || infiniteKey !== null) return false;
-	const wanted = settings?.infiniteScroll ?? INFINITE_SCROLL.OFF;
-	return wanted === INFINITE_SCROLL.OFF || !isInfiniteScrollTarget(location.pathname);
-}
-
-/**
- * ul にある画像の数。張れなかった ul が描き進んだかを見る手掛かり。(infiniteListImages)
- * @param {Element} ul グリッドの ul
- * @returns {number} img の数。数えられなければ -1
- */
-function countGridImages(ul) {
-	try {
-		return ul.querySelectorAll('img').length;
-	} catch {
-		return -1;
-	}
-}
-
-/**
- * 張れていないグリッドを試し直す価値があるか。
- * 前回試した ul と別の ul が現れたか、同じ ul でも画像が増えていれば試す。
- * 張れている (または何も試していない) ときは見ない。
- * @returns {boolean} 試し直すなら true
- */
-function hasGridChanged() {
-	const ul = findGridList(document);
-	if (!ul) return false;
-	return ul !== infiniteList || countGridImages(ul) !== infiniteListImages;
-}
-
-/**
- * 継ぎ足しを張ったグリッドを、今も見ているか。
- * pixiv 本体が別のページ (ホーム・検索・別ユーザー) へ遷移した直後は、遅延させた追従が
- * 届くまで継ぎ足しが張られたままになる。その間の URL は別のページのものなので、
- * `?p=` を触ってはいけない。(触ると遷移先の URL に無関係な `?p=` が残る)
- * @returns {boolean} 張ったグリッドの URL のままなら true。張っていなければ false
- */
-function isOnAttachedGrid() {
-	return infiniteKey !== null && infiniteKey === gridKeyOf(infiniteTargetPage(location.pathname));
-}
-
-/**
- * 継ぎ足しを撤去する。
- * グリッドについての記憶 (`infiniteGridKey` / `infiniteBasePage` / `infiniteList`) は捨てない。
- * 設定を切っただけでも呼ばれるので、ここで捨てると再び入れたときに
- * 「グリッドが何ページ目を並べているか」を見失う。
- * @returns {void}
- */
-function disposeInfinite() {
-	// 撤去後のグリッドは pixiv が並べたぶんだけになるので、?p= も基準ページへ戻す。
-	// 張っていたグリッドを見ているときだけ書く。判定が infiniteKey を見るので、消す前に書く
-	if (isOnAttachedGrid()) writePageParam(infiniteBasePage);
-	infinite?.dispose();
-	infinite = null;
-	infiniteKey = null;
-	infiniteListImages = -1;
-}
-
-/**
- * URL の ?p= を、今画面に出ているページへ合わせ直す。
- * pixiv (Next.js) が ?p= を自分の値へ戻したあとに呼ぶ。継ぎ足しが動いていなければ何もしない。
- * @returns {void}
- */
-function syncPageParam() {
-	const page = infinite?.currentPage();
-	if (page) writePageParam(page);
-}
-
-/**
- * 無限スクロールを今の設定と URL に合わせる。
- *
- * ビュワーの入切とは独立に効かせる。ビュワーを使わない人も無限スクロールだけ使える。
- * (ピックアップ非表示と同じ扱い)
- * @returns {void}
- */
-function syncInfinite() {
-	// 自分で書いた ?p= も inject.js のフックを通って handleLocationChange() を呼び戻す
-	// (通知の経路は遅延させてあるが、同期で届く経路が増えても 2 本張らないよう、ここで閉じる)
-	if (syncingInfinite) return;
-	syncingInfinite = true;
-	try {
-		syncInfiniteOnce();
-	} finally {
-		syncingInfinite = false;
-	}
-}
-
-/**
- * 遷移の通知を受けてから、少し待って無限スクロールを合わせる。
+ * 遷移の通知を受けてから、少し待ってグリッドへの追従 (Tab 移動と無限スクロール) を合わせる。
  * 通知の時点では React がまだ前のページを描いているので、描き替わるのを待つ。
+ * (前のページの DOM を全部たどって当てても、新しいページには効かない)
  * 待っている間に届いた通知は 1 回にまとめる。(最初の通知から LOCATION_CHECK_DELAY_MS 後に走る)
  * @returns {void}
  */
-function scheduleInfiniteSync() {
-	if (infiniteSyncTimer) return;
-	infiniteSyncTimer = setTimeout(() => {
-		infiniteSyncTimer = 0;
-		syncInfinite();
+function scheduleGridSync() {
+	if (deferredSyncTimer) return;
+	deferredSyncTimer = setTimeout(() => {
+		deferredSyncTimer = 0;
+		syncTabSkip();
+		infinite.sync();
 	}, LOCATION_CHECK_DELAY_MS);
-}
-
-/**
- * 無限スクロールを今の設定と URL に合わせる本体。再入は syncInfinite() が防ぐ。
- * 判断は decideInfiniteSync() (純粋関数) に任せ、ここは DOM と記憶の更新だけを持つ。
- * @returns {void}
- */
-function syncInfiniteOnce() {
-	// 自分のモーダルを開いている間 URL は /artworks/{id} で、対象外のページに見える。
-	// ここで判断すると継ぎ足したカードごと撤去してしまうので触らない
-	// (設定を変えても、閉じたときの handleLocationChange() が必ず追従する)
-	if (isViewingOwnWork()) return;
-	const wanted = settings?.infiniteScroll ?? INFINITE_SCROLL.OFF;
-	// 設定とは切り離し、「どのグリッドを見ているか」はページだけで決める。
-	// オフにしただけでは別のグリッドへ移ったことにはならないので、
-	// このグリッドについて覚えた基準ページを失わずに済む
-	const page = infiniteTargetPage(location.pathname);
-	const key = gridKeyOf(page);
-	const active = infinite?.isActive() === true;
-	const decision = decideInfiniteSync({
-		wanted,
-		key,
-		gridKey: infiniteGridKey,
-		attachedKey: infiniteKey,
-		active,
-		detached: isGridDetached(),
-		// 同じグリッドで張れていないときだけ DOM を見る。張れているうちは querySelector も走らせない
-		listChanged: infiniteKey !== null && infiniteKey === key && !active && hasGridChanged(),
-		param: parsePageParam(location.search),
-		ownPage: infiniteOwnPage,
-		basePage: infiniteBasePage,
-	});
-	if (decision.changedGrid) {
-		// 別のグリッドを見始めた。(対象外のページへ出た場合も含む) 前のグリッドの記憶を捨てる
-		infiniteList = null;
-		infiniteListImages = -1;
-	}
-	// 記憶は撤去 (disposeInfinite が ?p= を基準ページへ書き戻す) より先に更新する
-	infiniteGridKey = decision.gridKey;
-	infiniteBasePage = decision.basePage;
-	infiniteOwnPage = decision.ownPage;
-	if (decision.action === SYNC_ACTIONS.KEEP || decision.action === SYNC_ACTIONS.RESTORE_PARAM) {
-		// 同じグリッドに張ったまま見続けている。設定の変更はモードの差し替えだけで追従する。
-		// ここで作り直すと、継ぎ足したカードが消えて読み進めた場所を失う
-		infinite?.setMode(wanted);
-		// pixiv が ?p= を基準ページへ戻しただけ。(モーダルを閉じた直後等) 今の位置へ書き直す
-		if (decision.action === SYNC_ACTIONS.RESTORE_PARAM) syncPageParam();
-		return;
-	}
-	// 対象外のページへ出た / 別のグリッドへ移った / 描き直された / 基準が動いた / オフにされた。
-	// 前の ul に張ったものは必ず撤去する
-	disposeInfinite();
-	if (decision.action === SYNC_ACTIONS.DETACH) return;
-	const ul = findGridList(document);
-	// グリッドがまだ描かれていない。ここでは組み立てず、現れたときにもう一度呼ばれるのを待つ
-	if (!ul) return;
-	infiniteKey = key;
-	infiniteList = ul;
-	try {
-		infinite = attachInfiniteScroll(document, {
-			ul,
-			strings,
-			source: createPageSource(page.userId, page.category, strings.lang),
-			mode: wanted,
-			loggedIn: readSession(document).isLoggedIn,
-			// グリッドに並んでいるのは基準ページのぶんだけ。続きはその次から読む
-			startPage: infiniteBasePage,
-			onPageChange: writePageParam,
-		});
-		// 雛形が採れない / sentinel を置けないと inactiveHandle が返る。
-		// 掴んだのが描き途中の ul だっただけかもしれないので、ul と画像の数を覚えておき、
-		// 別の ul が現れるか画像が増えたときだけ試し直す。(hasGridChanged)
-		// 基準ページは触らない。まだ 1 件も継ぎ足していないので、グリッドの中身は変わっていない
-		if (!infinite.isActive()) infiniteListImages = countGridImages(ul);
-	} catch (error) {
-		// 継ぎ足せなくても pixiv 標準のページャは残る。閲覧そのものは壊さない。
-		// キーと ul は残すので、同じ ul にいる限り作り直しは繰り返さない
-		warn('infinite scroll setup failed', error);
-		infinite = null;
-		infiniteListImages = countGridImages(ul);
-	}
-}
-
-/**
- * 見えているページに合わせて ?p= を書き換える。
- * 上へ戻れば小さい値も書く。(画面と URL を常に一致させる)
- * 再読み込みや共有で同じ場所へ戻れるようにするための追従なので、履歴は積まない。
- * モーダルが開いている間は書かない。その間 URL は /artworks/{id} で router.js の持ち物。
- * 張ったグリッドの URL でなくなっていても書かない。別のページへ遷移した直後、
- * 遅延させた追従が撤去するまでの間にも scroll → onPageChange でここへ来るため
- * @param {number} page ページ番号
- * @returns {void}
- */
-function writePageParam(page) {
-	if (viewer?.isOpen() || !isOnAttachedGrid()) return;
-	const previousOwn = infiniteOwnPage;
-	try {
-		const url = new URL(location.href);
-		// 1 ページ目は pixiv 自身も ?p= を付けない。付けずに揃える
-		if (page > 1) url.searchParams.set('p', String(page));
-		else url.searchParams.delete('p');
-		// 書く前に覚える。書き込みの途中で遷移の通知が来ても、自分の値だと分かるようにする
-		infiniteOwnPage = page;
-		// 既に同じ URL なら書かない。replaceState を呼び過ぎるとブラウザに絞られる。
-		// ここで history.replaceState(history.state, ...) としてはいけない。isolated world の
-		// history.state は古いことがあり、Next.js の state を拡張の目印で上書きしてしまう。
-		// state を保ったまま URL だけ差し替えるのは注入側 (page world) に任せる
-		if (url.href !== location.href) replaceUrlKeepingState(url.href);
-	} catch (error) {
-		// 書けていないので、URL に残っているのは前に自分が書いた値のまま。記憶も戻す
-		infiniteOwnPage = previousOwn;
-		// URL がずれるだけ。継ぎ足しは続ける
-		warn('page param update failed', error);
-	}
 }
 
 /**
@@ -588,7 +301,7 @@ function writePageParam(page) {
  * @returns {boolean} どれかが有効なら true
  */
 function needsNavigationWatch() {
-	const infiniteOn = (settings?.infiniteScroll ?? INFINITE_SCROLL.OFF) !== INFINITE_SCROLL.OFF;
+	const infiniteOn = infiniteModeOf(settings) !== INFINITE_SCROLL.OFF;
 	const tabSkipOn = (settings?.gridTabSkip ?? GRID_TAB_SKIP.NONE) !== GRID_TAB_SKIP.NONE;
 	return Boolean(settings?.enabled || settings?.hidePickup || infiniteOn || tabSkipOn);
 }
@@ -596,7 +309,7 @@ function needsNavigationWatch() {
 /**
  * URL が変わったかもしれないときの入口。
  * 注入側のイベント・popstate・MutationObserver の 3 経路をここに集約する。
- * @param {{deferInfinite?: boolean}} [options] 無限スクロールの追従を遅らせるか
+ * @param {{deferGrid?: boolean}} [options] グリッドへの追従 (Tab 移動と無限スクロール) を遅らせるか
  *   (注入側のイベントと popstate は React の描画より先に届くので、その 2 経路は遅らせる)
  * @returns {void}
  */
@@ -606,9 +319,12 @@ function handleLocationChange(options = {}) {
 	// pixiv 本体が作品ページへ遷移したときは apply() へ進み、対象外として止める
 	if (isViewingOwnWork()) return;
 	syncPickup();
-	syncTabSkip();
-	if (options.deferInfinite) scheduleInfiniteSync();
-	else syncInfinite();
+	if (options.deferGrid) {
+		scheduleGridSync();
+	} else {
+		syncTabSkip();
+		infinite.sync();
+	}
 	apply();
 }
 
@@ -628,14 +344,14 @@ function startNavigationWatch() {
 	observedPath = location.pathname;
 	const onNavigate = () => {
 		observedPath = location.pathname;
-		// pixiv の pushState / replaceState の中で同期に届く。無限スクロールの追従
-		// (雛形の採取と sentinel の挿入) だけは React の描画が済むのを待ってから行う
-		handleLocationChange({ deferInfinite: true });
+		// pixiv の pushState / replaceState の中で同期に届く。グリッドへの追従
+		// (Tab 移動の全走査、雛形の採取と sentinel の挿入) は React の描画が済むのを待ってから行う
+		handleLocationChange({ deferGrid: true });
 	};
 	const onPopState = () => {
 		observedPath = location.pathname;
-		// この時点の DOM は戻る前のページのまま。無限スクロールの追従は描き替わるのを待つ
-		handleLocationChange({ deferInfinite: true });
+		// この時点の DOM は戻る前のページのまま。グリッドへの追従は描き替わるのを待つ
+		handleLocationChange({ deferGrid: true });
 	};
 	window.addEventListener(NAV_EVENTS.NAVIGATE, onNavigate);
 	window.addEventListener('popstate', onPopState);
@@ -654,10 +370,10 @@ function startNavigationWatch() {
 			}
 			// 遷移の通知から遅らせた追従が控えている間は合わせない。(前のページの ul に張ってしまう)
 			// 無限スクロールを使っていなければ、URL が変わらない限り合わせ直すものは無い
-			if (infiniteSyncTimer || isInfiniteIdle()) return;
+			if (deferredSyncTimer || infinite.isIdle()) return;
 			// 直接開いたページで ul が現れたときと、描き直されて張り先が外れたときに張る。
 			// 張れているうちは何もしないので、費用は間隔ごとに判定 1 回で済む
-			if (!infinite?.isActive() || isGridDetached()) syncInfinite();
+			if (infinite.needsCheck()) infinite.sync();
 		}, LOCATION_CHECK_DELAY_MS);
 	});
 	observer.observe(document.body, { childList: true, subtree: true });
@@ -671,8 +387,8 @@ function startNavigationWatch() {
 			observer.disconnect();
 			clearTimeout(checkTimer);
 			checkTimer = 0;
-			clearTimeout(infiniteSyncTimer);
-			infiniteSyncTimer = 0;
+			clearTimeout(deferredSyncTimer);
+			deferredSyncTimer = 0;
 		},
 	};
 }
@@ -683,24 +399,9 @@ function startNavigationWatch() {
  */
 function stopNavigationWatch() {
 	// 監視を外すと、この先どうなっても追従できなくなる。先に後始末を済ませる。
-	// モーダルを開いたまま全部オフにされた場合、syncInfinite() はモーダル中のガードで
-	// 素通りするので、ここで解体しないと継ぎ足したカードがページに残ってしまう。
-	// グリッドについての記憶は残す。監視していない間に描き直されても、
-	// 最後に見た ul が外れていることで次に張るときに気付ける
-	if (isViewingOwnWork()) {
-		// 閉じるための history.back() がまだ届いていない。URL が作品ページのままだと
-		// ?p= を基準ページへ書き戻せないので、一覧へ戻ってから撤去する。
-		// 待つ間に監視を張り直されたら、継ぎ足しはそちらが引き継ぐ。待ちは 1 本だけ張る
-		if (!awaitingCloseForDispose) {
-			awaitingCloseForDispose = true;
-			window.addEventListener('popstate', () => {
-				awaitingCloseForDispose = false;
-				if (!navigationWatch) disposeInfinite();
-			}, { once: true });
-		}
-	} else {
-		disposeInfinite();
-	}
+	// モーダルを開いたまま全部オフにされた場合は、一覧へ戻ってから撤去する。(作品ページの URL では ?p= を書き戻せない)
+	// 待つ間に監視を張り直されたら、継ぎ足しはそちらが引き継ぐ
+	infinite.disposeAfterClose(() => navigationWatch !== null);
 	if (!navigationWatch) return;
 	navigationWatch.dispose();
 	navigationWatch = null;
@@ -709,11 +410,7 @@ function stopNavigationWatch() {
 
 /**
  * 設定を読んでから監視を始める。
- *
- * startNavigationWatch() を apply() より先に呼ぶ順序には意味がある。
- * popstate は登録順に配られるので、こちらの購読が router.js の購読より先になる。
- * そのおかげで、対象外のページへ戻ったときに stop() が router を捨ててから
- * handlePopState が走ることはない。逆順にすると、捨てたはずの viewer を触りにいく。
+ * startNavigationWatch() は apply() より先に呼ぶ。(popstate の購読を router.js より先に張る。逆順にすると捨てた viewer を触る)
  * @returns {Promise<void>}
  */
 async function boot() {
@@ -721,14 +418,14 @@ async function boot() {
 	strings = createStrings(uiLanguage(pageLanguage));
 	// popup は pixiv のページを持たないので、見た言語をここで残す。失敗しても先へ進む。
 	// 残すのは uiLanguage() で解決した後の UI 言語 (strings.lang) で、生の表示言語 (pageLanguage) ではない
-	void savePageLanguage(strings.lang);
+	void rememberPageLanguage(strings.lang);
 	settings = await loadSettings();
 	// ビュワーの入切とは独立して効かせる。ピックアップ非表示や無限スクロールだけを使う人もいる
 	pickupHider = attachPickupHider(document);
 	syncPickup();
 	syncTabSkip();
 	// この時点ではグリッドがまだ無いのが普通。張れなければ遷移監視の経路で張り直す
-	syncInfinite();
+	infinite.sync();
 	if (needsNavigationWatch()) {
 		startNavigationWatch();
 		if (settings.enabled) apply();
@@ -751,7 +448,7 @@ function handleSettingsChange(next) {
 	syncTabSkip();
 	syncPickup();
 	// ビュワーを切っても無限スクロールは切らない。設定そのものが変わったときだけ追従する
-	syncInfinite();
+	infinite.sync();
 	if (!next.enabled) {
 		// 作品を開いたまま切ると URL が /artworks/{id} に残る。先に履歴を戻して pixiv 本体に任せる
 		if (viewer?.isOpen()) router?.close();

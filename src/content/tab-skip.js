@@ -25,6 +25,31 @@ import { warn } from '../common/log.js';
 /** MutationObserver に渡す設定 (固定) */
 const OBSERVE_OPTIONS = Object.freeze({ childList: true, subtree: true });
 
+/** Node.ELEMENT_NODE。通知で増えたノードのうち要素だけを溜める */
+const ELEMENT_NODE_TYPE = 1;
+
+/**
+ * 溜めたノードから、まだ文書にあって、他のノードの部分木に含まれないものだけを残す。
+ * 含まれるものは祖先のほうをたどれば見つかるので、二度たどらない。
+ * @param {Set<Node>} roots 溜めたノード
+ * @returns {Node[]} たどる起点
+ */
+export function outermostConnected(roots) {
+	const result = [];
+	for (const root of roots) {
+		if (root.isConnected === false) continue;
+		let inner = false;
+		for (let node = root.parentElement ?? null; node; node = node.parentElement ?? null) {
+			if (roots.has(node)) {
+				inner = true;
+				break;
+			}
+		}
+		if (!inner) result.push(root);
+	}
+	return result;
+}
+
 /**
  * 何かをフォーカス順から外す設定か。
  * `none` と、設定が壊れて知らない値になったときの両方で false。当てる側と予約する側で判定を揃える
@@ -238,12 +263,18 @@ export function attachTabSkip(doc, mode, deps = {}) {
 
 	/**
 	 * 予約した当て直し。溜めていたノードを引き取って走る。
+	 * 間に外れたノードと、他のノードの部分木に含まれるノードは見ない。
 	 * @returns {void}
 	 */
 	const flush = () => {
 		pending = false;
 		timer = 0;
-		const roots = [...pendingRoots];
+		let roots = [];
+		try {
+			roots = outermostConnected(pendingRoots);
+		} catch (error) {
+			warn('tab skip failed', error);
+		}
 		pendingRoots.clear();
 		apply(roots);
 	};
@@ -271,7 +302,10 @@ export function attachTabSkip(doc, mode, deps = {}) {
 	const observer = createObserver((records) => {
 		if (!isSkippingMode(current)) return;
 		for (const record of records ?? []) {
-			for (const node of record.addedNodes ?? []) pendingRoots.add(node);
+			// テキストノード等は作品リンクを持たないので溜めない
+			for (const node of record.addedNodes ?? []) {
+				if (node?.nodeType === ELEMENT_NODE_TYPE) pendingRoots.add(node);
+			}
 		}
 		if (pending) return;
 		pending = true;

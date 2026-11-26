@@ -47,7 +47,7 @@ export const ARTWORK_LINK_SELECTOR = ARTWORK_LINK_SELECTORS.join(',');
 export const GA4_LABEL_ATTR = 'data-ga4-label';
 
 /** 作品カードのサムネのリンクに付く計測用ラベル。 */
-export const THUMB_LINK_LABEL = 'thumbnail_link';
+const THUMB_LINK_LABEL = 'thumbnail_link';
 
 /** 作品カードのタイトルのリンクに付く計測用ラベル。 */
 export const TITLE_LINK_LABEL = 'title_link';
@@ -546,8 +546,9 @@ export const POPUP_THEMES = Object.freeze({
  * SYSTEM は「今見えている配色」ではないのでキーに現れない。
  * 解決済みの DARK / LIGHT だけを引く。(popup-ui.js の resolveTheme を通す)
  * labelKey は文言そのものではなく、strings.theme を引くための鍵。(文言の出どころは src/i18n)
+ * popup 専用。content script の束では使われないので、落とせるよう純粋な即時関数で組む。
  */
-export const THEME_TOGGLE = Object.freeze({
+export const THEME_TOGGLE = /* @__PURE__ */ (() => Object.freeze({
 	[POPUP_THEMES.DARK]: Object.freeze({
 		next: POPUP_THEMES.LIGHT,
 		icon: 'lightMode',
@@ -558,7 +559,7 @@ export const THEME_TOGGLE = Object.freeze({
 		icon: 'darkMode',
 		labelKey: 'TO_DARK',
 	}),
-});
+}))();
 
 /** 設定の既定値。保存値が壊れていたらここへ倒す。 */
 export const SETTINGS_DEFAULTS = Object.freeze({

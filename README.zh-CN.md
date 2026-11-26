@@ -242,6 +242,7 @@ npm run build
 | `npm run build:icons` | 生成扩展程序图标的 PNG（生成物已提交） |
 | `npm run build:symbols` | 重新生成界面图标的图形数据（生成物已提交） |
 | `npm run build:site-images` | 导出项目主页的图片（WebP 和 OGP 用的 JPEG）（生成物已提交。原始素材 PNG 不包含在仓库中，因此无法在本地运行） |
+| `npm run build:site-langs` | 重写项目主页所有页面的语言列表（hreflang、语言菜单、页脚）和 `sitemap.xml` |
 | `npm run build:screenshots` | 组合 Chrome 应用商店用的截图（原始截图不包含在仓库中，因此无法在本地运行） |
 | `npm run pack:crx -- --key <私钥>` | 生成上传到商店的已签名 CRX（用于 Chrome 应用商店的“经过验证的 CRX 上传”。签名私钥仅由作者持有） |
 

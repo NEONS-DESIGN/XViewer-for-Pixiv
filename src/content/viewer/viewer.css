@@ -108,10 +108,10 @@
 	/* ページ・作品を送るクリック領域のカーソル。(原寸表示と画面端のクリック領域で共有)
 	   pixiv の .cur は拡張から使えないので同じ形を SVG で持つ。
 	   白い画像の上でも消えないよう、黒い縁取りの上に白い矢印を重ねる */
-	--cursor-prev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M18 4 L8 14 L18 24' fill='none' stroke='%23000' stroke-opacity='.5' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M18 4 L8 14 L18 24' fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 14 14;
-	--cursor-next: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M10 4 L20 14 L10 24' fill='none' stroke='%23000' stroke-opacity='.5' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M10 4 L20 14 L10 24' fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 14 14;
-	--cursor-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M4 18 L14 8 L24 18' fill='none' stroke='%23000' stroke-opacity='.5' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M4 18 L14 8 L24 18' fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 14 14;
-	--cursor-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M4 10 L14 20 L24 10' fill='none' stroke='%23000' stroke-opacity='.5' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M4 10 L14 20 L24 10' fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 14 14;
+	--cursor-prev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 4 8 14l10 10' stroke='%23000' stroke-opacity='.5' stroke-width='6'/%3E%3Cpath d='M18 4 8 14l10 10' stroke='%23fff' stroke-width='2.5'/%3E%3C/svg%3E") 14 14;
+	--cursor-next: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 4 20 14l-10 10' stroke='%23000' stroke-opacity='.5' stroke-width='6'/%3E%3Cpath d='M10 4 20 14l-10 10' stroke='%23fff' stroke-width='2.5'/%3E%3C/svg%3E") 14 14;
+	--cursor-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 18 14 8l10 10' stroke='%23000' stroke-opacity='.5' stroke-width='6'/%3E%3Cpath d='M4 18 14 8l10 10' stroke='%23fff' stroke-width='2.5'/%3E%3C/svg%3E") 14 14;
+	--cursor-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 10 14 20l10-10' stroke='%23000' stroke-opacity='.5' stroke-width='6'/%3E%3Cpath d='M4 10 14 20l10-10' stroke='%23fff' stroke-width='2.5'/%3E%3C/svg%3E") 14 14;
 	/* コメントの入力欄の地。pixiv 本体の入力欄と同じ濃さ */
 	--field-bg: rgba(255, 255, 255, 0.12);
 	--field-bg-hover: rgba(255, 255, 255, 0.16);
@@ -225,7 +225,6 @@
 	   帯にはサイドバーの地色が透ける (background は border の下まで塗る) ので、
 	   見た目はただの余白になる */
 	border-right: var(--scrollbar-inset) solid transparent;
-	padding: 0;
 }
 
 /* 作品情報。**大きさに関わらずスクロールさせない。** 中身の高さをそのまま使う。
@@ -395,12 +394,6 @@
 	height: 100%;
 }
 
-.frame img {
-	max-width: 100%;
-	max-height: 100%;
-	object-fit: contain;
-}
-
 .arrow {
 	position: absolute;
 	top: 50%;
@@ -485,11 +478,6 @@
 	   中央のままだとはみ出した上端と左端がスクロールしても出てこない */
 	display: grid;
 	place-items: safe center;
-}
-
-/* 画像の入れ物。原寸のまま置き、ステージ側の縮小 (max-width) を打ち消す */
-.zoom-canvas {
-	display: block;
 }
 
 .zoom-image {
@@ -708,14 +696,42 @@
 	padding: 4px 6px;
 }
 
-/* 押せるカウンタ。数字そのものがボタンなので、枠は付けず余白の丸みだけで示す */
-.count-action {
+/* 地の無いボタン。枠・地・字体の既定を外し、押せることは cursor で示す。
+   色・余白・角丸は個別の規則が持つ。個別の規則より前に置くこと (font の上書きが後ろで効く) */
+.count-action,
+.share-button,
+.share-item,
+.to-top,
+.comment-replies,
+.comment-reply-toggle,
+.comment-delete,
+.comment-picker-tab,
+.comment-picker-item,
+.ugoira-rate,
+.ugoira-rate-item,
+.slideshow-speed,
+.slideshow-speed-option {
 	border: 0;
-	border-radius: 999px;
 	background: transparent;
-	color: inherit;
 	font: inherit;
 	cursor: pointer;
+}
+
+/* 地の無いボタンのうち、ホバーで地を敷くもの */
+.share-button:hover,
+.share-item:hover,
+.to-top:hover,
+.ugoira-rate:hover,
+.ugoira-rate-item:hover,
+.slideshow-speed:hover,
+.slideshow-speed-option:hover {
+	background: var(--hover);
+}
+
+/* 押せるカウンタ。数字そのものがボタンなので、枠は付けず余白の丸みだけで示す */
+.count-action {
+	border-radius: 999px;
+	color: inherit;
 }
 
 .count-action:hover:not(:disabled) {
@@ -735,12 +751,10 @@
    .count-action を併記して特異性を上げているのは、押せない素の .count (span) にまで
    ホバーの色が乗らないようにするため */
 .count-action.count-like:hover:not(:disabled),
-.count-action.count-like.is-on,
-.count-action.count-like.is-on:hover:not(:disabled) { color: var(--like); }
+.count-action.count-like.is-on { color: var(--like); }
 
 .count-action.count-bookmark:hover:not(:disabled),
-.count-action.count-bookmark.is-on,
-.count-action.count-bookmark.is-on:hover:not(:disabled) { color: var(--bookmark); }
+.count-action.count-bookmark.is-on { color: var(--bookmark); }
 
 /* 未ログインの案内と失敗の文言。カウンタの隣ではなく次の行に置く */
 .counts > .status {
@@ -788,8 +802,8 @@
 	height: 14px;
 }
 
+/* 位置の基準は .link-row が持つ。ここは static のまま */
 .share-wrap {
-	position: static;
 	flex: 0 0 auto;
 }
 
@@ -798,38 +812,53 @@
 	align-items: center;
 	gap: 4px;
 	padding: 4px 8px;
-	border: 0;
 	border-radius: 999px;
-	background: transparent;
 	color: var(--side-link);
-	font: inherit;
 	font-size: 13px;
-	cursor: pointer;
 }
 
-.share-button:hover { background: var(--hover); }
 .share-button svg {
 	width: 16px;
 	height: 16px;
 }
 
+/* 押すと開くメニュー。(シェア / うごイラの速度 / 自動送りの間隔) 右端に揃えて浮かせる。
+   width と padding を別々に数えると中身が枠から食み出し、
+   サイドバー (overflow-y: auto) に横スクロールバーが出る */
+.share-menu,
+.ugoira-rate-menu,
+.slideshow-speed-panel {
+	position: absolute;
+	right: 0;
+	box-sizing: border-box;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	background: var(--surface);
+	box-shadow: var(--menu-shadow);
+}
+
+/* メニューの項目。縁が隣と接しているので、輪郭は内側に出す (外側だと隣の項目に重なる) */
+.share-item,
+.ugoira-rate-item,
+.slideshow-speed-option {
+	box-sizing: border-box;
+	width: 100%;
+	font-size: 13px;
+	text-align: left;
+}
+
+.share-item:focus-visible,
+.ugoira-rate-item:focus-visible,
+.slideshow-speed-option:focus-visible { outline-offset: -2px; }
+
 /* 上向きに開く。下に開くとコメント側へ張り出し、
    サイドバーが縦に詰まっている作品では枠の外へ出て切れる */
 .share-menu {
-	position: absolute;
-	/* width と padding を別々に数えると中身が枠から食み出し、
-	   サイドバー (overflow-y: auto) に横スクロールバーが出る */
-	box-sizing: border-box;
-	right: 0;
 	bottom: 100%;
 	z-index: 2;
 	min-width: 200px;
 	max-width: 100%;
 	padding: 8px 0;
-	border: 1px solid var(--border);
-	border-radius: 8px;
-	background: var(--surface);
-	box-shadow: var(--menu-shadow);
 }
 
 .share-menu-heading {
@@ -840,25 +869,13 @@
 }
 
 .share-item {
-	box-sizing: border-box;
 	display: flex;
 	align-items: center;
 	gap: 10px;
-	width: 100%;
 	padding: 8px 12px;
-	border: 0;
-	background: transparent;
 	color: var(--side-fg);
-	font: inherit;
-	font-size: 13px;
-	text-align: left;
 	text-decoration: none;
-	cursor: pointer;
 }
-
-.share-item:hover { background: var(--hover); }
-/* 項目の縁が隣と接しているので、輪郭は内側に出す (外側だと隣の項目に重なる) */
-.share-item:focus-visible { outline-offset: -2px; }
 
 /* ブランドのロゴは viewBox が 512 系で、余白の取り方も Material Symbols と違う。
    文字と釣り合う大きさに揃える */
@@ -919,20 +936,15 @@
 	align-items: center;
 	gap: 2px;
 	padding: 2px 8px 2px 4px;
-	border: 0;
 	border-radius: 999px;
-	background: transparent;
 	color: var(--side-link);
-	font: inherit;
 	font-size: 12px;
 	font-weight: normal;
 	/* 継承した 1.6 のままだとボタンが見出しの文字より高くなり、
 	   出入りのたびに見出しの高さが 0.8px 変わってコメントがずれる */
 	line-height: 1;
-	cursor: pointer;
 }
 
-.to-top:hover { background: var(--hover); }
 .to-top svg {
 	width: 16px;
 	height: 16px;
@@ -1064,7 +1076,8 @@
 	align-self: flex-start;
 }
 
-.comment-avatar {
+.comment-avatar,
+.comment-form-avatar {
 	flex: 0 0 auto;
 	width: 32px;
 	height: 32px;
@@ -1139,13 +1152,9 @@ a.comment-name:hover {
 	gap: 2px;
 	margin-top: 2px;
 	padding: 2px 6px 2px 2px;
-	border: 0;
 	border-radius: 999px;
-	background: transparent;
 	color: var(--side-link);
-	font: inherit;
 	font-size: 12px;
-	cursor: pointer;
 }
 
 .comment-replies:hover:not(:disabled) { background: var(--hover); }
@@ -1187,7 +1196,9 @@ a.comment-name:hover {
 	height: 24px;
 }
 
-.reply-error {
+/* 返信の読み込みと削除の失敗。そのコメントの下に出す */
+.reply-error,
+.comment-error {
 	margin: 4px 0 0;
 	color: var(--danger);
 	font-size: 12px;
@@ -1224,14 +1235,6 @@ a.comment-name:hover {
 	display: flex;
 	align-items: center;
 	gap: 8px;
-}
-
-.comment-form-avatar {
-	flex: 0 0 auto;
-	width: 32px;
-	height: 32px;
-	border-radius: 50%;
-	object-fit: cover;
 }
 
 /* 入力欄と、その右端に重ねる絵文字ボタンの土台 */
@@ -1285,7 +1288,9 @@ a.comment-name:hover {
 	align-items: center;
 }
 
-.comment-form-pick {
+/* 入力欄のアイコンだけの小さなボタン。(絵文字とスタンプを開く / 選んだスタンプを取り消す) */
+.comment-form-pick,
+.comment-form-stamp-clear {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -1299,7 +1304,8 @@ a.comment-name:hover {
 	cursor: pointer;
 }
 
-.comment-form-pick:hover {
+.comment-form-pick:hover,
+.comment-form-stamp-clear:hover {
 	color: var(--side-fg);
 }
 
@@ -1319,21 +1325,7 @@ a.comment-name:hover {
 }
 
 .comment-form-stamp-clear {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 24px;
-	height: 24px;
-	padding: 0;
-	border: 0;
 	border-radius: 50%;
-	background: transparent;
-	color: var(--side-sub);
-	cursor: pointer;
-}
-
-.comment-form-stamp-clear:hover {
-	color: var(--side-fg);
 }
 
 .comment-form-submit {
@@ -1371,20 +1363,21 @@ a.comment-name:hover {
 	font-size: 12px;
 }
 
-/* 返信を書く導線。「返信を表示」と同じ、地の無い小さなボタン */
-.comment-reply-toggle {
+/* 返信を書く導線と削除。「返信を表示」と同じ、地の無い小さなボタン */
+.comment-reply-toggle,
+.comment-delete {
 	padding: 2px 6px 2px 0;
-	border: 0;
-	background: transparent;
-	color: var(--side-link);
-	font: inherit;
 	font-size: 12px;
 	line-height: 1;
-	cursor: pointer;
 }
 
-.comment-reply-toggle:hover {
+.comment-reply-toggle:hover,
+.comment-delete:hover {
 	text-decoration: underline;
+}
+
+.comment-reply-toggle {
+	color: var(--side-link);
 }
 
 /* 投稿者のラベル。名前の直後に置く。(pixiv 本体と同じ並び)
@@ -1413,21 +1406,9 @@ a.comment-name:hover {
 	background: var(--label-self-bg);
 }
 
-/* 削除。返信と同じ、地の無い小さなボタン。
-   ただし取り消せない操作なので、色は --accent ではなく --danger で置く */
+/* 削除は取り消せない操作なので、色は --accent ではなく --danger で置く */
 .comment-delete {
-	padding: 2px 6px 2px 0;
-	border: 0;
-	background: transparent;
 	color: var(--danger);
-	font: inherit;
-	font-size: 12px;
-	line-height: 1;
-	cursor: pointer;
-}
-
-.comment-delete:hover {
-	text-decoration: underline;
 }
 
 /* 聞き返している最中。押せば消える状態なので、文字を強めて区別を付ける */
@@ -1438,13 +1419,6 @@ a.comment-name:hover {
 .comment-delete:disabled {
 	color: var(--side-sub);
 	cursor: default;
-}
-
-/* 削除に失敗したときだけ、そのコメントの下に出す */
-.comment-error {
-	margin: 4px 0 0;
-	color: var(--danger);
-	font-size: 12px;
 }
 
 /* 返信の入力欄はコメントの直下。返信一覧 (.comment-replies-area の
@@ -1494,13 +1468,9 @@ a.comment-name:hover {
 .comment-picker-tab {
 	flex: 1 1 0;
 	padding: 4px 8px;
-	border: 0;
 	border-radius: 999px;
-	background: transparent;
 	color: var(--side-sub);
-	font: inherit;
 	font-size: 12px;
-	cursor: pointer;
 }
 
 .comment-picker-tab[aria-selected='true'] {
@@ -1528,12 +1498,8 @@ a.comment-name:hover {
 	align-items: center;
 	justify-content: center;
 	padding: 2px;
-	border: 0;
 	border-radius: 4px;
-	background: transparent;
-	font: inherit;
 	font-size: 11px;
-	cursor: pointer;
 }
 
 .comment-picker-item:hover {
@@ -1711,7 +1677,7 @@ a.comment-name:hover {
 	height: 100%;
 }
 
-.ugoira-poster,
+/* 画像 (poster) は .stage img が縮めるので、ここは canvas の分だけ */
 .ugoira-canvas {
 	max-width: 100%;
 	max-height: 100%;
@@ -1811,58 +1777,43 @@ a.comment-name:hover {
 	min-width: 48px;
 	height: var(--ugoira-rate-height);
 	padding: 0 10px;
-	border: 0;
 	border-radius: 999px;
-	background: transparent;
 	color: var(--fg);
-	font: inherit;
 	font-size: 13px;
 	font-variant-numeric: tabular-nums;
-	cursor: pointer;
 }
 
-.ugoira-rate:hover { background: var(--hover); }
-
-/* 上向きに開く。下は画面の端なので、下に開くと切れる */
-.ugoira-rate-menu {
-	position: absolute;
-	right: 0;
+/* 帯から上向きに開くメニュー。(うごイラの速度 / 自動送りの間隔) 下は画面の端なので、下に開くと切れる */
+.ugoira-rate-menu,
+.slideshow-speed-panel {
 	bottom: calc(100% + 8px);
-	box-sizing: border-box;
-	min-width: 120px;
 	padding: 6px 0;
-	border: 1px solid var(--border);
-	border-radius: 8px;
-	background: var(--surface);
-	box-shadow: var(--menu-shadow);
+}
+
+.ugoira-rate-menu {
+	min-width: 120px;
+}
+
+/* 帯から開くメニューの項目 */
+.ugoira-rate-item,
+.slideshow-speed-option {
+	padding: 6px 12px;
+	color: var(--fg);
+	font-variant-numeric: tabular-nums;
+}
+
+/* 選んでいる速度・間隔。色だけに頼らず太さでも示す */
+.ugoira-rate-item[aria-checked='true'],
+.slideshow-speed-option[aria-checked='true'] {
+	color: var(--accent);
+	font-weight: 600;
 }
 
 .ugoira-rate-item {
-	box-sizing: border-box;
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: 12px;
-	width: 100%;
-	padding: 6px 12px;
-	border: 0;
-	background: transparent;
-	color: var(--fg);
-	font: inherit;
-	font-size: 13px;
-	font-variant-numeric: tabular-nums;
-	text-align: left;
-	cursor: pointer;
-}
-
-.ugoira-rate-item:hover { background: var(--hover); }
-/* 項目の縁が隣と接しているので、輪郭は内側に出す (外側だと隣の項目に重なる) */
-.ugoira-rate-item:focus-visible { outline-offset: -2px; }
-
-/* 選んでいる速度。色だけに頼らず太さでも示す */
-.ugoira-rate-item[aria-checked='true'] {
-	color: var(--accent);
-	font-weight: 600;
 }
 
 .ugoira-rate-normal {
@@ -1957,17 +1908,11 @@ a.comment-name:hover {
 	gap: 4px;
 	height: 32px;
 	padding: 0 10px 0 8px;
-	border: 0;
 	border-radius: 999px;
-	background: transparent;
 	color: var(--fg);
-	font: inherit;
 	font-size: 13px;
 	font-variant-numeric: tabular-nums;
-	cursor: pointer;
 }
-
-.slideshow-speed:hover { background: var(--hover); }
 
 .slideshow-speed svg {
 	width: 20px;
@@ -1988,43 +1933,12 @@ a.comment-name:hover {
 
 .slideshow-speed-sizer { visibility: hidden; }
 
-/* 上向きに開く。下は画面の端なので、下に開くと切れる */
 .slideshow-speed-panel {
-	position: absolute;
-	right: 0;
-	bottom: calc(100% + 8px);
-	box-sizing: border-box;
 	min-width: 200px;
-	padding: 6px 0;
-	border: 1px solid var(--border);
-	border-radius: 8px;
-	background: var(--surface);
-	box-shadow: var(--menu-shadow);
 }
 
 .slideshow-speed-option {
-	box-sizing: border-box;
 	display: block;
-	width: 100%;
-	padding: 6px 12px;
-	border: 0;
-	background: transparent;
-	color: var(--fg);
-	font: inherit;
-	font-size: 13px;
-	font-variant-numeric: tabular-nums;
-	text-align: left;
-	cursor: pointer;
-}
-
-.slideshow-speed-option:hover { background: var(--hover); }
-/* 項目の縁が隣と接しているので、輪郭は内側に出す (外側だと隣の項目に重なる) */
-.slideshow-speed-option:focus-visible { outline-offset: -2px; }
-
-/* 選んでいる間隔。色だけに頼らず太さでも示す */
-.slideshow-speed-option[aria-checked='true'] {
-	color: var(--accent);
-	font-weight: 600;
 }
 
 /* カスタムの秒数。見出しを上に、スライダーと秒数の欄を下に並べる */

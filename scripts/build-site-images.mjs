@@ -6,14 +6,20 @@
  * JPEG を経由すると圧縮が二重に掛かるので、必ず可逆の PNG から直接書き出すこと。
  *
  * 1 枚ごとに可逆 WebP と非可逆 WebP の両方を作り、小さいほうを採る。(LOSSLESS_TOLERANCE までは可逆を優先する)
+ * 元素材が 1 枚でも欠けていれば、何も書き出す前に止まる。
+ * パスはリポジトリのルートから解く。(どのフォルダから実行しても同じ場所を読み書きする)
  */
 import sharp from 'sharp';
 import { mkdir, stat, writeFile } from 'node:fs/promises';
+import { ROOT_DIR } from './paths.mjs';
 
-/** 元素材の置き場所。 */
+// 元素材と出力先はルートからの相対パスなので、カレントをルートへ移してから使う
+process.chdir(ROOT_DIR);
+
+/** 元素材の置き場所。(リポジトリのルートからの相対パス) */
 const SOURCE_DIR = 'store/sources';
 
-/** 出力先のディレクトリ。 */
+/** 出力先のディレクトリ。(リポジトリのルートからの相対パス) */
 const OUT_DIR = 'site/assets/img';
 
 /**
@@ -60,16 +66,33 @@ const IMAGES = [
 ];
 
 /**
- * 元素材があるか確かめる。
- * @param {string} path 元素材のパス
- * @returns {Promise<void>}
- * @throws {Error} 見つからないとき
+ * 元素材のパスを返す。
+ * @param {string} source SOURCE_DIR 内のファイル名
+ * @returns {string} 元素材のパス
  */
-async function assertSource(path) {
-	try {
-		await stat(path);
-	} catch {
-		throw new Error(`元素材が見つかりません: ${path} (store/sources/ に撮影素材を置いてから実行してください)`);
+function sourcePath(source) {
+	return `${SOURCE_DIR}/${source}`;
+}
+
+/**
+ * すべての元素材があるか確かめる。欠けているものはまとめて 1 つのエラーにする。
+ * @param {ReadonlyArray<{ source: string }>} images 書き出す画像
+ * @returns {Promise<void>}
+ * @throws {Error} 1 枚でも見つからないとき
+ */
+async function assertSources(images) {
+	const results = await Promise.all(images.map(async ({ source }) => {
+		const path = sourcePath(source);
+		try {
+			const info = await stat(path);
+			return info.isFile() ? null : path;
+		} catch {
+			return path;
+		}
+	}));
+	const missing = results.filter(Boolean);
+	if (missing.length > 0) {
+		throw new Error(`元素材が見つかりません: ${missing.join(', ')} (store/sources/ に撮影素材を置いてから実行してください)`);
 	}
 }
 
@@ -94,8 +117,7 @@ async function encodeWebp(path) {
  * @returns {Promise<void>}
  */
 async function buildOne({ source, out, og }) {
-	const path = `${SOURCE_DIR}/${source}`;
-	await assertSource(path);
+	const path = sourcePath(source);
 	const { width, height } = await sharp(path).metadata();
 
 	const { buffer, mode } = await encodeWebp(path);
@@ -114,6 +136,8 @@ async function buildOne({ source, out, og }) {
  * @returns {Promise<void>}
  */
 async function build() {
+	// 書き出しの途中で欠けに気づくと、前の画像だけ新しくなった状態で止まるので先に全部確かめる
+	await assertSources(IMAGES);
 	await mkdir(OUT_DIR, { recursive: true });
 	for (const image of IMAGES) {
 		await buildOne(image);

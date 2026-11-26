@@ -6,8 +6,47 @@
 import { main } from '../../src/popup/app.js';
 import { SETTINGS_DEFAULTS } from '../../src/common/constants.js';
 import { createSections } from '../../src/popup/sections.js';
-import { createStrings } from '../../src/i18n/index.js';
+import { buildStrings } from '../../src/i18n/freeze.js';
+import { SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE } from '../../src/common/language.js';
+import ja from '../../src/i18n/ja.js';
+import jaPopup from '../../src/i18n/ja-popup.js';
+import en from '../../src/i18n/en.js';
+import enPopup from '../../src/i18n/en-popup.js';
+import ko from '../../src/i18n/ko.js';
+import koPopup from '../../src/i18n/ko-popup.js';
+import zhCN from '../../src/i18n/zh-CN.js';
+import zhCNPopup from '../../src/i18n/zh-CN-popup.js';
+import zhTW from '../../src/i18n/zh-TW.js';
+import zhTWPopup from '../../src/i18n/zh-TW-popup.js';
 import { fakeElement, fakeDoc } from './dom.js';
+
+/**
+ * 言語ごとのカタログの断片。(ビュワー側 / 設定画面側) src/i18n/load.js の LOADERS と同じ組み合わせ。
+ * @type {Readonly<Record<string, {viewer: object, popup: object}>>}
+ */
+export const CATALOG_PARTS = Object.freeze({
+	ja: { viewer: ja, popup: jaPopup },
+	en: { viewer: en, popup: enPopup },
+	ko: { viewer: ko, popup: koPopup },
+	'zh-CN': { viewer: zhCN, popup: zhCNPopup },
+	'zh-TW': { viewer: zhTW, popup: zhTWPopup },
+});
+
+/** createPopupStrings が作ったカタログの使い回し。 */
+const popupStringsCache = new Map();
+
+/**
+ * 設定画面が使うカタログ (設定画面の節) を同期で作る。loadStrings(lang) が返すものと同じ中身。
+ * @param {string} lang 言語コード。未知の言語なら既定の言語
+ * @returns {object} 凍結した文言のカタログ
+ */
+export function createPopupStrings(lang) {
+	const resolved = SUPPORTED_LANGUAGES.includes(lang) ? lang : DEFAULT_LANGUAGE;
+	if (!popupStringsCache.has(resolved)) {
+		popupStringsCache.set(resolved, buildStrings(resolved, CATALOG_PARTS[resolved].popup));
+	}
+	return popupStringsCache.get(resolved);
+}
 
 /** popup.html の描き先の id。(app.js の ROOT_ID と同じ値。export されていないので写す) */
 const ROOT_ID = 'app';
@@ -25,7 +64,7 @@ const RESET_ROLE = 'reset';
  * @returns {string[]} data-role の値
  */
 export function focusableRoles() {
-	const keys = createSections(createStrings('ja')).flatMap((section) => section.fields.map((field) => field.key));
+	const keys = createSections(createPopupStrings('ja')).flatMap((section) => section.fields.map((field) => field.key));
 	return [...keys, THEME_ROLE, RESET_ROLE];
 }
 

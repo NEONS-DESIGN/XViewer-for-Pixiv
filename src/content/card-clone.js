@@ -20,6 +20,9 @@ import { currentLocalePrefix } from '../common/locale.js';
 import { safeCdnUrl, artworkPath } from '../pixiv/endpoints.js';
 import { stripTabSkipMarks } from './tab-skip.js';
 
+/** 数字だけの文字列。複数枚バッジの枚数の span を見分ける */
+const DIGITS_PATTERN = /^\d+$/;
+
 /**
  * #rrggbb を getComputedStyle が返す rgb(r, g, b) の形にする。
  * @param {string} hex 6 桁の hex 表記
@@ -84,7 +87,7 @@ export function findBadge(card) {
 	const thumb = card.querySelector(THUMB_LINK_SELECTOR);
 	if (!thumb) return null;
 	for (const span of [...thumb.querySelectorAll('span')]) {
-		if (!/^\d+$/.test((span.textContent ?? '').trim())) continue;
+		if (!DIGITS_PATTERN.test((span.textContent ?? '').trim())) continue;
 		// span からオーバーレイ層の直下 (祖先の祖先が thumb) まで遡る。そのノードごと足したり外したりする。
 		// 想定より浅い構造で thumb 自身や外まで出てしまう場合は、安全側 (バッジ無し) に倒して null を返す。
 		let node = span;
@@ -101,9 +104,23 @@ export function findBadge(card) {
 }
 
 /**
+ * 雛形から、雛形にした作品に紐づく印を落とす。雛形を作った時点で 1 回だけ呼ぶ。
+ * 落とすのは tab-skip の印 (tabindex="-1" / aria-label) と、オーバーレイ層のラベル (R-18 / 非公開)。
+ * どちらも作品ごとに付け直す手当てが無く、残すと継ぎ足した全カードに同じものが付く。
+ * @param {object} template 雛形 (cloneNode 済みの li)
+ * @returns {object} 同じ雛形
+ */
+function cleanTemplate(template) {
+	stripTabSkipMarks(template);
+	for (const label of findOverlayLabels(template)) label.remove();
+	return template;
+}
+
+/**
  * カードの並びから single / multi の 2 枚を選ぶ。
  * accept を満たすカードだけを見て、単枚とバッジ付きが揃った時点で切り上げる。
  * (getComputedStyle を並び全部に呼ばないため)
+ * 返す雛形は cleanTemplate 済みで、single は必ずバッジを持たない。
  * @param {object[]} cards 候補のカード (li)
  * @param {(card: object) => boolean} accept 雛形にしてよいか
  * @returns {{single: object, multi: object|null}|null} 雛形。採れなければ null
@@ -123,14 +140,15 @@ function pickTemplates(cards, accept) {
 		single = multi.cloneNode(true);
 		findBadge(single)?.remove();
 	}
-	return single ? { single, multi } : null;
+	if (!single) return null;
+	return { single: cleanTemplate(single), multi: multi ? cleanTemplate(multi) : null };
 }
 
 /**
  * サムネのオーバーレイ層にある、雛形の作品に紐づいたラベルを集める。
  *
  * 「R-18」「非公開」のような表示で、**複数枚バッジと同じ層に、バッジより前に並ぶ**。
- * 雛形を cloneNode するとこれも付いてくるので、組み立てのときに落とす。
+ * 雛形を cloneNode するとこれも付いてくるので、雛形を作るときに落とす。(cleanTemplate)
  * 残すと別の作品に他人のラベルが付く。
  *
  * 掴み方は findBadge と同じく「祖先の祖先が thumb」。そこから画像の入れ物 (文字を持たない) と
@@ -148,7 +166,7 @@ export function findOverlayLabels(card) {
 		if (node.parentElement?.parentElement !== thumb) continue;
 		const text = (node.textContent ?? '').trim();
 		// 文字を持たない層は画像の入れ物。数字だけのものは findBadge が拾えなかったバッジ
-		if (text === '' || /^\d+$/.test(text)) continue;
+		if (text === '' || DIGITS_PATTERN.test(text)) continue;
 		labels.push(node);
 	}
 	return labels;
@@ -162,12 +180,8 @@ export function findOverlayLabels(card) {
  *
  * 残りからは **未ブックマークのハートを持つカードを優先する**。ブックマーク済みのカードは
  * ハートが塗られた見た目になるので雛形にしない。
- *
- * **1 枚もハートが無ければ、ハート無しのカードで組む。** 自分のユーザーページでは pixiv が
- * 自分の作品にブックマークボタンを描かないので、ここで諦めると
- * 自分のページだけ無限スクロールが起動しなくなる。
- * 優先順位を付けるのは混在への備え — 読み込み途中などで 1 枚だけハートが欠けたカードを掴むと、
- * 継ぎ足したカードだけブックマークできなくなる。
+ * 1 枚もハートが無ければ (自分のユーザーページ)、ハート無しのカードで組む。
+ * 返す雛形は、雛形にした作品の印 (tab-skip の印とラベル) を落としてある。
  * @param {object} ul グリッドの ul
  * @param {{computedStyle?: Function}} [deps] テスト用の依存
  * @returns {{single: object, multi: object|null}|null} 雛形。採れなければ null
@@ -193,6 +207,7 @@ export function captureTemplates(ul, deps = {}) {
  * 1 作品ぶんのカードを組む。
  *
  * 画像 URL が pximg でなければカードを作らない。API の値をそのまま img へ渡さないため。
+ * templates は captureTemplates の戻り値を渡す。(印を落とし済みで、single はバッジを持たない前提で組む)
  * @param {{single: object, multi: object|null}} templates 雛形
  * @param {object} work 作品サマリ (profile/illusts の 1 件)
  * @param {{loggedIn: boolean, localePrefix?: string}} deps セッションの状態。
@@ -204,9 +219,8 @@ export function buildCard(templates, work, deps) {
 	const src = safeCdnUrl(work?.url);
 	if (!src) return null;
 	try {
-		const wantsBadge = Number(work.pageCount) > 1;
-		const base = wantsBadge && templates.multi ? templates.multi : templates.single;
-		const card = base.cloneNode(true);
+		const useMulti = Number(work.pageCount) > 1 && Boolean(templates.multi);
+		const card = (useMulti ? templates.multi : templates.single).cloneNode(true);
 
 		// 雛形は pixiv 本体のカードなので、href の接頭辞も今の表示言語に揃える
 		const localePrefix = deps.localePrefix ?? currentLocalePrefix();
@@ -216,10 +230,6 @@ export function buildCard(templates, work, deps) {
 			if (link.getAttribute('data-gtm-value')) link.setAttribute('data-gtm-value', String(work.id));
 			if (link.getAttribute('data-gtm-user-id')) link.setAttribute('data-gtm-user-id', String(work.userId));
 		}
-		// 雛形は tab-skip.js が当てた後に採られることが多い。印 (tabindex="-1" / aria-label) を
-		// 残すと、tab-skip が居ない間に組んだカードだけ Tab 順が違い、読み上げが全部同じ作品名になる。
-		// tab-skip が生きていれば次の当て直しで付け直される
-		stripTabSkipMarks(card);
 
 		const img = card.querySelector('img');
 		if (img) {
@@ -233,14 +243,9 @@ export function buildCard(templates, work, deps) {
 		const titleLink = links.find((link) => !link.querySelector('img'));
 		if (titleLink) titleLink.textContent = String(work.title ?? '');
 
-		// 雛形の作品に紐づくラベル (R-18 / 非公開) を落とす。作品ごとに付け直す手当てが無いので、
-		// 残すと別の作品に他人のラベルが付くので、出さない
-		for (const label of findOverlayLabels(card)) label.remove();
-
-		const badge = findBadge(card);
-		if (badge && !wantsBadge) badge.remove();
-		else if (badge && wantsBadge) {
-			const count = [...badge.querySelectorAll('span')].find((span) => /^\d+$/.test((span.textContent ?? '').trim()));
+		if (useMulti) {
+			const spans = findBadge(card)?.querySelectorAll('span') ?? [];
+			const count = [...spans].find((span) => DIGITS_PATTERN.test((span.textContent ?? '').trim()));
 			if (count) count.textContent = String(work.pageCount);
 		}
 

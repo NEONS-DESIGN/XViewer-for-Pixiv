@@ -6,6 +6,8 @@ import {
 	BOOKMARK_BUTTON_SELECTOR, BOOKMARKED_FILL, PAGER_SELECTOR,
 } from '../../src/common/constants.js';
 import { clearSessionCache } from '../../src/content/session.js';
+import { PIXIV_ERROR_KINDS } from '../../src/pixiv/errors.js';
+import { buildNextData } from '../helpers/pixiv.js';
 import { createStrings } from '../../src/i18n/index.js';
 import { makeCard, makeGrid, el, fakeComputedStyle } from '../helpers/card.js';
 
@@ -27,7 +29,7 @@ afterEach(clearSessionCache);
  * @returns {{create: Function, trigger: Function, state: object}} 生成関数と操作
  */
 function fakeObserver() {
-	const state = { observed: [], disconnected: 0, callback: null, init: null, inits: [], created: 0 };
+	const state = { observed: [], disconnected: 0, callback: null, init: null, inits: [], created: 0, observeCalls: 0 };
 	const create = (callback, init) => {
 		state.callback = callback;
 		state.init = init;
@@ -36,7 +38,10 @@ function fakeObserver() {
 		// 作り直したら監視対象も仕切り直す
 		state.observed = [];
 		return {
-			observe(node) { state.observed.push(node); },
+			observe(node) {
+				state.observeCalls += 1;
+				state.observed.push(node);
+			},
 			unobserve(node) { state.observed = state.observed.filter((one) => one !== node); },
 			disconnect() { state.disconnected += 1; },
 		};
@@ -44,6 +49,39 @@ function fakeObserver() {
 	const trigger = () => state.callback?.([{ isIntersecting: true, target: state.observed[0] }]);
 	return { create, trigger, state };
 }
+
+/**
+ * 本物と同じく、observe() のたびに今の交差状態を後から 1 回知らせる IntersectionObserver の偽物。
+ * sentinel が見張りの範囲に入ったままの画面 (背の高い画面) を intersecting: true で再現する。
+ * 知らせた callback の戻り値 (advance の待ち) を runs に積む。
+ * @param {{intersecting: () => boolean}} options 知らせる交差状態
+ * @returns {{create: Function, runs: Promise<void>[], settle: () => Promise<void>}} 生成関数と、
+ *   積まれた待ちが尽きるまで待つ関数
+ */
+function autoObserver(options) {
+	const runs = [];
+	const create = (callback) => ({
+		observe(node) {
+			setTimeout(() => runs.push(callback([{ isIntersecting: options.intersecting(), target: node }])), 0);
+		},
+		unobserve() {},
+		disconnect() {},
+	});
+	/**
+	 * 知らせと、それが起こした継ぎ足しが尽きるまで待つ。
+	 * @returns {Promise<void>}
+	 */
+	const settle = async () => {
+		for (let i = 0; i < AUTO_OBSERVER_SETTLE_ROUNDS; i += 1) {
+			await tick();
+			await Promise.all(runs);
+		}
+	};
+	return { create, runs, settle };
+}
+
+/** autoObserver の settle() が待つ回数。継ぎ足し 1 ページにつき 1 回の知らせが届くので、テストのページ数より多くしておく */
+const AUTO_OBSERVER_SETTLE_ROUNDS = 10;
 
 /**
  * observe() が投げる IntersectionObserver の偽物を作る生成関数。
@@ -269,6 +307,8 @@ function setup(options = {}) {
 			createObserver: options.createObserver ?? observer.create,
 			computedStyle: fakeComputedStyle,
 			actions: options.actions,
+			// 見えているページの見直しは 1 フレーム待たずにその場で走らせる。(待つことはその専用のテストで確かめる)
+			schedule: (fn) => fn(),
 			...options.deps,
 		},
 	});
@@ -486,12 +526,83 @@ test('最終ページを越えていたら読まずに終わる', async () => {
 	assert.equal(sentinelMessage(wrap), SENTINEL_TEXT.DONE);
 });
 
-test('空のページが返ったらそこで終わる', async () => {
-	// pageCount が実際より多い場合の保険
-	const { observer, loaded } = setup({ startPage: 3, pages: 3, claimedPages: 5 });
+test('空のページが続いても総ページ数までで終わる', async () => {
+	// pageCount が実際より多い場合の保険。途中の空のページは飛ばすが、総ページ数を越えては読まない
+	const { observer, loaded, wrap } = setup({ startPage: 3, pages: 3, claimedPages: 5 });
 	await observer.trigger();
-	assert.deepEqual(loaded, [4]);
+	assert.deepEqual(loaded, [4, 5]);
 	assert.equal(observer.state.disconnected, 1);
+	assert.equal(sentinelMessage(wrap), SENTINEL_TEXT.DONE);
+});
+
+test('途中のページが空でも読み切った扱いにせず、次のページへ進む', async () => {
+	// 48 件の作品がすべて応答から消える (取得の間に非公開・削除が重なった) と空のページが返る。
+	// そこで終えると、以降のページへ二度と進めない
+	const pages = [];
+	const { source, loaded } = sourceOf((page) => (page === 2 ? [] : [singleWork(`${page}1`)]), 4);
+	const { ul, wrap, observer } = setup({ cards: [makeCard({ id: '1' })], source, onPageChange: (page) => pages.push(page) });
+	await observer.trigger();
+	assert.deepEqual(loaded, [2, 3]);
+	assert.deepEqual(addedCards(ul).map((li) => li.getAttribute(XV_CARD_ATTR)), ['31']);
+	// 空のページは画面に出ていないので ?p= にも現れない
+	assert.deepEqual(pages, [3]);
+	assert.equal(observer.state.disconnected, 0, '途中で読み切った扱いにしている');
+	assert.equal(sentinelMessage(wrap), '');
+	await observer.trigger();
+	assert.deepEqual(loaded, [2, 3, 4]);
+	assert.equal(sentinelMessage(wrap), SENTINEL_TEXT.DONE);
+});
+
+test('総ページ数が分からないときは空のページで終わる', async () => {
+	// 先へ進むと、空のページを際限なく読み続ける
+	const { source, loaded } = sourceOf(() => [], () => Number.NaN);
+	const { wrap, observer } = setup({ cards: [makeCard({ id: '1' })], source });
+	await observer.trigger();
+	assert.deepEqual(loaded, [2]);
+	assert.equal(sentinelMessage(wrap), SENTINEL_TEXT.DONE);
+});
+
+test('継ぎ足した後に sentinel を見張り直す', async () => {
+	// IntersectionObserver は交差が変わったときにしか鳴らない。見張り直すと今の交差状態が必ず知らされる
+	const { wrap, observer } = setup({ pages: 3 });
+	assert.equal(observer.state.observeCalls, 1);
+	await observer.trigger();
+	assert.equal(observer.state.observeCalls, 2, '継ぎ足した後に見張り直していない');
+	assert.deepEqual(observer.state.observed, [sentinelOf(wrap)]);
+	// 読み切った後は見張り直さない
+	await observer.trigger();
+	assert.equal(observer.state.observeCalls, 2, '読み切ったのに見張り直している');
+});
+
+test('1 枚も組めなかったときと失敗したときは見張り直さない', async () => {
+	// 見張り直すと、下端に留まっている間ずっと同じページを読み直す。読み直しは再試行ボタンに任せる
+	const unbuildable = setupUnbuildable();
+	await unbuildable.observer.trigger();
+	assert.equal(unbuildable.observer.state.observeCalls, 1);
+	const flaky = setupFlaky();
+	await flaky.observer.trigger();
+	assert.equal(flaky.observer.state.observeCalls, 1);
+});
+
+test('継ぎ足しても sentinel が見張りの範囲に残る画面では、続けて読み切るまで読む', async () => {
+	// 背の高い画面 (4K の等倍・縦置き・縮小表示) では 1 ページ (約 2,000px) 足しても sentinel が範囲に残る
+	const auto = autoObserver({ intersecting: () => true });
+	const { ul, wrap, loaded } = setup({ pages: 4, createObserver: auto.create });
+	await auto.settle();
+	assert.deepEqual(loaded, [2, 3, 4], '範囲に残ったまま止まっている');
+	assert.equal(addedCards(ul).length, 6);
+	assert.equal(sentinelMessage(wrap), SENTINEL_TEXT.DONE);
+});
+
+test('継ぎ足して sentinel が範囲の外へ出たら、それ以上は読まない', async () => {
+	let intersecting = true;
+	const auto = autoObserver({ intersecting: () => intersecting });
+	const { loaded } = setup({ pages: 4, createObserver: auto.create });
+	// 組み立て直後の知らせ (範囲内) で 1 ページ読み、その継ぎ足しで sentinel が範囲の外へ押し出された
+	await tick();
+	intersecting = false;
+	await auto.settle();
+	assert.deepEqual(loaded, [2]);
 });
 
 test('総ページ数が取れなかったら何も並べずに失敗として出す', async () => {
@@ -618,6 +729,19 @@ test('重複の判定は継ぎ足した ID を覚え、pixiv のカードだけ�
 	await observer.trigger();
 	assert.equal(addedCards(ul).length, 4, '3 ページ目まで継ぎ足していない');
 	assert.equal(sentinelMessage(wrap), SENTINEL_TEXT.DONE, '自分のカードの走査に失敗して止まっている');
+});
+
+test('重複の判定は、継ぎ足したカードの後ろに本体が足したカードと、ハッシュやクエリ付きの href も拾う', async () => {
+	// 自分のカードの並びは飛ばすが、その後ろに本体のカードが来ても見落とさない。
+	// href の読み方は grid.js (作品を開くときの並び) と揃える
+	const { source } = sourceOf((page) => (page === 2 ? [singleWork('21')] : [singleWork('31'), singleWork('32')]), 3);
+	const { ul, observer } = setup({ cards: [makeCard({ id: '1' })], source });
+	await observer.trigger();
+	const late = makeCard({ id: '31' });
+	for (const link of late.querySelectorAll('a')) link.setAttribute('href', '/artworks/31?from=pixiv#2');
+	ul.appendChild(late);
+	await observer.trigger();
+	assert.deepEqual(addedCards(ul).map((li) => li.getAttribute(XV_CARD_ATTR)), ['21', '32'], 'ID 31 が二重に並んでいる');
 });
 
 test('全件が既に並んでいたページは失敗にせず、ページを進めて次を読む', async () => {
@@ -913,8 +1037,28 @@ test('空のページで終わったときは知らせない', async () => {
 	const pages = [];
 	const { observer, loaded } = setup({ startPage: 3, pages: 3, claimedPages: 5, onPageChange: (page) => pages.push(page) });
 	await observer.trigger();
-	assert.deepEqual(loaded, [4]);
+	assert.deepEqual(loaded, [4, 5]);
 	assert.deepEqual(pages, []);
+});
+
+test('継ぎ足した直後には位置を測らず、次のフレームで ?p= を知らせる', async () => {
+	// 足した直後に rect を読むと、そのタスクの中でページ全体のレイアウトが確定してしまう
+	const pages = [];
+	const queued = [];
+	let measured = 0;
+	const { observer } = setup({
+		onPageChange: (page) => pages.push(page),
+		deps: {
+			schedule: (fn) => queued.push(fn),
+			rectTop: () => { measured += 1; return 0; },
+		},
+	});
+	await observer.trigger();
+	assert.equal(measured, 0, '継ぎ足した直後に位置を測っている');
+	assert.deepEqual(pages, []);
+	assert.equal(queued.length, 1);
+	queued.shift()();
+	assert.deepEqual(pages, [2]);
 });
 
 test('?p= の知らせが投げても継ぎ足しは続く', async () => {
@@ -1158,6 +1302,26 @@ test('継ぎ足したカードのハートを押すとブックマークされ�
 	assert.deepEqual(calls, [['add', '21', false]]);
 	assert.deepEqual(heartFillsOf(card), [BOOKMARKED_FILL, BOOKMARKED_FILL]);
 	assert.equal(card.getAttribute(XV_BOOKMARK_ID_ATTR), '999');
+});
+
+test('ブックマークが 401 を返したら、以後は古いトークンを送らない', async (t) => {
+	// __NEXT_DATA__ は読み直しても同じ古いトークンなので、印だけ付けてトークンを渡さなくする。
+	// トークンが無ければ client.js が往復せずに UNAUTHORIZED へ倒す
+	const tokens = [];
+	const doc = fakeDoc();
+	const script = doc.head.appendChild(el('script', { id: '__NEXT_DATA__' }));
+	script.textContent = buildNextData({ token: 'OLD' });
+	const unauthorized = Object.assign(new Error('401'), { kind: PIXIV_ERROR_KINDS.UNAUTHORIZED });
+	const { ul, observer } = setup({
+		doc,
+		actions: fakeActions([], { async addBookmark(id, isPrivate, token) { tokens.push(token); throw unauthorized; } }),
+	});
+	await observer.trigger();
+	// 失敗の warn でテストの出力を汚さない (テストの終わりに自動で戻る)
+	t.mock.method(console, 'warn', () => {});
+	await pressHeart(addedCard(ul, '21'));
+	await pressHeart(addedCard(ul, '21'));
+	assert.deepEqual(tokens, ['OLD', '']);
 });
 
 test('Shift を押しながらだと非公開ブックマークになる', async () => {

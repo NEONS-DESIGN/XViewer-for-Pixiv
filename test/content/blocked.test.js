@@ -73,8 +73,8 @@ test('表示設定で止まった作品には設定へのリンクと再読み�
 	const { container } = render(DETAIL, reason);
 	const link = find(container, '.blocked-link');
 	assert.equal(link.textContent, '表示設定を変更する');
-	assert.equal(link.target, '_blank');
-	assert.equal(link.rel, 'noopener noreferrer');
+	assert.equal(link.getAttribute('target'), '_blank');
+	assert.equal(link.getAttribute('rel'), 'noopener noreferrer');
 	assert.equal(find(container, '.blocked-note').textContent, '変更後はページを再読み込みしてください');
 });
 

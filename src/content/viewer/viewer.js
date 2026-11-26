@@ -39,6 +39,8 @@ import { artworkPath, illustUrl, safeCdnUrl } from '../../pixiv/endpoints.js';
 import { fetchIllustPages, fetchUgoiraMeta } from '../../pixiv/illust-assets.js';
 import { normalizeDetail, ILLUST_TYPES } from '../../pixiv/normalize.js';
 import { readSession } from '../session.js';
+import { el, btn, createAlert, externalLink } from './dom.js';
+import { isRendered } from './focus.js';
 import {
 	renderWork,
 	rerenderMain,
@@ -174,18 +176,6 @@ const KEEP_OPEN_SELECTOR = [
  */
 
 /**
- * 要素が描画されているか。
- * display: none の要素 (幅 900px 以下で畳んだサイドバー等) は focus() が無言で失敗するので、
- * Tab の巡回から外す。偽の DOM のように getClientRects を持たない相手は描画済みとみなす。
- * @param {Element} element 対象
- * @returns {boolean} 描画されていれば true
- */
-function isRendered(element) {
-	if (typeof element.getClientRects !== 'function') return true;
-	return element.getClientRects().length > 0;
-}
-
-/**
  * イベントが「押しても閉じない要素」の上で起きたか。
  * ボタンの click 処理が中のアイコンを差し替えると、ステージへ届いた時点の event.target は
  * 文書から外れていて closest() ではボタンを辿れないので、発火した時点の道筋で見る。
@@ -198,15 +188,23 @@ function eventKeepsOpen(event, boundary) {
 }
 
 /**
+ * イベントが最初に届いた要素。
+ * Shadow DOM の中の要素は document で受けると event.target がホストになるため composedPath() で見る。
+ * @param {Event} event イベント
+ * @returns {EventTarget|null} 最初に届いた要素。道筋が引けなければ null
+ */
+function originalTarget(event) {
+	return (typeof event.composedPath === 'function' ? event.composedPath()[0] : null) ?? null;
+}
+
+/**
  * キーがレンジ (うごイラのシークバー) の上で押されたか。
- * Shadow DOM の中の要素は event.target がホストになるため composedPath() で見る。
  * @param {KeyboardEvent} event キー
  * @returns {boolean} レンジの上なら true
  */
 export function isRangeInput(event) {
-	const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
-	const target = path[0];
-	return target?.tagName === 'INPUT' && target.type === 'range';
+	const target = originalTarget(event);
+	return target?.tagName === 'INPUT' && target.type === RANGE_INPUT_TYPE;
 }
 
 /**
@@ -214,13 +212,11 @@ export function isRangeInput(event) {
  *
  * ビュワーは document の捕捉フェーズで全キーを取るので、この判定が無いと
  * コメントを書いている最中の左右キーで作品が送られる。
- * Shadow DOM の中の要素は event.target がホストになるため composedPath() で見る。
  * @param {KeyboardEvent} event キー
  * @returns {boolean} 入力欄の中なら true
  */
 export function isTextEntry(event) {
-	const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
-	const target = path[0];
+	const target = originalTarget(event);
 	if (!target) return false;
 	if (TEXT_ENTRY_TAGS.includes(target.tagName)) return true;
 	return target.isContentEditable === true;
@@ -381,18 +377,15 @@ export function createViewer(deps) {
 	 */
 	function ensureHost() {
 		if (host) return;
-		host = doc.createElement('div');
+		host = el(doc, 'div');
 		host.id = HOST_ELEMENT_ID;
 		// 注入先のページと UI の言語が違うことがある。読み上げを正しい言語にするため明示する
 		host.lang = strings.lang;
 		shadow = host.attachShadow({ mode: 'open' });
 
-		const style = doc.createElement('style');
-		style.textContent = tokensCss + viewerCss + noticeCss;
-		shadow.appendChild(style);
+		shadow.appendChild(el(doc, 'style', '', tokensCss + viewerCss + noticeCss));
 
-		overlay = doc.createElement('div');
-		overlay.className = 'overlay';
+		overlay = el(doc, 'div', 'overlay');
 		overlay.setAttribute('role', 'dialog');
 		overlay.setAttribute('aria-modal', 'true');
 		overlay.setAttribute('aria-label', strings.viewer.DIALOG_LABEL);
@@ -402,13 +395,10 @@ export function createViewer(deps) {
 		// tabindex="-1" なので FOCUSABLE_SELECTOR には入らず、Tab の巡回先にはならない
 		overlay.setAttribute('tabindex', '-1');
 
-		stage = doc.createElement('div');
-		stage.className = 'stage';
+		stage = el(doc, 'div', 'stage');
 
 		// 閉じるボタン。開いた直後のフォーカス先ではない。(フォーカスは overlay が受ける)
-		const closeButton = doc.createElement('button');
-		closeButton.className = 'close';
-		closeButton.type = 'button';
+		const closeButton = btn(doc, 'close');
 		// アイコンだけのボタンには aria-label と title を必ず両方付ける
 		closeButton.setAttribute('aria-label', strings.viewer.CLOSE);
 		closeButton.title = strings.viewer.CLOSE_TITLE;
@@ -417,29 +407,21 @@ export function createViewer(deps) {
 
 		// サイドバーを出さないと、サイドバーにある作品ページへのリンクも出ない。代わりに閉じるボタンの右へ置く。
 		// href と表示するかどうかは作品を開くたびに applyWorkLink() が決める
-		workLink = doc.createElement('a');
-		workLink.className = 'work-link';
-		workLink.setAttribute('target', '_blank');
-		workLink.setAttribute('rel', 'noopener noreferrer');
+		workLink = externalLink(doc, '', 'work-link');
 		workLink.title = strings.viewer.WORK_PAGE_TITLE;
 		workLink.hidden = true;
-		const workLinkLabel = doc.createElement('span');
-		workLinkLabel.textContent = strings.viewer.WORK_PAGE;
-		workLink.append(workLinkLabel, createIcon(doc, 'openInNew'));
+		workLink.append(el(doc, 'span', '', strings.viewer.WORK_PAGE), createIcon(doc, 'openInNew'));
 
 		// 狭い画面ではサイドバーを CSS で畳む。このボタンで引き出して、画像を押しのけて並べる。
 		// 広い画面では CSS で消えるので、押しても見た目は変わらない
-		sidebarToggle = doc.createElement('button');
-		sidebarToggle.className = 'sidebar-toggle';
-		sidebarToggle.type = 'button';
+		sidebarToggle = btn(doc, 'sidebar-toggle');
 		sidebarToggle.hidden = true;
 		sidebarToggle.addEventListener('click', () => {
 			sidebarOpen = !sidebarOpen;
 			applySidebarToggle();
 		});
 
-		sidebar = doc.createElement('div');
-		sidebar.className = 'sidebar';
+		sidebar = el(doc, 'div', 'sidebar');
 		sidebar.id = SIDEBAR_ELEMENT_ID;
 		sidebarToggle.setAttribute('aria-controls', SIDEBAR_ELEMENT_ID);
 
@@ -481,9 +463,9 @@ export function createViewer(deps) {
 
 		// 入力欄に文字を打っている間は自動送りを止める。
 		// 入力欄から入力欄へ移るときは、外れた時点で行き先を見て止めたままにする
+		// overlay は Shadow DOM の中にあるので、ここで受ける event.target は付け替えられていない
 		overlay.addEventListener('focusin', (event) => {
-			const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
-			slideshow.setSuspended(SLIDESHOW_SUSPEND.TYPING, isTypingTarget(path[0] ?? event.target));
+			slideshow.setSuspended(SLIDESHOW_SUSPEND.TYPING, isTypingTarget(event.target));
 		});
 		overlay.addEventListener('focusout', (event) => {
 			slideshow.setSuspended(SLIDESHOW_SUSPEND.TYPING, isTypingTarget(event.relatedTarget));
@@ -799,11 +781,8 @@ export function createViewer(deps) {
 	 * @returns {void}
 	 */
 	function showStatus(message, kind) {
-		const status = doc.createElement('p');
-		status.className = 'status';
+		const status = kind === STATUS_KINDS.ERROR ? createAlert(doc, 'status', message) : el(doc, 'p', 'status', message);
 		status.dataset.kind = kind;
-		if (kind === STATUS_KINDS.ERROR) status.setAttribute('role', 'alert');
-		status.textContent = message;
 		clearStatus();
 		stage.appendChild(status);
 	}
@@ -943,17 +922,7 @@ export function createViewer(deps) {
 	 */
 	function onKeyDown(event) {
 		controls?.wake();
-		if (zoomLayer?.consumeKey(event)) {
-			event.preventDefault();
-			event.stopPropagation();
-			return;
-		}
-		if (controls?.consumeKey(event)) {
-			event.preventDefault();
-			event.stopPropagation();
-			return;
-		}
-		if (consumeKey(event)) {
+		if (zoomLayer?.consumeKey(event) || controls?.consumeKey(event) || consumeKey(event)) {
 			event.preventDefault();
 			event.stopPropagation();
 			return;
@@ -1028,7 +997,14 @@ export function createViewer(deps) {
 			showRenderFailure(detail.id, error);
 			return;
 		}
-		if (token !== requestToken) return;
+		if (token === requestToken) afterMainRendered();
+	}
+
+	/**
+	 * 主役を描き終えた (描き直し終えた) あとの後始末。
+	 * @returns {void}
+	 */
+	function afterMainRendered() {
 		// 画像の無い主役 (うごイラ・ブロック表示) は、描き終えた時点で表示し終えたとみなす
 		if (currentPage() === null) slideshow.pageShown();
 		// 枚数が決まったので、ポインタの下の領域のカーソルを合わせ直す
@@ -1048,29 +1024,20 @@ export function createViewer(deps) {
 		const startPage = currentPage() ?? 0;
 		// 原寸表示を開けるのは画像だけで、画像は主役の設定のどれが変わっても作り直す
 		zoomLayer?.close();
-		let done;
-		let token;
+		/** 描き直しの世代。組み立てが同期で落ちたときはまだ取っていない (null) */
+		let token = null;
 		try {
 			const result = rerenderMain(lastDetail, readSession(doc), settings, renderTargets(startPage), changedKeys);
 			if (!result.rebuilt) return;
 			token = ++requestToken;
-			done = result.done;
+			await result.done;
 		} catch (error) {
-			showRenderFailure(lastDetail.id, error);
-			return;
-		}
-		try {
-			await done;
-		} catch (error) {
-			if (token !== requestToken) return;
+			// 待っている間に次の要求が来ていたら、その失敗は伝えない
+			if (token !== null && token !== requestToken) return;
 			showRenderFailure(lastDetail?.id, error);
 			return;
 		}
-		if (token !== requestToken) return;
-		// 画像の無い主役 (うごイラ・ブロック表示) は、描き直し終えた時点で表示し終えたとみなす
-		if (currentPage() === null) slideshow.pageShown();
-		navZones?.refresh();
-		warmNeighbor();
+		if (token === requestToken) afterMainRendered();
 	}
 
 	/**
@@ -1195,7 +1162,6 @@ export function createViewer(deps) {
 		doc.removeEventListener('visibilitychange', onVisibilityChange);
 		// 帯を先に外してから止める。次に開いたときは停止状態から始まる
 		disposeControls();
-		flushSlideshowSaves();
 		slideshow.reset();
 		unlockBody();
 		unlockBackground();

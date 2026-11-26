@@ -72,7 +72,7 @@ export function commentsFloorHeight({ outside, contentHeight, nthBottom }) {
 /**
  * コメント区画の採寸を作る。
  * @param {CommentsLayoutDeps} deps 依存
- * @returns {{applyFloor: () => void, applyFloorUnlessWatched: () => void, watchSize: (el: HTMLElement) => void, syncScrollState: () => void, scrollToTop: () => void, watchScroll: () => void, reset: () => void, dispose: () => void}} 採寸の口
+ * @returns {{applyFloor: () => void, applyFloorUnlessWatched: () => void, watchSize: (el: HTMLElement) => void, unwatchSize: (el: HTMLElement) => void, syncScrollState: () => void, scrollToTop: () => void, watchScroll: () => void, reset: () => void, dispose: () => void}} 採寸の口
  */
 export function createCommentsLayout(deps) {
 	const { doc, container, scrollTarget, parts } = deps;
@@ -159,6 +159,16 @@ export function createCommentsLayout(deps) {
 	}
 
 	/**
+	 * watchSize() の見張りを解く。区画から外す要素は、外す前にこれを呼ぶ。
+	 * ResizeObserver は解くまで相手を持ち続け、外した直後にも大きさ 0 の通知で測り直しに来る。
+	 * @param {HTMLElement} el 見張りを解く要素
+	 * @returns {void}
+	 */
+	function unwatchSize(el) {
+		sizeWatcher?.unobserve(el);
+	}
+
+	/**
 	 * サイドバーを送るたびに見直す。
 	 *
 	 * **下の線と「上部へ」は同じ合図で出す。** どちらも「見出しと入力欄が上端に貼り付いた」ことに
@@ -234,5 +244,5 @@ export function createCommentsLayout(deps) {
 		unwatchScroll = null;
 	}
 
-	return { applyFloor, applyFloorUnlessWatched, watchSize, syncScrollState, scrollToTop, watchScroll, reset, dispose };
+	return { applyFloor, applyFloorUnlessWatched, watchSize, unwatchSize, syncScrollState, scrollToTop, watchScroll, reset, dispose };
 }

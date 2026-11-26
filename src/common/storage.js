@@ -282,7 +282,8 @@ function applyChanges(raw, changes) {
 
 /**
  * 設定の変更を購読する。popup で変えた値を開いているページへ即座に届けるために使う。
- * 保存領域を読むのは最初の通知の 1 回だけで、以後は通知の changes を手元の保存値へ重ねる。(読めなかったら次の通知で読み直す)
+ * 保存領域を読むのは最初の通知の 1 回だけで、以後は通知の changes を手元の保存値へ重ねる。
+ * 読めなかった通知はコールバックへ何も渡さず、次の通知で読み直す。(既定値を配ると、切っていた機能が一時的に入る)
  * 通知は届いた順に処理する。コールバックが投げても unhandled rejection にせず warn に残す。
  * @param {(settings: typeof SETTINGS_DEFAULTS) => void} callback 変更後の設定を受け取る
  * @param {{storage?: object}} [deps] chrome.storage の差し替え
@@ -302,11 +303,17 @@ export function watchSettings(callback, deps = {}) {
 		if (areaName !== SYNC_AREA_NAME) return;
 		queue = queue
 			.then(async () => {
+				if (raw !== null) {
+					raw = applyChanges(raw, changes);
+					return normalizeSettings(raw);
+				}
 				// 最初に読んだ値は、この通知の変更を既に含んでいる
-				raw = raw === null ? await readRaw({ area }) : applyChanges(raw, changes);
-				return normalizeSettings(raw);
+				raw = await readRaw({ area });
+				return raw === null ? null : normalizeSettings(raw);
 			})
-			.then(callback)
+			.then((settings) => {
+				if (settings !== null) callback(settings);
+			})
 			.catch((error) => warn('設定の変更を反映できませんでした', error));
 	};
 	storage.onChanged.addListener(listener);

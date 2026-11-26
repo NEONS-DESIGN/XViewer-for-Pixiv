@@ -6,7 +6,6 @@
  * 区画の採寸は comments-layout.js、削除の導線は comments-delete.js に分けてある。
  */
 import { createIcon } from '../../common/icons.js';
-import { setImageSrcAttribute } from '../../common/image-source.js';
 import { currentLocalePrefix } from '../../common/locale.js';
 import { getJson, FRESH_FETCH_INIT } from '../../pixiv/client.js';
 import { commentRootsUrl, commentRepliesUrl, emojiUrl, stampUrl, userPath, illustUrl } from '../../pixiv/endpoints.js';
@@ -15,12 +14,13 @@ import { createCommentForm } from './comment-form.js';
 import { createCommentPicker } from './comment-picker.js';
 import { createCommentsLayout } from './comments-layout.js';
 import { attachDelete, createConfirmRegistry, DELETE_BUTTON_CLASS } from './comments-delete.js';
-import { isFocused } from './focus.js';
+import { el, btn, createAlert, fallbackImage } from './dom.js';
+import { isFocused, isRendered } from './focus.js';
 import { parseCommentText } from '../../pixiv/emoji.js';
 import { postComment, postStamp, deleteComment } from '../../pixiv/actions.js';
 import { PIXIV_ERROR_KINDS } from '../../pixiv/errors.js';
-import { readSession, clearSessionCache } from '../session.js';
-import { DEFAULT_COMMENT_PAGE_SIZE, DISPLAY_TIME_ZONE_OFFSET, KEYS, USER_ID_PATTERN } from '../../common/constants.js';
+import { readSession, markSessionExpired } from '../session.js';
+import { DEFAULT_COMMENT_PAGE_SIZE, DISPLAY_TIME_ZONE_OFFSET, KEYS, STATUS_KINDS, USER_ID_PATTERN } from '../../common/constants.js';
 import { warn } from '../../common/log.js';
 
 /** 返信の 1 ページ目。replies API は offset ではなく 1 始まりの page で送る。 */
@@ -114,16 +114,15 @@ export function parseCommentDate(value) {
 export function renderCommentText(doc, text) {
 	return parseCommentText(text).map((fragment) => {
 		if (fragment.kind !== 'emoji') return doc.createTextNode(fragment.text);
-		const image = doc.createElement('img');
-		image.className = 'comment-emoji';
-		image.setAttribute('loading', 'lazy');
-		image.setAttribute('decoding', 'async');
-		setImageSrcAttribute(image, emojiUrl(fragment.id));
-		// 読み上げと、画像が出ないときの控えを兼ねて元の文字を持たせる
-		image.setAttribute('alt', fragment.text);
+		// 読み上げと、画像が出ないときの控えを兼ねて元の文字を持たせる。
 		// 落ちても本文が読めるように、元の (heaven) の形へ戻す
-		image.addEventListener('error', () => { image.replaceWith(doc.createTextNode(fragment.text)); });
-		return image;
+		return fallbackImage(doc, {
+			className: 'comment-emoji',
+			url: emojiUrl(fragment.id),
+			alt: fragment.text,
+			fallback: fragment.text,
+			lazy: true,
+		});
 	});
 }
 
@@ -136,19 +135,14 @@ export function renderCommentText(doc, text) {
  */
 export function renderStamp(doc, stampId, strings) {
 	const url = stampUrl(stampId);
-	if (!url) {
-		const fallback = doc.createElement('span');
-		fallback.textContent = strings.comments.STAMP_PLACEHOLDER;
-		return fallback;
-	}
-	const image = doc.createElement('img');
-	image.className = 'comment-stamp';
-	image.setAttribute('loading', 'lazy');
-	image.setAttribute('decoding', 'async');
-	setImageSrcAttribute(image, url);
-	image.setAttribute('alt', strings.comments.STAMP_ALT);
-	image.addEventListener('error', () => { image.replaceWith(doc.createTextNode(strings.comments.STAMP_PLACEHOLDER)); });
-	return image;
+	if (!url) return el(doc, 'span', '', strings.comments.STAMP_PLACEHOLDER);
+	return fallbackImage(doc, {
+		className: 'comment-stamp',
+		url,
+		alt: strings.comments.STAMP_ALT,
+		fallback: strings.comments.STAMP_PLACEHOLDER,
+		lazy: true,
+	});
 }
 
 /**
@@ -177,12 +171,19 @@ export function createComments(deps) {
 	const localePrefix = deps.localePrefix ?? currentLocalePrefix(doc);
 	const scrollTarget = deps.scrollTarget ?? null;
 	const pageSize = deps.pageSize ?? DEFAULT_COMMENT_PAGE_SIZE;
-	const fetchJson = deps.fetchJson ?? ((url, clientDeps = {}, init = {}) => getJson(url, clientDeps, init));
+	const fetchJson = deps.fetchJson ?? getJson;
 	const api = { postComment, postStamp, deleteComment, ...deps.actions };
 	/** roots / replies の取得を中断するためのもの。load() の冒頭で前の分を中断して作り直す */
 	let aborter = new AbortController();
 	/** 読み込み済みの件数。「もっと見る」で増やす */
 	let offset = 0;
+	/**
+	 * 一覧に出したルートコメントの ID。読み込んだ分と投稿した分。
+	 * 投稿や他人の書き込みで roots の並びがずれると、「もっと見る」が出したものをもう一度返すことがある。
+	 * 同じ ID は並べ直さない
+	 * @type {Set<string>}
+	 */
+	const shownRootIds = new Set();
 	/** 今表示している作品 */
 	let workId = null;
 	/** @type {HTMLElement|null} */
@@ -231,27 +232,18 @@ export function createComments(deps) {
 	 * @returns {HTMLElement} 見出し
 	 */
 	function createHeading() {
-		const heading = doc.createElement('h3');
-		heading.className = 'comments-heading';
+		const heading = el(doc, 'h3', 'comments-heading');
 		// 削除で行が消えて次の受け皿が無いとき、フォーカスをここへ戻す。Tab の巡回には入れない
 		heading.setAttribute('tabindex', '-1');
 		headingEl = heading;
 
 		// 「上部へ」を右端へ寄せるため、見出しの文字も要素に入れる
-		const title = doc.createElement('span');
-		title.className = 'comments-heading-text';
-		title.textContent = strings.comments.HEADING;
-		heading.appendChild(title);
+		heading.appendChild(el(doc, 'span', 'comments-heading-text', strings.comments.HEADING));
 
 		if (scrollTarget) {
-			toTopButton = doc.createElement('button');
-			toTopButton.type = 'button';
-			toTopButton.className = 'to-top';
+			toTopButton = btn(doc, 'to-top');
 			// 文言が見えているので title は付けない (同じ文字が重なるだけ)
-			toTopButton.appendChild(createIcon(doc, 'expandLess'));
-			const text = doc.createElement('span');
-			text.textContent = strings.comments.TO_TOP;
-			toTopButton.appendChild(text);
+			toTopButton.append(createIcon(doc, 'expandLess'), el(doc, 'span', '', strings.comments.TO_TOP));
 			toTopButton.hidden = true;
 			toTopButton.addEventListener('click', () => { layout.scrollToTop(); });
 			heading.appendChild(toTopButton);
@@ -266,8 +258,8 @@ export function createComments(deps) {
 
 	/**
 	 * 更新系の失敗を文言にする。投稿にも削除にも使う。
-	 * 401 はログインが切れている。(別タブでログアウトした等) 覚えているセッションを捨て、
-	 * 再読み込みまで案内する。__NEXT_DATA__ は SPA 遷移で変わらないので、捨てても
+	 * 401 はログインが切れている。(別タブでログアウトした等) ログインが切れた印を付け、
+	 * 再読み込みまで案内する。__NEXT_DATA__ は SPA 遷移で変わらないので、読み直しても
 	 * 再読み込みまで新しいトークンは得られない
 	 * @param {unknown} error 失敗の中身
 	 * @param {string} [fallback] 401 以外で出す文言。省略すると投稿の失敗
@@ -275,7 +267,7 @@ export function createComments(deps) {
 	 */
 	function postErrorMessage(error, fallback = strings.comments.POST_FAILED) {
 		if (error?.kind === PIXIV_ERROR_KINDS.UNAUTHORIZED) {
-			clearSessionCache();
+			markSessionExpired();
 			return strings.comments.SESSION_EXPIRED;
 		}
 		return fallback;
@@ -342,8 +334,7 @@ export function createComments(deps) {
 	 * @returns {HTMLElement} 入れ物
 	 */
 	function createHeader(commentOff) {
-		const header = doc.createElement('div');
-		header.className = 'comments-header';
+		const header = el(doc, 'div', 'comments-header');
 		headerEl = header;
 		header.appendChild(createHeading());
 		if (canPost) {
@@ -357,10 +348,7 @@ export function createComments(deps) {
 		} else if (!commentOff) {
 			// 案内を出すのは未ログインのときだけ。コメントを受け付けていない作品は一覧側が
 			// 伝えるので、両方出して二重に断らない
-			const signIn = doc.createElement('p');
-			signIn.className = 'status';
-			signIn.textContent = strings.comments.SIGN_IN;
-			header.appendChild(signIn);
+			header.appendChild(el(doc, 'p', 'status', strings.comments.SIGN_IN));
 		}
 		// 入力欄の高さも下限に効く。入れ物ごと見張る
 		layout.watchSize(header);
@@ -374,7 +362,7 @@ export function createComments(deps) {
 	const deleteDeps = {
 		doc,
 		strings,
-		deleteComment: (illustId, commentId, token) => api.deleteComment(illustId, commentId, token),
+		deleteComment: api.deleteComment,
 		illustId: () => detailRef?.id ?? null,
 		csrfToken: () => readSession(doc).csrfToken,
 		watchGeneration: () => {
@@ -425,8 +413,9 @@ export function createComments(deps) {
 		// 返信は roots の数え方に入らないのでルートのときだけ
 		if (isRoot) offset = Math.max(0, offset - 1);
 		// 最後の 1 件だったら「まだコメントはありません」へ戻す。
-		// 戻さないと見出しだけが残って、読み込みに失敗したように見える
-		if (list && list.children.length === 0) showEmpty();
+		// 戻さないと見出しだけが残って、読み込みに失敗したように見える。
+		// 続き (「もっと見る」) が残っているなら空ではないので出さない
+		if (list && list.children.length === 0 && moreButton?.hidden !== false) showEmpty();
 		// 行ごと消えるとフォーカスが body へ落ち、キーボード利用者が Tab の起点を失う
 		receiver?.focus();
 		// 消した行は一覧の中にあり、一覧の高さの変化は ResizeObserver が拾う
@@ -453,8 +442,7 @@ export function createComments(deps) {
 	 * @returns {{item: HTMLElement, body: HTMLElement, repliesSlot: HTMLElement, meta: HTMLElement}} 要素・本文側の入れ物・返信ボタンの差し込み先・下段
 	 */
 	function createItem(comment, isRoot = false) {
-		const item = doc.createElement('li');
-		item.className = 'comment-item';
+		const item = el(doc, 'li', 'comment-item');
 
 		// 退会したユーザーと ID が取れなかったコメントには飛び先が無い。押せないままにする。
 		// 数字でない ID はパスに埋めると別のページを指しうるので、取れなかったのと同じ扱いにする
@@ -469,8 +457,7 @@ export function createComments(deps) {
 		// ただし名前と飛び先が同じなので、読み上げと Tab の巡回からは外して 1 件 1 リンクに見せる
 		let avatarNode = avatar;
 		if (userPage) {
-			const avatarLink = doc.createElement('a');
-			avatarLink.className = 'comment-avatar-link';
+			const avatarLink = el(doc, 'a', 'comment-avatar-link');
 			avatarLink.href = userPage;
 			avatarLink.setAttribute('aria-hidden', 'true');
 			avatarLink.setAttribute('tabindex', '-1');
@@ -478,41 +465,29 @@ export function createComments(deps) {
 			avatarNode = avatarLink;
 		}
 
-		const body = doc.createElement('div');
-		body.className = 'comment-body';
+		const body = el(doc, 'div', 'comment-body');
 
 		// 飛び先があるときだけ a にする。target は付けない (作者行と同じく同じタブで開く)
-		const name = doc.createElement(userPage ? 'a' : 'span');
-		name.className = 'comment-name';
+		const name = el(doc, userPage ? 'a' : 'span', 'comment-name', comment.userName);
 		if (userPage) name.href = userPage;
-		name.textContent = comment.userName;
 
 		// 名前の直後にラベルを置く。(pixiv 本体と同じ並び) 付かないコメントには要素ごと作らない
 		const label = commentLabel(comment, readSession(doc).self?.id ?? null, detailRef?.userId ?? null, strings);
-		let labelNode = null;
-		if (label) {
-			labelNode = doc.createElement('span');
-			// 本体は「あなた」だけ地を緑にしている。色の出し分けは CSS に任せ、印だけ付ける
-			labelNode.className = label === strings.comments.roles.SELF ? 'comment-label is-self' : 'comment-label';
-			labelNode.textContent = label;
-		}
+		// 本体は「あなた」だけ地を緑にしている。色の出し分けは CSS に任せ、印だけ付ける
+		const labelNode = label
+			? el(doc, 'span', label === strings.comments.roles.SELF ? 'comment-label is-self' : 'comment-label', label)
+			: null;
 
-		const text = doc.createElement('p');
-		text.className = 'comment-text';
+		const text = el(doc, 'p', 'comment-text');
 		if (comment.isStamp) text.appendChild(renderStamp(doc, comment.stampId, strings));
 		else text.append(...renderCommentText(doc, comment.text));
 
 		// 下段は「返信を書く導線が左端、返信を読む導線がその隣、日時が右端」で揃える。
 		// どちらの導線も後から差し込む。返信を読む導線は枠だけ先に置いて、
 		// 返信の有無で日時の位置がずれないようにする
-		const meta = doc.createElement('div');
-		meta.className = 'comment-meta';
-		const repliesSlot = doc.createElement('span');
-		repliesSlot.className = 'comment-replies-slot';
-		const date = doc.createElement('span');
-		date.className = 'comment-date';
-		date.textContent = comment.date ? strings.comments.formatDateTime(comment.date) : '';
-		meta.append(repliesSlot, date);
+		const meta = el(doc, 'div', 'comment-meta');
+		const repliesSlot = el(doc, 'span', 'comment-replies-slot');
+		meta.append(repliesSlot, el(doc, 'span', 'comment-date', comment.date ? strings.comments.formatDateTime(comment.date) : ''));
 
 		body.append(name, ...(labelNode ? [labelNode] : []), text, meta);
 		item.append(avatarNode, body);
@@ -549,14 +524,11 @@ export function createComments(deps) {
 		/** @type {object[]} 1 ページ目を読んでいる最中に投稿できた返信。並べ終わったら末尾へ足す */
 		let pendingPosted = [];
 
-		const toggle = doc.createElement('button');
-		toggle.type = 'button';
-		toggle.className = 'comment-replies';
+		const toggle = btn(doc, 'comment-replies');
 		toggle.setAttribute('aria-expanded', 'false');
 		// アイコンは差し替えるので、入れ物の span を挟んで中身だけ入れ替える
-		const toggleMark = doc.createElement('span');
-		toggleMark.className = 'comment-replies-mark';
-		const toggleText = doc.createElement('span');
+		const toggleMark = el(doc, 'span', 'comment-replies-mark');
+		const toggleText = el(doc, 'span');
 		toggle.append(toggleMark, toggleText);
 
 		/**
@@ -591,11 +563,7 @@ export function createComments(deps) {
 		 */
 		function showError(error) {
 			clearError();
-			replyErrorNode = doc.createElement('p');
-			replyErrorNode.className = 'reply-error';
-			replyErrorNode.setAttribute('role', 'alert');
-			replyErrorNode.textContent = strings.comments.REPLY_FAILED;
-			body.appendChild(replyErrorNode);
+			replyErrorNode = body.appendChild(createAlert(doc, 'reply-error', strings.comments.REPLY_FAILED));
 			warn('failed to load replies', comment.id, error);
 		}
 
@@ -618,11 +586,8 @@ export function createComments(deps) {
 				if (!open) return;
 				clearError();
 				if (!area) {
-					area = doc.createElement('div');
-					area.className = 'comment-replies-area';
-					replyList = doc.createElement('ul');
-					replyList.className = 'comment-reply-list';
-					area.appendChild(replyList);
+					area = el(doc, 'div', 'comment-replies-area');
+					replyList = area.appendChild(el(doc, 'ul', 'comment-reply-list'));
 					body.appendChild(area);
 				}
 				const loaded = (responseBody?.comments ?? []).map((raw) => normalizeComment(raw, strings));
@@ -638,9 +603,7 @@ export function createComments(deps) {
 				page += 1;
 				if (responseBody?.hasNext === true) {
 					if (!replyMore) {
-						replyMore = doc.createElement('button');
-						replyMore.type = 'button';
-						replyMore.className = 'more reply-more';
+						replyMore = btn(doc, 'more reply-more');
 						replyMore.addEventListener('click', () => { void loadPage(); });
 						area.appendChild(replyMore);
 					}
@@ -731,10 +694,7 @@ export function createComments(deps) {
 		/** @type {object|null} 開いている入力欄。畳んでいる間は null */
 		let form = null;
 
-		const toggle = doc.createElement('button');
-		toggle.type = 'button';
-		toggle.className = 'comment-reply-toggle';
-		toggle.textContent = strings.comments.REPLY;
+		const toggle = btn(doc, 'comment-reply-toggle', strings.comments.REPLY);
 		toggle.setAttribute('aria-expanded', 'false');
 		toggle.addEventListener('click', () => {
 			if (form) {
@@ -822,6 +782,8 @@ export function createComments(deps) {
 		// 一覧から読んだ 1 件と同じ導線を付ける。付けないと、描き直すまで
 		// この 1 件にだけ返信できない。返信はまだ無いので「返信を表示」は隠れる
 		list.prepend(createRootItem(fromPosted(posted)));
+		// 続きの読み込みで同じコメントが返ってきても、もう一度並べない
+		shownRootIds.add(posted.id);
 		// 一覧は watchSize() で見張っているので、高さの変化は ResizeObserver が拾う
 		layout.applyFloorUnlessWatched();
 	}
@@ -833,11 +795,19 @@ export function createComments(deps) {
 	 */
 	function showEmpty() {
 		if (emptyEl) return;
-		emptyEl = doc.createElement('p');
-		emptyEl.className = 'status';
-		emptyEl.textContent = strings.comments.EMPTY;
-		container.appendChild(emptyEl);
+		emptyEl = container.appendChild(el(doc, 'p', 'status', strings.comments.EMPTY));
 		layout.watchSize(emptyEl);
+	}
+
+	/**
+	 * 区画に出した文言 (空の案内・読み込みの失敗) を外す。高さの見張りも一緒に解く。
+	 * @param {HTMLElement|null} node 外す文言。null なら何もしない
+	 * @returns {void}
+	 */
+	function dropStatus(node) {
+		if (!node) return;
+		layout.unwatchSize(node);
+		node.remove();
 	}
 
 	/**
@@ -875,40 +845,22 @@ export function createComments(deps) {
 	function ensureList() {
 		// 一覧と「まだコメントはありません」は両立しない。1 件目が入る時点で消す。
 		// 一覧の有無とは切り離す: 最後の 1 件を消して案内へ戻したあとは一覧が残ったまま案内が出ている
-		emptyEl?.remove();
+		dropStatus(emptyEl);
 		emptyEl = null;
 		if (list) return;
 
 		// 一覧と「もっと見る」を同じ領域に入れてスクロールさせる。
 		// 外に置くと、一番下まで読んでいなくてもボタンが見えて不自然になる
-		scroll = doc.createElement('div');
-		scroll.className = 'comment-scroll';
-		container.appendChild(scroll);
-
-		list = doc.createElement('ul');
-		list.className = 'comment-list';
-		scroll.appendChild(list);
+		scroll = container.appendChild(el(doc, 'div', 'comment-scroll'));
+		list = scroll.appendChild(el(doc, 'ul', 'comment-list'));
 		// 返信の開閉でも高さが変わる。一覧そのものを見張れば全部拾える
 		layout.watchSize(list);
 
-		moreButton = doc.createElement('button');
-		moreButton.type = 'button';
-		moreButton.className = 'more';
-		moreButton.textContent = strings.comments.MORE;
+		moreButton = btn(doc, 'more', strings.comments.MORE);
 		// 続きがあるかは読んでみるまで分からない。loadMore() が出す
 		moreButton.hidden = true;
 		moreButton.addEventListener('click', () => { void loadMore(); });
 		scroll.appendChild(moreButton);
-	}
-
-	/**
-	 * 区画が描画されているか。畳まれたサイドバー (display: none の祖先) の下では false。
-	 * 測る口が無い相手 (テスト用の DOM) は描画されているものとして扱う
-	 * @returns {boolean} 描画されていれば true
-	 */
-	function isRendered() {
-		if (typeof container.getClientRects !== 'function') return true;
-		return container.getClientRects().length > 0;
 	}
 
 	/**
@@ -932,10 +884,11 @@ export function createComments(deps) {
 	function whenRendered(task) {
 		stopWaitingForRender();
 		const Observer = doc.defaultView?.ResizeObserver;
-		if (!Observer || isRendered()) return task();
+		// 畳まれたサイドバー (display: none の祖先) の下では描画されていない
+		if (!Observer || isRendered(container)) return task();
 		// 畳まれていた区画が出てくると大きさが 0 から変わるので、ResizeObserver の通知で拾える
 		const observer = new Observer(() => {
-			if (!isRendered()) return;
+			if (!isRendered(container)) return;
 			stopWaitingForRender();
 			void task();
 		});
@@ -964,10 +917,14 @@ export function createComments(deps) {
 			if (workId !== requestedWorkId || !list || list !== requestedList) return;
 			const comments = (body?.comments ?? []).map((raw) => normalizeComment(raw, strings));
 			for (const comment of comments) {
+				// 並びがずれて、出したものがもう一度返ってくることがある
+				if (shownRootIds.has(comment.id)) continue;
+				shownRootIds.add(comment.id);
 				list.appendChild(createRootItem(comment));
 			}
+			// 飛ばした分も含めて、受け取った件数だけ進める。進めないと同じ範囲を読み続ける
 			offset += comments.length;
-			errorNode?.remove();
+			dropStatus(errorNode);
 			errorNode = null;
 			if (moreButton) {
 				moreButton.textContent = strings.comments.MORE;
@@ -983,13 +940,9 @@ export function createComments(deps) {
 			if (error?.kind === PIXIV_ERROR_KINDS.ABORTED) return;
 			// 一時的な失敗で以降が読めなくならないよう、ボタンは再試行として残す。
 			// 表示は 1 つだけ。失敗のたびに積み上げない
-			errorNode?.remove();
-			errorNode = doc.createElement('p');
-			errorNode.className = 'status';
-			errorNode.dataset.kind = 'error';
-			errorNode.setAttribute('role', 'alert');
-			errorNode.textContent = strings.comments.LOAD_FAILED;
-			container.appendChild(errorNode);
+			dropStatus(errorNode);
+			errorNode = container.appendChild(createAlert(doc, 'status', strings.comments.LOAD_FAILED));
+			errorNode.dataset.kind = STATUS_KINDS.ERROR;
 			// watchSize() の初回通知が測り直しを担う
 			layout.watchSize(errorNode);
 			if (moreButton) {
@@ -1019,6 +972,7 @@ export function createComments(deps) {
 			stopWaitingForRender();
 			workId = detail.id;
 			offset = 0;
+			shownRootIds.clear();
 			container.textContent = '';
 			// 前の作品で測った下限と、消える見出しの購読を残さない。
 			// 一覧やボタンの参照も戻す。残すと前の作品の応答が新しい一覧へ追記される
@@ -1049,12 +1003,8 @@ export function createComments(deps) {
 			else layout.syncScrollState();
 
 			if (detail.commentOff) {
-				const off = doc.createElement('p');
-				off.className = 'status';
-				off.textContent = strings.comments.COMMENT_OFF;
-				container.appendChild(off);
 				// watchSize() の初回通知が測り直しを担う
-				layout.watchSize(off);
+				layout.watchSize(container.appendChild(el(doc, 'p', 'status', strings.comments.COMMENT_OFF)));
 				return;
 			}
 			if (detail.commentCount === 0) {
@@ -1115,6 +1065,7 @@ export function createComments(deps) {
 			emptyEl = null;
 			confirmations.clear();
 			workId = null;
+			shownRootIds.clear();
 			canPost = false;
 			forms.clear();
 			picker?.dispose();

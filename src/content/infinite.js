@@ -7,10 +7,11 @@
  * React は外から append した li を消さない前提で組む。
  */
 import { captureTemplates, buildCard, paintHeart, heartPaths } from './card-clone.js';
-import { readSession, clearSessionCache } from './session.js';
-import { parseArtworkPath } from './page.js';
+import { readSession, markSessionExpired } from './session.js';
+import { idsFromLinks } from './grid.js';
 import { pickVisiblePage } from './infinite-page.js';
 import { addBookmark, deleteBookmark } from '../pixiv/actions.js';
+import { PIXIV_ORIGIN } from '../pixiv/endpoints.js';
 import { PIXIV_ERROR_KINDS } from '../pixiv/errors.js';
 import { warn } from '../common/log.js';
 import { createStyleHandle } from '../common/style-injector.js';
@@ -54,13 +55,16 @@ const RETRYABLE_STATES = new Set(Object.keys(FAILURE_TEXT_KEY));
 /** prefetch モードで組み立て直後 / setMode() 直後に先読みを始めるまで待てる空き時間の上限 (ms)。 */
 const PREFETCH_IDLE_TIMEOUT_MS = 1000;
 
-/** sentinel が引く strings.infinite のキーの一覧。カタログ側との過不足を確かめる基準にもなる */
-export const SENTINEL_TEXT_KEYS = Object.freeze([
+/**
+ * sentinel が引く strings.infinite のキーの一覧。カタログ側との過不足を確かめる基準にもなる。
+ * 本体は参照しないので、使われなければ束から落ちるよう純粋な即時関数で組む。
+ */
+export const SENTINEL_TEXT_KEYS = /* @__PURE__ */ (() => Object.freeze([
 	'LOADING',
 	'RETRY',
 	'DONE',
 	...Object.values(FAILURE_TEXT_KEY),
-]);
+]))();
 
 /** sentinel の中の部品のクラス名。pixiv 側と衝突しないよう xv- を付ける。 */
 const SENTINEL_CLASS = Object.freeze({
@@ -115,6 +119,8 @@ const CARD_SHOW_CSS = `
  *   本体のテーマ切り替えに自動で追従し、地の色から浮かない
  * - 外部リソース (フォント・画像) は読まない
  * - セレクタは全て [data-xv-sentinel] の中に閉じ、クラス名には xv- を付ける
+ * - idle (中身が空) でも高さを 0 にしない。0 だと交差を取り損ねるので :empty でも少しだけ残す
+ * CSS の中にはコメントを書かない。(テンプレート文字列は縮められず、そのまま配布物に残る)
  */
 const SENTINEL_CSS = `
 [${SENTINEL_ATTR}] {
@@ -129,7 +135,6 @@ const SENTINEL_CSS = `
 	line-height: 1.5;
 	text-align: center;
 }
-/* idle は何も出さないが、高さが 0 だと交差を取り損ねるので少しだけ残す */
 [${SENTINEL_ATTR}]:empty {
 	min-height: 24px;
 	padding: 0;
@@ -232,6 +237,8 @@ export function attachInfiniteScroll(doc, options) {
 		?? ((callback, init) => new globalThis.IntersectionObserver(callback, init));
 	/** 画面。スクロールと大きさの変化はここで受ける。取れなければ ?p= の追従だけを諦める */
 	const view = doc.defaultView ?? null;
+	/** 作品リンクの href を読む基準。pixiv の作品リンクはパスだけなので、普通は使われない */
+	const origin = doc.location?.origin ?? PIXIV_ORIGIN;
 	// 要素の上端 (ビューポート基準) を読む。測れない要素は 0 (= 上端の上) として扱う。
 	// DOM から外れた要素は getBoundingClientRect() が 0 を返すので、そのままだと
 	// 「上端を越えた」に倒れる。印のカードを pixiv に消されても、その上にいながら
@@ -276,11 +283,7 @@ export function attachInfiniteScroll(doc, options) {
 	let state = SENTINEL_STATE.IDLE;
 	/** @type {object[]|null} 先読みして持っている作品。prefetch でだけ入る */
 	let prefetched = null;
-	/**
-	 * @type {Promise<object[]|null>|null} 走っている先読み。無ければ null。
-	 * 先読みは「読み込み中」に含めない。含めると、先読みが終わる前に下端へ着いた人の
-	 * advance() が弾かれ、以後 sentinel が画面内に留まって二度と鳴らなくなる
-	 */
+	/** @type {Promise<object[]|null>|null} 走っている先読み。無ければ null。「読み込み中」(loading) には含めない */
 	let prefetchTask = null;
 	/** @type {object|null} ul の直後に置いた目印 */
 	let sentinel = null;
@@ -353,6 +356,24 @@ export function attachInfiniteScroll(doc, options) {
 		// observe() が投げても dispose() で切れるように、先に印を付ける
 		observing = true;
 		observer.observe(sentinel);
+	}
+
+	/**
+	 * sentinel を見張り直す。observe() は最初に今の交差状態を必ず通知するので、
+	 * まだ範囲内なら次のページを読み、範囲外なら何も起きない。
+	 * IntersectionObserver は交差が変わったときにしか鳴らないので、継ぎ足しのたびに呼ぶ。
+	 * 見張っていないとき (読み切った後・dispose 後) は何もしない。
+	 * @returns {void}
+	 */
+	function reobserve() {
+		if (!observing || !observer) return;
+		try {
+			observer.unobserve(sentinel);
+			observer.observe(sentinel);
+		} catch (error) {
+			// 見張り直せなくても、次に交差が変わったときには鳴る
+			warn('infinite scroll re-observe failed', error);
+		}
 	}
 
 	/**
@@ -455,24 +476,21 @@ export function attachInfiniteScroll(doc, options) {
 	}
 
 	/**
-	 * ul に本体 (pixiv) が並べている作品の ID を集める。
-	 * 継ぎ足しの重複判定に使う。基準ページの記憶がずれたとき (pixiv がグリッドを描き直した等) に
-	 * 同じ作品が二重に並ぶのを止めるための保険。
+	 * ul に本体 (pixiv) が並べている作品の ID を集める。継ぎ足しの重複判定の保険に使う。
 	 * 自分が継ぎ足したカードは ownIds が覚えているので、ここでは見ない。
-	 * (継ぎ足すたびに増え続ける自分のカードを毎回数え直すと、ページを追うごとに遅くなる)
+	 * 自分のカードは本体のカードの後ろに固まって並ぶので、頭と尻から自分のカードに当たるまでだけ見る。
+	 * (自分のカードの数に比例して遅くならない。本体が自分のカードの後ろへ足したカードも拾える)
 	 * @returns {Set<string>} 作品 ID
 	 */
 	function existingWorkIds() {
-		const ids = new Set();
-		for (const card of ul.children) {
-			if (card.hasAttribute?.(XV_CARD_ATTR)) continue;
-			for (const link of card.querySelectorAll?.(ARTWORK_LINK_SELECTOR) ?? []) {
-				// 作品リンクの href はパスだけ (/artworks/{id})。origin を挟まずそのまま読める
-				const id = parseArtworkPath(link.getAttribute('href') ?? '');
-				if (id) ids.add(id);
-			}
-		}
-		return ids;
+		const children = ul.children;
+		const isOwn = (card) => card.hasAttribute?.(XV_CARD_ATTR) === true;
+		const links = [];
+		const collect = (card) => { links.push(...(card.querySelectorAll?.(ARTWORK_LINK_SELECTOR) ?? [])); };
+		let head = 0;
+		for (; head < children.length && !isOwn(children[head]); head += 1) collect(children[head]);
+		for (let tail = children.length - 1; tail > head && !isOwn(children[tail]); tail -= 1) collect(children[tail]);
+		return new Set(idsFromLinks(links, origin));
 	}
 
 	/**
@@ -676,10 +694,20 @@ export function attachInfiniteScroll(doc, options) {
 				const works = held ?? await source.loadPage(next, { signal: aborter.signal });
 				held = null;
 				if (disposed) return;
-				// 空の応答は総ページ数が実際より多かったときの保険
-				if (!Array.isArray(works) || works.length === 0) {
+				if (!Array.isArray(works)) {
 					finish();
 					return;
+				}
+				if (works.length === 0) {
+					// 総ページ数が分からないか、最終ページまで来ていれば読み切った
+					if (!Number.isFinite(lastKnown) || next >= lastKnown) {
+						finish();
+						return;
+					}
+					// 途中のページの作品が全部応答から消えていた。画面には何も出ないので印は置かず、次のページへ進む
+					lastPage = next;
+					showState(SENTINEL_STATE.LOADING);
+					continue;
 				}
 				const { added, skipped } = render(works, next);
 				// 作品は返ってきたのに 1 枚も組めなかった。(画像 URL が全て safeCdnUrl を
@@ -692,7 +720,8 @@ export function attachInfiniteScroll(doc, options) {
 					return;
 				}
 				lastPage = next;
-				notifyPage();
+				// 継ぎ足した直後に rect を読むと、その場でページ全体のレイアウトが確定してしまう。次のフレームで見る
+				requestPageCheck();
 				if (lastPage >= lastKnown) {
 					finish();
 					return;
@@ -704,6 +733,8 @@ export function attachInfiniteScroll(doc, options) {
 			showState(SENTINEL_STATE.IDLE);
 			// 先読みは描き終えてから始め、待たない (待つと次の advance() が弾かれる)
 			if (mode === INFINITE_SCROLL.PREFETCH) startPrefetch(lastPage + 1);
+			// 継ぎ足しても sentinel が見張りの範囲に残っていれば (背の高い画面など)、続けて次を読む
+			reobserve();
 		} catch (error) {
 			// dispose() 後に届いた失敗。中断 (ABORTED) のこともあれば、応答の読み込み中に
 			// 中断されて別の種類のエラーになることもあるので、error.kind では判定しない
@@ -797,8 +828,8 @@ export function attachInfiniteScroll(doc, options) {
 		} catch (error) {
 			if (disposed) return;
 			restoreHeart(card, bookmarkId);
-			// 401 はログインが切れている。(別タブでログアウトした等) 覚えたセッションを捨てる
-			if (error?.kind === PIXIV_ERROR_KINDS.UNAUTHORIZED) clearSessionCache();
+			// 401 はログインが切れている。(別タブでログアウトした等) 以後は古いトークンで送らない
+			if (error?.kind === PIXIV_ERROR_KINDS.UNAUTHORIZED) markSessionExpired();
 			warn('bookmark failed', error);
 		} finally {
 			sending.delete(card);

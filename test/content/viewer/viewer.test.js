@@ -128,7 +128,7 @@ function fakeDoc(options = {}) {
 
 /**
  * ビュワーと依存の記録を用意する。
- * @param {object} [options] getJsonImpl と settings、setTimeout / clearTimeout / createImage / saveSetting の差し替え、__NEXT_DATA__ の中身 (nextData)
+ * @param {object} [options] getJsonImpl と settings、setTimeout / clearTimeout (省略時は偽のタイマ) / createImage / saveSetting の差し替え、__NEXT_DATA__ の中身 (nextData)
  * @returns {{viewer: object, doc: object, fetched: string[], navigated: string[], closed: () => number, shadow: () => object, stage: () => object}} 一式
  */
 function setup(options = {}) {
@@ -137,6 +137,8 @@ function setup(options = {}) {
 	const fetched = [];
 	const navigated = [];
 	let closeRequests = 0;
+	// 渡されなければ偽のタイマにする。本物だと帯を隠す待ちや保存の待ちが残り、テストが終わってもプロセスが抜けない
+	const timers = options.setTimeout ? { setTimeout: options.setTimeout, clearTimeout: options.clearTimeout } : fakeTimers();
 	const viewer = createViewer({
 		doc,
 		settings: options.settings ?? settings(),
@@ -152,8 +154,8 @@ function setup(options = {}) {
 		// サイドバーを出すテストだけが渡す。作者情報の取得で通信させない
 		fetchUser: options.fetchUser,
 		clearUserCache: options.clearUserCache ?? (() => {}),
-		setTimeout: options.setTimeout,
-		clearTimeout: options.clearTimeout,
+		setTimeout: timers.setTimeout,
+		clearTimeout: timers.clearTimeout,
 		createImage: options.createImage,
 		saveSetting: options.saveSetting ?? (async () => true),
 	});
@@ -1681,11 +1683,11 @@ test('入力欄にフォーカスがある間は数えず、入力欄どうし�
 	const overlay = find(shadow(), '.overlay');
 	const textarea = { tagName: 'TEXTAREA' };
 	const input = { tagName: 'INPUT', type: 'text' };
-	await overlay.dispatch('focusin', { composedPath: () => [textarea] });
+	await overlay.dispatch('focusin', { target: textarea });
 	assert.deepEqual(timers.ids(SLIDESHOW_TEST_INTERVAL_MS), []);
 	await overlay.dispatch('focusout', { relatedTarget: input });
 	assert.deepEqual(timers.ids(SLIDESHOW_TEST_INTERVAL_MS), [], '行き先も入力欄なら、外れた時点で数え直さない');
-	await overlay.dispatch('focusin', { composedPath: () => [input] });
+	await overlay.dispatch('focusin', { target: input });
 	assert.deepEqual(timers.ids(SLIDESHOW_TEST_INTERVAL_MS), []);
 	await overlay.dispatch('focusout', { relatedTarget: null });
 	assert.equal(timers.ids(SLIDESHOW_TEST_INTERVAL_MS).length, 1);

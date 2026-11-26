@@ -8,15 +8,9 @@
  * 開いたら選んでいる項目へフォーカスし、上下キーで移動、Home / End で端へ、Escape で閉じてボタンへ戻す。
  * キーは consumeKey() で受ける。ビュワー本体が document の捕捉フェーズで上下キーを作品の移動に使っているため。
  */
-import { createIcon } from '../../common/icons.js';
 import { KEYS, UGOIRA_PLAYBACK_RATES, DEFAULT_UGOIRA_RATE } from '../../common/constants.js';
 import { activeElementIn } from './focus.js';
-
-/** 再生ボタンの表示。キーは今の再生状態、値は「押すと何になるか」。アイコンは言語に依らない。 */
-const TOGGLE = Object.freeze({
-	PLAYING: Object.freeze({ icon: 'pause', labelKey: 'PAUSE' }),
-	PAUSED: Object.freeze({ icon: 'play', labelKey: 'PLAY' }),
-});
+import { createPopupToggle, setPlayToggleLook } from './control-parts.js';
 
 /** 速度のメニューの中で使うキー。項目の移動と端への移動。 */
 const MENU_KEYS = Object.freeze({
@@ -66,7 +60,6 @@ export function seekPercent(index, total) {
  *   setPlaying: (playing: boolean) => void,
  *   setFrame: (index: number, total: number) => void,
  *   setLoaded: (count: number, total: number) => void,
- *   setRate: (rate: number) => void,
  *   consumeKey: (event: KeyboardEvent) => boolean,
  *   dispose: () => void,
  * }}
@@ -76,8 +69,6 @@ export function createUgoiraControls(deps) {
 	const text = strings.ugoira;
 	/** 今の再生速度 */
 	let rate = UGOIRA_PLAYBACK_RATES.includes(deps.rate) ? deps.rate : DEFAULT_UGOIRA_RATE;
-	/** 速度のメニューを開いているか */
-	let menuOpen = false;
 	/** シークバーをマウス・指でつかんでいるか */
 	let grabbing = false;
 	/** 再生中か。再生中は読み上げ用の値 (aria-valuetext) をコマごとには書かない */
@@ -187,73 +178,20 @@ export function createUgoiraControls(deps) {
 		item.addEventListener('click', () => {
 			setRate(value);
 			deps.onRate(value);
-			closeMenu(true);
+			rateMenu.close(true);
 		});
 		menu.append(item);
 		return item;
 	});
 
-	/**
-	 * メニューの開閉を画面に反映する。
-	 * @param {boolean} next 開くなら true
-	 * @returns {void}
-	 */
-	function setMenuOpen(next) {
-		menuOpen = next;
-		menu.hidden = !next;
-		rateButton.setAttribute('aria-expanded', String(next));
-	}
-
-	/**
-	 * メニューを閉じる。キーや項目で閉じたときはボタンへフォーカスを戻す。
-	 * (戻さないと、隠れた項目にフォーカスが残ってモーダルのキー操作が効かなくなる)
-	 * @param {boolean} refocus ボタンへフォーカスを戻すか
-	 * @returns {void}
-	 */
-	function closeMenu(refocus) {
-		if (!menuOpen) return;
-		setMenuOpen(false);
-		if (refocus) rateButton.focus();
-	}
-
-	rateButton.addEventListener('click', () => {
-		if (menuOpen) {
-			closeMenu(false);
-			return;
-		}
-		setMenuOpen(true);
-		// 開いたら選んでいる項目へ。そのまま上下で選び直せる
-		items[UGOIRA_PLAYBACK_RATES.indexOf(rate)]?.focus();
+	// 開いたら選んでいる項目へ。そのまま上下で選び直せる
+	const rateMenu = createPopupToggle({
+		doc,
+		wrap: rateWrap,
+		button: rateButton,
+		popup: menu,
+		focusOnOpen: () => items[UGOIRA_PLAYBACK_RATES.indexOf(rate)],
 	});
-
-	/**
-	 * フォーカスが速度の部品の外へ出たら閉じる。(Tab で抜けたとき)
-	 * relatedTarget が無いとき (窓が非アクティブになった等) は閉じない。外側のクリックは pointerdown が受け持つ
-	 * @param {FocusEvent} event フォーカスの移動
-	 * @returns {void}
-	 */
-	function onFocusOut(event) {
-		if (!menuOpen) return;
-		const next = event.relatedTarget;
-		if (!next) return;
-		if (typeof rateWrap.contains === 'function' && rateWrap.contains(next)) return;
-		setMenuOpen(false);
-	}
-	rateWrap.addEventListener('focusout', onFocusOut);
-
-	/**
-	 * メニューの外が押されたら閉じる。Shadow DOM の中なので composedPath() で見る。
-	 * @param {PointerEvent} event 押された位置
-	 * @returns {void}
-	 */
-	function onPointerDown(event) {
-		if (!menuOpen) return;
-		const path = event.composedPath?.() ?? [];
-		if (path.includes(rateWrap)) return;
-		setMenuOpen(false);
-	}
-	// 捕捉フェーズで受ける。pixiv 側やビュワーが途中で止めても届くようにする
-	doc.addEventListener('pointerdown', onPointerDown, true);
 
 	rateWrap.append(rateButton, menu);
 	element.append(toggle, seek, counter, rateWrap);
@@ -265,11 +203,7 @@ export function createUgoiraControls(deps) {
 	 */
 	function setPlaying(next) {
 		playing = next;
-		const look = next ? TOGGLE.PLAYING : TOGGLE.PAUSED;
-		const label = text[look.labelKey];
-		toggle.setAttribute('aria-label', label);
-		toggle.title = label;
-		toggle.replaceChildren(createIcon(doc, look.icon));
+		setPlayToggleLook(doc, toggle, next, text);
 		// 止まったら今のコマを読み上げ用の値へ入れる。(再生中はコマごとに書かない)
 		if (!next) writeValueText();
 	}
@@ -341,7 +275,6 @@ export function createUgoiraControls(deps) {
 		setPlaying,
 		setFrame,
 		setLoaded,
-		setRate,
 
 		/**
 		 * キーを食い止める。ビュワー本体のキー操作 (Escape で閉じる・上下で作品を移動) より先に呼ばれ、
@@ -350,10 +283,10 @@ export function createUgoiraControls(deps) {
 		 * @returns {boolean} 食い止めたなら true
 		 */
 		consumeKey(event) {
-			if (!menuOpen) return false;
+			if (!rateMenu.isOpen()) return false;
 			if (event.key === KEYS.CLOSE) {
 				event.preventDefault?.();
-				closeMenu(true);
+				rateMenu.close(true);
 				return true;
 			}
 			if (moveFocus(event.key)) {
@@ -368,10 +301,8 @@ export function createUgoiraControls(deps) {
 		 * @returns {void}
 		 */
 		dispose() {
-			doc.removeEventListener('pointerdown', onPointerDown, true);
-			rateWrap.removeEventListener('focusout', onFocusOut);
+			rateMenu.dispose();
 			grabbing = false;
-			setMenuOpen(false);
 		},
 	};
 }

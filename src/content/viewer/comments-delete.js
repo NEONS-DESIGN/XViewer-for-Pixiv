@@ -9,6 +9,7 @@
  * ここが持つのは通信とボタンの状態だけ。一覧から外す・件数を戻す・空の案内へ戻す・
  * フォーカスの受け皿を決めるのは comments.js (`deps.onRemoved`) の仕事。
  */
+import { btn, createAlert } from './dom.js';
 import { isFocused } from './focus.js';
 import { warn } from '../../common/log.js';
 
@@ -110,10 +111,7 @@ export function attachDelete(comment, target, deps) {
 	/** @type {HTMLElement|null} 失敗の表示。1 つだけ持つ */
 	let errorNode = null;
 
-	const button = doc.createElement('button');
-	button.type = 'button';
-	button.className = DELETE_BUTTON_CLASS;
-	button.textContent = strings.comments.DELETE;
+	const button = btn(doc, DELETE_BUTTON_CLASS, strings.comments.DELETE);
 
 	/**
 	 * 聞き返しをやめる。外 (Escape・別のボタン) から呼ぶ用の口。
@@ -142,11 +140,7 @@ export function attachDelete(comment, target, deps) {
 	 */
 	function showError(error) {
 		errorNode?.remove();
-		errorNode = doc.createElement('p');
-		errorNode.className = 'comment-error';
-		errorNode.setAttribute('role', 'alert');
-		errorNode.textContent = deps.errorMessage(error);
-		body.appendChild(errorNode);
+		errorNode = body.appendChild(createAlert(doc, 'comment-error', deps.errorMessage(error)));
 		warn('failed to delete comment', comment.id, error);
 	}
 

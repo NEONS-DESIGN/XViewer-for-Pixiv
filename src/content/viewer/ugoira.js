@@ -10,19 +10,20 @@
  */
 import { safeCdnUrl } from '../../pixiv/endpoints.js';
 import { fetchUgoiraMeta } from '../../pixiv/illust-assets.js';
-import { parseStoredZip, createStoredZipReader } from '../../pixiv/ugoira-zip.js';
+import { createStoredZipReader } from '../../pixiv/ugoira-zip.js';
 import { assignImageSrc } from '../../common/image-source.js';
 import { IMAGE_QUALITY, UGOIRA_START_FRAMES, UGOIRA_PLAYBACK_RATES, DEFAULT_UGOIRA_RATE } from '../../common/constants.js';
 import { warn } from '../../common/log.js';
 import { createUgoiraControls } from './ugoira-controls.js';
+import { replacePaneError } from './image-pane.js';
 
 /** 開発者向けの失敗理由。画面には出さず warn に渡す。 */
 const REASONS = Object.freeze({
-	ZIP_NOT_CDN: 'zip の URL が pixiv の CDN ではありません',
-	ZIP_FETCH: 'zip の取得に失敗しました',
-	NO_FRAMES: 'フレームがありません',
-	DECODE: 'フレームの画像をデコードできませんでした',
-	UNSUPPORTED_ZIP: '受信しながら読めない形式の zip です (data descriptor か STORE 以外)',
+	ZIP_NOT_CDN: 'zip url is not on the pixiv CDN',
+	ZIP_FETCH: 'zip fetch failed',
+	NO_FRAMES: 'no frames',
+	DECODE: 'frames could not be decoded',
+	UNSUPPORTED_ZIP: 'zip cannot be read while streaming',
 });
 
 /** delay が読めなかったときに使う待ち時間 (ミリ秒)。 */
@@ -245,13 +246,17 @@ export function createUgoiraPlayer(deps) {
 			frameStartedAt = now - playable[frameIndex].delay / rate;
 		}
 		const next = advanceFrame({ now, startedAt: frameStartedAt, index: frameIndex, timings: playable, complete, rate });
+		// 1 コマしか無ければ同じ絵なので描き直さない
+		const moved = next.index !== frameIndex || playable.length > 1;
 		frameIndex = next.index;
 		frameStartedAt = next.startedAt;
-		if (next.advanced > 0) draw();
+		if (next.advanced > 0 && moved) draw();
 		if (next.stalled) {
 			stalled = true;
 			return;
 		}
+		// 揃った 1 コマは動かないので、次も予約しない
+		if (complete && playable.length === 1) return;
 		scheduleNext(now);
 	}
 
@@ -358,12 +363,7 @@ export function createUgoiraPlayer(deps) {
 	 */
 	function showPaneError(message) {
 		if (disposed || !root) return;
-		root.querySelector('.pane-error')?.remove();
-		const line = doc.createElement('p');
-		line.className = 'pane-error';
-		line.setAttribute('role', 'alert');
-		line.textContent = message;
-		root.appendChild(line);
+		replacePaneError(doc, root, message);
 	}
 
 	/**
@@ -500,37 +500,32 @@ export function createUgoiraPlayer(deps) {
 	}
 
 	/**
-	 * zip を読み、エントリが揃うたびに onEntry へ渡す。
-	 * body を読めるなら受信しながら切り出す。body が無ければ同じ応答の全体を受け取ってから切り出す。
-	 * 受信しながらは切り出せない形 (data descriptor か STORE 以外) は全体を受け取っても読めないので、
-	 * 取り直さずに受信をやめて失敗にする。
+	 * zip を受信しながら読み、エントリが揃うたびに onEntry へ渡す。
+	 * body が無い応答 (中身の無い応答) はエントリを 1 つも返さない。
+	 * 受信しながらは切り出せない形 (data descriptor か STORE 以外) は、取り直さずに受信をやめて失敗にする。
 	 * @param {Response} response zip の応答
 	 * @param {(entry: {name: string, parts: Uint8Array[]}) => void} onEntry エントリを受け取る関数
 	 * @returns {Promise<void>}
 	 * @throws {Error} 通信の失敗、読めない形式の zip
 	 */
 	async function readFrames(response, onEntry) {
-		if (typeof response.body?.getReader === 'function') {
-			const reader = response.body.getReader();
-			const zipReader = createStoredZipReader();
-			for (;;) {
-				const { done, value } = await reader.read();
-				if (done || disposed || failed) return;
-				for (const entry of zipReader.push(value)) onEntry(entry);
-				if (zipReader.ended()) {
-					// 残りは中央ディレクトリだけなので受け取らない
-					reader.cancel().catch(() => {});
-					return;
-				}
-				if (zipReader.needsFallback()) {
-					reader.cancel().catch(() => {});
-					throw new Error(REASONS.UNSUPPORTED_ZIP);
-				}
+		if (typeof response.body?.getReader !== 'function') return;
+		const reader = response.body.getReader();
+		const zipReader = createStoredZipReader();
+		for (;;) {
+			const { done, value } = await reader.read();
+			if (done || disposed || failed) return;
+			for (const entry of zipReader.push(value)) onEntry(entry);
+			if (zipReader.ended()) {
+				// 残りは中央ディレクトリだけなので受け取らない
+				reader.cancel().catch(() => {});
+				return;
+			}
+			if (zipReader.unsupported()) {
+				reader.cancel().catch(() => {});
+				throw new Error(REASONS.UNSUPPORTED_ZIP);
 			}
 		}
-		const buffer = await response.arrayBuffer();
-		if (disposed) return;
-		for (const entry of parseStoredZip(buffer)) onEntry({ name: entry.name, parts: [entry.bytes] });
 	}
 
 	return {
@@ -594,6 +589,8 @@ export function createUgoiraPlayer(deps) {
 				const zipUrl = safeCdnUrl(pickZipUrl(meta, deps.settings.imageQuality));
 				if (!zipUrl) throw new Error(REASONS.ZIP_NOT_CDN);
 				const metaFrames = Array.isArray(meta.frames) ? meta.frames : [];
+				// コマが無ければ zip を受け取っても全部捨てるので、取りに行かない
+				if (metaFrames.length === 0) throw new Error(REASONS.NO_FRAMES);
 				// 並び順は meta が持つので、zip の並びには頼らない
 				frames = new Array(metaFrames.length).fill(undefined);
 				totalFrames = metaFrames.length;
@@ -649,6 +646,8 @@ export function createUgoiraPlayer(deps) {
 		dispose() {
 			disposed = true;
 			aborter.abort();
+			// 読み込み中の静止画は文書から外しても転送が続くので、src を空にして取り消す
+			if (poster) assignImageSrc(poster, '');
 			// 自分が作った DOM は自分で片付ける。
 			// これを外すと、次に開いた作品の画像と横に並んで両方潰れる
 			root?.remove();

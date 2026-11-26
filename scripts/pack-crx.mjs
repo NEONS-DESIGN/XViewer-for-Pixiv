@@ -8,7 +8,10 @@
  * 3. できた CRX の署名を公開鍵で検証し、出力先へ置く
  *
  * 秘密鍵の場所はリポジトリに書かない。--key か環境変数 XVIEWER_CRX_KEY で渡す。
- * 同じ版の CRX が出力先に既にあれば止まる。(ストアへ上げた版を上書きしないため。--force で上書き)
+ * 同じ版の CRX が出力先に既にあれば、ビルドする前に止まる。(ストアへ上げた版を上書きしないため。--force で上書き)
+ *
+ * リポジトリの中の場所 (dist / store/versions / build.mjs) はルートから解く。
+ * --key / --out に渡した場所は、実行したときのカレントから解く。
  *
  * Chrome は使い捨てのプロファイルで起動する。普段の Chrome が起動していると、
  * 同じプロファイルでは処理がそちらへ渡されてしまい、CRX が作られないため。
@@ -24,6 +27,8 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { verifyCrx3 } from './crx.mjs';
 import { toManifestVersion } from './manifest-version.mjs';
 import { OUT_DIR } from './static-files.mjs';
+import { PACKAGE_JSON, readJson } from './json.mjs';
+import { ROOT_DIR, fromRoot } from './paths.mjs';
 
 /** 秘密鍵の場所を渡す環境変数。 */
 const KEY_ENV = 'XVIEWER_CRX_KEY';
@@ -31,8 +36,11 @@ const KEY_ENV = 'XVIEWER_CRX_KEY';
 /** Chrome の場所を渡す環境変数。(自動で見つからないとき用) */
 const CHROME_ENV = 'CHROME_PATH';
 
-/** CRX の出力先の既定。 */
+/** CRX の出力先の既定。(リポジトリのルートからの相対パス) */
 const DEFAULT_OUT_DIR = 'store/versions';
+
+/** 子プロセスで走らせるビルドの本体。(リポジトリのルートからの相対パス) */
+const BUILD_SCRIPT = 'scripts/build.mjs';
 
 /** 出力するファイル名の接頭辞。手で作っている zip と同じ名前の付け方にそろえる。 */
 const FILE_PREFIX = 'XViewer for Pixiv_';
@@ -53,9 +61,6 @@ const OUTPUT_POLL_MS = 200;
 /** 一時ディレクトリを消すときの再試行。(Chrome がプロファイルを掴んだまま少し残ることがある) */
 const CLEANUP_RETRIES = 5;
 const CLEANUP_RETRY_DELAY_MS = 500;
-
-/** version の出どころ。 */
-const PACKAGE_JSON = 'package.json';
 
 /**
  * OS ごとの Chrome 系ブラウザの既定の場所。先頭から探す。
@@ -98,7 +103,7 @@ function readOptions() {
 	if (!key) throw new Error(`秘密鍵の場所を --key か環境変数 ${KEY_ENV} で渡してください`);
 	return {
 		key: resolve(key),
-		outDir: resolve(values.out ?? DEFAULT_OUT_DIR),
+		outDir: values.out === undefined ? fromRoot(DEFAULT_OUT_DIR) : resolve(values.out),
 		chrome: values.chrome ?? process.env[CHROME_ENV],
 		force: values.force,
 	};
@@ -131,41 +136,32 @@ async function readPublicKeyFromPrivate(path) {
 }
 
 /**
- * JSON ファイルを読む。
- * @param {string} path ファイルの場所
- * @returns {Promise<object>} 中身
- * @throws {Error} 読めない・JSON として解釈できないとき
+ * package.json の version を読む。
+ * @returns {Promise<string>} package.json の version (semver のまま)
+ * @throws {Error} 読めない・version が manifest の規則に合わないとき
  */
-async function readJson(path) {
-	let text;
-	try {
-		text = await readFile(path, 'utf8');
-	} catch (error) {
-		throw new Error(`${path} を読めません: ${error.message}`);
-	}
-	try {
-		return JSON.parse(text);
-	} catch (error) {
-		throw new Error(`${path} を JSON として読めません: ${error.message}`);
-	}
+async function readPackageVersion() {
+	const { version } = await readJson(fromRoot(PACKAGE_JSON));
+	toManifestVersion(version);
+	return version;
 }
 
 /**
  * ビルドし直し、dist の manifest が package.json の version になっているかを確かめる。
- * @returns {Promise<string>} package.json の version
- * @throws {Error} ビルドの失敗、version の不一致
+ * @param {string} version 先に読んだ package.json の version
+ * @returns {Promise<void>}
+ * @throws {Error} ビルドの失敗、version の不一致 (ビルドの間に package.json が変わったときも含む)
  */
-async function buildAndCheckVersion() {
-	const { version } = await readJson(PACKAGE_JSON);
+async function buildAndCheckVersion(version) {
 	// CRX は Chrome 系の出力 (dist) だけを使う。Firefox 側のビルドの失敗に巻き込まれないよう Chrome 系だけ作る
-	const result = spawnSync(process.execPath, ['scripts/build.mjs', '--target=chrome'], { stdio: 'inherit' });
+	const result = spawnSync(process.execPath, [fromRoot(BUILD_SCRIPT), '--target=chrome'], { cwd: ROOT_DIR, stdio: 'inherit' });
+	if (result.error) throw new Error(`ビルドを起動できません: ${result.error.message}`);
 	if (result.status !== 0) throw new Error('ビルドに失敗しました');
-	const manifest = await readJson(join(OUT_DIR, 'manifest.json'));
+	const manifest = await readJson(fromRoot(OUT_DIR, 'manifest.json'));
 	const expected = toManifestVersion(version);
 	if (manifest.version !== expected) {
 		throw new Error(`dist/manifest.json の version (${manifest.version}) が package.json (${expected}) と合いません`);
 	}
-	return version;
 }
 
 /**
@@ -213,7 +209,7 @@ async function waitForFile(path) {
  */
 async function packWithChrome(chrome, keyPath, workDir) {
 	const extensionDir = join(workDir, PACK_DIR_NAME);
-	await cp(OUT_DIR, extensionDir, { recursive: true });
+	await cp(fromRoot(OUT_DIR), extensionDir, { recursive: true });
 	const result = spawnSync(chrome, [
 		`--pack-extension=${extensionDir}`,
 		`--pack-extension-key=${keyPath}`,
@@ -240,12 +236,14 @@ async function main() {
 	const options = readOptions();
 	const publicKey = await readPublicKeyFromPrivate(options.key);
 	const chrome = findChrome(options.chrome);
-	const version = await buildAndCheckVersion();
+	const version = await readPackageVersion();
 
+	// 既にある版なら dist を作り直す前に止める
 	const outPath = join(options.outDir, `${FILE_PREFIX}${version}.crx`);
 	if (existsSync(outPath) && !options.force) {
 		throw new Error(`${outPath} が既にあります。version を上げるか、作り直すなら --force を付けてください`);
 	}
+	await buildAndCheckVersion(version);
 
 	const workDir = await mkdtemp(join(tmpdir(), TEMP_PREFIX));
 	try {

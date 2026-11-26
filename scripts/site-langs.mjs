@@ -193,6 +193,21 @@ export function localDate(date = new Date()) {
 }
 
 /**
+ * sitemap.xml を読む。無ければ空の文字列を返す。
+ * @param {string} file sitemap.xml の場所
+ * @returns {Promise<string>} 中身 (無ければ '')
+ * @throws {Error} 無い以外の理由で読めないとき (使用中・権限が無いなど。全部の lastmod を書き直さないよう止める)
+ */
+async function readSitemap(file) {
+	try {
+		return await readFile(file, 'utf8');
+	} catch (error) {
+		if (error?.code === 'ENOENT') return '';
+		throw new Error(`${file} を読めません: ${error?.message ?? error}`);
+	}
+}
+
+/**
  * ページと sitemap.xml を書き直す。check が真なら書かずに、差のあるファイルを返すだけにする。
  * sitemap.xml の改行は元のファイルに合わせる。(無ければ CRLF)
  * @param {{siteDir: string, check?: boolean, today?: string}} options site/ の場所など
@@ -211,7 +226,7 @@ export async function syncSiteLanguages({ siteDir, check = false, today = localD
 		}
 	}
 	const sitemapFile = path.join(siteDir, 'sitemap.xml');
-	const sitemap = await readFile(sitemapFile, 'utf8').catch(() => '');
+	const sitemap = await readSitemap(sitemapFile);
 	const sitemapEol = sitemap === '' || sitemap.includes('\r\n') ? '\r\n' : '\n';
 	const nextSitemap = renderSitemap(sitemap.replace(/\r\n/g, '\n'), today);
 	if (nextSitemap !== sitemap.replace(/\r\n/g, '\n')) {

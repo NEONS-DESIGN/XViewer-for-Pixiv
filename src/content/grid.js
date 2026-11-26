@@ -5,7 +5,7 @@
  * 付け直しが必要になるが、document で拾えば再描画の影響を受けない。
  * pixiv の CSS クラス名はビルドごとに変わるため、掴んでよいのは href だけ。
  */
-import { ARTWORK_LINK_SELECTOR, CARD_SELECTOR, CARD_LINK_SELECTOR } from '../common/constants.js';
+import { ARTWORK_LINK_SELECTOR, ARTWORK_LINK_SELECTORS, CARD_SELECTOR, CARD_LINK_SELECTOR } from '../common/constants.js';
 import { warn } from '../common/log.js';
 import { PIXIV_ORIGIN } from '../pixiv/endpoints.js';
 import { parseArtworkPath } from './page.js';
@@ -17,6 +17,14 @@ import { parseArtworkPath } from './page.js';
  * ページ全体で section はこの 1 個だけ (作品グリッドは div) なので、これで十分に見分けられる。
  */
 const NON_GRID_CONTAINER_SELECTOR = 'section';
+
+/**
+ * 作品グリッドの起点にしてよい作品リンク。カード (li) の中にあり、ピックアップ欄の中には無いもの。
+ * 擬似クラスは接頭辞ごとのセレクタへ 1 本ずつ付けてから結合する。(カンマの後ろへ継ぎ足すと末尾の 1 本にしか掛からない)
+ */
+const GRID_CARD_LINK_SELECTOR = ARTWORK_LINK_SELECTORS
+	.map((link) => `${CARD_SELECTOR} ${link}:not(${NON_GRID_CONTAINER_SELECTOR} ${link})`)
+	.join(',');
 
 /** Node.DOCUMENT_NODE。collectWorkIds が document を渡されたかを見る */
 const DOCUMENT_NODE_TYPE = 9;
@@ -72,6 +80,26 @@ export function startPageFromLink(href, origin) {
 }
 
 /**
+ * 作品リンクの並びから作品 ID を DOM 順に集める。
+ * 1 作品につきリンクが 2 本 (画像用とタイトル用) あるので ID で重複を除く。作品リンクでないものは飛ばす。
+ * @param {Iterable<Element>} links 作品リンク
+ * @param {string} origin 相対 URL を解決するための基準
+ * @returns {string[]} 作品 ID の配列 (重複なし)
+ */
+export function idsFromLinks(links, origin) {
+	const ids = [];
+	const seen = new Set();
+	for (const link of links) {
+		const id = workIdFromLink(link.getAttribute('href'), origin);
+		if (id && !seen.has(id)) {
+			seen.add(id);
+			ids.push(id);
+		}
+	}
+	return ids;
+}
+
+/**
  * 押したカードが属する欄の作品 ID を DOM 順に集める。
  * リンクから祖先を上り、作品カードのリンク (CARD_LINK_SELECTOR) が 2 作品以上入る最初の箱を欄とみなす。
  * ホームの横送り・グリッド・フィード、検索の結果はそれぞれ別の箱なので、欄をまたがない。
@@ -83,15 +111,7 @@ export function startPageFromLink(href, origin) {
 export function collectGroupIds(link, origin) {
 	const own = workIdFromLink(link?.getAttribute?.('href') ?? null, origin);
 	for (let node = link?.parentElement ?? null; node; node = node.parentElement) {
-		const ids = [];
-		const seen = new Set();
-		for (const card of node.querySelectorAll(CARD_LINK_SELECTOR)) {
-			const id = workIdFromLink(card.getAttribute('href'), origin);
-			if (id && !seen.has(id)) {
-				seen.add(id);
-				ids.push(id);
-			}
-		}
+		const ids = idsFromLinks(node.querySelectorAll(CARD_LINK_SELECTOR), origin);
 		if (ids.length >= 2) return ids;
 	}
 	return own ? [own] : [];
@@ -101,16 +121,13 @@ export function collectGroupIds(link, origin) {
  * 作品グリッドの ul を探す。
  * 「カード (li) の中にある作品リンク」を起点に、その li の親を返す。
  * ピックアップ欄の中のカードは飛ばす。(NON_GRID_CONTAINER_SELECTOR)
+ * 最初に当たったリンクで止まるので、継ぎ足したカードが増えても費用は変わらない。
  * @param {Document|ParentNode} doc 対象のドキュメント
  * @returns {Element|null} グリッドの ul。まだ描かれていなければ null
  */
 export function findGridList(doc) {
 	try {
-		for (const link of doc.querySelectorAll(ARTWORK_LINK_SELECTOR)) {
-			if (link.closest?.(NON_GRID_CONTAINER_SELECTOR)) continue;
-			const list = link.closest?.(CARD_SELECTOR)?.parentElement ?? null;
-			if (list) return list;
-		}
+		return doc.querySelector(GRID_CARD_LINK_SELECTOR)?.closest(CARD_SELECTOR)?.parentElement ?? null;
 	} catch (error) {
 		// 掴めないだけ。呼び出し側は「まだ描かれていない」として次の機会に回す
 		warn('grid list lookup failed', error);
@@ -129,16 +146,7 @@ export function findGridList(doc) {
  */
 export function collectWorkIds(root, origin) {
 	const scope = root.nodeType === DOCUMENT_NODE_TYPE ? findGridList(root) ?? root : root;
-	const ids = [];
-	const seen = new Set();
-	for (const link of scope.querySelectorAll(ARTWORK_LINK_SELECTOR)) {
-		const id = workIdFromLink(link.getAttribute('href'), origin);
-		if (id && !seen.has(id)) {
-			seen.add(id);
-			ids.push(id);
-		}
-	}
-	return ids;
+	return idsFromLinks(scope.querySelectorAll(ARTWORK_LINK_SELECTOR), origin);
 }
 
 /**

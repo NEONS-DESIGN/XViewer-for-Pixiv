@@ -2,15 +2,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { PROJECT_LICENSE, THIRD_PARTY } from '../../src/common/licenses.js';
-import { createStrings } from '../../src/i18n/index.js';
+import jaPopup from '../../src/i18n/ja-popup.js';
 import { OUT_DIR, STATIC_FILES } from '../../scripts/static-files.mjs';
 
 const NOTICE = await readFile(new URL('../../NOTICE', import.meta.url), 'utf8');
 const LICENSE = await readFile(new URL('../../LICENSE', import.meta.url), 'utf8');
 const APACHE_2 = await readFile(new URL('../../LICENSES/Apache-2.0.txt', import.meta.url), 'utf8');
 // NOTICE は日本語のままなので、比較は日本語カタログに対して行う
-const DISCLAIMER = createStrings('ja').licenses.disclaimer;
-const NOTES = createStrings('ja').licenses.notes;
+const DISCLAIMER = jaPopup.licenses.disclaimer;
+const NOTES = jaPopup.licenses.notes;
 
 test('免責の本文は商標ガイドラインが求める 2 つの表記を含む', () => {
 	const body = DISCLAIMER.body.join('\n');

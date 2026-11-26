@@ -7,6 +7,7 @@
 import { createIcon } from '../../common/icons.js';
 import { setImageSrcAttribute } from '../../common/image-source.js';
 import { createAvatar, showAvatar } from './avatar.js';
+import { el, btn, createAlert } from './dom.js';
 import { hasFocusWithin } from './focus.js';
 import { stampUrl } from '../../pixiv/endpoints.js';
 import { KEYS } from '../../common/constants.js';
@@ -38,12 +39,8 @@ export function createCommentForm(deps) {
 	/** @type {HTMLElement|null} 失敗の表示。1 つだけ持つ */
 	let errorNode = null;
 
-	const element = doc.createElement('div');
-	element.className = 'comment-form';
-
-	const row = doc.createElement('div');
-	row.className = 'comment-form-row';
-	element.appendChild(row);
+	const element = el(doc, 'div', 'comment-form');
+	const row = element.appendChild(el(doc, 'div', 'comment-form-row'));
 
 	if (deps.avatarUrl) {
 		const avatar = createAvatar(doc, 'comment-form-avatar');
@@ -51,32 +48,21 @@ export function createCommentForm(deps) {
 		row.appendChild(avatar);
 	}
 
-	const field = doc.createElement('div');
-	field.className = 'comment-form-field';
-	row.appendChild(field);
+	const field = row.appendChild(el(doc, 'div', 'comment-form-field'));
 
-	const input = doc.createElement('textarea');
-	input.className = 'comment-form-input';
+	const input = el(doc, 'textarea', 'comment-form-input');
 	input.rows = 1;
 	input.setAttribute('placeholder', placeholder);
 	input.setAttribute('aria-label', placeholder);
 	field.appendChild(input);
 
 	/** スタンプを選んでいる間だけ出す確認の表示。 */
-	const stampBox = doc.createElement('div');
-	stampBox.className = 'comment-form-stamp-box';
+	const stampBox = field.appendChild(el(doc, 'div', 'comment-form-stamp-box'));
 	stampBox.hidden = true;
-	field.appendChild(stampBox);
 
-	const pickSlot = doc.createElement('span');
-	pickSlot.className = 'comment-form-pick-slot';
-	field.appendChild(pickSlot);
+	const pickSlot = field.appendChild(el(doc, 'span', 'comment-form-pick-slot'));
 
-	const submit = doc.createElement('button');
-	submit.type = 'button';
-	submit.className = 'comment-form-submit';
-	submit.textContent = strings.commentForm.SUBMIT;
-	row.appendChild(submit);
+	const submit = row.appendChild(btn(doc, 'comment-form-submit', strings.commentForm.SUBMIT));
 
 	/**
 	 * この入力欄の中にフォーカスがあるか。Escape を食い止めるかの判断に使う。
@@ -162,11 +148,7 @@ export function createCommentForm(deps) {
 	 */
 	function showError(error) {
 		clearError();
-		errorNode = doc.createElement('p');
-		errorNode.className = 'comment-form-error';
-		errorNode.setAttribute('role', 'alert');
-		errorNode.textContent = errorMessage(error);
-		element.appendChild(errorNode);
+		errorNode = element.appendChild(createAlert(doc, 'comment-form-error', errorMessage(error)));
 	}
 
 	/**
@@ -191,14 +173,11 @@ export function createCommentForm(deps) {
 	function selectStamp(id) {
 		stampId = id;
 		stampBox.textContent = '';
-		const image = doc.createElement('img');
-		image.className = 'comment-form-stamp';
+		const image = el(doc, 'img', 'comment-form-stamp');
 		const url = stampUrl(id);
 		if (url) setImageSrcAttribute(image, url);
 		image.setAttribute('alt', strings.commentForm.STAMP_ALT);
-		const clear = doc.createElement('button');
-		clear.type = 'button';
-		clear.className = 'comment-form-stamp-clear';
+		const clear = btn(doc, 'comment-form-stamp-clear');
 		clear.title = strings.commentForm.STAMP_CLEAR;
 		clear.setAttribute('aria-label', strings.commentForm.STAMP_CLEAR);
 		clear.appendChild(createIcon(doc, 'close'));
@@ -259,9 +238,7 @@ export function createCommentForm(deps) {
 	submit.addEventListener('click', () => send());
 
 	if (picker) {
-		const pick = doc.createElement('button');
-		pick.type = 'button';
-		pick.className = 'comment-form-pick';
+		const pick = btn(doc, 'comment-form-pick');
 		pick.title = strings.commentForm.PICK;
 		pick.setAttribute('aria-label', strings.commentForm.PICK);
 		pick.appendChild(createIcon(doc, 'mood'));

@@ -2,12 +2,17 @@
  * 拡張機能アイコンの PNG を生成する。
  * 生成物 (src/icons/*.png) はコミットする。通常のビルドでは走らせない。
  * Chrome の manifest は PNG しか受け付けないため、SVG をここでラスタライズする。
+ * 出力先はリポジトリのルートから解く。(どのフォルダから実行しても同じ場所へ書く)
  */
 import { Resvg } from '@resvg/resvg-js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { ICON_OUTPUTS, buildIconSvg, iconFileName } from './icon-svg.mjs';
+import { ROOT_DIR } from './paths.mjs';
 
-/** 出力先のディレクトリ。 */
+// 出力先はルートからの相対パスなので、カレントをルートへ移してから使う
+process.chdir(ROOT_DIR);
+
+/** 出力先のディレクトリ。(リポジトリのルートからの相対パス) */
 const OUT_DIR = 'src/icons';
 
 /** 角の外側を透明で残す。(アイコン自身が角丸の背景を持つため) */

@@ -15,6 +15,7 @@ import { createSections, createAdvancedSections } from '../../src/popup/sections
 import { THEME_TOGGLE } from '../../src/common/constants.js';
 import { THIRD_PARTY } from '../../src/common/licenses.js';
 import { SENTINEL_TEXT_KEYS } from '../../src/content/infinite.js';
+import { createPopupStrings } from '../helpers/popup.js';
 
 /**
  * 2 つの集合が一致することを確かめる。
@@ -39,7 +40,7 @@ function assertSameKeySet(actual, expected, label) {
 test('定義表の全 field の key が strings.popup.fields のキーと一致する', () => {
 	// 設定タブ・詳細設定タブの両方と、選択肢の下に出す項目 (reveal) まで数える
 	for (const lang of SUPPORTED_LANGUAGES) {
-		const strings = createStrings(lang);
+		const strings = createPopupStrings(lang);
 		const fieldKeys = [...createSections(strings), ...createAdvancedSections(strings)]
 			.flatMap((section) => section.fields)
 			.flatMap(function walk(field) {
@@ -52,7 +53,7 @@ test('定義表の全 field の key が strings.popup.fields のキーと一致�
 test('THEME_TOGGLE の labelKey が strings.theme のキーと一致する', () => {
 	const labelKeys = Object.values(THEME_TOGGLE).map((entry) => entry.labelKey);
 	for (const lang of SUPPORTED_LANGUAGES) {
-		const strings = createStrings(lang);
+		const strings = createPopupStrings(lang);
 		assertSameKeySet(Object.keys(strings.theme), labelKeys, `[${lang}] theme`);
 	}
 });
@@ -60,7 +61,7 @@ test('THEME_TOGGLE の labelKey が strings.theme のキーと一致する', () 
 test('THIRD_PARTY の name が strings.licenses.notes のキーと一致する', () => {
 	const names = THIRD_PARTY.map((entry) => entry.name);
 	for (const lang of SUPPORTED_LANGUAGES) {
-		const strings = createStrings(lang);
+		const strings = createPopupStrings(lang);
 		assertSameKeySet(Object.keys(strings.licenses.notes), names, `[${lang}] licenses.notes`);
 	}
 });

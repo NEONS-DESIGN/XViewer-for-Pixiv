@@ -27,53 +27,6 @@ const OFFSET_EXTRA_LENGTH = 28;
 const ZIP_METHOD_STORE = 0;
 
 /**
- * @typedef {object} ZipEntry
- * @property {string} name ファイル名 (例: 000000.jpg)
- * @property {Uint8Array} bytes 中身。STORE なのでそのまま JPEG
- */
-
-/**
- * STORE 方式の zip を解析してエントリの配列を返す。
- * 壊れている・途中で切れている場合は読めたところまでを返す。(例外にしない)
- * @param {ArrayBuffer} buffer zip 全体
- * @returns {ZipEntry[]} エントリの配列
- * @throws {Error} STORE 以外の圧縮方式が含まれるとき
- */
-export function parseStoredZip(buffer) {
-	const view = new DataView(buffer);
-	const decoder = new TextDecoder();
-	const entries = [];
-	let offset = 0;
-
-	while (offset + LOCAL_FILE_HEADER_SIZE <= buffer.byteLength
-		&& view.getUint32(offset, true) === LOCAL_FILE_HEADER_SIGNATURE) {
-		const method = view.getUint16(offset + OFFSET_METHOD, true);
-		if (method !== ZIP_METHOD_STORE) {
-			throw new Error(`未対応の圧縮方式です: ${method}`);
-		}
-		const size = view.getUint32(offset + OFFSET_COMPRESSED_SIZE, true);
-		const nameLength = view.getUint16(offset + OFFSET_NAME_LENGTH, true);
-		const extraLength = view.getUint16(offset + OFFSET_EXTRA_LENGTH, true);
-		const nameStart = offset + LOCAL_FILE_HEADER_SIZE;
-		const dataStart = nameStart + nameLength + extraLength;
-
-		// 途中で切れているなら、そこで打ち切って読めた分を返す
-		if (dataStart + size > buffer.byteLength) break;
-
-		// subarray() は使わない。Firefox の content script では Permission denied になるので、
-		// 同じ buffer を指す view をコンストラクタで直接作る。
-		// 範囲は直前の判定 (dataStart + size <= byteLength) の内側に収まるので RangeError にはならない
-		entries.push({
-			name: decoder.decode(new Uint8Array(buffer, nameStart, nameLength)),
-			bytes: new Uint8Array(buffer, dataStart, size),
-		});
-		offset = dataStart + size;
-	}
-
-	return entries;
-}
-
-/**
  * @typedef {object} StreamedZipEntry
  * @property {string} name ファイル名 (例: 000000.jpg)
  * @property {Uint8Array[]} parts 中身。受け取ったチャンクを指す view の並び (つなぐと中身になる)
@@ -82,8 +35,8 @@ export function parseStoredZip(buffer) {
 /**
  * @typedef {object} StoredZipReader
  * @property {(chunk: Uint8Array) => StreamedZipEntry[]} push チャンクを渡し、中身が揃ったエントリを受け取る
- * @property {() => boolean} needsFallback 受信しながらは読めない形 (data descriptor か STORE 以外) を見つけたか。true になった後の push は空配列を返す。
- *   呼ぶ側は取り直さず失敗にする。(parseStoredZip() もこの 2 つの形は読めない)
+ * @property {() => boolean} unsupported 受信しながらは読めない形 (data descriptor か STORE 以外) を見つけたか。true になった後の push は空配列を返す。
+ *   呼ぶ側は取り直さず失敗にする。
  * @property {() => boolean} ended ローカルファイルヘッダの並びが終わったか (中央ディレクトリか知らない署名に来た)。true になった後の push は空配列を返す
  */
 
@@ -104,7 +57,7 @@ export function createStoredZipReader() {
 	let buffered = 0;
 	/** @type {{name: string, remaining: number, parts: Uint8Array[]}|null} 中身を集めている途中のエントリ */
 	let current = null;
-	let fallback = false;
+	let unsupportedFound = false;
 	let finished = false;
 
 	/**
@@ -162,7 +115,7 @@ export function createStoredZipReader() {
 
 	return {
 		push(chunk) {
-			if (fallback || finished || chunk.byteLength === 0) return [];
+			if (unsupportedFound || finished || chunk.byteLength === 0) return [];
 			queue.push(chunk);
 			buffered += chunk.byteLength;
 			const done = [];
@@ -192,7 +145,7 @@ export function createStoredZipReader() {
 				const flags = header.getUint16(OFFSET_FLAGS, true);
 				const method = header.getUint16(OFFSET_METHOD, true);
 				if ((flags & FLAG_DATA_DESCRIPTOR) !== 0 || method !== ZIP_METHOD_STORE) {
-					fallback = true;
+					unsupportedFound = true;
 					release();
 					break;
 				}
@@ -210,7 +163,7 @@ export function createStoredZipReader() {
 			}
 			return done;
 		},
-		needsFallback: () => fallback,
+		unsupported: () => unsupportedFound,
 		ended: () => finished,
 	};
 }

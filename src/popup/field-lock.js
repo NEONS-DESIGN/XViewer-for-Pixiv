@@ -5,13 +5,14 @@
  * 非活性の項目を押す・キーで動かすと操作を止め、項目の下に「親の項目をオンにしてください」を出す。
  * 出した警告はしばらくすると消え、親がオンになったときにも消える。
  */
-import { createIcon } from '../common/icons.js';
+import { createIcon } from './icons.js';
+import { toggleToken } from './description.js';
 
 /** 警告を出しておく時間 (ミリ秒)。 */
 export const LOCK_WARNING_MS = 4000;
 
 /** 非活性の項目の入れ物に付ける印。見た目 (薄く・押せないカーソル) は popup.css がこれで決める */
-export const LOCKED_CLASS = 'is-locked';
+const LOCKED_CLASS = 'is-locked';
 
 /** 警告の行に添えるアイコン。色だけに頼らず形でも示す */
 const WARNING_ICON = 'error';
@@ -33,21 +34,6 @@ export function isRequirementMet(requires, settings) {
 	if (!requires) return true;
 	const value = settings[requires.key];
 	return requires.off === undefined ? value === true : value !== requires.off;
-}
-
-/**
- * 空白区切りの属性値へ語を足す・外す。(aria-describedby の付け外しに使う)
- * @param {Element} element 対象
- * @param {string} name 属性名
- * @param {string} token 語
- * @param {boolean} present 足すなら true
- * @returns {void}
- */
-function toggleToken(element, name, token, present) {
-	const tokens = (element.getAttribute(name) ?? '').split(/\s+/).filter((one) => one && one !== token);
-	if (present) tokens.push(token);
-	if (tokens.length > 0) element.setAttribute(name, tokens.join(' '));
-	else element.removeAttribute(name);
 }
 
 /**
@@ -106,8 +92,6 @@ export function attachFieldLock(doc, { wrapper, control, kind, key, message: ini
 		toggleToken(control, 'aria-describedby', warningId, true);
 		if (timer !== null) cancel(timer);
 		timer = later(hideWarning, LOCK_WARNING_MS);
-		// テスト (Node) でタイマがプロセスを待たせないようにする。ブラウザには無いので呼べるときだけ
-		timer?.unref?.();
 	}
 
 	/**

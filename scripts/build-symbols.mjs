@@ -6,6 +6,10 @@
  */
 import { readFile, writeFile } from 'node:fs/promises';
 import { parseSvgElements } from './svg-elements.mjs';
+import { ROOT_DIR } from './paths.mjs';
+
+// 入力と出力はルートからの相対パスなので、カレントをルートへ移してから使う
+process.chdir(ROOT_DIR);
 
 /** 抜き出す図形。左がコード側の名前、右が Material Symbols のファイル名。 */
 const ICON_SOURCES = {
@@ -217,6 +221,55 @@ async function readBrandVersion() {
 	}
 }
 
+/** 名前で引く表の定数名。図形ごとの定数名と重なってはいけない。 */
+const TABLE_NAME = 'ICON_SHAPES';
+
+/** 図形ごとの定数名の頭。 */
+const SHAPE_CONSTANT_PREFIX = 'ICON_';
+
+/**
+ * esbuild などに「呼び出しに副作用が無い」と伝える注記。
+ * 使われない図形の定数を束から落とせるよう、凍らせる呼び出しの前に付ける。
+ */
+const PURE_ANNOTATION = '/* @__PURE__ */';
+
+/**
+ * 図形の名前 (camelCase) を定数名にする。
+ * @param {string} name 図形の名前 ("chevronLeft" など)
+ * @returns {string} 定数名 ("ICON_CHEVRON_LEFT" など)
+ */
+function constantName(name) {
+	return SHAPE_CONSTANT_PREFIX + name.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toUpperCase();
+}
+
+/**
+ * 図形ごとの定数と、名前で引く表の書き出しを組む。
+ * 図形を 1 つずつ別の定数にするので、使う図形だけを名前つきで import した束には残りの図形が入らない。
+ * @param {Record<string, object>} shapes 名前ごとの図形
+ * @returns {string} 生成物の本体
+ * @throws {Error} 定数名が重なるとき (表の名前とも、図形どうしでも)
+ */
+function shapeExports(shapes) {
+	const names = Object.keys(shapes);
+	const constants = names.map(constantName);
+	const seen = new Set([TABLE_NAME]);
+	for (const [index, constant] of constants.entries()) {
+		if (seen.has(constant)) throw new Error(`図形 ${names[index]} の定数名 ${constant} が重なっています`);
+		seen.add(constant);
+	}
+	const declarations = names.map((name, index) => [
+		`/** ${name} の図形。 */`,
+		`export const ${constants[index]} = ${PURE_ANNOTATION} deepFreeze(${JSON.stringify(shapes[name], null, '\t')});`,
+	].join('\n'));
+	const table = [
+		'/** 名前 (createIcon に渡すキー) から図形を引く表。 */',
+		`export const ${TABLE_NAME} = ${PURE_ANNOTATION} Object.freeze({`,
+		...names.map((name, index) => `\t${name}: ${constants[index]},`),
+		'});',
+	].join('\n');
+	return `${declarations.join('\n\n')}\n\n${table}\n`;
+}
+
 /**
  * icon-shapes.js を生成する。
  * @returns {Promise<number>} 生成した図形の数
@@ -227,7 +280,7 @@ async function build() {
 		await loadShapes(BRAND_SOURCES, BRAND_SOURCE_DIR),
 		loadCustomShapes(),
 	]);
-	const source = `${header(await readBrandVersion())}\n${DEEP_FREEZE_SOURCE}\nexport const ICON_SHAPES = deepFreeze(${JSON.stringify(shapes, null, '\t')});\n`;
+	const source = `${header(await readBrandVersion())}\n${DEEP_FREEZE_SOURCE}\n${shapeExports(shapes)}`;
 	await writeFile(OUTPUT_PATH, source.replace(/\r?\n/g, OUTPUT_EOL), 'utf8');
 	return Object.keys(shapes).length;
 }

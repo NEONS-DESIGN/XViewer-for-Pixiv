@@ -10,6 +10,7 @@
 import { canView } from '../../pixiv/normalize.js';
 import { VIEWING_SETTINGS_URL } from '../../pixiv/endpoints.js';
 import { assignImageSrc } from '../../common/image-source.js';
+import { el, externalLink } from './dom.js';
 
 /** ブロックの種別。 */
 export const BLOCK_KINDS = Object.freeze({
@@ -59,8 +60,7 @@ export function createBlocked(deps) {
 	 */
 	function createBackdrop(mini) {
 		// 48x48 を引き伸ばしてぼかす。元が極小なので拡大しても中身は読み取れない
-		const backdrop = doc.createElement('img');
-		backdrop.className = 'blocked-backdrop';
+		const backdrop = el(doc, 'img', 'blocked-backdrop');
 		assignImageSrc(backdrop, mini);
 		backdrop.alt = '';
 		backdrop.addEventListener('error', () => { backdrop.remove(); });
@@ -76,37 +76,22 @@ export function createBlocked(deps) {
 		 * @returns {void}
 		 */
 		render(detail, reason) {
-			const blocked = doc.createElement('div');
-			blocked.className = 'blocked';
+			const blocked = el(doc, 'div', 'blocked');
 			root = blocked;
 
 			// 未ログインでは urls が全て null。無いときに img を作ると src='' の失敗が 1 往復増えるだけ
 			const mini = detail.urls?.mini;
 			if (mini) blocked.appendChild(createBackdrop(mini));
 
-			const panel = doc.createElement('div');
-			panel.className = 'blocked-panel';
-
-			const message = doc.createElement('p');
-			message.className = 'blocked-message';
-			message.textContent = reason.kind === BLOCK_KINDS.LOGIN
+			const panel = el(doc, 'div', 'blocked-panel');
+			panel.appendChild(el(doc, 'p', 'blocked-message', reason.kind === BLOCK_KINDS.LOGIN
 				? strings.blocked.LOGIN_REQUIRED
-				: strings.blocked.HIDDEN_BY_SETTING;
-			panel.appendChild(message);
+				: strings.blocked.HIDDEN_BY_SETTING));
 
 			if (reason.kind === BLOCK_KINDS.SETTING) {
-				const link = doc.createElement('a');
-				link.className = 'blocked-link';
-				link.href = VIEWING_SETTINGS_URL;
-				link.target = '_blank';
-				link.rel = 'noopener noreferrer';
+				const link = panel.appendChild(externalLink(doc, VIEWING_SETTINGS_URL, 'blocked-link'));
 				link.textContent = strings.blocked.CHANGE_SETTING;
-				panel.appendChild(link);
-
-				const note = doc.createElement('p');
-				note.className = 'blocked-note';
-				note.textContent = strings.blocked.RELOAD_AFTER_CHANGE;
-				panel.appendChild(note);
+				panel.appendChild(el(doc, 'p', 'blocked-note', strings.blocked.RELOAD_AFTER_CHANGE));
 			}
 
 			blocked.appendChild(panel);

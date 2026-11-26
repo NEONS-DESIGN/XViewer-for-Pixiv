@@ -5,12 +5,12 @@
  * 保存ボタンは作らず、変更のたびに保存する。
  * 見た目の反映は保存の完了を待たない。
  */
-import { createIcon } from '../common/icons.js';
+import { createIcon } from './icons.js';
 import { supportsRichOptions } from '../common/rich-select.js';
 import { renderTabs } from '../common/tabs.js';
 import { renderConfirmRow } from '../common/confirm-row.js';
 import { POPUP_THEMES, THEME_TOGGLE, SETTINGS_DEFAULTS } from '../common/constants.js';
-import { createDescription } from './description.js';
+import { createDescription, toggleToken } from './description.js';
 import { renderLicensePanel, renderBriefDisclaimer } from './license-panel.js';
 import { TITLE, createTabs, createResetField, createSections, createAdvancedSections } from './sections.js';
 import { attachFieldLock, isRequirementMet } from './field-lock.js';
@@ -112,6 +112,7 @@ function renderHeader(doc, initial, onChange, strings) {
  * @property {object} state 今の設定。変更のたびに更新し、子の項目の非活性の判定に使う
  * @property {(patch: object) => void} onChange 設定を変えたときの処理 (state の更新と非活性の判定を含む)
  * @property {boolean} rich 選択肢の中に説明を入れられるか (appearance: base-select の対応)
+ * @property {{setTimeout?: Function, clearTimeout?: Function}} timers タイマの差し替え (attachFieldLock へ渡す)
  * @property {Array<{requires: readonly object[], lock: {setLocked: (locked: boolean, message?: string) => void}}>} locks 親の条件を持つ項目の一覧
  */
 
@@ -124,7 +125,7 @@ function renderHeader(doc, initial, onChange, strings) {
  */
 function lockIfDependent(ctx, requires, target) {
 	if (!requires?.length) return null;
-	const lock = attachFieldLock(ctx.doc, target);
+	const lock = attachFieldLock(ctx.doc, { ...target, timers: ctx.timers });
 	ctx.locks.push({ requires, lock });
 	return lock;
 }
@@ -316,8 +317,7 @@ function renderRange(ctx, field, requires) {
 		output.classList.toggle('is-warning', warn);
 		warning.hidden = !warn;
 		warningText.textContent = warn ? field.warning : '';
-		if (warn) input.setAttribute('aria-describedby', warningId);
-		else input.removeAttribute('aria-describedby');
+		toggleToken(input, 'aria-describedby', warningId, warn);
 	}
 
 	head.append(label, output);
@@ -510,9 +510,10 @@ function renderAdvancedPanel(ctx, strings) {
  * @param {() => void} deps.onReset 初期化を確定したときの処理
  * @param {string|null} [deps.notice] 画面の先頭に出す一言 (保存の失敗など)
  * @param {string|null} [deps.initialTab] 最初に開くタブの id。描き直しで現在地を保つために渡す
+ * @param {{setTimeout?: Function, clearTimeout?: Function}} [deps.timers] タイマの差し替え (非活性の項目の警告を消す計時)
  * @returns {{currentTab: () => string}} 今開いているタブの id を返す関数
  */
-export function renderPopup({ doc, root, settings, strings, onChange, onReset, notice = null, initialTab = null }) {
+export function renderPopup({ doc, root, settings, strings, onChange, onReset, notice = null, initialTab = null, timers = {} }) {
 	const theme = resolveTheme(settings.popupTheme, doc.defaultView);
 	applyTheme(doc, theme);
 
@@ -534,6 +535,7 @@ export function renderPopup({ doc, root, settings, strings, onChange, onReset, n
 		doc,
 		state: { ...settings },
 		rich: supportsRichOptions(doc.defaultView),
+		timers,
 		locks: [],
 		onChange: (patch) => {
 			Object.assign(ctx.state, patch);

@@ -108,8 +108,8 @@ test('commentToNodes はリンクを新しいタブで開き、opener を渡さ�
 	assert.deepEqual(fragment.children.map((node) => node.tag), ['#text', 'a', 'br', '#text']);
 	const anchor = fragment.children[1];
 	assert.equal(anchor.href, 'https://example.com/x');
-	assert.equal(anchor.target, '_blank');
-	assert.equal(anchor.rel, 'noopener noreferrer');
+	assert.equal(anchor.getAttribute('target'), '_blank');
+	assert.equal(anchor.getAttribute('rel'), 'noopener noreferrer');
 	assert.equal(anchor.textContent, 'ここ');
 	assert.equal(fragment.children[3].textContent, '2行目');
 });

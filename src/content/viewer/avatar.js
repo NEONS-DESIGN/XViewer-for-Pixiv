@@ -7,6 +7,7 @@
  */
 import { safeCdnUrl } from '../../pixiv/endpoints.js';
 import { assignImageSrc } from '../../common/image-source.js';
+import { el } from './dom.js';
 
 /** 画像がまだ無い (取得前・失敗) ことを表すクラス。viewer.css が枠だけを残す。 */
 export const AVATAR_PENDING_CLASS = 'is-pending';
@@ -19,8 +20,7 @@ export const AVATAR_PENDING_CLASS = 'is-pending';
  * @returns {HTMLImageElement} img
  */
 export function createAvatar(doc, className, options = {}) {
-	const avatar = doc.createElement('img');
-	avatar.className = className;
+	const avatar = el(doc, 'img', className);
 	if (options.lazy) {
 		avatar.setAttribute('loading', 'lazy');
 		avatar.setAttribute('decoding', 'async');

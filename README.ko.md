@@ -243,6 +243,7 @@ GitHub를 사용하신다면 [Issues](https://github.com/NEONS-DESIGN/XViewer-fo
 | `npm run build:icons` | 확장 프로그램 아이콘 PNG를 생성한다 (생성물은 커밋되어 있음) |
 | `npm run build:symbols` | UI 아이콘의 도형 데이터를 다시 생성한다 (생성물은 커밋되어 있음) |
 | `npm run build:site-images` | 소개 사이트의 이미지 (WebP와 OGP용 JPEG)를 내보낸다 (생성물은 커밋되어 있음. 원본 PNG 소재는 저장소에 포함되지 않으므로 로컬에서는 작동하지 않는다) |
+| `npm run build:site-langs` | 소개 사이트 모든 페이지의 언어 목록 (hreflang·언어 메뉴·푸터)과 `sitemap.xml`을 다시 쓴다 |
 | `npm run build:screenshots` | Chrome 웹 스토어용 스크린숏을 만든다 (바탕이 되는 캡처는 저장소에 포함되지 않으므로 로컬에서는 작동하지 않는다) |
 | `npm run pack:crx -- --key <비밀 키>` | 스토어에 올릴 서명된 CRX를 만든다 (Chrome 웹 스토어의 ‘검증된 CRX 업로드’용. 서명용 비밀 키는 제작자만 가지고 있다) |
 

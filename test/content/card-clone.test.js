@@ -258,13 +258,29 @@ test('単枚の作品はバッジを外す', () => {
 	assert.equal(card.querySelector('span'), null);
 });
 
-test('single にバッジ付きの雛形が渡されても単枚の作品はバッジを外す', () => {
-	// captureTemplates が返す single は常にバッジ無しなので、上のテストだけでは
-	// buildCard 自身のバッジ除去 (badge && !wantsBadge) を一度も通らない。
-	// buildCard は templates を引数で受け取る公開関数なので、この入力も契約上ありえる
-	const templates = { single: makeCard({ id: '1', pages: 2 }), multi: null };
+test('captureTemplates は雛形の作品に紐づく印 (ラベルと tab-skip の印) を雛形の時点で落とす', () => {
+	// どの作品のカードでも中身が同じなので、カード 1 枚ごとに落とさず雛形で 1 回だけ落とす
+	const templates = capture([
+		makeCard({ id: '1', label: 'R-18', tabSkipped: true }),
+		makeCard({ id: '2', pages: 3, label: '非公開', tabSkipped: true }),
+	]);
+	for (const [name, template] of Object.entries(templates)) {
+		assert.deepEqual(findOverlayLabels(template), [], `${name} にラベルが残っている`);
+		assert.equal(template.querySelectorAll(`[${TAB_SKIP_MARK_ATTR}]`).length, 0, `${name} に tabindex の印が残っている`);
+		assert.equal(template.querySelectorAll(`[${TAB_SKIP_LABEL_ATTR}]`).length, 0, `${name} に aria-label の印が残っている`);
+	}
+	// バッジは multi にだけ残る
+	assert.equal(findBadge(templates.single), null);
+	assert.equal(badgeCount(findBadge(templates.multi)), '3');
+});
+
+test('全作品が複数枚の作者では、multi から作った single もバッジとラベルを持たない', () => {
+	const templates = capture([makeCard({ id: '1', pages: 2, label: 'R-18' })]);
+	assert.equal(findBadge(templates.single), null);
+	assert.deepEqual(findOverlayLabels(templates.single), []);
 	const card = buildCard(templates, work({ pageCount: 1 }), { loggedIn: true });
 	assert.equal(card.querySelector('span'), null);
+	assert.equal(card.textContent.includes('R-18'), false);
 });
 
 test('ブックマーク済みならハートを ff4060 にする', () => {

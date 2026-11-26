@@ -1,5 +1,5 @@
 /**
- * フォーカスの所在を調べる小物。
+ * フォーカスの所在と、要素が描画されているかを調べる小物。
  *
  * ビュワーは Shadow DOM の中にいるので `document.activeElement` はホスト要素を返す。
  * 「どこにフォーカスがあるか」は必ず**その要素の属する木** (`getRootNode()`) から引く。
@@ -39,4 +39,16 @@ export function hasFocusWithin(doc, el) {
 	const active = activeElementIn(doc, el);
 	if (active === null) return false;
 	return active === el || (typeof el.contains === 'function' && el.contains(active));
+}
+
+/**
+ * 要素が描画されているか。display: none の祖先の下では false。
+ * display: none の要素には focus() が無言で効かず、位置も測れない。
+ * 測る口が無い相手 (テスト用の DOM) は描画されているものとして扱う。
+ * @param {Element} el 調べる要素
+ * @returns {boolean} 描画されていれば true
+ */
+export function isRendered(el) {
+	if (typeof el.getClientRects !== 'function') return true;
+	return el.getClientRects().length > 0;
 }

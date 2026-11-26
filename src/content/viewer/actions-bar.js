@@ -27,42 +27,13 @@ import { STATUS_KINDS } from '../../common/constants.js';
 import { createIcon } from '../../common/icons.js';
 import { formatCount } from '../../common/format.js';
 import { warn } from '../../common/log.js';
-import { readSession, clearSessionCache } from '../session.js';
+import { readSession, markSessionExpired } from '../session.js';
+import { el, btn } from './dom.js';
 import { isFocused } from './focus.js';
 import { fetchUserProfile, patchUserProfile } from '../../pixiv/user.js';
 import { isOwnWork } from '../../pixiv/normalize.js';
 import { PIXIV_ERROR_KINDS } from '../../pixiv/errors.js';
 import { likeIllust, addBookmark, deleteBookmark, followUser, unfollowUser } from '../../pixiv/actions.js';
-
-/**
- * ブックマークのボタンの読み上げ名。
- * @param {string|null} bookmarkId 入っていればその id
- * @param {object} strings 文言のカタログ
- * @returns {string} 押すと何が起きるか
- */
-export function bookmarkLabel(bookmarkId, strings) {
-	return strings.actionsBar.bookmarkLabel(Boolean(bookmarkId));
-}
-
-/**
- * いいねのボタンの読み上げ名。
- * @param {boolean} liked 済みなら true
- * @param {object} strings 文言のカタログ
- * @returns {string} 状態か、押すと何が起きるか
- */
-export function likeLabel(liked, strings) {
-	return strings.actionsBar.likeLabel(liked);
-}
-
-/**
- * フォローのボタンの読み上げ名。
- * @param {boolean} following フォロー中なら true
- * @param {object} strings 文言のカタログ
- * @returns {string} 状態
- */
-export function followLabel(following, strings) {
-	return strings.actionsBar.followLabel(following);
-}
 
 /**
  * カウンタの読み上げ名。
@@ -126,7 +97,7 @@ export function createActionsBar(deps) {
 	/**
 	 * 更新系の失敗を伝える。
 	 * 401 はログインが切れている。(別タブでログアウトした等)
-	 * 覚えているセッションを捨て、通信失敗とは別の文言で知らせる。
+	 * ログインが切れた印を付け、通信失敗とは別の文言で知らせる。
 	 * __NEXT_DATA__ は初期 HTML のもので SPA 遷移では更新されず、
 	 * ログインし直しただけでは新しい CSRF トークンを読めない。文言で再読み込みまで案内する
 	 * @param {string} message 通常の失敗文言
@@ -136,7 +107,7 @@ export function createActionsBar(deps) {
 	 */
 	function announceFailure(message, error, logLabel) {
 		if (error?.kind === PIXIV_ERROR_KINDS.UNAUTHORIZED) {
-			clearSessionCache();
+			markSessionExpired();
 			announce(strings.actionsBar.messages.SESSION_EXPIRED, STATUS_KINDS.ERROR);
 		} else {
 			announce(message, STATUS_KINDS.ERROR);
@@ -147,20 +118,16 @@ export function createActionsBar(deps) {
 	/**
 	 * 文言付きのボタンを作る。
 	 * 文言が見えているので aria-label は付けない。(可視テキストと重複して二度読まれる)
+	 * @param {string} className クラス
 	 * @param {string} iconName アイコン名
 	 * @param {string} label ラベル
 	 * @param {(event: MouseEvent) => void} onClick 押されたとき
 	 * @returns {HTMLButtonElement} ボタン
 	 */
-	function createButton(iconName, label, onClick) {
-		const button = doc.createElement('button');
-		button.type = 'button';
-		button.className = 'action';
+	function createButton(className, iconName, label, onClick) {
+		const button = btn(doc, className);
 		button.title = label;
-		button.appendChild(createIcon(doc, iconName));
-		const text = doc.createElement('span');
-		text.textContent = label;
-		button.appendChild(text);
+		button.append(createIcon(doc, iconName), el(doc, 'span', '', label));
 		button.addEventListener('click', onClick);
 		return button;
 	}
@@ -198,11 +165,8 @@ export function createActionsBar(deps) {
 	function upgradeCount(marker, iconName, onClick) {
 		const item = container.querySelector(`.${marker}`);
 		if (!item) return null;
-		const button = doc.createElement('button');
-		button.type = 'button';
-		button.className = `count count-action ${marker}`;
-		button.appendChild(createIcon(doc, iconName));
-		button.appendChild(doc.createElement('span'));
+		const button = btn(doc, `count count-action ${marker}`);
+		button.append(createIcon(doc, iconName), el(doc, 'span'));
 		button.addEventListener('click', onClick);
 		container.replaceChild(button, item);
 		return button;
@@ -234,7 +198,7 @@ export function createActionsBar(deps) {
 	 * @returns {void}
 	 */
 	function describeBookmark(button, bookmarkId, count) {
-		describeCount(button, bookmarkLabel(bookmarkId, strings), count, bookmarkId ? undefined : strings.actionsBar.BOOKMARK_PRIVATE_HINT);
+		describeCount(button, strings.actionsBar.bookmarkLabel(Boolean(bookmarkId)), count, bookmarkId ? undefined : strings.actionsBar.BOOKMARK_PRIVATE_HINT);
 	}
 
 	/**
@@ -245,7 +209,7 @@ export function createActionsBar(deps) {
 	 * @returns {void}
 	 */
 	function applyFollowState(button, following) {
-		relabel(button, followLabel(following, strings));
+		relabel(button, strings.actionsBar.followLabel(following));
 		reicon(button, following ? 'personCheck' : 'personAdd');
 		button.classList.toggle('is-on', following);
 	}
@@ -269,7 +233,7 @@ export function createActionsBar(deps) {
 	function renderFollow(detail) {
 		let following = false;
 
-		const button = createButton('personAdd', followLabel(false, strings), async () => {
+		const button = createButton('action action-follow', 'personAdd', strings.actionsBar.followLabel(false), async () => {
 			// disabled にするとブラウザがフォーカスを外すので、持っていたかを先に見る
 			const hadFocus = isFocused(doc, button);
 			button.disabled = true;
@@ -294,7 +258,6 @@ export function createActionsBar(deps) {
 				if (hadFocus && !disposed) button.focus();
 			}
 		});
-		button.className = 'action action-follow';
 		button.disabled = true;
 		button.setAttribute('aria-busy', 'true');
 		followContainer.appendChild(button);
@@ -327,10 +290,7 @@ export function createActionsBar(deps) {
 			// 未ログインでは更新系が使えない。カウンタは押せない表示のまま残すので件数は読める。
 			// 押せるものが無いので、結果を読み上げる領域も要らない
 			if (!session.isLoggedIn || !session.csrfToken) {
-				const notice = doc.createElement('p');
-				notice.className = 'status';
-				notice.textContent = strings.actionsBar.messages.LOGIN_TO_ACT;
-				container.appendChild(notice);
+				container.appendChild(el(doc, 'p', 'status', strings.actionsBar.messages.LOGIN_TO_ACT));
 				return;
 			}
 
@@ -340,8 +300,7 @@ export function createActionsBar(deps) {
 			// なぜ押せないかは画面から分かる (案内の文言は足さない)
 			if (isOwnWork(detail, session.self)) return;
 
-			statusLine = doc.createElement('p');
-			statusLine.className = 'action-status';
+			statusLine = el(doc, 'p', 'action-status');
 			// 押した結果を読み上げさせる。alert ではないので操作を邪魔しない
 			statusLine.setAttribute('role', 'status');
 
@@ -364,7 +323,7 @@ export function createActionsBar(deps) {
 					liked = true;
 					if (alreadyLiked !== true) likeCount += 1;
 					likeButton.classList.add('is-on');
-					describeCount(likeButton, likeLabel(true, strings), likeCount);
+					describeCount(likeButton, strings.actionsBar.likeLabel(true), likeCount);
 					announce(alreadyLiked === true ? strings.actionsBar.messages.ALREADY_LIKED : strings.actionsBar.messages.LIKED);
 					// いいねのボタンは押せないまま残り、フォーカスを置けない。隣のブックマークへ移す
 					if (hadFocus && bookmarkButton && !bookmarkButton.disabled) bookmarkButton.focus();
@@ -375,7 +334,7 @@ export function createActionsBar(deps) {
 					announceFailure(strings.actionsBar.messages.LIKE_FAILED, error, 'like failed');
 				}
 			});
-			describeCount(likeButton, likeLabel(liked, strings), likeCount);
+			describeCount(likeButton, strings.actionsBar.likeLabel(liked), likeCount);
 			if (likeButton) {
 				// いいねは取り消せない。済みなら押させない
 				likeButton.disabled = liked;

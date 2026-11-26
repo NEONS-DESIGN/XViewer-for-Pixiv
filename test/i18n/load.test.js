@@ -3,13 +3,24 @@ import assert from 'node:assert/strict';
 import { loadStrings } from '../../src/i18n/load.js';
 import { createStrings } from '../../src/i18n/index.js';
 import { SUPPORTED_LANGUAGES } from '../../src/common/language.js';
+import { createPopupStrings } from '../helpers/popup.js';
 
-test('loadStrings はすべての対応言語で createStrings と同じカタログを返す', async () => {
+test('loadStrings はすべての対応言語で設定画面の節のカタログを返す', async () => {
 	// 入れ子と書式の関数まで比べる。(同じモジュールを読むので関数は同じ参照になる)
 	for (const lang of SUPPORTED_LANGUAGES) {
 		const loaded = await loadStrings(lang);
 		assert.equal(loaded.lang, lang);
-		assert.deepEqual(loaded, createStrings(lang));
+		assert.deepEqual(loaded, createPopupStrings(lang));
+	}
+});
+
+test('loadStrings のカタログはビュワー側の節を持たない', async () => {
+	// 設定画面はビュワー側の節を使わないので、その断片を読まない
+	for (const lang of SUPPORTED_LANGUAGES) {
+		const loaded = await loadStrings(lang);
+		for (const key of Object.keys(createStrings(lang))) {
+			if (key !== 'lang') assert.equal(Object.hasOwn(loaded, key), false, `${lang}: ${key}`);
+		}
 	}
 });
 

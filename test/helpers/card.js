@@ -11,6 +11,20 @@
  */
 import { TAB_SKIP_MARK_ATTR, TAB_SKIP_LABEL_ATTR } from '../../src/common/constants.js';
 
+/** 本物の Node.nodeType の値。'#document' / '#fragment' のタグはそれぞれの種類を名乗り、他は要素を名乗る */
+const NODE_TYPES = Object.freeze({ ELEMENT: 1, DOCUMENT: 9, FRAGMENT: 11 });
+
+/**
+ * タグ名から nodeType を決める。
+ * @param {string} tag タグ名
+ * @returns {number} nodeType
+ */
+function nodeTypeOf(tag) {
+	if (tag === '#document') return NODE_TYPES.DOCUMENT;
+	if (tag === '#fragment') return NODE_TYPES.FRAGMENT;
+	return NODE_TYPES.ELEMENT;
+}
+
 /**
  * 要素の代わりを作る。cloneNode と closest を持つ。
  * @param {string} tag タグ名 (小文字)
@@ -24,6 +38,7 @@ export function el(tag, attrs = {}) {
 	const node = {
 		tag,
 		tagName: tag.toUpperCase(),
+		nodeType: nodeTypeOf(tag),
 		children: [],
 		parent: null,
 		attributes: { ...attrs },
@@ -182,16 +197,83 @@ function descendants(root) {
  * タグ名と属性だけを見る簡易セレクタ。
  * 'a[href^="/artworks/"]' / '[data-ga4-label="bookmark_button"]' / 'li' / 'img' を解する。
  * カンマ区切りの並びも解する。(ARTWORK_LINK_SELECTOR は表示言語の接頭辞ごとに 1 本ずつ並ぶ)
+ * 子孫結合子 ('li a[href^="/artworks/"]') と、末尾の :not(セレクタ) も解する。(:not の中も子孫結合子を使える)
+ * 解せないセレクタは合わない (false) 扱いにする。
  * @param {object} node 要素
  * @param {string} selector セレクタ
  * @returns {boolean} 合えば true
  */
 function matches(node, selector) {
-	return selector.split(',').some((one) => matchesOne(node, one));
+	return splitTopLevel(selector, ',').some((one) => matchesComplex(node, one.trim()));
+}
+
+/** 子孫結合子として扱う空白。 */
+const WHITESPACE = /\s/;
+
+/** 複合セレクタの末尾に付いた :not(...) 1 つ。 */
+const TRAILING_NOT = /^(.*):not\((.*)\)$/;
+
+/**
+ * 括弧と引用符の外にある区切りで文字列を割る。
+ * @param {string} text 割る文字列
+ * @param {string} separator 区切り文字。' ' なら空白の並びを 1 つの区切りとして扱う
+ * @returns {string[]} 割った断片 (空の断片は落とす)
+ */
+function splitTopLevel(text, separator) {
+	const parts = [];
+	let depth = 0;
+	let quoted = false;
+	let current = '';
+	for (const char of text) {
+		if (char === '"') quoted = !quoted;
+		else if (!quoted && (char === '(' || char === '[')) depth += 1;
+		else if (!quoted && (char === ')' || char === ']')) depth -= 1;
+		const isSeparator = separator === ' ' ? WHITESPACE.test(char) : char === separator;
+		if (isSeparator && depth === 0 && !quoted) {
+			parts.push(current);
+			current = '';
+			continue;
+		}
+		current += char;
+	}
+	parts.push(current);
+	return parts.filter((part) => part.trim() !== '');
 }
 
 /**
- * カンマを含まないセレクタ 1 本に合うか。
+ * 子孫結合子でつないだセレクタ 1 本に合うか。末尾の複合セレクタが node に、それより前が祖先に合えばよい。
+ * @param {object} node 要素
+ * @param {string} selector カンマを含まないセレクタ
+ * @returns {boolean} 合えば true
+ */
+function matchesComplex(node, selector) {
+	const compounds = splitTopLevel(selector, ' ');
+	if (compounds.length === 0 || !matchesCompound(node, compounds.at(-1))) return false;
+	let index = compounds.length - 2;
+	for (let current = node.parent; current && index >= 0; current = current.parent) {
+		if (matchesCompound(current, compounds[index])) index -= 1;
+	}
+	return index < 0;
+}
+
+/**
+ * 複合セレクタ 1 つ (タグ・属性 1 つと、末尾の :not(...) の並び) に合うか。
+ * @param {object} node 要素
+ * @param {string} compound 複合セレクタ
+ * @returns {boolean} 合えば true
+ */
+function matchesCompound(node, compound) {
+	const negations = [];
+	let base = compound;
+	for (let parsed = TRAILING_NOT.exec(base); parsed; parsed = TRAILING_NOT.exec(base)) {
+		base = parsed[1];
+		negations.push(parsed[2]);
+	}
+	return matchesOne(node, base) && negations.every((inner) => !matches(node, inner));
+}
+
+/**
+ * タグと属性 1 つだけの単純なセレクタに合うか。
  * @param {object} node 要素
  * @param {string} selector セレクタ
  * @returns {boolean} 合えば true

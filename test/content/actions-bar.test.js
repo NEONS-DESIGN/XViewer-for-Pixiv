@@ -1,12 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-	bookmarkLabel,
-	likeLabel,
-	followLabel,
-	countLabel,
-	createActionsBar,
-} from '../../src/content/viewer/actions-bar.js';
+import { countLabel, createActionsBar } from '../../src/content/viewer/actions-bar.js';
 import { clearSessionCache } from '../../src/content/session.js';
 import { PixivError, PIXIV_ERROR_KINDS } from '../../src/pixiv/errors.js';
 import { createStrings } from '../../src/i18n/index.js';
@@ -20,19 +14,19 @@ const STRINGS = createStrings('ja');
 const BOOKMARK_PRIVATE_HINT = STRINGS.actionsBar.BOOKMARK_PRIVATE_HINT;
 
 test('ブックマークのラベルは状態で変わる', () => {
-	assert.equal(bookmarkLabel(null, STRINGS), 'ブックマークに追加');
-	assert.equal(bookmarkLabel('38764402172', STRINGS), 'ブックマークから削除');
+	assert.equal(STRINGS.actionsBar.bookmarkLabel(false), 'ブックマークに追加');
+	assert.equal(STRINGS.actionsBar.bookmarkLabel(true), 'ブックマークから削除');
 });
 
 test('いいねのラベルは取り消せないことを明記する', () => {
 	// pixiv の仕様上いいねは解除できない。押す前に分かるようにしておく
-	assert.equal(likeLabel(false, STRINGS), 'いいね (取り消せません)');
-	assert.equal(likeLabel(true, STRINGS), 'いいね済み');
+	assert.equal(STRINGS.actionsBar.likeLabel(false), 'いいね (取り消せません)');
+	assert.equal(STRINGS.actionsBar.likeLabel(true), 'いいね済み');
 });
 
 test('フォローのラベルは状態で変わる', () => {
-	assert.equal(followLabel(false, STRINGS), 'フォロー');
-	assert.equal(followLabel(true, STRINGS), 'フォロー中');
+	assert.equal(STRINGS.actionsBar.followLabel(false), 'フォロー');
+	assert.equal(STRINGS.actionsBar.followLabel(true), 'フォロー中');
 });
 
 test('押せるカウンタの文言は操作の説明と件数を両方持つ', () => {
@@ -43,11 +37,11 @@ test('押せるカウンタの文言は操作の説明と件数を両方持つ',
 
 test('ラベル関数は英語のカタログで英語を返す', () => {
 	const en = createStrings('en');
-	assert.equal(bookmarkLabel('123', en), 'Remove bookmark');
-	assert.equal(bookmarkLabel(null, en), 'Add bookmark');
-	assert.equal(likeLabel(true, en), 'Liked');
-	assert.equal(likeLabel(false, en), 'Like (cannot be undone)');
-	assert.equal(followLabel(true, en), 'Following');
+	assert.equal(en.actionsBar.bookmarkLabel(true), 'Remove bookmark');
+	assert.equal(en.actionsBar.bookmarkLabel(false), 'Add bookmark');
+	assert.equal(en.actionsBar.likeLabel(true), 'Liked');
+	assert.equal(en.actionsBar.likeLabel(false), 'Like (cannot be undone)');
+	assert.equal(en.actionsBar.followLabel(true), 'Following');
 });
 
 test('countLabel は英語では助数詞を付けない', () => {

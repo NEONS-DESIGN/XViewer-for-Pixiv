@@ -1,6 +1,9 @@
 /**
  * アイコンを DOM へ起こす役。図形データは icon-shapes.js が持つ。
  * アイコンは常に装飾で、意味は親のテキストか aria-label が持つ。
+ *
+ * 名前で引く createIcon は図形の表 (ICON_SHAPES) ごと束に入る。
+ * 使う図形が少ない束 (popup) は、図形を名前つきで import して createIconFromShape へ渡す。
  */
 import { ICON_SHAPES } from './icon-shapes.js';
 import { warn } from './log.js';
@@ -12,17 +15,28 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const EMPTY_VIEW_BOX = '0 0 24 24';
 
 /**
- * アイコンの svg 要素を作る。
- * viewBox は図形ごとの値をそのまま使う。(Material Symbols は 0 -960 960 960)
- * 返す svg は寸法を持たない。大きさは使う側の CSS が決める約束。
- * 中身は innerHTML を使わず createElementNS で組み立てる。
- * (innerHTML はホストページが Trusted Types を強制すると例外になり、アイコンが空になる)
+ * アイコンの svg 要素を名前から作る。
  * @param {Document} doc 対象のドキュメント
  * @param {string} name ICON_SHAPES のキー
  * @returns {SVGSVGElement} svg 要素。未知の名前なら中身が空の svg (warn で名前を残す)
  */
 export function createIcon(doc, name) {
-	const shape = ICON_SHAPES[name];
+	return createIconFromShape(doc, ICON_SHAPES[name], name);
+}
+
+/**
+ * アイコンの svg 要素を図形から作る。
+ * viewBox は図形ごとの値をそのまま使う。(Material Symbols は 0 -960 960 960)
+ * 返す svg は寸法を持たない。大きさは使う側の CSS が決める約束。
+ * 中身は innerHTML を使わず createElementNS で組み立てる。
+ * (innerHTML はホストページが Trusted Types を強制すると例外になり、アイコンが空になる)
+ * @param {Document} doc 対象のドキュメント
+ * @param {{viewBox: string, elements: ReadonlyArray<{tag: string, attrs: Record<string, string>}>}|undefined} shape
+ *   図形 (icon-shapes.js の ICON_* のどれか)。無ければ中身が空の svg
+ * @param {string} [name] 警告に残す名前
+ * @returns {SVGSVGElement} svg 要素。図形が無ければ中身が空の svg (warn で名前を残す)
+ */
+export function createIconFromShape(doc, shape, name) {
 	// 文字列参照のタイプミスに気づけるよう警告だけ出す。UI 構築は止めない
 	if (!shape) warn('知らないアイコン名です', name);
 	const svg = doc.createElementNS(SVG_NS, 'svg');

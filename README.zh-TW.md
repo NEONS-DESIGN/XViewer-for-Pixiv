@@ -243,6 +243,7 @@ npm run build
 | `npm run build:icons` | 產生擴充功能圖示的 PNG（產出物已提交） |
 | `npm run build:symbols` | 重新產生 UI 圖示的圖形資料（產出物已提交） |
 | `npm run build:site-images` | 輸出介紹網站的圖片（WebP 與 OGP 用的 JPEG）（產出物已提交。原始素材的 PNG 不包含在儲存庫中，因此無法在本機執行） |
+| `npm run build:site-langs` | 重新寫入介紹網站所有頁面的語言清單（hreflang、語言選單、頁尾）與 `sitemap.xml` |
 | `npm run build:screenshots` | 組合 Chrome 線上應用程式商店用的螢幕截圖（作為來源的擷取畫面不包含在儲存庫中，因此無法在本機執行） |
 | `npm run pack:crx -- --key <私密金鑰>` | 產生要上傳到商店的已簽署 CRX（用於 Chrome 線上應用程式商店的「經過驗證的 CRX 上傳」。簽署用的私密金鑰只有作者持有） |
 

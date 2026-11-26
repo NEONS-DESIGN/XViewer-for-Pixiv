@@ -144,6 +144,21 @@ const META5 = Object.freeze({
 const ZIP5 = buildStoredZip(ENTRIES5);
 
 /**
+ * zip 全体を 1 チャンクで流す body を作る。応答ごとに作り直す。(body は 1 回しか読めない)
+ * @param {ArrayBuffer|Uint8Array} zip zip 全体
+ * @returns {ReadableStream<Uint8Array>} body
+ */
+function zipBody(zip) {
+	const chunk = zip instanceof Uint8Array ? zip : new Uint8Array(zip);
+	return new ReadableStream({
+		start(controller) {
+			controller.enqueue(chunk);
+			controller.close();
+		},
+	});
+}
+
+/**
  * 少しずつ流せる zip の応答を作る。
  * dispose で signal が abort されると、本物の fetch と同じく読み取りが AbortError で落ちる。
  * @param {Uint8Array} zip zip 全体
@@ -161,7 +176,7 @@ function streamedZip(zip) {
 			init.signal.addEventListener('abort', () => {
 				try { controller.error(new DOMException('aborted', 'AbortError')); } catch { /* 閉じた後 */ }
 			}, { once: true });
-			return { ok: true, status: 200, body, arrayBuffer: async () => { throw new Error('body を読むこと'); } };
+			return { ok: true, status: 200, body };
 		},
 		send(from, to) { controller.enqueue(new Uint8Array(zip.buffer, from, to - from)); },
 		close() { controller.close(); },
@@ -226,7 +241,7 @@ function build({ sizes = [10, 10, 10], fetchImpl, holdImages = false, holdTimers
 			return metaResponse(META3);
 		}
 		zipInits.push(init);
-		return { ok: true, status: 200, arrayBuffer: async () => ZIP3 };
+		return { ok: true, status: 200, body: zipBody(ZIP3) };
 	};
 	const player = createUgoiraPlayer({
 		doc,
@@ -323,7 +338,7 @@ test('meta を待つ間に dispose したら、meta が後から届いても zip
 	const fetchImpl = (url) => {
 		asked.push(url);
 		if (url.includes('ugoira_meta')) return new Promise((resolve) => { answer = () => resolve(metaResponse(META3)); });
-		return Promise.resolve({ ok: true, status: 200, arrayBuffer: async () => ZIP3 });
+		return Promise.resolve({ ok: true, status: 200, body: zipBody(ZIP3) });
 	};
 	const { container, player } = build({ fetchImpl });
 	const rendering = player.render(DETAIL);
@@ -665,7 +680,7 @@ test('同じ作品を開き直したら ugoira_meta を取り直さない', asyn
 	const fetchImpl = async (url) => {
 		asked.push(url);
 		if (url.includes('ugoira_meta')) return metaResponse(META3);
-		return { ok: true, status: 200, arrayBuffer: async () => ZIP3 };
+		return { ok: true, status: 200, body: zipBody(ZIP3) };
 	};
 	const first = build({ fetchImpl });
 	await first.player.render(DETAIL);
@@ -684,7 +699,7 @@ test('ugoira_meta の失敗は覚えず、開き直したら取り直す', async
 	const fetchImpl = async (url) => {
 		asked.push(url);
 		if (url.includes('ugoira_meta')) return failing ? { ok: false, status: 500, text: async () => '' } : metaResponse(META3);
-		return { ok: true, status: 200, arrayBuffer: async () => ZIP3 };
+		return { ok: true, status: 200, body: zipBody(ZIP3) };
 	};
 	const first = build({ fetchImpl });
 	await first.player.render(DETAIL);
@@ -769,17 +784,16 @@ test('次のコマが未着ならそのコマで待ち、届いたら進む', as
 	player.dispose();
 });
 
-test('response.body が無ければ全体を受け取ってから再生する', async () => {
-	let reads = 0;
+test('response.body が無ければ静止画のまま再生できないことを出す', async () => {
 	const fetchImpl = async (url) => {
 		if (url.includes('ugoira_meta')) return metaResponse(META3);
-		return { ok: true, status: 200, arrayBuffer: async () => { reads += 1; return ZIP3; } };
+		return { ok: true, status: 200, body: null };
 	};
 	const { container, player, images } = build({ fetchImpl });
 	await player.render(DETAIL);
-	assert.equal(reads, 1);
-	assert.equal(images.length, 3);
-	assert.equal(find(container, '.ugoira-canvas').hidden, false);
+	assert.equal(images.length, 0);
+	assert.equal(find(container, '.ugoira-canvas').hidden, true);
+	assert.equal(find(container, '.pane-error').textContent, 'うごイラを再生できませんでした');
 	player.dispose();
 });
 
@@ -801,7 +815,7 @@ function unreadableZip(entries) {
 }
 
 test('data descriptor の zip は取り直さず、受信をやめて再生できないことを出す', async () => {
-	// 2 つ目のエントリに bit 3。受信しながらは切り出せず、全体を受け取っても parseStoredZip では読めない
+	// 2 つ目のエントリに bit 3。受信しながらは切り出せない
 	const entries = ENTRIES5.slice(0, 3).map((entry, at) => ({ ...entry, flags: at === 1 ? 0x08 : 0 }));
 	const { fetchImpl, stream, zipInits, zip } = unreadableZip(entries);
 	const { container, player } = build({ fetchImpl });
@@ -839,7 +853,7 @@ test('JPEG なら alpha:false で getContext する', async () => {
 test('JPEG 以外は透過を残して getContext する', async () => {
 	const fetchImpl = async (url) => {
 		if (url.includes('ugoira_meta')) return metaResponse({ ...META3, mime_type: 'image/png' });
-		return { ok: true, status: 200, arrayBuffer: async () => ZIP3 };
+		return { ok: true, status: 200, body: zipBody(ZIP3) };
 	};
 	const { player, contextArgs, cleared, drawn } = build({ fetchImpl });
 	await player.render(DETAIL);
@@ -1000,14 +1014,43 @@ test('受信中に一時停止したら、コマが届いても止まったま�
 	player.dispose();
 });
 
-test('meta にコマが無ければ静止画のまま理由を出す', async () => {
+test('meta にコマが無ければ zip を取らず、静止画のまま理由を出す', async () => {
+	const asked = [];
 	const fetchImpl = async (url) => {
+		asked.push(url);
 		if (url.includes('ugoira_meta')) return metaResponse({ ...META3, frames: [] });
-		return { ok: true, status: 200, arrayBuffer: async () => ZIP3 };
+		return { ok: true, status: 200, body: zipBody(ZIP3) };
 	};
 	const { container, player, rafCallbacks } = build({ fetchImpl });
 	await player.render(DETAIL);
 	assert.equal(find(container, '.pane-error').textContent, 'うごイラを再生できませんでした');
 	assert.equal(rafCallbacks.length, 0);
+	assert.equal(asked.filter((url) => !url.includes('ugoira_meta')).length, 0, 'zip を取りに行かない');
+	player.dispose();
+});
+
+test('dispose で静止画の読み込みを取り消す', async () => {
+	const { container, player } = build();
+	const rendering = player.render(DETAIL);
+	const poster = find(container, '.ugoira-poster');
+	assert.equal(poster.src, DETAIL.urls.regular);
+	player.dispose();
+	assert.equal(poster.src, '');
+	await rendering;
+});
+
+test('1 コマだけのうごイラは、揃ったら描き直さず次のコマも予約しない', async () => {
+	const fetchImpl = async (url) => {
+		if (url.includes('ugoira_meta')) return metaResponse({ ...META3, frames: [META3.frames[0]] });
+		return { ok: true, status: 200, body: zipBody(ZIP3) };
+	};
+	const { player, images, drawn, rafCallbacks, timers } = build({ fetchImpl, holdTimers: true });
+	await player.render(DETAIL);
+	assert.deepEqual(drawn, [images[0]]);
+	assert.equal(rafCallbacks.length, 1);
+	rafCallbacks[0](1000);
+	assert.deepEqual(timers, [], '動かないので眠らない');
+	assert.equal(rafCallbacks.length, 1);
+	assert.deepEqual(drawn, [images[0]], '同じ絵を描き直さない');
 	player.dispose();
 });

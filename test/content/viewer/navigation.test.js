@@ -318,13 +318,11 @@ test('reset で並びと今の作品を捨てる', async () => {
 
 test('peek は最後に動いた向きの隣を返す。初めは次の向き', async () => {
 	const nav = openedNavigation(fakeDeps(), ['1', '2', '3'], '2');
-	assert.equal(nav.lastDirection(), 1);
 	assert.equal(nav.peek(), '3');
 	await nav.moveWork(-1);
 	// openWork の偽物は setCurrentWorkId を呼ばないので、viewer の代わりに記録する
 	nav.setCurrentWorkId('1');
-	assert.equal(nav.lastDirection(), -1);
-	// 1 より前は無い
+	// 前へ動いたので前の隣を見る。1 より前は無い (次の向きなら 2 が返る)
 	assert.equal(nav.peek(), null);
 });
 
@@ -341,15 +339,19 @@ test('peek は端で並びを広げない', () => {
 
 test('reset と setSequence で向きは次へ戻る', async () => {
 	const nav = openedNavigation(fakeDeps(), ['1', '2', '3'], '2');
+	// openWork の偽物は setCurrentWorkId を呼ばないので、今の作品は 2 のまま。peek の返す隣で向きを見る
 	await nav.moveWork(-1);
-	assert.equal(nav.lastDirection(), -1);
+	assert.equal(nav.peek(), '1');
 	nav.setSequence(fakeSequence(['1', '2', '3']));
-	assert.equal(nav.lastDirection(), 1);
-	nav.setCurrentWorkId('2');
+	assert.equal(nav.peek(), '3');
 	await nav.moveWork(-1);
+	assert.equal(nav.peek(), '1');
 	nav.reset();
-	assert.equal(nav.lastDirection(), 1);
 	assert.equal(nav.peek(), null);
+	// 開き直したら次の向きから
+	nav.setSequence(fakeSequence(['1', '2', '3']));
+	nav.setCurrentWorkId('2');
+	assert.equal(nav.peek(), '3');
 });
 
 test('canMove は隣がある向きだけ true を返す', () => {
@@ -405,11 +407,14 @@ test('moveToFirst は先頭へ移って true を返し、向きを次へ戻す',
 	const deps = fakeDeps();
 	const nav = openedNavigation(deps, ['1', '2', '3'], '3');
 	await nav.moveWork(-1);
-	assert.equal(nav.lastDirection(), -1);
+	// openWork の偽物は setCurrentWorkId を呼ばないので、今の作品は 3 のまま。前の向きなら 2 が隣
+	assert.equal(nav.peek(), '2');
 	assert.equal(await nav.moveToFirst(), true);
 	assert.deepEqual(deps.navigated, ['2', '1']);
 	assert.deepEqual(deps.opened, ['2', '1']);
-	assert.equal(nav.lastDirection(), 1);
+	nav.setCurrentWorkId('1');
+	// 次の向きに戻っているので 2 が隣。(前の向きなら null)
+	assert.equal(nav.peek(), '2');
 });
 
 test('moveToFirst は先頭にいれば false を返し、作品を開かない', async () => {

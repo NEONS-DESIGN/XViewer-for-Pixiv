@@ -8,9 +8,9 @@
 import { PIXIV_EMOJI } from '../../pixiv/emoji.js';
 import { emojiUrl, stampUrl } from '../../pixiv/endpoints.js';
 import { stampIds } from '../../pixiv/stamps.js';
+import { el, btn, fallbackImage } from './dom.js';
 import { activeElementIn, hasFocusWithin } from './focus.js';
 import { KEYS } from '../../common/constants.js';
-import { setImageSrcAttribute } from '../../common/image-source.js';
 
 /**
  * タブを移るキー。選ばれていないタブは Tab の巡回から外してあるので、
@@ -86,20 +86,11 @@ export function createCommentPicker(deps) {
 	 * @returns {HTMLButtonElement} 項目
 	 */
 	function createItem(className, label, url, fallback, onPick) {
-		const button = doc.createElement('button');
-		button.type = 'button';
-		button.className = `comment-picker-item ${className}`;
+		const button = btn(doc, `comment-picker-item ${className}`);
 		button.setAttribute('aria-label', label);
-		if (url) {
-			const image = doc.createElement('img');
-			setImageSrcAttribute(image, url);
-			image.setAttribute('alt', '');
-			// 画像が読めなくても何が置かれていたか分かるようにする (一覧側と同じ扱い)
-			image.addEventListener('error', () => { image.replaceWith(doc.createTextNode(fallback)); });
-			button.appendChild(image);
-		} else {
-			button.textContent = fallback;
-		}
+		// 画像が読めなくても何が置かれていたか分かるようにする (一覧側と同じ扱い)
+		if (url) button.appendChild(fallbackImage(doc, { url, alt: '', fallback }));
+		else button.textContent = fallback;
 		button.addEventListener('click', onPick);
 		return button;
 	}
@@ -191,31 +182,25 @@ export function createCommentPicker(deps) {
 	 * @returns {HTMLElement} パネル
 	 */
 	function buildPanel() {
-		const element = doc.createElement('div');
-		element.className = 'comment-picker';
+		const element = el(doc, 'div', 'comment-picker');
 		element.setAttribute('role', 'dialog');
 		element.setAttribute('aria-label', strings.commentPicker.PANEL);
 
-		const tablist = doc.createElement('div');
-		tablist.className = 'comment-picker-tabs';
+		const tablist = el(doc, 'div', 'comment-picker-tabs');
 		tablist.setAttribute('role', 'tablist');
 		tabs = TABS.map((one) => {
-			const tab = doc.createElement('button');
-			tab.type = 'button';
-			tab.className = 'comment-picker-tab';
+			const tab = btn(doc, 'comment-picker-tab', one.label);
 			tab.setAttribute('role', 'tab');
 			tab.setAttribute('id', `${IDS.TAB_PREFIX}${one.key}`);
 			tab.setAttribute('aria-controls', IDS.GRID);
 			tab.dataset.tab = one.key;
-			tab.textContent = one.label;
 			tab.addEventListener('click', () => { selectTab(one.key); });
 			tablist.appendChild(tab);
 			return tab;
 		});
 		element.appendChild(tablist);
 
-		grid = doc.createElement('div');
-		grid.className = 'comment-picker-grid';
+		grid = el(doc, 'div', 'comment-picker-grid');
 		// タブの中身であることを読み上げへ伝える。見出しは syncTabs() が選ばれたタブに向ける
 		grid.setAttribute('role', 'tabpanel');
 		grid.setAttribute('id', IDS.GRID);

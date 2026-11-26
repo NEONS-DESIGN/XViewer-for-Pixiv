@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { workIdFromLink, collectWorkIds, attachGridListener, collectGroupIds, startPageFromLink, findGridList } from '../../src/content/grid.js';
+import { workIdFromLink, collectWorkIds, attachGridListener, collectGroupIds, startPageFromLink, findGridList, idsFromLinks } from '../../src/content/grid.js';
 import { CARD_SELECTOR, CARD_LINK_SELECTOR } from '../../src/common/constants.js';
 import { el, makeCard, makeGrid } from '../helpers/card.js';
 
@@ -68,12 +68,29 @@ test('findGridList はグリッドが無ければ null', () => {
 	assert.equal(findGridList(fakeHome({ pickup: ['1'] }).doc), null);
 });
 
-test('findGridList は querySelectorAll が投げても null', (t) => {
+test('findGridList は querySelector が投げても null', (t) => {
 	// 失敗は警告に留める。テストの出力を汚さないよう差し替える (テストの終わりに自動で戻る)
 	const warn = t.mock.method(console, 'warn', () => {});
-	const doc = { querySelectorAll() { throw new Error('壊れた DOM'); } };
+	const doc = { querySelector() { throw new Error('壊れた DOM'); } };
 	assert.equal(findGridList(doc), null);
 	assert.equal(warn.mock.callCount(), 1);
+});
+
+test('findGridList は全リンクを集めず、最初に当たった 1 本で決める', () => {
+	// 継ぎ足しで数千枚になっても、呼ぶたびに全リンクの NodeList を作らない
+	const { doc, ul } = fakeHome({ pickup: ['9'], header: ['99'], grid: ['3', '2', '1'] });
+	doc.querySelectorAll = () => { throw new Error('全リンクを集めている'); };
+	assert.equal(findGridList(doc), ul);
+});
+
+test('findGridList は英語表示のピックアップ欄も飛ばす', () => {
+	// :not() は接頭辞ごとのセレクタへ 1 本ずつ付ける。結合した後ろへ付けると先頭の 1 本が裸で残る
+	const doc = el('#document');
+	doc.nodeType = DOCUMENT_NODE;
+	doc.appendChild(el('section')).appendChild(makeGrid([makeCard({ id: '9', localePrefix: '/en' })]).wrap);
+	const { wrap, ul } = makeGrid([makeCard({ id: '1', localePrefix: '/en' })]);
+	doc.appendChild(wrap);
+	assert.equal(findGridList(doc), ul);
 });
 
 test('collectWorkIds は document を渡されたら作品グリッドの ul だけを集める', () => {
@@ -410,4 +427,11 @@ test('collectGroupIds はフィードの #n 付きリンクも同じ作品とし
 test('collectGroupIds は他の作品が見つからなければ押した作品だけを返す', () => {
 	const link = nestedLink([['/artworks/7'], ['/artworks/7']]);
 	assert.deepEqual(collectGroupIds(link, ORIGIN), ['7']);
+});
+
+test('idsFromLinks は作品 ID を DOM 順に重複なく集め、作品リンクでないものは飛ばす', () => {
+	const links = ['/artworks/3', '/artworks/3#2', '/users/1/artworks/タグ', '/en/artworks/2', 'https://www.pixiv.net/artworks/1?x=1', null]
+		.map((href) => ({ getAttribute: () => href }));
+	assert.deepEqual(idsFromLinks(links, ORIGIN), ['3', '2', '1']);
+	assert.deepEqual(idsFromLinks([], ORIGIN), []);
 });

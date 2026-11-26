@@ -92,11 +92,14 @@ function tagNames(tags) {
  * 作品を今のユーザーが見られるか。
  * 作品の xRestrict とユーザー設定の xRestrict を比べて決める。
  * error フラグや urls では判定できないので、そちらを判定に使わないこと。
+ * 作品の xRestrict が整数でなければ (null / 欠け / 文字列など) 見られない側に倒す。
+ * (null <= 0 は true になるため、比べる前に弾く)
  * @param {{xRestrict: number}} work 対象の作品
  * @param {{xRestrict: number}|null} self ログイン中のユーザー設定。未ログインなら null
  * @returns {boolean} 見られるなら true
  */
 export function canView(work, self) {
+	if (!Number.isInteger(work?.xRestrict)) return false;
 	const limit = self ? self.xRestrict : DEFAULT_X_RESTRICT;
 	return work.xRestrict <= limit;
 }

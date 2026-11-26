@@ -33,7 +33,6 @@ import { warn } from '../../common/log.js';
  * @property {(workId: string) => void} setCurrentWorkId 今開いている作品を記録する
  * @property {() => string|null} currentWorkId 今開いている作品
  * @property {() => string|null} peek 最後に動いた向きの隣の作品。並びの端なら null (並びは広げない)
- * @property {() => 1|-1} lastDirection 最後に動いた向き。動く前と並びを差し替えた後は 1
  * @property {() => void} reset 閉じたときに状態を捨てる
  */
 
@@ -240,14 +239,6 @@ export function createNavigation(deps) {
 		 */
 		peek() {
 			return neighbor(lastMove);
-		},
-
-		/**
-		 * 最後に動いた向きを返す。
-		 * @returns {1|-1} 1 なら次、-1 なら前
-		 */
-		lastDirection() {
-			return lastMove;
 		},
 
 		/**
