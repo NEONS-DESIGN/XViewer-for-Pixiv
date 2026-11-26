@@ -42,14 +42,12 @@ scratch/
 /パッケージ化
 
 # ローカル管理の設計資料 / ストア素材 (リポジトリには置かない)
-/CLAUDE.md
 /SPEC.md
 /SITE_SPEC.md
 /UI_DESIGN_KIT.md
 /WEB_SPEC.md
 /docs/*.md
 /docs/modules/
-/docs/superpowers/
 /store/
 /store/README.md
 /store/screenshots/
@@ -59,5 +57,3 @@ scratch/
 /store/AMO.txt
 # AMO へ提出する物の作業場所 (ビルドの成果物と掲載情報)
 /store/amo/
-.claude/
-.superpowers/
